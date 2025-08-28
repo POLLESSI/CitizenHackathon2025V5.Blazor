@@ -1,0 +1,109 @@
+﻿@inject Blazored.Toast.Services.IToastService ToastService
+
+@* <button class="btn btn-primary" @onclick="() => ToastService.ShowSuccess(" It works !", "Success" )">
+    Test the toast
+</button> *@
+
+<h3>Traffic Condition Detail</h3>
+
+@if (CurrentTrafficCondition is not null)
+{
+    <div class="detail-container bordeaux-background">
+        <p>Latitude : @CurrentTrafficCondition.Latitude</p>
+        <p>Longitude : @CurrentTrafficCondition.Longitude</p>
+        <p>Date Condition : @CurrentTrafficCondition.DateCondition</p>
+        <p>Incident Type : @CurrentTrafficCondition.IncidentType</p>
+    </div>
+}
+else
+{
+    <p>Loading Traffic Conditions details...</p>
+}
+
+
+@code {
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@

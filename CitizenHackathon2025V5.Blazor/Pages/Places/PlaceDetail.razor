@@ -1,0 +1,29 @@
+﻿@inject Blazored.Toast.Services.IToastService ToastService
+
+@* <button class="btn btn-primary" @onclick="() => ToastService.ShowSuccess(" It works !", "Success" )">
+    Test the toast
+</button> *@
+
+<h3>Place Detail</h3>
+
+@if (CurrentPlace is not null)
+{
+    <div class="detail-container bordeaux-background">
+        <p>Location Name : @CurrentPlace.Name</p>
+        <p>Latitude : @CurrentPlace.Latitude</p>
+        <p>Longitude : @CurrentPlace.Longitude</p>
+        <p>Type : @CurrentPlace.Type</p>
+        <p>Indoor : @CurrentPlace.Indoor</p>
+        <p>Capacity : @CurrentPlace.Capacity</p>
+        <p>Tag : @CurrentPlace.Tag</p>
+    </div>
+}
+else
+{
+    <p>Loading places details...</p>
+}
+
+
+@code {
+
+}

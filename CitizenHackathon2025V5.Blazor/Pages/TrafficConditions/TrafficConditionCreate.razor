@@ -1,0 +1,111 @@
+﻿@using CitizenHackathon2025V5.Blazor.Client.Models;
+@using Microsoft.AspNetCore.Components.Forms
+
+<h3>Create Traffic Condition </h3>
+
+<EditForm Model="NewTrafficCondition" @OnSubmit="submit" class="form-control">
+    <div class="form-control-sm">
+        <label>Latitude : </label>
+        <InputNumber @bind-Value="NewTrafficCondition.Latitude"></InputNumber>
+    </div>
+    <div class="form-control-sm">
+        <label>Longitude :</label>
+        <InputNumber @bind-Value="NewTrafficCondition.Longitude"></InputNumber>
+    </div>
+    <div class="form-control-sm">
+        <label>DateCondition : </label>
+        <InputDate @bind-Value="NewTrafficCondition.DateCondition"></InputDate>
+    </div>
+    <div class="form-control-sm">
+        <label>IncidentType : </label>
+        <InputText @bind-Value="NewTrafficCondition.IncidentType"></InputText>
+    </div>
+    <div class="form-control-sm">
+        <label>Description : </label>
+        <InputText @bind-Value="NewTrafficCondition.Description"></InputText>
+    </div>
+    <div class="form-control-sm">
+        <label>Level : </label>
+        <InputText @bind-Value="NewTrafficCondition.Level"></InputText>
+    </div>
+    <button type="submit" class="btn btn-success">Submit</button>
+</EditForm>
+
+@code {
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@

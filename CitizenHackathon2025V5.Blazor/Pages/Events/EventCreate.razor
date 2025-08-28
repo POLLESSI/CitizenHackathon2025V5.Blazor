@@ -1,0 +1,115 @@
+﻿@using CitizenHackathon2025V5.Blazor.Client.Models;
+@using Microsoft.AspNetCore.Components.Forms
+
+<h3>Event Create</h3>
+
+<EditForm Model="NewEvent" @OnSubmit="submit" class="form-control">
+    <div class="form-control-sm">
+        <label>Name : </label>
+        <InputText @bind-Value="NewEvent.Name"></InputText>
+    </div>
+    <div class="form-control-sm">
+        <label>Latitude :</label>
+        <InputNumber @bind-Value="NewEvent.Latitude"></InputNumber>
+    </div>
+    <div class="form-control-sm">
+        <label>Longitude : </label>
+        <InputNumber @bind-Value="NewEvent.Longitude"></InputNumber>
+    </div>
+    <div class="form-control-sm">
+        <label>DateEvent : </label>
+        <InputDate @bind-Value="NewEvent.DateEvent"></InputDate>
+    </div>
+    <div class="form-control-sm">
+        <label>ExpectedCrowd : </label>
+        <InputNumber @bind-Value="NewEvent.ExpectedCrowd"></InputNumber>
+    </div>
+    <div class="form-control-sm">
+        <label>IsOutDoor : </label>
+        <InputNumber @bind-Value="NewEvent.IsOutdoor"></InputNumber>
+    </div>
+    <button type="submit" class="btn btn-success">Submit</button>
+</EditForm>
+
+@code {
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@

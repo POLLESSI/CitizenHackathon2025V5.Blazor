@@ -1,0 +1,23 @@
+﻿@inject Blazored.Toast.Services.IToastService ToastService
+
+@* <button class="btn btn-primary" @onclick="() => ToastService.ShowSuccess(" It works !", "Success" )">
+    Test the toast
+</button> *@
+
+<h3>Event Detail</h3>
+
+@* @if (CurrentEvent is not null)
+{
+    <div class="detail-container bordeaux-background">
+        <p>Name : @CurrentEvent.Name</p>
+        <p>Authority : @CurrentEvent.Latitude</p>
+        <p>License Number : @CurrentEvent.Longitude</p>
+        <p>URL : @CurrentEvent.DateEvent</p>
+        <p>Date : @CurrentEvent.ExpectedCrowd</p>
+        <p>Is Outdoor : @CurrentEvent.IsOutdoor</p>
+    </div>
+}
+ *@else
+{
+<p>Loading Certification details...</p>
+}

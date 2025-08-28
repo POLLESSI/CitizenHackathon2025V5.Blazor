@@ -1,0 +1,129 @@
+﻿@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.Enums
+@using CitizenHackathon2025V5.Blazor.Client.Components
+@using Microsoft.AspNetCore.SignalR.Client
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject Blazored.Toast.Services.IToastService ToastService
+@implements IAsyncDisposable
+
+@* <button class="btn btn-primary" @onclick="() => ToastService.ShowSuccess(" It works !", "Success" )">
+    Test the toast
+</button> *@
+
+<div class="filter-buttons">
+    <button @onclick="() => FilterLevel = null">Tous</button>
+    <button @onclick="() => FilterLevel = TrafficLevel.Low">Léger</button>
+    <button @onclick="() => FilterLevel = TrafficLevel.Medium">Modéré</button>
+    <button @onclick="() => FilterLevel = TrafficLevel.High">Sévère</button>
+</div>
+
+<LeafletMapComponent @ref="map" />
+
+@code {
+    private HubConnection? hubConnection;
+    private LeafletMapComponent map = default!;
+    private TrafficLevel? FilterLevel = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Nav.ToAbsoluteUri("/TrafficHub"))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<List<TrafficEventDTO>>("ReceiveTrafficEvents", async events =>
+        {
+            var filtered = FilterLevel is null
+                ? events
+                : events.Where(e => e.Level == FilterLevel.Value).ToList();
+
+            await JS.InvokeVoidAsync("mapInterop.updateTrafficMarkers", filtered);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+            await hubConnection.DisposeAsync();
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@

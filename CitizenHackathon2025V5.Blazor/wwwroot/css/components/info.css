@@ -1,0 +1,163 @@
+﻿.oz-info {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
+    padding: 1rem 1.5rem;
+    margin: 1rem 0;
+    color: #fff;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
+}
+
+    .oz-info h2 {
+        margin-bottom: 0.5rem;
+        font-size: 1.25rem;
+        color: var(--color-primary-light);
+    }
+
+    .oz-info p {
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+
+    .oz-info .icon {
+        font-size: 1.2rem;
+        color: var(--color-secondary);
+        margin-right: 0.5rem;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/

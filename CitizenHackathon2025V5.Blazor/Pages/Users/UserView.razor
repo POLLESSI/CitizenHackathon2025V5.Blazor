@@ -1,0 +1,123 @@
+﻿@page "/userview"
+@* @using CitizenHackathon2025V5.Blazor.Client.Services
+@inject UserService UserService *@
+
+<h3>Users</h3>
+
+@if (CurrentUser != null)
+{
+    <p>Connecté en tant que: @CurrentUser.Email (@CurrentUser.Role)</p>
+    <button @onclick="Logout">Logout</button>
+
+    <ul>
+        @foreach (var user in Users)
+        {
+            <li @onclick="() => SelectUser(user)" style="cursor:pointer;@(SelectedUser == user ? " font-weight:bold;" : "")">
+                @user.Email (@user.Role)
+            </li>
+        }
+    </ul>
+
+    @if (SelectedUser != null)
+    {
+        <div class="selected-user">
+            <h4>User details:</h4>
+            <p>Email: @SelectedUser.Email</p>
+            <p>Role: @SelectedUser.Role</p>
+        </div>
+    }
+}
+else
+{
+    <p>Loading...</p>
+}
+
+<button @onclick="SaveToken">Sauvegarder Token</button>
+<button @onclick="LoadToken">Lire Token</button>
+<button @onclick="Logout">Logout</button>
+
+<p>Token actuel : @_token</p>
+
+@code {
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@

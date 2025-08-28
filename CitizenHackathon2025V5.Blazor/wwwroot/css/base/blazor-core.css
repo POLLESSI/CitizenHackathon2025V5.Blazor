@@ -1,0 +1,154 @@
+﻿#blazor-error-ui {
+    background: var(--color-danger);
+    color: white;
+    padding: 0.5rem 1rem;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    display: none;
+}
+
+    #blazor-error-ui.show {
+        display: block;
+    }
+
+    #blazor-error-ui button {
+        background: none;
+        border: none;
+        color: white;
+        float: right;
+        font-size: 1.2rem;
+        cursor: pointer;
+    }
+
+.blazor-error-boundary {
+    border: 1px dashed var(--color-danger);
+    padding: var(--spacing-md);
+    background-color: rgba(220, 53, 69, 0.1);
+}
+
+    .blazor-error-boundary::before {
+        content: "Blazor Error:";
+        color: var(--color-danger);
+        font-weight: bold;
+        display: block;
+        margin-bottom: 0.5rem;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/

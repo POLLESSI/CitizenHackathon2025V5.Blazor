@@ -1,0 +1,94 @@
+﻿/* Basic Pulsating Circle Style */
+.traffic-icon .pulse-green,
+.traffic-icon .pulse-orange,
+.traffic-icon .pulse-red,
+.traffic-icon .pulse-gray {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    position: relative;
+    box-shadow: 0 0 6px rgba(0,0,0,0.1);
+}
+
+/* Pulse effect via animation */
+.traffic-icon .pulse-green {
+    background-color: #28a745; /* bright green */
+    animation: pulse-green 2s infinite;
+    box-shadow: 0 0 8px #28a745aa;
+}
+
+.traffic-icon .pulse-orange {
+    background-color: #fd7e14; /* bright orange */
+    animation: pulse-orange 2s infinite;
+    box-shadow: 0 0 8px #fd7e14aa;
+}
+
+.traffic-icon .pulse-red {
+    background-color: #dc3545; /* bright red */
+    animation: pulse-red 2s infinite;
+    box-shadow: 0 0 8px #dc3545aa;
+}
+
+.traffic-icon .pulse-gray {
+    background-color: #6c757d; /* neutral gray */
+    animation: pulse-gray 2s infinite;
+    box-shadow: 0 0 8px #6c757daa;
+}
+
+/* Specific pulse animations */
+
+@keyframes pulse-green {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.9;
+        box-shadow: 0 0 8px #28a745aa;
+    }
+
+    50% {
+        transform: scale(1.4);
+        opacity: 0.4;
+        box-shadow: 0 0 20px #28a74555;
+    }
+}
+
+@keyframes pulse-orange {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.9;
+        box-shadow: 0 0 8px #fd7e14aa;
+    }
+
+    50% {
+        transform: scale(1.4);
+        opacity: 0.4;
+        box-shadow: 0 0 20px #fd7e1455;
+    }
+}
+
+@keyframes pulse-red {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.9;
+        box-shadow: 0 0 8px #dc3545aa;
+    }
+
+    50% {
+        transform: scale(1.4);
+        opacity: 0.4;
+        box-shadow: 0 0 20px #dc354555;
+    }
+}
+
+@keyframes pulse-gray {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.7;
+        box-shadow: 0 0 8px #6c757daa;
+    }
+
+    50% {
+        transform: scale(1.4);
+        opacity: 0.3;
+        box-shadow: 0 0 20px #6c757d55;
+    }
+}

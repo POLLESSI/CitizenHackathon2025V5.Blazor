@@ -1,0 +1,130 @@
+﻿@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.Enums
+@inject IJSRuntime JSRuntime
+<h3>Leaflet Map Component</h3>
+
+<div id="leaflet-map" style="height: 600px; width: 100%;"></div>
+<LeafletMapComponent @ref="mapComponent" />
+
+@code {
+    // Expose public methods to be called via @ref
+    private bool mapInitialized = false;
+    private LeafletMapComponent? mapComponent;
+
+
+    // Appelée via @ref
+    public async Task UpdateMarkersAsync(List<TrafficEventDTO> events)
+    {
+        if (!mapInitialized)
+        {
+            await JSRuntime.InvokeVoidAsync("mapInterop.initMap");
+            mapInitialized = true;
+        }
+
+        await JSRuntime.InvokeVoidAsync("mapInterop.updateTrafficMarkers", events);
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && mapComponent is not null)
+        {
+            var demoEvents = new List<TrafficEventDTO>
+            {
+                new()
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    Type = "Serious accident",
+                    Description = "Accident on the E42",
+                    Latitude = 48.8566,
+                    Longitude = 2.3522,
+                    StartTime = DateTime.UtcNow,
+                    DelayInSeconds = 3600,
+                    Level = (TrafficLevel)3,
+
+                }
+            };
+
+            await mapComponent.UpdateMarkersAsync(demoEvents);
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@

@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36414.22
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CitizenHackathon2025V5.Blazor.Client", "CitizenHackathon2025V5.Blazor\CitizenHackathon2025V5.Blazor.Client.csproj", "{C195B4FD-428B-437D-A47E-BD48807E05BB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution elements", "Solution elements", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
+	ProjectSection(SolutionItems) = preProject
+		Deploiement.txt = Deploiement.txt
+		Readme.md = Readme.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C195B4FD-428B-437D-A47E-BD48807E05BB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C195B4FD-428B-437D-A47E-BD48807E05BB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C195B4FD-428B-437D-A47E-BD48807E05BB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C195B4FD-428B-437D-A47E-BD48807E05BB}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {45D8F293-4224-4F1F-902A-89D8EE268B1C}
+	EndGlobalSection
+EndGlobal

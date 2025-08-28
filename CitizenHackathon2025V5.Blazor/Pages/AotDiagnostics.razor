@@ -1,0 +1,108 @@
+﻿@page "/aot-diagnostics"
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+
+<h3>🔍 Diagnostic Blazor AOT</h3>
+
+<p>Accessibility test of <code>dotnet.native.wasm</code> :</p>
+
+@if (CheckInProgress)
+{
+    <p>⏳ Verification in progress...</p>
+}
+else if (!string.IsNullOrEmpty(StatusMessage))
+{
+    <p><strong>@StatusMessage</strong></p>
+}
+
+@code {
+    private bool CheckInProgress = true;
+    private string? StatusMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var baseUri = Navigation.BaseUri.TrimEnd('/');
+            var ok = await JS.InvokeAsync<bool>("checkWasmAccess", $"{baseUri}/_framework/dotnet.native.wasm");
+            StatusMessage = ok
+                ? "✅ The dotnet.native.wasm file is accessible from the browser."
+                : "❌ The dotnet.native.wasm file was not found or was inaccessible.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"❌ JS error: {ex.Message}";
+        }
+
+        CheckInProgress = false;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/ *@

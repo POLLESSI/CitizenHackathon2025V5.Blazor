@@ -1,0 +1,162 @@
+﻿/* ============================================
+   SITE.VARIABLES.CSS
+   Centralizes colors, contrasts and themes
+   ============================================ */
+
+:root {
+    --font-main: 'Segoe UI', sans-serif;
+    /* General palette */
+    --color-primary: #ffa726;
+    --color-secondary: #a6c1ee;
+    --color-accent: #fbc2eb;
+    --color-text: #222;
+    --color-bg: #fff;
+    --color-border: #444;
+}
+
+/* THEME: Dawn */
+.theme-dawn {
+    --color-bg: #fef6ff;
+    --color-primary: #fbc2eb;
+    --color-secondary: #a6c1ee;
+    --color-text: #3c3c3c;
+}
+
+/* THEME: Day */
+.theme-day {
+    --color-bg: #ffffff;
+    --color-primary: #a1c4fd;
+    --color-secondary: #c2e9fb;
+    --color-text: #222;
+}
+
+/* THEME: Sunset */
+.theme-sunset {
+    --color-bg: #fff3e0;
+    --color-primary: #fda085;
+    --color-secondary: #f6d365;
+    --color-text: #2e1c0b;
+}
+
+/* THEME: Night */
+.theme-night {
+    --color-bg: #121212;
+    --color-primary: #434343;
+    --color-secondary: #000000;
+    --color-text: #eee;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/

@@ -1,0 +1,108 @@
+﻿/* Optional: Custom variant for paragraphs */
+.detail-container.maroon p {
+    background: rgba(135, 206, 250, 0.1);
+    border-left: 3px solid deepskyblue;
+    border-radius: 6px;
+    transition: transform 0.2s ease, background-color 0.3s ease;
+}
+
+    .detail-container.maroon p:hover {
+        background-color: rgba(135, 206, 250, 0.2);
+        transform: scale(1.01);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/

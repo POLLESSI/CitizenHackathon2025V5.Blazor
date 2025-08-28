@@ -1,0 +1,129 @@
+﻿@page "/outzen"
+@using CitizenHackathon2025V5.Blazor.Client.Services
+@using CitizenHackathon2025V5.Blazor.Client.Shared.CrowdInfo
+@using CitizenHackathon2025V5.Blazor.Client.Shared.Suggestion
+@inject IOutZenSignalRFactory OutZenFactory
+
+<h3>OutZen Live Feed</h3>
+
+@if (crowdInfo != null)
+{
+    <p><b>Crowd:</b> @crowdInfo.CrowdLevel - @crowdInfo.Density</p>
+}
+
+@if (suggestions != null)
+{
+    <ul>
+        @foreach (var s in suggestions)
+        {
+            <li>@s.Title (@s.DistanceKm km)</li>
+        }
+    </ul>
+}
+
+@code {
+    private CrowdInfoDTO? crowdInfo;
+    private List<SuggestionDTO>? suggestions;
+    private OutZenSignalRService? _signalR;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 🔹 Use the factory
+        _signalR = await OutZenFactory.CreateAsync();
+
+        // 🔹 Subscribe to events
+        _signalR.OnCrowdInfoUpdated += dto =>
+        {
+            crowdInfo = dto;
+            InvokeAsync(StateHasChanged);
+        };
+
+        _signalR.OnSuggestionsUpdated += list =>
+        {
+            suggestions = list;
+            InvokeAsync(StateHasChanged);
+        };
+
+        // 🔹 Initialize the connection
+        await _signalR.InitializeOutZenAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_signalR != null)
+        {
+            await _signalR.DisposeAsync();
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@

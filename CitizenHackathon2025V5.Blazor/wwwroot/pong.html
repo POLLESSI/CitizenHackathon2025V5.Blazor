@@ -1,0 +1,482 @@
+﻿<!DOCTYPE html>
+<html lang="fr-BE">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pong — 2 joueurs (HTML5)</title>
+    <!-- Modern font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --glass-bg: rgba(255,255,255,0.12);
+            --glass-brd: rgba(255,255,255,0.35);
+            --text: #f7f7fb;
+            --shadow: rgba(0,0,0,0.25);
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Poppins",system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+            color: var(--text);
+            /* Animated gradient background */
+            background: linear-gradient(120deg, #0f1021, #1b1e4b, #2a0d4a, #103d5d, #0f1021);
+            background-size: 300% 300%;
+            animation: moveBg 18s ease-in-out infinite;
+            overflow: hidden;
+        }
+
+        @keyframes moveBg {
+            0% {
+                background-position: 0% 50%
+            }
+
+            50% {
+                background-position: 100% 50%
+            }
+
+            100% {
+                background-position: 0% 50%
+            }
+        }
+
+        .wrap {
+            position: relative;
+            min-height: 100%;
+            display: grid;
+            place-items: center;
+            padding: clamp(10px, 2vw, 24px);
+        }
+
+        /* Frosted glass scoreboard */
+        .hud {
+            position: fixed;
+            inset: 18px 18px auto 18px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            backdrop-filter: blur(10px);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-brd);
+            box-shadow: 0 6px 18px var(--shadow);
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .brand {
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            opacity: 0.9
+        }
+
+        .score {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            font-weight: 800;
+            font-size: clamp(24px, 4vw, 36px);
+            text-shadow: 0 6px 18px rgba(0,0,0,0.35);
+        }
+
+            .score .dash {
+                opacity: .35;
+                font-weight: 600
+            }
+
+        .hint {
+            font-size: 12px;
+            opacity: .8
+        }
+
+        /* Play area */
+        .stage {
+            position: relative;
+            width: min(960px, 92vw);
+            aspect-ratio: 16/9;
+            border-radius: 24px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.08);
+            overflow: hidden;
+            background: radial-gradient(1200px 600px at 50% 50%, rgba(255,255,255,0.06), transparent 60%);
+        }
+
+        canvas {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* Message center */
+        .centerMsg {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            pointer-events: none;
+            text-align: center;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            text-shadow: 0 6px 18px rgba(0,0,0,0.5);
+        }
+
+            .centerMsg .bubble {
+                background: var(--glass-bg);
+                border: 1px solid var(--glass-brd);
+                border-radius: 18px;
+                padding: 16px 20px;
+                box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+            }
+
+        .kbd {
+            display: inline-grid;
+            place-items: center;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid rgba(255,255,255,.3);
+            background: rgba(255,255,255,.08);
+            font-weight: 700;
+        }
+
+        /* Bright dotted center line */
+        .net {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            transform: translateX(-50%);
+            background: repeating-linear-gradient(to bottom, rgba(255,255,255,.65) 0 14px, transparent 14px 28px);
+            filter: drop-shadow(0 0 6px rgba(255,255,255,.5));
+            opacity: .6
+        }
+
+        /* Mobile note */
+        @media (max-width: 640px) {
+            .hint {
+                display: none
+            }
+
+            .hud {
+                height: auto;
+                padding: 8px 12px
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="hud">
+            <div class="brand">PONG<span style="opacity:.6">·</span>NEO</div>
+            <div class="score"><span id="p1">0</span><span class="dash">—</span><span id="p2">0</span></div>
+            <div class="hint">J1: <span class="kbd">W</span>/<span class="kbd">S</span> · J2: <span class="kbd">↑</span>/<span class="kbd">↓</span> · <span class="kbd">Espace</span> démarrer / pause</div>
+        </div>
+
+        <div class="stage" id="stage">
+            <div class="net" aria-hidden="true"></div>
+            <canvas id="game" width="960" height="540"></canvas>
+            <div class="centerMsg" id="centerMsg"><div class="bubble">Appuie sur <span class="kbd">Espace</span> pour jouer</div></div>
+        </div>
+    </div>
+
+    <script>
+    (() => {
+            const canvas = document.getElementById('game');
+            const ctx = canvas.getContext('2d');
+            const stage = document.getElementById('stage');
+            const msg = document.getElementById('centerMsg');
+            const sP1 = document.getElementById('p1');
+            const sP2 = document.getElementById('p2');
+
+            // Ratio management (CSS scaling, canvas keeps its logical size)
+            const resize = () => {
+                // nothing to do here because we leave the canvas in logical pixels, CSS manages the display
+            };
+            addEventListener('resize', resize);
+
+            // Gradient colors
+            function paddleGradient(x, y, w, h) {
+                const g = ctx.createLinearGradient(x, y, x + w, y + h);
+                g.addColorStop(0, '#66d2ff');
+                g.addColorStop(1, '#8a7dff');
+                return g;
+            }
+            function ballGradient(x, y, r) {
+                const g = ctx.createRadialGradient(x, y, 2, x, y, r);
+                g.addColorStop(0, '#ffffff');
+                g.addColorStop(1, '#80e7ff');
+                return g;
+            }
+
+            // Entities
+            const field = { w: canvas.width, h: canvas.height, wall: 14 };
+            const paddle = (x) => ({ x, y: field.h / 2 - 50, w: 14, h: 100, speed: 420, vy: 0 });
+            const p1 = paddle(36), p2 = paddle(field.w - 36 - 14);
+            const ball = { x: field.w / 2, y: field.h / 2, r: 9, vx: 0, vy: 0, speed: 360 };
+
+            // Light trail: keep a history of positions
+            const trail = []; const TRAIL_MAX = 16;
+
+            let running = false; let lastTime = 0; let p1Score = 0, p2Score = 0;
+
+            function serve(toLeft = false) {
+                ball.x = field.w / 2; ball.y = field.h / 2;
+                const angle = (Math.random() * 0.6 - 0.3) + (toLeft ? Math.PI : 0);
+                const dir = Math.random() < 0.5 ? -1 : 1; // vertical hazard
+                const speed = 330;
+                ball.vx = Math.cos(angle) * speed * (toLeft ? -1 : 1);
+                ball.vy = Math.sin(angle) * speed * dir * 0.6;
+                ball.speed = Math.hypot(ball.vx, ball.vy);
+                trail.length = 0;
+            }
+
+            // Keyboard inputs
+            const keys = new Set();
+            addEventListener('keydown', (e) => {
+                if (["w", "s", "ArrowUp", "ArrowDown", " "].includes(e.key)) e.preventDefault();
+                if (e.key === ' ') { running = !running; msg.style.display = running ? 'none' : 'grid'; if (running && ball.vx === 0 && ball.vy === 0) serve(Math.random() < 0.5); return; }
+                keys.add(e.key);
+            });
+            addEventListener('keyup', (e) => { keys.delete(e.key); });
+
+            function update(dt) {
+                // Player movements
+                p1.vy = (keys.has('w') ? -1 : 0) + (keys.has('s') ? 1 : 0);
+                p2.vy = (keys.has('ArrowUp') ? -1 : 0) + (keys.has('ArrowDown') ? 1 : 0);
+                p1.y += p1.vy * p1.speed * dt; p2.y += p2.vy * p2.speed * dt;
+                // Terminals
+                for (const p of [p1, p2]) { p.y = Math.max(field.wall, Math.min(field.h - field.wall - p.h, p.y)); }
+
+                // Ball
+                ball.x += ball.vx * dt; ball.y += ball.vy * dt;
+
+                // Up/down bounces
+                if (ball.y - ball.r <= field.wall) { ball.y = field.wall + ball.r; ball.vy *= -1; }
+                if (ball.y + ball.r >= field.h - field.wall) { ball.y = field.h - field.wall - ball.r; ball.vy *= -1; }
+
+                // Snowshoe collision (AABB + visual rounding)
+                const hitPaddle = (p) => (
+                    ball.x + ball.r > p.x && ball.x - ball.r < p.x + p.w &&
+                    ball.y + ball.r > p.y && ball.y - ball.r < p.y + p.h
+                );
+
+                // P1
+                if (ball.vx < 0 && hitPaddle(p1)) {
+                    ball.x = p1.x + p1.w + ball.r;
+                    const rel = (ball.y - (p1.y + p1.h / 2)) / (p1.h / 2); // -1 .. 1
+                    const bounce = rel * 0.7; // control the angle
+                    const sp = Math.min(900, Math.hypot(ball.vx, ball.vy) * 1.05); // accelerated
+                    const angle = bounce * (Math.PI / 3); // max angle ~60°
+                    ball.vx = Math.cos(angle) * sp;
+                    ball.vy = Math.sin(angle) * sp;
+                }
+                // P2
+                if (ball.vx > 0 && hitPaddle(p2)) {
+                    ball.x = p2.x - ball.r;
+                    const rel = (ball.y - (p2.y + p2.h / 2)) / (p2.h / 2);
+                    const bounce = rel * 0.7;
+                    const sp = Math.min(900, Math.hypot(ball.vx, ball.vy) * 1.05);
+                    const angle = Math.PI - bounce * (Math.PI / 3);
+                    ball.vx = Math.cos(angle) * sp;
+                    ball.vy = Math.sin(angle) * sp;
+                }
+
+                // Score
+                if (ball.x < -ball.r) { p2Score++; sP2.textContent = p2Score; running = false; msg.style.display = 'grid'; msg.firstElementChild.textContent = 'Point J2 ! Espace pour servir'; serve(false); }
+                if (ball.x > field.w + ball.r) { p1Score++; sP1.textContent = p1Score; running = false; msg.style.display = 'grid'; msg.firstElementChild.textContent = 'Point J1 ! Espace pour servir'; serve(true); }
+
+                // Drag: push position
+                trail.push({ x: ball.x, y: ball.y });
+                if (trail.length > TRAIL_MAX) trail.shift();
+            }
+
+            function roundRect(x, y, w, h, r) {
+                const rr = Math.min(r, Math.min(w, h) / 2);
+                ctx.beginPath();
+                ctx.moveTo(x + rr, y);
+                ctx.arcTo(x + w, y, x + w, y + h, rr);
+                ctx.arcTo(x + w, y + h, x, y + h, rr);
+                ctx.arcTo(x, y + h, x, y, rr);
+                ctx.arcTo(x, y, x + w, y, rr);
+                ctx.closePath();
+            }
+
+            function draw() {
+                // Soft vignette effect
+                ctx.clearRect(0, 0, field.w, field.h);
+
+                // Upper/lower walls
+                ctx.save();
+                ctx.fillStyle = 'rgba(255,255,255,0.22)';
+                roundRect(0, 0, field.w, field.wall, 10); ctx.fill();
+                roundRect(0, field.h - field.wall, field.w, field.wall, 10); ctx.fill();
+                ctx.restore();
+
+                // Snowshoes (gradient + shadow)
+                for (const p of [p1, p2]) {
+                    ctx.save();
+                    ctx.fillStyle = paddleGradient(p.x, p.y, p.w, p.h);
+                    ctx.shadowColor = 'rgba(102,210,255,0.6)';
+                    ctx.shadowBlur = 12; ctx.shadowOffsetY = 0;
+                    roundRect(p.x, p.y, p.w, p.h, 8); ctx.fill();
+                    ctx.restore();
+                }
+
+                // Light trail of the ball
+                ctx.save();
+                for (let i = 0; i < trail.length; i++) {
+                    const t = trail[i];
+                    const alpha = (i + 1) / trail.length * 0.6; // older = more transparent
+                    ctx.globalAlpha = alpha * 0.7;
+                    ctx.shadowColor = 'rgba(128, 231, 255, 0.9)';
+                    ctx.shadowBlur = 18 * (i / trail.length);
+                    ctx.beginPath();
+                    ctx.arc(t.x, t.y, ball.r * (0.9 + i / trail.length * 0.4), 0, Math.PI * 2);
+                    ctx.fillStyle = ballGradient(t.x, t.y, ball.r * 1.2);
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                // Ball (soft edge + glow)
+                ctx.save();
+                ctx.shadowColor = 'rgba(180, 240, 255, 0.95)';
+                ctx.shadowBlur = 24;
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+                ctx.fillStyle = ballGradient(ball.x, ball.y, ball.r);
+                ctx.fill();
+                ctx.restore();
+
+                // Decorative depth lines
+                ctx.save();
+                ctx.globalAlpha = 0.06;
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                for (let i = 1; i < 6; i++) {
+                    const inset = i * 20;
+                    roundRect(inset, inset, field.w - inset * 2, field.h - inset * 2, 20);
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            function loop(t) {
+                const now = t / 1000; const dt = Math.min(0.033, now - lastTime || 0); lastTime = now;
+                if (running) { update(dt); }
+                draw();
+                requestAnimationFrame(loop);
+            }
+
+            // Initial setup
+            serve(Math.random() < 0.5);
+            requestAnimationFrame(loop);
+        })();</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--/*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/-->

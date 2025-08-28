@@ -1,0 +1,139 @@
+﻿@inject IJSRuntime JSRuntime
+@inject NavigationManager NavManager
+
+@if (showDialog)
+{
+    <div class="rgpd-overlay">
+        <div class="rgpd-modal">
+            <h2>Consent to data collection</h2>
+            <p>
+                OutZen provides you with real-time information on weather, traffic, crowds, and suggestions for nearby activities.
+                This data is linked to the event you're viewing, never to your personal location.
+            </p>
+            <p>
+                OutZen vous fournit des informations en temps réel sur la météo, le trafic, l'affluence et des suggestions d'activités à proximité.
+                Ces données sont liées à l'événement que vous consultez, jamais à votre localisation.
+            </p>
+            <p>
+                OutZen biedt je realtime informatie over het weer, verkeer, drukte en suggesties voor activiteiten in de buurt.
+                Deze gegevens zijn gekoppeld aan het evenement dat je bekijkt, nooit aan je persoonlijke locatie.
+            </p>
+            <p>+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++</p>
+            <p>
+                Do you agree to OutZen analyzing this data to offer you the best alternatives?
+            </p>
+            <p>
+                Acceptez-vous qu'OutZen ces données pour vous proposer les meilleures alternatives ?
+            </p>
+            <p>
+                Accepteer je dat OutZen deze gegevens analyseert om je de beste alternatieven te bieden?
+            </p>
+            <div class="rgpd-actions">
+                <button @onclick="Accept" class="accept">I accept</button>
+                <button @onclick="Decline" class="decline">I refuse</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool showDialog = false;
+    private const string StorageKey = "OutZenConsentGiven";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var value = await JSRuntime.InvokeAsync<string>("localStorage.getItem", StorageKey);
+        showDialog = string.IsNullOrWhiteSpace(value);
+    }
+
+    private async Task Accept()
+    {
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", StorageKey, "true");
+        showDialog = false;
+        StateHasChanged();
+    }
+
+    private void Decline()
+    {
+        // Redirects to a neutral page
+        NavManager.NavigateTo("https://wallonieenpoche.be");
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/ *@

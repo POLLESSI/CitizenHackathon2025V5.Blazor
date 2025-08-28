@@ -1,0 +1,211 @@
+﻿@page "/presentation"
+@inject IJSRuntime JS
+@inject Blazored.Toast.Services.IToastService ToastService
+
+@* <button class="btn btn-primary" @onclick="() => ToastService.ShowSuccess(" It works !", "Success" )">
+    Test the toast
+</button> *@
+
+<button class="btn btn-success" @onclick="TestSignalR">
+    🧪 Tester la réception SignalR
+</button>
+
+<PageTitle>Presentation - OutZen</PageTitle>
+
+<div class="presentation-container">
+    <div class="hero-section">
+        <h1 class="scroll-reveal title">Welcome to OutZen</h1>
+        <p class="lead">
+            Your smart companion to help you fully enjoy your sightseeing trips, stress-free.
+        </p>
+    </div>
+
+    <section class="features">
+        <h2>What OutZen does</h2>
+        <ul>
+            <li>
+                📍 <strong>Real-time suggestions</strong> depending on your location and preferences.
+            </li>
+            <li>
+                🌤️ <strong>Weather Analysis</strong> to adapt your activities to the climate.
+            </li>
+            <li>
+                🚦 <strong>Traffic status</strong> to avoid traffic jams and optimize your journey.
+            </li>
+            <li>
+                👥 <strong>Crowd density</strong> analyzed to avoid overloaded places.
+            </li>
+        </ul>
+    </section>
+
+    <section class="technos">
+        <h2>Technologies used</h2>
+        <p>
+            OutZen uses artificial intelligence connected to real-time weather, traffic, and crowd APIs to offer you seamless and enjoyable alternatives.
+        </p>
+    </section>
+    <section class="scroll-reveal description">
+        <p>
+            OutZen is a smart app that guides you toward the best travel experience.
+            By analyzing travel times, traffic, and weather in real time, it offers optimized suggestions to avoid crowds and make the most of your outing.
+        </p>
+    </section>
+
+    <section class="scroll-reveal simulator">
+        <h2>Crowd simulator</h2>
+        <input type="range" min="0" max="100" @bind="CrowdLevel" />
+        <p class="level-indicator" style="color:@LevelColor">Affluence actuelle : @CrowdLevel%</p>
+        <div class="bar" style="width:@CrowdLevel%; background-color:@LevelColor;"></div>
+    </section>
+
+    <section class="scroll-reveal map-container">
+        <h2>Interactive map</h2>
+        <div id="leafletMap" class="map"></div>
+    </section>
+
+    <section class="call-to-action">
+        <h2>Why choose OutZen?</h2>
+        <p>
+            Because a successful trip starts with good information.
+        </p>
+        <button class="cta-button" @onclick="NavigateHome">Back to home</button>
+    </section>
+</div>
+<select @onchange="ChangeTheme">
+    <option value="theme-ultraluxe">Ultra Luxe</option>
+</select>
+
+<div id="map"></div>
+
+<MapSimulator />
+
+@code {
+#nullable disable
+    [Inject]
+    NavigationManager Navigation { get; set; }
+
+    private void NavigateHome()
+    {
+        Navigation.NavigateTo("/");
+    }
+    private int CrowdLevel { get; set; } = 30;
+
+    private string LevelColor =>
+        CrowdLevel < 30 ? "green" :
+        CrowdLevel < 70 ? "orange" : "red";
+    private async Task ChangeTheme(ChangeEventArgs e)
+    {
+        await JS.InvokeVoidAsync("setTheme", e.Value?.ToString());
+    }
+    private async Task TestSignalR()
+    {
+        var fakeData = new
+        {
+            latitude = 50.895,
+            longitude = 4.3415,
+            level = 2,
+            description = "⚠️ Cork simulation",
+            timestamp = DateTime.Now
+        };
+
+        await JS.InvokeVoidAsync("trafficInterop.updateTrafficMarkers", new[] { fakeData });
+    }
+    // protected override async Task OnAfterRenderAsync(bool firstRender)
+    // {
+    //     if (!firstRender) return;
+           
+    //     try
+    //     {
+    //         await JS.InvokeVoidAsync("initializeLeafletMap");
+    //         await JS.InvokeVoidAsync("initScrollAnimations");
+    //         await JS.InvokeVoidAsync("startOutzenConnection");
+    //     }
+           // catch (Exception ex)
+           //  {
+           //      Console.WriteLine("Erreur JS interop : " + ex.Message);
+           //  }
+    // }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Console.WriteLine("Presentation.razor: JS initialisation via init.js");
+            await JS.InvokeVoidAsync("import", "./js/init.js");
+            await JS.InvokeVoidAsync("outzen.init");
+        }
+    }
+    [JSInvokable]
+    public async Task OnCrowdInfoReceived(string dataJson)
+    {
+        // Deserializes and processes received SignalR data
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    @* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@

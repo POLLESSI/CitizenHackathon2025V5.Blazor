@@ -1,0 +1,186 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#4a90e2" />
+    <title>📴 Offline - OutZen</title>
+    <link rel="icon" href="/icons/icon-192.png" type="image/png" />
+    <style>
+        h1 {
+            color: #333;
+        }
+
+        body {
+            font-family: sans-serif;
+            padding: 2rem;
+            background: #f3f3f3;
+            text-align: center;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #f8f9fa;
+            color: #333;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #offlineCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: -1;
+            background: #f3f3f3;
+        }
+
+        .icon {
+            width: 96px;
+            height: 96px;
+            margin-bottom: 1rem;
+        }
+
+        .message {
+            font-size: 1.25rem;
+            max-width: 320px;
+        }
+
+        .refresh {
+            margin-top: 1.5rem;
+            padding: 0.5rem 1rem;
+            font-size: 1rem;
+            background-color: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+            .refresh:hover {
+                background-color: #357abd;
+            }
+    </style>
+</head>
+<body>
+    <canvas id="offlineCanvas"></canvas>
+    <img id="smiley" src="/images/smiley.png" alt="Smiley" style="display:none;" />
+
+    <img class="icon" src="/icons/icon-192.png" alt="OutZen Icon" />
+    <h1>You are offline</h1>
+    <p class="message">
+        The OutZen app cannot be loaded at the moment.<br />
+        Check your internet connection.
+    </p>
+    <button class="refresh" onclick="location.reload()">🔄 Reload</button>
+
+    <!-- Animation script -->
+    <script>
+        const canvas = document.getElementById("offlineCanvas");
+        const ctx = canvas.getContext("2d");
+        const smiley = document.getElementById("smiley");
+
+        let width, height;
+        let x = 100, y = 100;
+        let dx = 3, dy = 3;
+        const size = 64;
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener("resize", resize);
+        resize();
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+            ctx.drawImage(smiley, x, y, size, size);
+            x += dx; y += dy;
+            if (x + size > width || x < 0) dx = -dx;
+            if (y + size > height || y < 0) dy = -dy;
+            requestAnimationFrame(draw);
+        }
+
+        smiley.onload = () => draw();
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--/*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/-->

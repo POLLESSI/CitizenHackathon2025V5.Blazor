@@ -1,0 +1,94 @@
+﻿@inject Blazored.Toast.Services.IToastService ToastService
+
+@* <button class="btn btn-primary" @onclick="() => ToastService.ShowSuccess(" It works !", "Success" )">
+    Test the toast
+</button> *@
+
+<h3>Suggestion Detail</h3>
+
+@if (CurrentSuggestion is not null)
+{
+    <div class="detail-container bordeaux-background">
+        <p>Id User : @CurrentSuggestion.User_Id</p>
+        <p>Date : @CurrentSuggestion.Date</p>
+        <p>Original Place : @CurrentSuggestion.OriginalPlace</p>
+        <p>Suggested Alternative : @CurrentSuggestion.SuggestedAlternative</p>
+        <p>Reason : @CurrentSuggestion.Reason</p>
+    </div>
+}
+else
+{
+    <p>Loading Suggestions details...</p>
+}
+
+
+@code {
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@

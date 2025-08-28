@@ -1,0 +1,198 @@
+﻿* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Poppins',sans-serif
+}
+
+body {
+    background: #000;
+    color: #fff;
+    overflow: hidden
+}
+
+a {
+    color: inherit;
+    text-decoration: none
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 500
+}
+
+#app {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column
+}
+
+.loading-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: #111
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1)
+    }
+
+    50% {
+        transform: scale(1.05)
+    }
+
+    100% {
+        transform: scale(1)
+    }
+}
+
+.marker-pulse {
+    animation: pulse 1s infinite
+}
+
+.button {
+    padding: .5rem 1rem;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    background: #ff4c4c;
+    color: #fff;
+    transition: .2s
+}
+
+    .button:hover {
+        background: #ff0000
+    }
+
+.crowd-info {
+    padding: .4rem .6rem;
+    border-radius: 4px;
+    background: rgba(0,0,0,.6);
+    color: #fff;
+    font-size: .85rem
+}
+
+.leaflet-container {
+    width: 100%;
+    height: 100%
+}
+
+.marker-cluster-small {
+    background-color: rgba(181,226,140,.6)
+}
+
+.marker-cluster-medium {
+    background-color: rgba(241,211,87,.6)
+}
+
+.marker-cluster-large {
+    background-color: rgba(253,156,115,.6)
+}
+
+canvas {
+    display: block
+}
+
+.outzen-theme {
+    --primary: #ff4c4c;
+    --secondary: #ff9000
+}
+
+.toast {
+    background: #222;
+    color: #fff;
+    padding: .5rem 1rem;
+    border-radius: 4px
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/

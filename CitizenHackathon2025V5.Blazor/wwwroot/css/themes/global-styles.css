@@ -1,0 +1,293 @@
+﻿/* ------------------------------
+   GLOBAL CSS VARIABLES
+------------------------------ */
+:root {
+    /* Typography */
+    --font-main: 'Segoe UI', 'Poppins', sans-serif;
+    /* Layout */
+    --max-container-width: 1280px;
+    --border-radius: 1rem;
+    --padding-default: 1.5rem;
+    /* Colors - base */
+    --color-bg: #0e0e0e;
+    --color-panel: #1a1a1a;
+    --color-text: #e0e0e0;
+    --color-accent: #00fff7;
+    --color-accent-soft: rgba(0, 255, 247, 0.2);
+    --color-error: #ff4d4f;
+    --color-success: #4caf50;
+    --color-warning: #ffc107;
+    /* Decorative */
+    --neon-glow: 0 0 10px var(--color-accent);
+    --box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    /* Info blocks */
+    --info-bg: rgba(135, 206, 250, 0.1);
+    --info-bg-hover: rgba(135, 206, 250, 0.2);
+    --info-border: deepskyblue;
+}
+
+/* ------------------------------
+   THEME: DARK / ULTRA-LUXE
+------------------------------ */
+[data-theme="dark"] {
+    --color-bg: #0e0e0e;
+    --color-text: #f0f0f0;
+    --color-accent: #00fff7;
+}
+
+[data-theme="ultra-luxe"] {
+    --color-bg: #0a0a0a;
+    --color-text: #ffd700;
+    --color-accent: #ff00ff;
+    --neon-glow: 0 0 12px var(--color-accent);
+    --box-shadow: 0 0 20px rgba(255, 0, 255, 0.3);
+    --info-border: gold;
+}
+
+/* ------------------------------
+   BASE RESET + BODY STYLES
+------------------------------ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    height: 100%;
+    background-color: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-main);
+    scroll-behavior: smooth;
+}
+
+    /* Scrollbars */
+    body::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    body::-webkit-scrollbar-thumb {
+        background-color: var(--color-accent);
+        border-radius: 4px;
+    }
+
+/* Links */
+a {
+    text-decoration: none;
+    color: var(--color-accent);
+    transition: color 0.3s ease;
+}
+
+    a:hover {
+        color: white;
+    }
+
+/* ------------------------------
+   REUSABLE COMPONENTS
+------------------------------ */
+.detail-container {
+    width: fit-content;
+    max-width: 80%;
+    margin: 2rem auto;
+    background-color: var(--color-panel);
+    padding: var(--padding-default);
+    border-radius: var(--border-radius);
+    box-shadow: var(--box-shadow);
+    color: var(--color-text);
+    font-family: var(--font-main);
+    position: relative;
+    animation: fadeInDetail 0.6s ease-in-out;
+}
+
+    .detail-container p {
+        margin: 0.75rem 0;
+        padding: 0.5rem 1rem;
+        background: var(--info-bg);
+        border-left: 3px solid var(--info-border);
+        border-radius: 6px;
+        transition: transform 0.2s ease, background-color 0.3s ease;
+    }
+
+        .detail-container p:hover {
+            background-color: var(--info-bg-hover);
+            transform: scale(1.01);
+        }
+
+.card {
+    background: var(--color-panel);
+    padding: 1rem;
+    border-radius: 1rem;
+    box-shadow: var(--box-shadow);
+    transition: transform 0.3s ease;
+}
+
+    .card:hover {
+        transform: scale(1.02);
+    }
+
+.btn {
+    background: var(--color-accent);
+    color: black;
+    padding: 0.6rem 1.2rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+    .btn:hover {
+        background: white;
+        color: var(--color-accent);
+    }
+
+.alert {
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+}
+
+.alert-success {
+    background-color: var(--color-success);
+    color: white;
+}
+
+.alert-error {
+    background-color: var(--color-error);
+    color: white;
+}
+
+.alert-warning {
+    background-color: var(--color-warning);
+    color: black;
+}
+
+/* ------------------------------
+   UTILITY CLASSES
+------------------------------ */
+.text-center {
+    text-align: center;
+}
+
+.mt-2 {
+    margin-top: 2rem;
+}
+
+.mb-2 {
+    margin-bottom: 2rem;
+}
+
+/* ------------------------------
+   ANIMATIONS
+------------------------------ */
+@keyframes fadeInDetail {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.pulse {
+    animation: pulse 2s infinite ease-in-out;
+}
+
+@keyframes hueShift {
+    from {
+        filter: hue-rotate(0deg);
+    }
+
+    to {
+        filter: hue-rotate(360deg);
+    }
+}
+
+.hue-shift {
+    animation: hueShift 30s linear infinite;
+}
+
+/* ------------------------------
+   RESPONSIVE HELPERS
+------------------------------ */
+@media (max-width: 768px) {
+    .detail-container {
+        max-width: 95%;
+    }
+
+    .card {
+        padding: 1rem;
+    }
+
+    .btn {
+        width: 100%;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/

@@ -1,0 +1,61 @@
+﻿/* ============================================
+   VISUAL-ELEMENTS.CSS
+   Contains animated visual elements (without keyframes)
+   ============================================ */
+
+/* Firefly */
+.oz-firefly {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: yellow;
+    border-radius: 50%;
+    animation: firefly-float 3s ease-in-out infinite;
+}
+
+/* Leaf */
+.oz-leaf {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: green;
+    clip-path: ellipse(60% 40%);
+    animation: leaf-fall 5s linear infinite;
+}
+
+/* Star */
+.oz-star {
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    background: white;
+    border-radius: 50%;
+    animation: star-twinkle 2s ease-in-out infinite;
+}
+
+/* Halo effect */
+.sunset-halo {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #ffa726 0%, transparent 70%);
+    animation: halo-pulse 2s ease-in-out infinite;
+}
+
+/* Dynamic background classes */
+.dynamic-bg.dawn {
+    background: linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%);
+}
+
+.dynamic-bg.day {
+    background: linear-gradient(to top, #a1c4fd 0%, #c2e9fb 100%);
+}
+
+.dynamic-bg.sunset {
+    background: linear-gradient(to top, #fda085 0%, #f6d365 100%);
+}
+
+.dynamic-bg.night {
+    background: linear-gradient(to top, #434343 0%, #000000 100%);
+}

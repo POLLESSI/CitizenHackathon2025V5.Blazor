@@ -1,0 +1,34 @@
+﻿### ✅ 3. `deploiement.txt` (Synthetic publication guide)
+
+```txt
+CitizenHackathon2025 - Frontend Deployment (Blazor WASM)
+
+1. AOT Compilation
+--------------------
+dotnet publish CitizenHackathon2025V3.Blazor.Client.csproj -c Release
+
+The output files are located in:> bin\Release\net8.0\wwwroot\
+
+2. Backend publishing (API)
+-----------------------------
+dotnet publish CitizenHackathon2025.API.csproj -c Release
+
+Deploy to a container, Windows/Linux server, or Azure App Service.
+
+3. Pre-production checks
+-----------------------------
+- [ ] dotnet.native.wasm present and served via HTTPS
+- [ ] Correct CSP (see index.html)
+- [ ] Les hubs SignalR accessibles
+- [ ] PWA icons in wwwroot/icons/
+- [ ] `manifest.webmanifest` present
+- [ ] The service worker is only enabled in production
+
+4. Trick
+-----------------------------
+If JS/CSS/wasm files aren't loading:
+- Check for presence in `wwwroot/`
+- Check relative paths in `index.html`
+- Clear browser cache
+
+© 2025 POLLESSI - All rights reserved

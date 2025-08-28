@@ -1,0 +1,83 @@
+﻿namespace CitizenHackathon2025V5.Blazor.Client.Models
+{
+    public class GptInteractionModel
+    {
+#nullable disable
+        public int Id { get; set; }
+        public string Prompt { get; set; }
+        public string PromptHash { get; set; }
+        public string Response { get; set; }
+        public DateTime CreatedAt { get; set; }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/

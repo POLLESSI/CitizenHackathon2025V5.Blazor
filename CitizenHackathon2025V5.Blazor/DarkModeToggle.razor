@@ -1,0 +1,69 @@
+﻿<button class="dark-toggle" @onclick="ToggleDarkMode">
+    <span class="icon">@(_isDark ? "🌙" : "☀️")</span>
+</button>
+
+@code {
+    private bool _isDark = false;
+
+    private async Task ToggleDarkMode()
+    {
+        _isDark = !_isDark;
+        await JS.InvokeVoidAsync("toggleDarkMode");
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/ *@

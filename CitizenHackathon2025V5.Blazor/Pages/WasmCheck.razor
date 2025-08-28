@@ -1,0 +1,96 @@
+﻿@page "/wasmcheck"
+@inject IJSRuntime JS
+
+<h3>Diagnostic WebAssembly</h3>
+
+<p><strong>Statut :</strong> @status</p>
+
+<button class="btn btn-info" @onclick="CheckWasmAccess">Start verification</button>
+
+@code {
+    private string status = "On hold...";
+
+    private async Task CheckWasmAccess()
+    {
+        try
+        {
+            var ok = await JS.InvokeAsync<bool>("checkWasmFile");
+            status = ok ? "✅ dotnet.native.wasm is accessible." : "❌ dotnet.native.wasm not found or blocked.";
+        }
+        catch (Exception ex)
+        {
+            status = $"❌ Erreur JS : {ex.Message}";
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@

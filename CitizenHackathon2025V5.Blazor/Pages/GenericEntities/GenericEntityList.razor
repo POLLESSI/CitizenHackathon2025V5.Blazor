@@ -1,0 +1,120 @@
+﻿@* @inherits GenericEntityList<TModel>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-danger">
+        @ErrorMessage
+    </div>
+}
+else if (IsLoading && VisibleItems.Count == 0)
+{
+    <div class="loading-spinner">
+        Loading...
+    </div>
+}
+else
+{
+    <div class="generic-entity-list">
+        @if (VisibleItems?.Any() ?? false)
+        {
+            @foreach (var item in VisibleItems)
+            {
+                <div class="generic-entity-item" @onclick="@(() => OnItemSelected(item))">
+                    @ItemTemplate(item)
+                </div>
+            }
+
+            @if (!IsEndOfList)
+            {
+                <div class="text-center mt-3">
+                    <button class="btn btn-primary" @onclick="LoadMoreItemsAsync" disabled="@IsLoading">
+                        @(IsLoading ? "Loading..." : "Load more")
+                    </button>
+                </div>
+            }
+        }
+        else
+        {
+            <div class="alert alert-info">
+                No items to display.
+            </div>
+        }
+    </div>
+}
+
+ *@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@*  /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/ *@

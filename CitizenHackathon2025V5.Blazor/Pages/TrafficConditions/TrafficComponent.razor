@@ -1,0 +1,124 @@
+﻿@page "/trafficcomponent"
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.Services
+@using CitizenHackathon2025V5.Blazor.Client.Utils
+@inject TrafficServiceBlazor TrafficService
+@inject Blazored.Toast.Services.IToastService ToastService
+@inject OutZenSignalRService SignalRService
+
+<h3>Traffic Events</h3>
+
+@if (trafficEvents == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <ul class="space-y-4">
+        @foreach (var evt in trafficEvents)
+        {
+            var color = TrafficSeverityHelper.GetColor((int)evt.Level);
+            var icon = TrafficSeverityHelper.GetIcon((int)evt.Level);
+            var label = TrafficSeverityHelper.GetLabel((int)evt.Level);
+
+            <li class="p-3 rounded shadow-md bg-white dark:bg-gray-800">
+                <div class="flex items-center gap-2">
+                    <span class="@color text-xl">@icon</span>
+                    <div>
+                        <strong>@evt.Type</strong> — <em class="@color">@label</em><br />
+                        <span class="text-sm text-gray-500 dark:text-gray-300">@evt.Description</span><br />
+                        <span class="text-xs text-gray-400">@evt.StartTime.ToLocalTime():g</span>
+                    </div>
+                </div>
+            </li>
+        }
+    </ul>
+}
+
+<hr class="my-4" />
+<h4>Légende :</h4>
+<ul class="flex gap-4 text-sm">
+    <li><span class="text-green-500">🟢</span> Fluid</li>
+    <li><span class="text-yellow-500">🟡</span> Slow motion</li>
+    <li><span class="text-red-500">🔴</span> Cork</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@

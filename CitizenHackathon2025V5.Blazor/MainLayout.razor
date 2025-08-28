@@ -1,0 +1,185 @@
+﻿@using CitizenHackathon2025V5.Blazor.Client.Services
+@using CitizenHackathon2025V5.Blazor.Client.SignalR
+@inherits LayoutComponentBase
+
+<button class="btn btn-primary" @onclick="ShowTestToast">
+    Test the toast
+</button>
+
+<PageTitle>OutZen CitizenHackathon 2025</PageTitle>
+
+<div class="background-svg">
+    <img src="/svg/animated-bg.svg" alt="Animated Background" />
+</div>
+
+<div class="dynamic-bg" style="background-image: url('@GetBackgroundImage()'); background-size: cover;">
+    <BlazoredToast />
+</div>
+
+<div class="app-container">
+    <NavMenu />
+
+    <main class="main-content">
+        <div class="page-content">
+            @Body
+        </div>
+    </main>
+    <div class="dynamic-bg @GetTimeClass()" style="background-image: url('@GetBackgroundImage()');"></div>
+
+    <footer class="main-footer">
+        <p>© @DateTime.Now.Year - OutZen by CitizenHackathon2025 🇧🇪</p>
+    </footer>
+
+    <canvas id="layoutBackgroundCanvas" width="800" height="400"></canvas>
+</div>
+<!-- Decorative SVGs -->
+@* <div class="svg-background">
+    <svg viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">
+        <defs>
+            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop id="stop1" offset="0%" stop-color="#00fff7" />
+                <stop id="stop2" offset="100%" stop-color="#ff00ff" />
+            </linearGradient>
+            <pattern id="image-pattern" patternUnits="userSpaceOnUse" width="800" height="600">
+                <image href="/images/background.jpg" x="0" y="0" width="800" height="600" />
+            </pattern>
+        </defs>
+        <rect id="svg-rect" width="800" height="600" fill="url(#image-pattern)">
+            <animateTransform attributeName="transform" type="rotate" from="0 400 300" to="360 400 300" dur="60s" repeatCount="indefinite" />
+        </rect>
+        <rect width="800" height="600" fill="url(#gradient)">
+            <animateTransform attributeName="transform" type="rotate" from="0 400 300" to="360 400 300" dur="60s" repeatCount="indefinite" />
+        </rect>
+    </svg>
+</div>
+
+<div class="orbit">
+    <div class="parallax-bg">Dynamic Background</div>
+    <div class="figurine"></div>
+</div>
+
+<div class="svg-dynamic-bg">
+    <svg viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">
+        <defs>
+            <radialGradient id="grad1" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="hsl(340, 100%, 60%)" />
+                <stop offset="100%" stop-color="hsl(200, 100%, 10%)" />
+            </radialGradient>
+        </defs>
+        <circle cx="400" cy="300" r="400" fill="url(#grad1)" />
+    </svg>
+</div>
+
+<div class="scroll-reveal">Content to display</div>
+
+<canvas id="geometryCanvas" width="600" height="400" style="border:1px solid #444;"></canvas>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const svg = document.getElementById("animated-svg");
+        const rect = document.getElementById("svg-rect");
+        const stop1 = document.getElementById("stop1");
+        const stop2 = document.getElementById("stop2");
+
+        let hue = 0;
+        setInterval(() => {
+            hue = (hue + 1) % 360;
+            const color1 = `hsl(${hue}, 100%, 60%)`;
+            const color2 = `hsl(${(hue + 120) % 360}, 100%, 60%)`;
+            stop1.setAttribute("stop-color", color1);
+            stop2.setAttribute("stop-color", color2);
+        }, 50);
+
+        document.addEventListener("mousemove", (e) => {
+            const x = (e.clientX / window.innerWidth - 0.5) * 20;
+            const y = (e.clientY / window.innerHeight - 0.5) * 20;
+            svg.style.transform = `rotateX(${y}deg) rotateY(${x}deg) scale(1.05)`;
+        });
+
+        document.addEventListener("mouseleave", () => {
+            svg.style.transform = "rotateX(0deg) rotateY(0deg)";
+        });
+    });
+</script> *@
+
+@* <BlazoredToast ToastId="Toast2" Position="ToastPosition.BottomRight" /> *@
+
+@code {
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@

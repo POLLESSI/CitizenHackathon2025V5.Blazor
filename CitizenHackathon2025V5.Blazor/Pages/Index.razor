@@ -1,0 +1,162 @@
+﻿@page "/"
+@using CitizenHackathon2025V5.Blazor.Client.Models
+@using CitizenHackathon2025V5.Blazor.Client.Services
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager Navigation
+@inject Blazored.Toast.Services.IToastService ToastService
+@inject IJSRuntime JS
+
+@* <button class="btn btn-primary" @onclick="() => ToastService.ShowSuccess(" It works !", "Success" )">
+    Test the toast
+</button> *@
+
+<PageTitle>OutZen - Home</PageTitle>
+
+<h2>Welcome to the</h2>
+
+<div class="index-hero scroll-fade">
+    <div class="index-svg-background">
+        <!-- Animated decorative SVG -->
+        <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
+            <circle cx="50" cy="50" r="40" fill="url(#gradient)" />
+            <defs>
+                <radialGradient id="gradient">
+                    <stop offset="0%" stop-color="#00fff7" />
+                    <stop offset="100%" stop-color="#7f5af0" />
+                </radialGradient>
+            </defs>
+        </svg>
+        <div class="index-noise-overlay"></div>
+    </div>
+
+    <h1 class="index-title">Welcome to OutZen</h1>
+    <p class="index-subtitle">
+        Explore events with peace of mind, even when the crowds get involved.
+    </p>
+
+    <button class="index-cta" @onclick="ScrollToSuggestions">
+        Discover the suggestions
+    </button>
+
+    <div class="earth-container scroll-fade">
+        <canvas id="rotatingEarth" width="50" height="50"></canvas>
+        <div class="earth-controls">
+            <label for="speedRange">Rotation Speed:</label>
+            <input type="range" id="speedRange" min="0" max="0.05" step="0.001" value="0.01" />
+        </div>
+    </div>
+</div>
+
+<section class="index-section scroll-fade" id="suggestions">
+    <h2>Suggestions Zen</h2>
+    <p>
+        Here are some alternatives within a 20 km radius of the selected event:
+    </p>
+
+    <ul>
+        <li>🌳 Upper Sambre Natural Park</li>
+        <li>🧘 Outdoor yoga classes in Gosselies</li>
+        <li>🎭 Open-air theater – La Traviata</li>
+    </ul>
+</section>
+
+<footer class="index-footer">
+    &copy; 2025 OutZen – Zen in the crowd, Zen in life.
+</footer>
+
+@code {
+    #nullable disable
+    private List<TrafficConditionModel> TrafficConditionsList = new();
+    [Inject] public TrafficConditionService TrafficService { get; set; }
+
+    private async Task ScrollToSuggestions()
+    {
+        await JS.InvokeVoidAsync("document.getElementById('suggestions').scrollIntoView", new { behavior = "smooth" });
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var rawTraffic = await TrafficService.GetLatestTrafficConditionAsync();
+        TrafficConditionsList = rawTraffic
+            .Where(t => t is not null)
+            .Select(t => t!)
+            .ToList();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JS.InvokeVoidAsync("initEarth");
+            await JS.InvokeVoidAsync("initScrollFade");
+            await JS.InvokeVoidAsync("trafficInterop.updateTrafficMarkers", TrafficConditionsList);
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@

@@ -1,0 +1,103 @@
+﻿/* blazored-toast.css */
+.blazored-toast-container {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 10000;
+}
+
+.blazored-toast {
+    background-color: rgba(0, 0, 0, 0.85);
+    color: #fff;
+    border-radius: 4px;
+    padding: 0.75rem 1.25rem;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    font-family: 'Poppins', sans-serif;
+}
+
+    .blazored-toast .blazored-toast-close {
+        color: #fff;
+    }
+
+.blazored-toast-success {
+    border-left: 4px solid #189d18;
+}
+
+.blazored-toast-error {
+    border-left: 4px solid #d9534f;
+}
+
+.blazored-toast-info {
+    border-left: 4px solid #0275d8;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/
