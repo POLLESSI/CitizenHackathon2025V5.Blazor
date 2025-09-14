@@ -1,4 +1,4 @@
-﻿namespace CitizenHackathon2025V5.Blazor.Client.DTOs
+namespace CitizenHackathon2025V5.Blazor.Client.DTOs
 {
     public class SuggestionUIDTO
     {
@@ -82,3 +82,7 @@
 
 
 /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/
+
+
+
+

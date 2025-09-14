@@ -1,4 +1,5 @@
-﻿export function startCanvas(canvasId) {
+﻿/*wwwroot / js / app / ui.effects.js*/
+export function startCanvas(canvasId) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) {
         console.error(`❌ Canvas with id '${canvasId}' not found.`);

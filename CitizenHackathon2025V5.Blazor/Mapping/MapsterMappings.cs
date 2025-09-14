@@ -1,9 +1,5 @@
-ï»¿using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Enums;
-using CitizenHackathon2025V5.Blazor.Client.Shared.CrowdInfo;
-using CitizenHackathon2025V5.Blazor.Client.Shared.Suggestion;
-using CitizenHackathon2025V5.Blazor.Client.Shared.TrafficCondition;
-using CitizenHackathon2025V5.Blazor.Client.Shared.WeatherForecast;
 using Mapster;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Mapping
@@ -15,23 +11,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Mapping
             // -------------------
             // CrowdInfo
             // -------------------
-            TypeAdapterConfig<CrowdInfoDTO, CrowdInfoUIDTO>.NewConfig()
+            TypeAdapterConfig<ClientCrowdInfoDTO, CrowdInfoUIDTO>.NewConfig()
                 .Map(dest => dest.CrowdLevel, src => MapCrowdLevel(ParseCrowdLevel(src.CrowdLevel)))
                 .Map(dest => dest.Color, src => MapCrowdColor(ParseCrowdLevel(src.CrowdLevel)))
                 .Map(dest => dest.Icon, src => MapCrowdIcon(ParseCrowdLevel(src.CrowdLevel)));
 
             // -------------------
-            // TrafficCondition
+            // TrafficConditionDTO
             // -------------------
-            TypeAdapterConfig<TrafficConditionDTO, TrafficInfoUIDTO>.NewConfig()
+            TypeAdapterConfig<ClientTrafficConditionDTO, TrafficInfoUIDTO>.NewConfig()
                 .Map(dest => dest.Level, src => ParseTrafficLevel(src.Level))
                 .Map(dest => dest.Color, src => MapTrafficColor(ParseTrafficLevel(src.Level)))
                 .Map(dest => dest.Icon, src => MapTrafficIcon(ParseTrafficLevel(src.Level)));
 
             // -------------------
-            // WeatherForecast
+            // WeatherForecastDTO
             // -------------------
-            TypeAdapterConfig<WeatherForecastDTO, WeatherForecastUIDTO>.NewConfig()
+            TypeAdapterConfig<ClientWeatherForecastDTO, WeatherForecastUIDTO>.NewConfig()
                 .Map(dest => dest.Id, src => src.Id)
                 .Map(dest => dest.Icon, src => MapWeatherIcon(src.Summary))
                 .Map(dest => dest.Color, src => MapWeatherColor(src.Summary));
@@ -39,7 +35,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Mapping
             // -------------------
             // Suggestion
             // -------------------
-            TypeAdapterConfig<SuggestionDTO, SuggestionUIDTO>.NewConfig()
+            TypeAdapterConfig<ClientSuggestionDTO, SuggestionUIDTO>.NewConfig()
                 .Map(dest => dest.Id, src => src.Id)
                 .Map(dest => dest.Title, src => src.Title)
                 .Map(dest => dest.Latitude, src => src.Latitude)
@@ -52,29 +48,65 @@ namespace CitizenHackathon2025V5.Blazor.Client.Mapping
         // ==================================================
         // Helpers - Crowd
         // ==================================================
-        private static int ParseCrowdLevel(string level) =>
-            int.TryParse(level, out var result) ? result : 1; // DÃ©faut = 1 (faible)
 
-        private static CrowdLevelEnum MapCrowdLevel(int level) =>
-            level <= 3 ? CrowdLevelEnum.Low :
-            level <= 6 ? CrowdLevelEnum.Medium :
-            CrowdLevelEnum.High;
+        // Overload 1: Source exposes a string ("Low" / "2" / etc.)
+        private static CrowdLevelEnum ParseCrowdLevel(string? level)
+        {
+            if (string.IsNullOrWhiteSpace(level)) return CrowdLevelEnum.Medium;
 
-        private static string MapCrowdColor(int level) =>
-            level <= 3 ? "green" :
-            level <= 6 ? "orange" :
-            "red";
+            if (int.TryParse(level, out var n))
+                return ParseCrowdLevel(n);
 
-        private static string MapCrowdIcon(int level) =>
-            level <= 3 ? "smile" :
-            level <= 6 ? "neutral" :
-            "frown";
+            return level.Trim().ToLowerInvariant() switch
+            {
+                "low" => CrowdLevelEnum.Low,
+                "medium" => CrowdLevelEnum.Medium,
+                "high" => CrowdLevelEnum.High,
+                "critical" => CrowdLevelEnum.Critical,
+                _ => CrowdLevelEnum.Medium
+            };
+        }
+
+        // Overload 2: source exposes an int (0..10 or already 0..3)
+        private static CrowdLevelEnum ParseCrowdLevel(int level)
+        {
+            // si c'est déjà l'énum 0..3, ça tombe juste
+            if (level <= 1) return CrowdLevelEnum.Low;
+            if (level == 2 || level == 3) return CrowdLevelEnum.Medium;
+
+            // sinon, bucketing 0..10 par ex.
+            if (level <= 3) return CrowdLevelEnum.Low;
+            if (level <= 6) return CrowdLevelEnum.Medium;
+            if (level <= 8) return CrowdLevelEnum.High;
+            return CrowdLevelEnum.Critical;
+        }
+
+        // If your UI property expects an int
+        private static int MapCrowdLevel(CrowdLevelEnum level) => (int)level;
+
+        private static string MapCrowdColor(CrowdLevelEnum level) => level switch
+        {
+            CrowdLevelEnum.Low => "green",
+            CrowdLevelEnum.Medium => "orange",
+            CrowdLevelEnum.High => "red",
+            CrowdLevelEnum.Critical => "darkred",
+            _ => "gray"
+        };
+
+        private static string MapCrowdIcon(CrowdLevelEnum level) => level switch
+        {
+            CrowdLevelEnum.Low => "smile",
+            CrowdLevelEnum.Medium => "neutral",
+            CrowdLevelEnum.High => "frown",
+            CrowdLevelEnum.Critical => "triangle-exclamation",
+            _ => "question"
+        };
 
         // ==================================================
         // Helpers - Traffic
         // ==================================================
         private static int ParseTrafficLevel(string level) =>
-            int.TryParse(level, out var result) ? result : 1; // DÃ©faut = 1 (Low)
+            int.TryParse(level, out var result) ? result : 1; // Défaut = 1 (Low)
 
         private static string MapTrafficColor(int level) =>
             level <= 3 ? "green" :
@@ -205,3 +237,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Mapping
 
 
 /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V4.Blazor.Client. All rights reserved.*/
+
+
+
+

@@ -1,65 +1,112 @@
 ﻿@page "/crowdinfo"
-@using CitizenHackathon2025V5.Blazor.Client.Models;
+@using CitizenHackathon2025V5.Blazor.Client.Models
+@using CitizenHackathon2025.Blazor.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.Constants
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
 @inject IJSRuntime js
 
-<span class="fas fa-certificate me-2"></span> CrowdInfos
+<span class="fas fa-certificate me-2"></span> Crowd Infos
 
-<h3>CrowdInfos List</h3>
-
-<div class="table-wrapper draggable-container" @ref="ScrollContainerRef" @onscroll="HandleScroll" style="height: 300px; overflow-y: auto; border: 1px solid #444;">
-    <table class="table table-striped table-dark styled-table">
-        <thead>
-            <tr>
-                <th>LocationName</th>
-                <th>CrowdLevel</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (CrowdInfoModel ce in CrowdInfos)
+<div class="page-list">
+    <h3>Crowd Infos</h3>
+    <div class="list-toolbar">
+        <div class="left">
+            <input class="input-compact" placeholder="Rechercher..."
+                   @bind="_q" @bind:event="oninput" />
+            @if (!string.IsNullOrWhiteSpace(_q))
             {
-                <tr>
-                    <td>•</td>
-                    <td>@ce.LocationName</td>
-                    <td>@ce.CrowdLevel</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(ce.Id)">Info</button>
-                    </td>
-                </tr>
+                <span class="badge badge-info">“@_q”</span>
             }
-        </tbody>
-    </table>
+        </div>
+
+        <div class="right">
+            <button class="chip @( _onlyRecent ? "active" : null )"
+                    @onclick="() => ToggleRecent()">
+                Recent
+            </button>
+        </div>
+    </div>
+    <div class="table-wrapper draggable-container"
+         @ref="ScrollContainerRef"
+         @onscroll="HandleScroll"
+         style="height:300px; overflow-y:auto; border:1px solid #444;">
+        <table class="table table-striped table-dark styled-table data-list">
+            <thead>
+                <tr>
+                    <th class="col-narrow">Location Name</th>
+                    <th class="col-narrow">Crowd Level</th>
+                    <th class="col-actions"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!FilterCrowd(visibleCrowdInfos).Any())
+                    {
+                        <tr><td colspan="99"><div class="empty-state">No incidents.</div></td></tr>
+                    }
+                    else
+                    {
+                    @foreach (var co in FilterCrowd(visibleCrowdInfos))
+                    {
+                            <tr>
+                                <td class="text-ellipsis" title="@co.LocationName">@co.LocationName</td>
+                                <td>
+                                    <span class="badge @($"badge--lvl{co.CrowdLevel}")">@co.CrowdLevel</span>
+                                </td>
+                                <td class="col-actions">
+                                    <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(co.Id)">Info</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+            </tbody>
+        </table>
+    </div>
 </div>
-
-
-<hr />
-
 @if (SelectedId > 0)
 {
-    <div class="draggable-container detail-wrapper">
-        <CrowdInfoDetail id="SelectedId"></CrowdInfoDetail>
+    <div class="detail-wrapper">
+        <div class="list-toolbar">
+            <div class="left"><span class="badge badge-info">Détail #@SelectedId</span></div>
+            <div class="right">
+                <button class="chip" @onclick="() => SelectedId = 0">Fermer</button>
+            </div>
+        </div>
+        <TrafficConditionDetail Id="@SelectedId" />
     </div>
 }
+@if (!FilterCrowd(visibleCrowdInfos).Any())
+{
+    <div class="oz-empty">No items for these filters.</div>
+}
+@if (!FilterCrowd(visibleCrowdInfos).Any())
+{
+    <div class="oz-empty">No items for these filters.</div>
+}
 
-<hr />
-
-<script src="https://cdn.jsdelivr.net/npm/tsparticles"></script>
 
 @code {
 #nullable disable
-    private List<CrowdInfoModel> allCrowdInfos = new(); // All elements
-    private List<CrowdInfoModel> visibleCrowdInfos = new(); // Those to display
-    private int batchSize = 5;
+    private List<CrowdInfoModel> allCrowdInfos = new();        
+    private List<CrowdInfoModel> visibleCrowdInfos = new();     
+    private int batchSize = 20;
     private int currentIndex = 0;
     private ElementReference ScrollContainerRef;
 
     protected override void OnInitialized()
     {
-        // Simulates a data source
-        for (int i = 1; i <= 50; i++)
-        {
-            allCrowdInfos.Add(new CrowdInfoModel { Id = i, LocationName = $"Crowd Info {i}" });
-        }
+        var now = DateTime.UtcNow;
+        var rnd = new Random();
+        // Demo: données fictives
+        for (int i = 1; i <= 200; i++)
+            allCrowdInfos.Add(new CrowdInfoModel
+            {
+                Id = i,
+                LocationName = $"Name {i}",
+                Latitude = rnd.NextDouble() * 180 - 90,
+                Longitude = rnd.NextDouble() * 360 - 180,
+                CrowdLevel = rnd.Next(50, 5000),
+                Timestamp = now.AddMinutes(-i * 10)
+            });
 
         LoadMoreItems();
     }
@@ -73,22 +120,35 @@
 
     private async Task HandleScroll()
     {
-        var scrollTop = await JS.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
-        var scrollHeight = await JS.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
-        var clientHeight = await JS.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
+        var scrollTop = await js.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
+        var scrollHeight = await js.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
+        var clientHeight = await js.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
 
-        if (scrollTop + clientHeight >= scrollHeight - 5)
+        if (scrollTop + clientHeight >= scrollHeight - 5 && currentIndex < allCrowdInfos.Count)
         {
-            if (currentIndex < allCrowdInfos.Count)
-            {
-                LoadMoreItems();
-                StateHasChanged();
-            }
+            LoadMoreItems();
+            StateHasChanged();
         }
     }
+
+    private string _q;
+    private bool _onlyRecent, _onlyFav;
+
+    private IEnumerable<CrowdInfoModel> FilterCrowd(IEnumerable<CrowdInfoModel> source)
+    {
+        var q = _q?.Trim();
+        var cutoff = DateTime.UtcNow.AddHours(-6);
+
+        return source
+            .Where(x => string.IsNullOrEmpty(q)
+                        || (x.LocationName ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+                        || x.Latitude.ToString().Contains(q, StringComparison.OrdinalIgnoreCase))
+                        
+            .Where(x => !_onlyRecent || x.Timestamp >= cutoff);
+    }
+
+    private void ToggleRecent() => _onlyRecent = !_onlyRecent;
 }
-
-
 
 
 

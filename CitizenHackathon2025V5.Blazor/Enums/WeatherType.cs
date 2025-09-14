@@ -1,4 +1,4 @@
-﻿namespace CitizenHackathon2025V5.Blazor.Client.Enums
+namespace CitizenHackathon2025V5.Blazor.Client.Enums
 {
     // <summary>
     /// Represents types of weather conditions.
@@ -146,3 +146,7 @@
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025.API. All rights reserved.
+
+
+
+

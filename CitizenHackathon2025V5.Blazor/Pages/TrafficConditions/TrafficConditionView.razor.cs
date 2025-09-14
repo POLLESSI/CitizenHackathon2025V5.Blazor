@@ -1,4 +1,4 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.Models;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -26,16 +26,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             await GetTrafficCondition();
 
             hubConnection = new HubConnectionBuilder()
-                .WithUrl(new Uri("https://localhost:7254/hubs/trafficconditionHub"))
+                .WithUrl(new Uri("https://localhost:7254/hubs/trafficHub"))
                 .Build();
 
             await hubConnection.StartAsync();
+
+            using (var message = await Client.GetAsync("TrafficCondition/latest")) 
+            { 
+                //...
+            } // /api/trafficcondition/latest
         }
         private void ClickInfo(int id) => SelectedId = id;
 
         private async Task GetTrafficCondition()
         {
-            using (HttpResponseMessage message = await Client.GetAsync("trafficcondition"))
+            using (HttpResponseMessage message = await Client.GetAsync("TrafficCondition/latest"))
             {
                 if (message.IsSuccessStatusCode)
                 {
@@ -147,3 +152,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

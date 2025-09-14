@@ -1,4 +1,6 @@
-﻿:root {
+﻿/*wwwroot.css.base.variable.css*/
+
+:root {
     /* 🎨 Colors */
     --color-primary: #1e90ff;
     --color-primary-dark: #009acb;
@@ -34,7 +36,6 @@
     --ultra-border: 1px solid rgba(255, 215, 0, 0.2);
     --ultra-blur: blur(10px);
 }
-
 
 
 

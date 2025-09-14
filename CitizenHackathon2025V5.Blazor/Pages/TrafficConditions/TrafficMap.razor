@@ -1,4 +1,4 @@
-﻿@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
 @using CitizenHackathon2025V5.Blazor.Client.Enums
 @using CitizenHackathon2025V5.Blazor.Client.Components
 @using Microsoft.AspNetCore.SignalR.Client
@@ -11,11 +11,16 @@
     Test the toast
 </button> *@
 
-<div class="filter-buttons">
-    <button @onclick="() => FilterLevel = null">Tous</button>
-    <button @onclick="() => FilterLevel = TrafficLevel.Low">Léger</button>
-    <button @onclick="() => FilterLevel = TrafficLevel.Medium">Modéré</button>
-    <button @onclick="() => FilterLevel = TrafficLevel.High">Sévère</button>
+<div class="page-list">
+    <h3>Traffic Conditions Map</h3>
+    <div class="filter-buttons">
+        <button @onclick="() => FilterLevel = null">Tous</button>
+        <button @onclick="() => FilterLevel = (int)TrafficLevel.FreeFlow">Light</button>
+        <button @onclick="() => FilterLevel = (int)TrafficLevel.Moderate">Moderate</button>
+        <button @onclick="() => FilterLevel = (int)TrafficLevel.Heavy">Severe</button>
+        <button @onclick="() => FilterLevel = (int)TrafficLevel.Jammed">Blocked</button>)
+    </div>
+
 </div>
 
 <LeafletMapComponent @ref="map" />
@@ -23,7 +28,7 @@
 @code {
     private HubConnection? hubConnection;
     private LeafletMapComponent map = default!;
-    private TrafficLevel? FilterLevel = null;
+    private int? FilterLevel = null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -32,7 +37,7 @@
             .WithAutomaticReconnect()
             .Build();
 
-        hubConnection.On<List<TrafficEventDTO>>("ReceiveTrafficEvents", async events =>
+        hubConnection.On<List<ClientTrafficEventDTO>>("ReceiveTrafficEvents", async events =>
         {
             var filtered = FilterLevel is null
                 ? events
@@ -43,6 +48,18 @@
 
         await hubConnection.StartAsync();
     }
+    // If level is an int coming from the DTO :
+    private string ColorFor(int level) => ((TrafficLevel)level) switch
+    {
+        TrafficLevel.FreeFlow => "#4CAF50",
+        TrafficLevel.Moderate => "#FFC107",
+        TrafficLevel.Heavy => "#FF5722",
+        TrafficLevel.Jammed => "#D32F2F",
+        _ => "#9E9E9E"
+    };
+
+    // � or if you do ifs :
+    // if ((TrafficLevel)level == TrafficLevel.FreeFlow) { ... }
 
     public async ValueTask DisposeAsync()
     {
@@ -127,3 +144,7 @@
 
 
 @* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@
+
+
+
+

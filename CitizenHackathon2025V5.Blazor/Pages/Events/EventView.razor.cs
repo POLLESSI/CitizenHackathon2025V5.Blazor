@@ -1,4 +1,4 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.Models;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -9,7 +9,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
 {
     public partial class EventView
     {
-#nullable disable
+    #nullable disable
         [Inject]
         public HttpClient Client { get; set; }  // Injection HttpClient
         [Inject] public EventService EventService { get; set; }
@@ -26,16 +26,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
             await GetEvent();
 
             hubConnection = new HubConnectionBuilder()
-                .WithUrl(new Uri("https://localhost:7254/hubs/eventHub"))
-                .Build();
-
+    .WithUrl(new Uri("https://localhost:7254/hubs/eventHub"))
+    .WithAutomaticReconnect()
+    .Build();
             await hubConnection.StartAsync();
+
+            using (var message = await Client.GetAsync("Event/Latest")) 
+            { 
+                //... 
+            } // baseAddress = /api/
         }
         private void ClickInfo(int id) => SelectedId = id;
 
         private async Task GetEvent()
         {
-            using (HttpResponseMessage message = await Client.GetAsync("event"))
+            using (HttpResponseMessage message = await Client.GetAsync("Event/Latest"))
             {
                 if (message.IsSuccessStatusCode)
                 {
@@ -144,3 +149,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

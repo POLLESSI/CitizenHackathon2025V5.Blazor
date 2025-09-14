@@ -1,4 +1,6 @@
-﻿.oz-btn {
+﻿/*wwwroot.css.components.button.css*/
+
+.oz-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;

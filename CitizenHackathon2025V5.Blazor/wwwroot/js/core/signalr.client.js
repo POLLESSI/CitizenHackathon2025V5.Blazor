@@ -1,4 +1,6 @@
-﻿window.signalRClient = (function () {
+﻿/*wwwroot.core.signalr.client.js*/
+
+window.signalRClient = (function () {
 
     function showToast(message, title = "SignalR Event", type = "info") {
         // Create the container if it does not exist

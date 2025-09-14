@@ -1,9 +1,11 @@
-using Blazored.Toast;
+﻿using Blazored.Toast;
 using CitizenHackathon2025V5.Blazor.Client;
 using CitizenHackathon2025V5.Blazor.Client.Services;
-using CitizenHackathon2025V5.Blazor;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+using Microsoft.AspNetCore.Components.WebAssembly.Http;
+using Microsoft.JSInterop;
 using Polly;
 using Polly.Extensions.Http;
 using System.Net.Http;
@@ -11,103 +13,125 @@ using System.Net.Http;
 // -----------------------------
 // Polly Policies
 // -----------------------------
-
-// Retry exponentiel
 static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
-    HttpPolicyExtensions
-        .HandleTransientHttpError()
-        .WaitAndRetryAsync(
-            retryCount: 3,
-            sleepDurationProvider: retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))
-        );
+    HttpPolicyExtensions.HandleTransientHttpError()
+        .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
-// Timeout (ex: 10 secondes)
 static IAsyncPolicy<HttpResponseMessage> GetTimeoutPolicy() =>
     Policy.TimeoutAsync<HttpResponseMessage>(10);
 
-// Circuit breaker
 static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy() =>
-    HttpPolicyExtensions
-        .HandleTransientHttpError()
-        .CircuitBreakerAsync(
-            handledEventsAllowedBeforeBreaking: 5,
-            durationOfBreak: TimeSpan.FromSeconds(30)
-        );
+    HttpPolicyExtensions.HandleTransientHttpError()
+        .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
 
 // -----------------------------
 // Host Builder
 // -----------------------------
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
-// Root components
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// -----------------------------
-// HttpClient avec Polly
-// -----------------------------
-builder.Services.AddHttpClient("CitizenHackathonAPI", client =>
+// Config
+var apiBaseUrl = builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7254";
+var apiRestBase = builder.Configuration["Api:RestBase"] ?? $"{apiBaseUrl.TrimEnd('/')}/api/";
+var hubBaseUrl = builder.Configuration["SignalR:HubBase"] ?? apiBaseUrl.TrimEnd('/');
+
+// =============================
+// Auth / DI de base
+// =============================
+builder.Services.AddOptions();
+builder.Services.AddAuthorizationCore();
+builder.Services.AddScoped<AuthenticationStateProvider, SimpleAuthStateProvider>();
+
+// Services applicatifs
+builder.Services.AddScoped(sp => new HttpClient
 {
-    client.BaseAddress = new Uri("https://localhost:7254/api/");
-})
-.AddPolicyHandler(GetRetryPolicy())
-.AddPolicyHandler(GetTimeoutPolicy())
-.AddPolicyHandler(GetCircuitBreakerPolicy());
-
-// Default HttpClient Service
-builder.Services.AddScoped(sp =>
-    new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
-
-// -----------------------------
-// Services Scoped
-// -----------------------------
-builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.AuthService>();
+    BaseAddress = new Uri("https://localhost:7254/api/")
+});
 builder.Services.AddScoped<CrowdInfoService>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<GptInteractionService>();
 builder.Services.AddScoped<PlaceService>();
 builder.Services.AddScoped<SuggestionService>();
 builder.Services.AddScoped<TrafficConditionService>();
-//builder.Services.AddSingleton<UserService>();
 builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.UserService>();
 builder.Services.AddScoped<TrafficStateService>();
 builder.Services.AddScoped<WeatherForecastService>();
+builder.Services.AddScoped<IHubTokenService, HubTokenService>();
 
-// -----------------------------
-// SignalR & OutZen
-// -----------------------------
-// Factory to dynamically create OutZenSignalRService
-builder.Services.AddScoped<IOutZenSignalRFactory, OutZenSignalRFactory>();
-
-// You can add a general SignalR service if needed
-// builder.Services.AddScoped<ISignalRService, SignalRService>();
-
-// -----------------------------
-// Services Singletons
-// -----------------------------
-builder.Services.AddSingleton<TrafficServiceBlazor>();
-builder.Services.AddSingleton<TrafficSignalRService>();
-
-// Multi-hubs SignalR Client (NOUVEAU)
-builder.Services.AddScoped(sp =>
-{
-    var baseHubUrl = builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7254";
-    var auth = sp.GetRequiredService<CitizenHackathon2025V5.Blazor.Client.Services.AuthService>();
-
-    Func<Task<string?>> tokenProvider = async () =>
-        await auth.GetAccessTokenOrNullAsync();
-
-    return new MultiHubSignalRClient(baseHubUrl, tokenProvider);
-});
-
-// -----------------------------
-// Blazored Toast
-// -----------------------------
+// Toasts
 builder.Services.AddBlazoredToast();
 
-// -----------------------------
-// Build et Run
-// -----------------------------
+// =============================
+// HTTP CLIENTS
+// =============================
+
+// Handler that adds Authorization: Bearer ...
+builder.Services.AddTransient<JwtAttachHandler>();
+
+// "Default" Client (all APIs -> with JWT + Polly)
+builder.Services.AddHttpClient("Default", client =>
+{
+    client.BaseAddress = new Uri(apiRestBase);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+})
+.AddHttpMessageHandler<JwtAttachHandler>()
+.AddPolicyHandler(GetRetryPolicy())
+.AddPolicyHandler(GetTimeoutPolicy())
+.AddPolicyHandler(GetCircuitBreakerPolicy());
+
+// "ApiRootAuth" Client (BASE = /) for /auth/hub-token (protected) ✅
+builder.Services.AddHttpClient("ApiRootAuth", client =>
+ {
+    client.BaseAddress = new Uri(apiBaseUrl); // <-- NO /api/
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+     })
+ .AddHttpMessageHandler<JwtAttachHandler>()           // needs the JWT
+ .AddPolicyHandler(GetRetryPolicy())
+ .AddPolicyHandler(GetTimeoutPolicy())
+ .AddPolicyHandler(GetCircuitBreakerPolicy());
+
+// "Auth" Client (NO JWT handler -> avoids loop when AuthService is constructed)
+builder.Services.AddHttpClient("Auth", client =>
+{
+    client.BaseAddress = new Uri(apiRestBase);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+});
+
+// Provides HttpClient by default to services that inject "HttpClient"
+builder.Services.AddScoped(sp =>
+    sp.GetRequiredService<IHttpClientFactory>().CreateClient("Default"));
+
+// Register IAuthService using the "Auth" client
+builder.Services.AddScoped<IAuthService>(sp =>
+{
+    var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Auth");
+    var js = sp.GetRequiredService<IJSRuntime>();
+    var provider = sp.GetRequiredService<AuthenticationStateProvider>();
+    return new AuthService(http, js, provider);
+});
+
+// ⚠️ DO NOT register the concrete type AuthService:
+// builder.Services.AddScoped<AuthService>(); // <-- deleted
+
+// =============================
+// SignalR multi-hubs
+// =============================
+builder.Services.AddSingleton<TrafficServiceBlazor>();
+builder.Services.AddSingleton<TrafficSignalRService>();
+builder.Services.AddScoped<IOutZenSignalRFactory, OutZenSignalRFactory>();
+
+builder.Services.AddScoped(sp =>
+{
+    var auth = sp.GetRequiredService<IAuthService>();
+    Func<Task<string?>> tokenProvider = async () => await auth.GetAccessTokenAsync();
+    return new MultiHubSignalRClient(hubBaseUrl, tokenProvider);
+});
+
 await builder.Build().RunAsync();
 
 
@@ -183,5 +207,8 @@ await builder.Build().RunAsync();
 
 
 
-
 /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/
+
+
+
+

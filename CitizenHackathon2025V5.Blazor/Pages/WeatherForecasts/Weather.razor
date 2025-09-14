@@ -1,0 +1,34 @@
+﻿@page "/weather"
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.Services
+@inject WeatherForecastService WeatherSvc
+
+<h3>Weather</h3>
+
+@if (forecasts is null)
+{
+    <p>Chargement…</p>
+}
+else if (forecasts.Count == 0)
+{
+    <p>Aucune donnée.</p>
+}
+else
+{
+    <ul>
+        @foreach (var f in forecasts)
+        {
+            <li>@f.DateWeather: @f.TemperatureC °C — @f.Summary</li>
+        }
+    </ul>
+}
+
+@code {
+    // ⬇️ le bon type ici
+    private IReadOnlyList<ClientWeatherForecastDTO>? forecasts;
+
+    protected override async Task OnInitializedAsync()
+    {
+        forecasts = await WeatherSvc.GetAsync();
+    }
+}

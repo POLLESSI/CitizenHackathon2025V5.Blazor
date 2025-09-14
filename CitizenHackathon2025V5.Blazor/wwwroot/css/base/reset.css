@@ -1,4 +1,6 @@
-﻿/* Normalize styles across browsers */
+﻿/*wwwroot.css.base.reset.css*/
+
+/* Normalize styles across browsers */
 *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;

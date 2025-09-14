@@ -1,5 +1,6 @@
-﻿using System.Net.Http.Json;
 using CitizenHackathon2025V5.Blazor.Client.Models;
+using System.Net;
+using System.Net.Http.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
@@ -14,27 +15,54 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         }
         public async Task<IEnumerable<PlaceModel?>> GetLatestPlaceAsync()
         {
-            var response = await _httpClient.GetAsync("place/latest");
-            if (response.IsSuccessStatusCode)
+            try
             {
-                return await response.Content.ReadFromJsonAsync<IEnumerable<PlaceModel?>>();
+                var response = await _httpClient.GetAsync("Place/Latest");
+                if (response.StatusCode == HttpStatusCode.NotFound) return null;
+                response.EnsureSuccessStatusCode();
+                
+                var list = await response.Content.ReadFromJsonAsync<IEnumerable<PlaceModel>>();
+                return list ?? Enumerable.Empty<PlaceModel>();
             }
-            return Enumerable.Empty<PlaceModel?>();
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in GetLatestPlaceAsync: {ex.Message}");
+                throw;
+            }
+            
         }
         public async Task<PlaceModel> SavePlaceAsync(PlaceModel @place)
         {
-            var response = await _httpClient.PostAsJsonAsync("place", @place);
-            if (response.IsSuccessStatusCode)
+            try
             {
-                return await response.Content.ReadFromJsonAsync<PlaceModel>();
+                var response = await _httpClient.PostAsJsonAsync("Place", @place);
+                if (response.StatusCode == HttpStatusCode.NotFound) return null;
+                response.EnsureSuccessStatusCode();
+                
+                var saved = await response.Content.ReadFromJsonAsync<PlaceModel>();
+                return saved ?? throw new InvalidOperationException("Response content was null");
             }
-            throw new Exception("Failed to save place");
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in SavePlaceAsync: {ex.Message}");
+                throw;
+            }
+            
         }
         public PlaceModel? UpdatePlace(PlaceModel @place)
         {
-            // This method is not implemented in the original code.
-            // You can implement it based on your requirements.
-            throw new NotImplementedException("UpdatePlace method is not implemented.");
+            try
+            {
+                // This method is not implemented in the original code.
+                // You can implement it based on your requirements.
+                throw new NotImplementedException("UpdatePlace method is not implemented.");
+            }
+            catch (Exception)
+            {
+
+                throw;
+            }
+            
         }
     }
 }
@@ -124,3 +152,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

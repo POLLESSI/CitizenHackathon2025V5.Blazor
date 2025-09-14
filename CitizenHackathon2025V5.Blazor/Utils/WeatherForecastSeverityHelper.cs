@@ -1,6 +1,5 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Enums;
-using CitizenHackathon2025V5.Blazor.Client.Shared.WeatherForecast;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Utils
 {
@@ -74,21 +73,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Utils
         public static string GetIcon(WeatherType type) =>
             type switch
             {
-                WeatherType.Clear or WeatherType.Sunny => "☀️",
-                WeatherType.PartlyCloudy => "⛅",
-                WeatherType.Cloudy or WeatherType.Overcast => "☁️",
-                WeatherType.Rain or WeatherType.Drizzle => "🌧️",
-                WeatherType.Thunderstorm or WeatherType.Storm => "⛈️",
-                WeatherType.Snow or WeatherType.snowstorm or WeatherType.Blizzard => "❄️",
-                WeatherType.Hail or WeatherType.hailstorm => "🌨️",
-                WeatherType.Fog or WeatherType.Mist or WeatherType.Smoke => "🌫️",
-                WeatherType.BlackIce or WeatherType.freezingrain => "🧊",
-                WeatherType.Windy => "💨",
-                WeatherType.Heatwave => "🔥",
-                WeatherType.ColdWave => "🥶",
-                WeatherType.Sandstorm => "🌪️",
-                WeatherType.Ash or WeatherType.Volcanicash or WeatherType.burningclouds => "🌋",
-                _ => "❓"
+                WeatherType.Clear or WeatherType.Sunny => "??",
+                WeatherType.PartlyCloudy => "?",
+                WeatherType.Cloudy or WeatherType.Overcast => "??",
+                WeatherType.Rain or WeatherType.Drizzle => "???",
+                WeatherType.Thunderstorm or WeatherType.Storm => "??",
+                WeatherType.Snow or WeatherType.snowstorm or WeatherType.Blizzard => "??",
+                WeatherType.Hail or WeatherType.hailstorm => "???",
+                WeatherType.Fog or WeatherType.Mist or WeatherType.Smoke => "???",
+                WeatherType.BlackIce or WeatherType.freezingrain => "??",
+                WeatherType.Windy => "??",
+                WeatherType.Heatwave => "??",
+                WeatherType.ColdWave => "??",
+                WeatherType.Sandstorm => "???",
+                WeatherType.Ash or WeatherType.Volcanicash or WeatherType.burningclouds => "??",
+                _ => "?"
             };
 
         /// <summary>
@@ -129,7 +128,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Utils
         /// <summary>
         /// Directly transforms a WeatherForecastDTO into a WeatherType.
         /// </summary>
-        public static WeatherType GetWeatherType(WeatherForecastDTO dto)
+        public static WeatherType GetWeatherType(ClientWeatherForecastDTO dto)
             => ToEnum(dto.Summary);
     }
 }
@@ -199,3 +198,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Utils
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+
+

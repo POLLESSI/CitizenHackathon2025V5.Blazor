@@ -1,49 +1,82 @@
 ﻿@page "/weatherforecastview"
 @using CitizenHackathon2025V5.Blazor.Client.Models
+@using CitizenHackathon2025.Blazor.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.Constants
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.Services
 @inject IJSRuntime JS
 
 <span class="fas fa-certificate me-2"></span> WeatherForecasts
 
-<h3>WeatherForecasts List</h3>
-
-<div class="table-wrapper draggable-container" @ref="ScrollContainerRef" @onscroll="HandleScroll" style="height: 300px; overflow-y: auto; border: 1px solid #444;">
-    <table class="table table-striped table-dark styled-table">
-        <thead>
-            <tr>
-                <th>TemperatureC</th>
-                <th>Summary</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (WeatherForecastModel ce in WeatherForecasts)
+<div class="page-list">
+    <h3>Weather Forecasts List</h3>
+    <div class="list-toolbar">
+        <div class="left">
+            <input class="input-compact" placeholder="Search weather..."
+                   @bind="_q" @bind:event="oninput" />
+            @if (!string.IsNullOrWhiteSpace(_q))
             {
-                <tr>
-                    <td>•</td>
-                    <td>@ce.TemperatureC</td>
-                    <td>@ce.Summary</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(ce.Id)">Info</button>
-                    </td>
-                </tr>
+                <span class="badge badge-info">“@_q”</span>
             }
-        </tbody>
-    </table>
+        </div>
+
+        <div class="right">
+            <button class="chip @( _onlyRecent ? "active" : null )"@onclick="() => ToggleRecent()">Recent</button>
+        </div>
+    </div>
+        <div class="table-wrapper draggable-container"
+                @ref="ScrollContainerRef"
+                @onscroll="HandleScroll"
+                style="height: 300px; overflow-y: auto; border: 1px solid #444;">
+            <table class="table table-striped table-dark styled-table data-list">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th class="col-narrow">TemperatureC</th>
+                        <th class="col-narrow">Summary</th>
+                        <th class="col-actions"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!FilterWeather(visibleWeatherForecasts).Any())
+                    {
+                      <tr><td colspan="99"><div class="empty-state">Aucun incident.</div></td></tr>
+                    }
+                    else
+                    {
+                    @foreach (var we in FilterWeather(visibleWeatherForecasts))
+                        {
+                            <tr>
+                                <td>•</td>
+                                <td>@we.TemperatureC</td>
+                                <td>@we.Summary</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(we.Id)">Info</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
 </div>
-
-
-<hr />
-
+           
 @if (SelectedId > 0)
 {
-    <div class="draggable-container detail-wrapper">
-        <WeatherForecastDetail id="SelectedId"></WeatherForecastDetail>
+    <div class="detail-wrapper">
+        <div class="list-toolbar">
+            <div class="left"><span class="badge badge-info">Détail #@SelectedId</span></div>
+            <div class="right">
+                <button class="chip" @onclick="() => SelectedId = 0">Fermer</button>
+            </div>
+        </div>
+        <WeatherForecastDetail Id="@SelectedId" />
     </div>
 }
-
-<hr />
-
-<script src="https://cdn.jsdelivr.net/npm/tsparticles"></script>
+@if (!FilterWeather(visibleWeatherForecasts).Any())
+{
+    <div class="oz-empty">No items for these filters.</div>
+}
 
 @code {
 #nullable disable
@@ -55,11 +88,19 @@
 
     protected override void OnInitialized()
     {
+        var rnd = new Random();
         // Simulates a data source
         for (int i = 1; i <= 50; i++)
-        {
-            allWeatherForecasts.Add(new WeatherForecastModel { Id = i, Summary = $"WeatherForecast {i}" });
-        }
+            allWeatherForecasts.Add(new WeatherForecastModel
+            {
+                Id = i,
+                DateWeather = DateTime.UtcNow.AddHours(i), // ex: prochaines heures
+                TemperatureC = rnd.Next(-5, 35),           // -5 à 35 °C
+                Summary = i % 2 == 0 ? "Sunny" : "Rainy",
+                Humidity = rnd.Next(20, 100),              // en %
+                RainfallNm = (decimal)(rnd.NextDouble() * 20), // en mm
+                WindSpeedKmh = (decimal)(rnd.Next(0, 100))
+            });
 
         LoadMoreItems();
     }
@@ -79,13 +120,30 @@
 
         if (scrollTop + clientHeight >= scrollHeight - 5)
         {
-            if (currentIndex < allWeatherForecasts.Count)
-            {
-                LoadMoreItems();
-                StateHasChanged();
-            }
+            LoadMoreItems();
+            StateHasChanged();   
         }
     }
+    private string _q;
+    private bool _onlyRecent, _onlyFav;
+
+    private IEnumerable<WeatherForecastModel> FilterWeather(IEnumerable<WeatherForecastModel> source)
+    {
+        var q = _q?.Trim();
+        var cutoff = DateTime.UtcNow.AddHours(-6);
+
+        return source
+            .Where(x => string.IsNullOrEmpty(q)
+                        // ✅ Convertit les nombres en string pour les comparer
+                        || x.TemperatureC.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                        || x.Humidity.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                        || x.WindSpeedKmh.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
+                        || (x.Summary ?? "").Contains(q, StringComparison.OrdinalIgnoreCase))
+            .Where(x => !_onlyRecent || x.DateWeather >= cutoff);
+    }
+
+    private void ToggleRecent() => _onlyRecent = !_onlyRecent;
+
 }
 
 
@@ -175,3 +233,7 @@
 
 
 @* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@
+
+
+
+

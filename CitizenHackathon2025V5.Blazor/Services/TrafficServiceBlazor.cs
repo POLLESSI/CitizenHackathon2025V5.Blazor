@@ -1,4 +1,4 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -9,16 +9,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     public class TrafficServiceBlazor
     {
         private readonly HubConnection _hubConnection;
-        public event Action<List<TrafficEventDTO>>? OnTrafficReceived;
+        public event Action<List<ClientTrafficEventDTO>>? OnTrafficReceived;
 
         public TrafficServiceBlazor(NavigationManager nav)
         {
             _hubConnection = new HubConnectionBuilder()
-                .WithUrl(nav.ToAbsoluteUri("/trafficHub"))
+                .WithUrl(nav.ToAbsoluteUri("/hubs/trafficHub"))
                 .WithAutomaticReconnect()
                 .Build();
 
-            _hubConnection.On<List<TrafficEventDTO>>("ReceiveTraffic", (trafficEvents) =>
+            _hubConnection.On<List<ClientTrafficEventDTO>>("ReceiveTraffic", (trafficEvents) =>
             {
                 OnTrafficReceived?.Invoke(trafficEvents);
             });
@@ -36,23 +36,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         }
         //public async Task<IEnumerable<TrafficConditionModel?>> GetLatestTrafficConditionAsync()
         //{
-        //    var response = await _httpClient.GetAsync("api/trafficcondition/latest");
+        //    var response = await _httpClient.GetAsync("api/TrafficConditionDTO/latest");
         //    if (response.IsSuccessStatusCode)
         //    {
         //        return await response.Content.ReadFromJsonAsync<IEnumerable<TrafficConditionModel?>>();
         //    }
         //    return Enumerable.Empty<TrafficConditionModel?>();
         //}
-        //public async Task<TrafficConditionModel> SaveTrafficConditionAsync(TrafficConditionModel @trafficCondition)
+        //public async Task<TrafficConditionModel> SaveTrafficConditionAsync(TrafficConditionModel @TrafficConditionDTO)
         //{
-        //    var response = await _httpClient.PostAsJsonAsync("api/trafficcondition", @trafficCondition);
+        //    var response = await _httpClient.PostAsJsonAsync("api/TrafficConditionDTO", @TrafficConditionDTO);
         //    if (response.IsSuccessStatusCode)
         //    {
         //        return await response.Content.ReadFromJsonAsync<TrafficConditionModel>();
         //    }
         //    throw new Exception("Failed to save traffic condition");
         //}
-        //public TrafficConditionModel? UpdateTrafficCondition(TrafficConditionModel @trafficCondition)
+        //public TrafficConditionModel? UpdateTrafficCondition(TrafficConditionModel @TrafficConditionDTO)
         //{
         //    // This method is not implemented in the original code.
         //    // You can implement it based on your requirements.
@@ -138,3 +138,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

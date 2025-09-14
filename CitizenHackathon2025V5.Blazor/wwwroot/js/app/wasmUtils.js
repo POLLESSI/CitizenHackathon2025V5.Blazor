@@ -1,4 +1,6 @@
-﻿export async function checkWasmAvailable(path = "_framework/blazor.webassembly.js") {
+﻿/*wwwroot / js / app / wasmUtils.js*/
+
+export async function checkWasmAvailable(path = "_framework/blazor.webassembly.js") {
     try {
         const response = await fetch(path, { method: "HEAD" });
         return response.ok;
@@ -84,7 +86,7 @@ window.init = () => {
     ThemeManager.init(); 
 };
 
-
+window.getScrollTop = () => window.scrollY || document.documentElement.scrollTop || 0;
 
 
 

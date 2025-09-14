@@ -1,39 +1,42 @@
-﻿@using CitizenHackathon2025V5.Blazor.Client.Models;
+@using CitizenHackathon2025V5.Blazor.Client.Models;
 @using Microsoft.AspNetCore.Components.Forms
 
-<h3>Weather Forecast Create</h3>
-
-<EditForm Model="NewWeatherForecast" @OnSubmit="submit" class="form-control">
-    <div class="form-control-sm">
-        <label>DateWeather : </label>
-        <InputDate @bind-Value="NewWeatherForecast.DateWeather"></InputDate>
-    </div>
-    <div class="form-control-sm">
-        <label>Temperature C :</label>
-        <InputNumber @bind-Value="NewWeatherForecast.TemperatureC"></InputNumber>
-    </div>
-    @* <div class="form-control-sm">
+<div class="page-list">
+    <h3>Create a new Weather Forecast</h3>
+    <EditForm Model="NewWeatherForecast" @OnSubmit="submit" class="form-control">
+        <div class="form-control-sm">
+            <label>DateWeather : </label>
+            <InputDate @bind-Value="NewWeatherForecast.DateWeather"></InputDate>
+        </div>
+        <div class="form-control-sm">
+            <label>Temperature C :</label>
+            <InputNumber @bind-Value="NewWeatherForecast.TemperatureC"></InputNumber>
+        </div>
+        @* <div class="form-control-sm">
         <label>Temperature F : </label>
         <InputNumber @bind-Value="NewWeatherForecast.TemperatureF"></InputNumber>
     </div> *@
-    <div class="form-control-sm">
-        <label>Summary : </label>
-        <InputText @bind-Value="NewWeatherForecast.Summary"></InputText>
-    </div>
-    <div class="form-control-sm">
-        <label>Rainfall Mm : </label>
-        <InputNumber @bind-Value="NewWeatherForecast.RainfallNm"></InputNumber>
-    </div>
-    <div class="form-control-sm">
-        <label>Humidity  : </label>
-        <InputNumber @bind-Value="NewWeatherForecast.Humidity"></InputNumber>
-    </div>
-    <div class="form-control-sm">
-        <label>Wind Speed Kmh  : </label>
-        <InputNumber @bind-Value="NewWeatherForecast.WindSpeedKmh"></InputNumber>
-    </div>
-    <button type="submit" class="btn btn-success">Submit</button>
-</EditForm>
+        <div class="form-control-sm">
+            <label>Summary : </label>
+            <InputText @bind-Value="NewWeatherForecast.Summary"></InputText>
+        </div>
+        <div class="form-control-sm">
+            <label>Rainfall Mm : </label>
+            <InputNumber @bind-Value="NewWeatherForecast.RainfallNm"></InputNumber>
+        </div>
+        <div class="form-control-sm">
+            <label>Humidity  : </label>
+            <InputNumber @bind-Value="NewWeatherForecast.Humidity"></InputNumber>
+        </div>
+        <div class="form-control-sm">
+            <label>Wind Speed Kmh  : </label>
+            <InputNumber @bind-Value="NewWeatherForecast.WindSpeedKmh"></InputNumber>
+        </div>
+        <button type="submit" class="btn btn-success">Submit</button>
+    </EditForm>
+</div>
+
+
 
 @code {
 
@@ -102,3 +105,7 @@
 
 
 @* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@
+
+
+
+

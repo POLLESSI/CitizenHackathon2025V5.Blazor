@@ -1,31 +1,32 @@
-﻿@inject IJSRuntime JS
+@inject IJSRuntime JS
 
-<div class="map-simulator-panel @(isCollapsed ? "collapsed" : "")">
-    <div class="header" @onclick="ToggleCollapse">
-        <span>🧪 Simulateur OutZen</span>
-        <span class="toggle-btn">@(!isCollapsed ? "➖" : "➕")</span>
-    </div>
-
-    @if (!isCollapsed)
-    {
-        <div class="body">
-            <label>
-                <input type="checkbox" @bind="AutoSimulationEnabled" />
-                Automatic simulation every 5s
-            </label>
-
-            <div class="buttons">
-                <button class="btn btn-sm btn-primary" @onclick="SimulateCrowd">👥 Crowd Event </button>
-                <button class="btn btn-sm btn-warning" @onclick="SimulateTraffic">🚦Traffic Event </button>
-                <button class="btn btn-sm btn-primary" @onclick="SimulateWeatherForecast">👥 Event Weather Forecast</button>
-
-                <button class="btn btn-sm btn-secondary" @onclick="ToggleCollapse">Closed</button>
-
-            </div>
-
-            <p>📡 Simulation : <strong>@(AutoSimulationEnabled ? "Enabled" : "Disabled")</strong></p>
+<div class="page-list">
+    <div class="map-simulator-panel @(isCollapsed ? "collapsed" : "")">
+        <div class="header" @onclick="ToggleCollapse">
+            <span>?? Simulateur OutZen</span>
+            <span class="toggle-btn">@(!isCollapsed ? "?" : "?")</span>
         </div>
-    }
+        @if (!isCollapsed)
+        {
+            <div class="body">
+                <label>
+                    <input type="checkbox" @bind="AutoSimulationEnabled" />
+                    Automatic simulation every 5s
+                </label>
+
+                <div class="buttons">
+                    <button class="btn btn-sm btn-primary" @onclick="SimulateCrowd">?? Crowd Event </button>
+                    <button class="btn btn-sm btn-warning" @onclick="SimulateTraffic">??Traffic Event </button>
+                    <button class="btn btn-sm btn-primary" @onclick="SimulateWeatherForecast">?? Event Weather Forecast</button>
+
+                    <button class="btn btn-sm btn-secondary" @onclick="ToggleCollapse">Closed</button>
+
+                </div>
+
+                <p>?? Simulation : <strong>@(AutoSimulationEnabled ? "Enabled" : "Disabled")</strong></p>
+            </div>
+        }
+    </div>
 </div>
 
 @code {
@@ -184,3 +185,7 @@
 
 
 @* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@
+
+
+
+

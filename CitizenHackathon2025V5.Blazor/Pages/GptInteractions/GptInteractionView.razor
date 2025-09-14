@@ -1,49 +1,91 @@
-ï»¿@page "/gptinteractionview"
+@page "/gptinteractionview"
 @using CitizenHackathon2025V5.Blazor.Client.Models;
+@using CitizenHackathon2025.Blazor.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.Constants
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
 @inject IJSRuntime js
 
-<span class="fas fa-certificate me-2"></span> GptInteractions
+<span class="fas fa-certificate me-2"></span> Gpt Interactions
 
-<h3>GptInteractions List</h3>
-
-<div class="table-wrapper draggable-container" @ref="ScrollContainerRef" @onscroll="HandleScroll" style="height: 300px; overflow-y: auto; border: 1px solid #444;">
-    <table class="table table-striped table-dark styled-table">
-        <thead>
-            <tr>
-                <th>Prompt</th>
-                <th>Response</th>
-                <th></th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (GptInteractionModel ce in GptInteractions)
+<div class="page-list">
+    <h3>Gpt Interactions List</h3>
+    <div class="list-toolbar">
+        <div class="left">
+            <input class="input-compact" placeholder="Rechercher..."
+                   @bind="_q" @bind:event="oninput" />
+            @if (!string.IsNullOrWhiteSpace(_q))
             {
-                <tr>
-                    <td>â€¢</td>
-                    <td>@ce.Prompt</td>
-                    <td>@ce.Response</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(ce.Id)">Info</button>
-                    </td>
-                </tr>
+                <span class="badge badge-info">“@_q”</span>
             }
-        </tbody>
-    </table>
-</div>
+        </div>
 
+        <div class="right">
+            <button class="chip @( _onlyRecent ? "active" : null )"
+                    @onclick="() => ToggleRecent()">
+                Récents
+            </button>
+        </div>
+    </div>
+        <div class="table-wrapper draggable-container"
+                @ref="ScrollContainerRef"
+                @onscroll="HandleScroll"
+                style="height: 300px; overflow-y: auto; border: 1px solid #444;">
+            <table class="table table-striped table-dark styled-table data-list">
+                <thead>
+                    <tr>
+                        <th class="col-narrow">#</th>
+                        <th class="col-narrow">Prompt</th>
+                        <th class="col-narrow">Response</th>
+                        <th class="col-actions">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!FilterGpt(visibleGptInteractions).Any())
+                    {
+                      <tr>
+                        <td colspan="99">
+                            <div class="empty-state">Aucun élément pour ces filtres.</div>
+                        </td>
+                      </tr>
+                    }
+                    else
+                    {
+                    @foreach (var gp in FilterGpt(visibleGptInteractions))
+                        {
+                            <tr>
+                                <td class="text-ellipsis" title="@gp.Prompt">@gp.Prompt</td>
+                                <td class="text-ellipsis" title="@gp.Response">@gp.Response</td>
+                                <td class="col-actions">
+                                    <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(gp.Id)">Info</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+</div>
+          
 
 <hr />
 
 @if (SelectedId > 0)
 {
-    <div class="draggable-container detail-wrapper">
-        <GptInteractionDetail id="SelectedId"></GptInteractionDetail>
+  <div class="detail-wrapper">
+    <div class="list-toolbar">
+      <div class="left"><span class="badge badge-info">Détail #@SelectedId</span></div>
+      <div class="right">
+        <button class="chip" @onclick="() => SelectedId = 0">Fermer</button>
+      </div>
     </div>
+        <GptInteractionDetail Id="@SelectedId" />
+  </div>
 }
 
-<hr />
-
-<script src="https://cdn.jsdelivr.net/npm/tsparticles"></script>
+@if (!FilterGpt(visibleGptInteractions).Any())
+{
+    <div class="oz-empty">No items for these filters.</div>
+}
 
 @code {
 #nullable disable
@@ -55,10 +97,17 @@
 
     protected override void OnInitialized()
     {
+        var now = DateTime.UtcNow;
         // Simulates a data source
         for (int i = 1; i <= 50; i++)
         {
-            allGptInteractions.Add(new GptInteractionModel { Id = i, Prompt = $"Gpt Interaction {i}" });
+            allGptInteractions.Add(new GptInteractionModel
+            {
+                Id = i,
+                Prompt = "",
+                Response = "",
+                CreatedAt = now.AddMinutes(-i * 10)
+            });
         }
 
         LoadMoreItems();
@@ -73,19 +122,32 @@
 
     private async Task HandleScroll()
     {
-        var scrollTop = await JS.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
-        var scrollHeight = await JS.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
-        var clientHeight = await JS.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
+        var scrollTop = await js.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
+        var scrollHeight = await js.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
+        var clientHeight = await js.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
 
-        if (scrollTop + clientHeight >= scrollHeight - 5)
+        if (scrollTop + clientHeight >= scrollHeight - 5 && currentIndex < allGptInteractions.Count)
         {
-            if (currentIndex < allGptInteractions.Count)
-            {
-                LoadMoreItems();
-                StateHasChanged();
-            }
+            LoadMoreItems();
+            StateHasChanged();
         }
     }
+    private string _q;
+    private bool _onlyRecent, _onlyFav;
+
+    private IEnumerable<GptInteractionModel> FilterGpt(IEnumerable<GptInteractionModel> source)
+    {
+        var q = _q?.Trim();
+        var cutoff = DateTime.UtcNow.AddHours(-6);
+
+        return source
+            .Where(x => string.IsNullOrEmpty(q)
+                        || (x.Prompt ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+                        || (x.Response ?? "").Contains(q, StringComparison.OrdinalIgnoreCase))
+            .Where(x => !_onlyRecent || x.CreatedAt >= cutoff);
+    }
+
+    private void ToggleRecent() => _onlyRecent = !_onlyRecent;
 }
 
 
@@ -167,3 +229,7 @@
 
 
 @* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@
+
+
+
+

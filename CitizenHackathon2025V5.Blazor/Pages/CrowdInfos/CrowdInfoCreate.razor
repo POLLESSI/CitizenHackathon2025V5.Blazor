@@ -1,4 +1,4 @@
-﻿@page "/crowdinfocreate"
+@page "/crowdinfocreate"
 @using CitizenHackathon2025V5.Blazor.Client.Models
 @using CitizenHackathon2025V5.Blazor.Client.Services
 @using Microsoft.AspNetCore.Components.Forms
@@ -6,43 +6,45 @@
 @inject Blazored.Toast.Services.IToastService ToastService
 
 <h3>Crowd Info Create</h3>
+<div class="page-list">
+    <p>Create a new Crowd Info entry by filling out the form below:</p>
+    <EditForm Model="@NewCrowdInfo" OnValidSubmit="Submit" class="form-control">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
 
-<EditForm Model="@NewCrowdInfo" OnValidSubmit="Submit" class="form-control">
-    <DataAnnotationsValidator />
-    <ValidationSummary />
+        <div class="form-control-sm">
+            <label>LocationName :</label>
+            <InputText @bind-Value="@NewCrowdInfo.LocationName" class="form-control" />
+            <ValidationMessage For="@(() => NewCrowdInfo.LocationName)" />
+        </div>
 
-    <div class="form-control-sm">
-        <label>LocationName :</label>
-        <InputText @bind-Value="@NewCrowdInfo.LocationName" class="form-control" />
-        <ValidationMessage For="@(() => NewCrowdInfo.LocationName)" />
-    </div>
+        <div class="form-control-sm">
+            <label>Latitude :</label>
+            <InputNumber TValue="double" @bind-Value="@NewCrowdInfo.Latitude" step="0.000001" class="form-control" />
+            <ValidationMessage For="@(() => NewCrowdInfo.Latitude)" />
+        </div>
 
-    <div class="form-control-sm">
-        <label>Latitude :</label>
-        <InputNumber TValue="double" @bind-Value="@NewCrowdInfo.Latitude" step="0.000001" class="form-control" />
-        <ValidationMessage For="@(() => NewCrowdInfo.Latitude)" />
-    </div>
+        <div class="form-control-sm">
+            <label>Longitude :</label>
+            <InputNumber TValue="double" @bind-Value="@NewCrowdInfo.Longitude" step="0.000001" class="form-control" />
+            <ValidationMessage For="@(() => NewCrowdInfo.Longitude)" />
+        </div>
 
-    <div class="form-control-sm">
-        <label>Longitude :</label>
-        <InputNumber TValue="double" @bind-Value="@NewCrowdInfo.Longitude" step="0.000001" class="form-control" />
-        <ValidationMessage For="@(() => NewCrowdInfo.Longitude)" />
-    </div>
+        <div class="form-control-sm">
+            <label>CrowdLevel :</label>
+            <InputNumber TValue="int" @bind-Value="@NewCrowdInfo.CrowdLevel" class="form-control" />
+            <ValidationMessage For="@(() => NewCrowdInfo.CrowdLevel)" />
+        </div>
 
-    <div class="form-control-sm">
-        <label>CrowdLevel :</label>
-        <InputNumber TValue="int" @bind-Value="@NewCrowdInfo.CrowdLevel" class="form-control" />
-        <ValidationMessage For="@(() => NewCrowdInfo.CrowdLevel)" />
-    </div>
+        <div class="form-control-sm">
+            <label>Timestamp :</label>
+            <InputDate TValue="DateTime" @bind-Value="@NewCrowdInfo.Timestamp" class="form-control" />
+            <ValidationMessage For="@(() => NewCrowdInfo.Timestamp)" />
+        </div>
 
-    <div class="form-control-sm">
-        <label>Timestamp :</label>
-        <InputDate TValue="DateTime" @bind-Value="@NewCrowdInfo.Timestamp" class="form-control" />
-        <ValidationMessage For="@(() => NewCrowdInfo.Timestamp)" />
-    </div>
-
-    <button type="submit" class="btn btn-success mt-2">Submit</button>
-</EditForm>
+        <button type="submit" class="btn btn-success mt-2">Submit</button>
+    </EditForm>
+</div>
 
 @code {
 }
@@ -121,3 +123,7 @@
 
 
 @* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@
+
+
+
+

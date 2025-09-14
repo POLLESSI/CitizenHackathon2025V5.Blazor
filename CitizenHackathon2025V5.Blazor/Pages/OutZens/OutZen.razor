@@ -1,37 +1,39 @@
-﻿@page "/outzen"
+@page "/outzen"
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
 @using CitizenHackathon2025V5.Blazor.Client.Services
-@using CitizenHackathon2025V5.Blazor.Client.Shared.CrowdInfo
-@using CitizenHackathon2025V5.Blazor.Client.Shared.Suggestion
+
 @inject IOutZenSignalRFactory OutZenFactory
 
-<h3>OutZen Live Feed</h3>
+<div class="page-list">
+    <h3>OutZen Live Feed</h3>
 
-@if (crowdInfo != null)
-{
-    <p><b>Crowd:</b> @crowdInfo.CrowdLevel - @crowdInfo.Density</p>
-}
+    @if (crowdInfo != null)
+    {
+        <p><b>Crowd:</b> @crowdInfo.CrowdLevel - @GetDensityFromLevel(crowdInfo.CrowdLevel)</p>
+    }
 
-@if (suggestions != null)
-{
-    <ul>
-        @foreach (var s in suggestions)
-        {
-            <li>@s.Title (@s.DistanceKm km)</li>
-        }
-    </ul>
-}
+    @if (suggestions != null)
+    {
+        <ul>
+            @foreach (var s in suggestions)
+            {
+                <li>@s.Title (@s.DistanceKm km)</li>
+            }
+        </ul>
+    }
+</div>
 
 @code {
-    private CrowdInfoDTO? crowdInfo;
-    private List<SuggestionDTO>? suggestions;
+    private ClientCrowdInfoDTO? crowdInfo;
+    private List<ClientSuggestionDTO>? suggestions;
     private OutZenSignalRService? _signalR;
 
     protected override async Task OnInitializedAsync()
     {
-        // 🔹 Use the factory
+        // ?? Use the factory
         _signalR = await OutZenFactory.CreateAsync();
 
-        // 🔹 Subscribe to events
+        // ?? Subscribe to events
         _signalR.OnCrowdInfoUpdated += dto =>
         {
             crowdInfo = dto;
@@ -44,8 +46,29 @@
             InvokeAsync(StateHasChanged);
         };
 
-        // 🔹 Initialize the connection
+        // ?? Initialize the connection
         await _signalR.InitializeOutZenAsync();
+    }
+    private static int GetDensityFromLevel(string? level)
+    {
+        if (int.TryParse(level, out var n))
+            return GetDensityFromLevel(n);
+
+        return level?.ToLowerInvariant() switch
+        {
+            "low" => 25,
+            "medium" => 50,
+            "high" => 75,
+            "critical" => 90,
+            _ => 50
+        };
+    }
+    private static int GetDensityFromLevel(int n)
+    {
+        if (n <= 3) return 25;
+        if (n <= 6) return 50;
+        if (n <= 8) return 75;
+        return 90;
     }
 
     public async ValueTask DisposeAsync()
@@ -127,3 +150,7 @@
 
 
 @* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@
+
+
+
+

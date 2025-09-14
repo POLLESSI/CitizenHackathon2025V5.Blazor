@@ -1,176 +1,241 @@
 ﻿// 📂 wwwroot/js/app/leafletOutZen.module.js
 // ============================
-// LEAFLET OUTZEN MODULE
+// LEAFLET OUTZEN MODULE (no bare imports)
+// - Uses globals loaded by CDN: L (Leaflet), Chart, signalR (optional)
+// - Safe to load directly in <script type="module"> without bundler
 // ============================
 
-// 🔗 Low-level Leaflet utilities
-import L from 'leaflet';
-import { Chart } from 'chart.js';
-import * as signalR from '@microsoft/signalr';
+/* global L, Chart, signalR */
+"use strict";
 
-// 🌍 Internal variables
-let map = null;
-const crowdMarkers = {};
-let filterLevel = null;
-let crowdChart = null;
+// 🌍 Internal state (module-scope)
+let _map = null;
+const _crowdMarkers = new Map(); // id -> { marker, level }
+let _filterLevel = null;
+let _crowdChart = null;
 
 // 🎯 Crowd Icons (Leaflet divIcon)
-const crowdIcons = {
-    0: L.divIcon({ className: 'crowd-icon level-0', html: '🟢' }),
-    1: L.divIcon({ className: 'crowd-icon level-1', html: '🟡' }),
-    2: L.divIcon({ className: 'crowd-icon level-2', html: '🟠' }),
-    3: L.divIcon({ className: 'crowd-icon level-3', html: '🔴' }),
+const _crowdIcons = {
+    0: L.divIcon({ className: "crowd-icon level-0", html: "🟢" }),
+    1: L.divIcon({ className: "crowd-icon level-1", html: "🟡" }),
+    2: L.divIcon({ className: "crowd-icon level-2", html: "🟠" }),
+    3: L.divIcon({ className: "crowd-icon level-3", html: "🔴" }),
 };
 
-// 🔒 HTML anti-injection
-function escapeHtml(s) {
+// 🔒 Tiny HTML-escape
+function _escapeHtml(s) {
     return String(s)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#039;');
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 }
 
 // ============================
 // Map Initialization
 // ============================
-export function initMap(containerId = 'map', center = [50.89, 4.34], zoom = 13) {
+export function initMap(containerId = "leafletMap", center = [50.89, 4.34], zoom = 13) {
     const el = document.getElementById(containerId);
     if (!el) throw new Error(`❌ Element #${containerId} not found.`);
 
-    map = L.map(containerId).setView(center, zoom);
+    // Idempotence: if already initialized, reuse the existing instance
+    if (_map && window.leafletMap) return _map;
+    if (el.classList.contains("leaflet-container") && window.leafletMap) {
+            _map = window.leafletMap;
+            return _map;
+        }
+    
+    _map = L.map(containerId).setView(center, zoom);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-    }).addTo(map);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; OpenStreetMap contributors",
+        maxZoom: 19
+    }).addTo(_map);
 
-    initAnimatedBackground();
-    initScrollAndParallax();
+    // Optional nice effects
+    try { initAnimatedBackground(); } catch { }
+    try { initScrollAndParallax(); } catch { }
 
-    window.leafletMap = map; // external access
-    return map;
+    // For manual debugging
+    window.leafletMap = _map;
+
+    return _map;
 }
 
 // ============================
 // Crowd Markers
 // ============================
-export function addOrUpdateCrowdMarker(id, lat, lng, level = 0, info = { title: '', description: '' }) {
-    if (!map) return;
-    if (crowdMarkers[id]) map.removeLayer(crowdMarkers[id].marker);
+export function addOrUpdateCrowdMarker(id, lat, lng, level = 0, info = { title: "", description: "" }) {
+    if (!_map) return;
 
-    const safeLevel = level in crowdIcons ? level : 0;
-    const marker = L.marker([lat, lng], { icon: crowdIcons[safeLevel] })
-        .bindPopup(`<strong>${escapeHtml(info.title)}</strong><br/>${escapeHtml(info.description)}`);
+    const key = String(id);
+    const safeLevel = (level in _crowdIcons) ? level : 0;
 
-    marker.on('add', () => blinkEffect(marker));
-    marker.addTo(map);
+    // Remove previous marker for this id
+    const existing = _crowdMarkers.get(key);
+    if (existing) {
+        _map.removeLayer(existing.marker);
+    }
 
-    crowdMarkers[id] = { marker, level: safeLevel };
-    updateVisibleCrowdMarkers();
+    const marker = L.marker([lat, lng], { icon: _crowdIcons[safeLevel] })
+        .bindPopup(`<strong>${_escapeHtml(info?.title ?? "")}</strong><br/>${_escapeHtml(info?.description ?? "")}`);
+
+    marker.on("add", () => _blinkEffect(marker));
+    marker.addTo(_map);
+
+    _crowdMarkers.set(key, { marker, level: safeLevel });
+
+    _updateVisibleCrowdMarkers();
 }
 
 export function removeCrowdMarker(id) {
-    if (!map || !crowdMarkers[id]) return;
-    map.removeLayer(crowdMarkers[id].marker);
-    delete crowdMarkers[id];
+    if (!_map) return;
+    const key = String(id);
+    const entry = _crowdMarkers.get(key);
+    if (!entry) return;
+    _map.removeLayer(entry.marker);
+    _crowdMarkers.delete(key);
 }
 
 export function setFilterLevel(level) {
-    filterLevel = level === undefined ? null : level;
-    updateVisibleCrowdMarkers();
+    _filterLevel = (level === undefined || level === null) ? null : level;
+    _updateVisibleCrowdMarkers();
 }
 
-function updateVisibleCrowdMarkers() {
-    Object.values(crowdMarkers).forEach(({ marker, level }) => {
-        if (filterLevel === null || level === filterLevel) {
-            if (!map.hasLayer(marker)) marker.addTo(map);
-        } else {
-            if (map.hasLayer(marker)) map.removeLayer(marker);
-        }
-    });
+function _updateVisibleCrowdMarkers() {
+    if (!_map) return;
+    for (const { marker, level } of _crowdMarkers.values()) {
+        const shouldShow = (_filterLevel === null) || (level === _filterLevel);
+        const isOnMap = _map.hasLayer(marker);
+        if (shouldShow && !isOnMap) marker.addTo(_map);
+        if (!shouldShow && isOnMap) _map.removeLayer(marker);
+    }
 }
 
-function blinkEffect(marker) {
+function _blinkEffect(marker) {
     const el = marker.getElement();
     if (!el) return;
-    el.classList.add('fade-in', 'blink');
-    setTimeout(() => el.classList.remove('blink'), 2000);
+    el.classList.add("fade-in", "blink");
+    setTimeout(() => el.classList.remove("blink"), 2000);
 }
 
 // ============================
 // Suggestions
 // ============================
 export function showSuggestions(suggestions = []) {
-    if (!map || !Array.isArray(suggestions)) return;
+    if (!_map || !Array.isArray(suggestions)) return;
 
     suggestions.forEach(s => {
-        const icon = L.icon({ iconUrl: s.icon || 'icons/suggestion-marker.png', iconSize: [32, 32] });
-        const title = s.title ?? s.name ?? 'Suggestion';
-        const distance = s.distanceKm != null ? `${s.distanceKm} km` : '';
+        const icon = L.icon({
+            iconUrl: s.icon || "images/suggestion-marker.png",
+            iconSize: [32, 32],
+            iconAnchor: [16, 32]
+        });
+        const title = s.title ?? s.name ?? "Suggestion";
+        const distance = (s.distanceKm != null) ? `${s.distanceKm} km` : "";
 
         L.marker([s.latitude, s.longitude], { icon })
-            .addTo(map)
-            .bindPopup(`<strong>${escapeHtml(title)}</strong>${distance ? `<br/>À ${escapeHtml(String(distance))}` : ''}`);
+            .addTo(_map)
+            .bindPopup(
+                `<strong>${_escapeHtml(title)}</strong>` +
+                (distance ? `<br/>À ${_escapeHtml(String(distance))}` : "")
+            );
     });
 }
 
 // ============================
 // Traffic Markers
 // ============================
-const trafficIconCache = {};
-function getTrafficIcon(level) {
-    if (trafficIconCache[level]) return trafficIconCache[level];
-    const color = level === 1 ? 'green' : level === 2 ? 'orange' : level === 3 ? 'red' : 'gray';
-    const icon = L.divIcon({ className: 'traffic-icon', html: `<div class="pulse-${color}"></div>`, iconSize: [16, 16], iconAnchor: [8, 8], popupAnchor: [0, -10] });
-    trafficIconCache[level] = icon;
+const _trafficIconCache = new Map(); // level -> icon
+
+function _trafficIcon(level) {
+    if (_trafficIconCache.has(level)) return _trafficIconCache.get(level);
+    const color = (level === 1) ? "green" : (level === 2) ? "orange" : (level === 3) ? "red" : "gray";
+    const icon = L.divIcon({
+        className: "traffic-icon",
+        html: `<div class="pulse-${color}"></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+        popupAnchor: [0, -10]
+    });
+    _trafficIconCache.set(level, icon);
     return icon;
 }
 
 export function addTrafficMarkers(trafficEvents = []) {
-    if (!map) return;
+    if (!_map || !Array.isArray(trafficEvents)) return;
     trafficEvents.forEach(e => {
-        const marker = L.marker([e.latitude, e.longitude], { icon: getTrafficIcon(e.level) })
-            .bindPopup(`<strong>${escapeHtml(e.description)}</strong><br/>${new Date(e.timestamp).toLocaleString()}`);
-        marker.addTo(map);
+        L.marker([e.latitude, e.longitude], { icon: _trafficIcon(e.level) })
+            .addTo(_map)
+            .bindPopup(
+                `<strong>${_escapeHtml(e.description ?? "Traffic")}</strong><br/>` +
+                `${e.timestamp ? new Date(e.timestamp).toLocaleString() : ""}`
+            );
     });
 }
 
 // ============================
 // Charts
 // ============================
-export function initCrowdChart(canvasId = 'crowdChart') {
-    const ctx = document.getElementById(canvasId)?.getContext('2d');
-    if (!ctx) return console.warn(`📉 Element #${canvasId} not found.`);
 
-    crowdChart = new Chart(ctx, {
-        type: 'line',
-        data: { labels: [], datasets: [{ label: 'Crowd Level (%)', data: [], borderColor: '#FFD700', backgroundColor: 'rgba(255,215,0,0.3)' }] },
-        options: { scales: { y: { beginAtZero: true, max: 100 } } },
-    });
+window.OutZenCharts = {
+    _instances: {},
+    ensure(canvasId, config) {
+        this.destroy(canvasId);
+        const el = document.getElementById(canvasId);
+        if (!el) { console.warn("Canvas not found:", canvasId); return null; }
+        const ctx = el.getContext('2d');
+        const chart = new Chart(ctx, config);
+        this._instances[canvasId] = chart;
+        return chart;
+    },
+    destroy(canvasId) {
+        const chart = this._instances[canvasId];
+        if (chart) {
+            try { chart.destroy(); } catch { }
+            delete this._instances[canvasId];
+        }
+    }
+};
+
+export function initCrowdChart(canvasId = "crowdChart") {
+    const config = {
+        type: "line",
+        data: {
+            labels: [],
+            datasets: [{
+                label: "Crowd Level (%)",
+                data: [],
+                // (you can let Chart.js choose the colors)
+                tension: 0.25
+            }]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+    };
+    window.OutZenCharts.ensure(canvasId, config);
 }
 
-export function updateCrowdChart(value) {
-    if (!crowdChart) return;
+export function updateCrowdChart(value, canvasId = "crowdChart") {
+    const chart = window.OutZenCharts._instances[canvasId];
+    if (!chart) return;
     const now = new Date().toLocaleTimeString();
-    const numeric = Number(String(value).replace('%', '').trim());
+    const numeric = Number(String(value).replace("%", "").trim());
     if (!Number.isFinite(numeric)) return;
 
-    crowdChart.data.labels.push(now);
-    crowdChart.data.datasets[0].data.push(numeric);
-
-    if (crowdChart.data.labels.length > 20) {
-        crowdChart.data.labels.shift();
-        crowdChart.data.datasets[0].data.shift();
+    chart.data.labels.push(now);
+    chart.data.datasets[0].data.push(numeric);
+    if (chart.data.labels.length > 20) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
     }
-
-    crowdChart.update();
+    chart.update();
 }
 
 // ============================
 // Animations (Background & Parallax)
 // ============================
-export function initAnimatedBackground(svgSelector = '.svg-background svg', stop1Id = 'stop1', stop2Id = 'stop2') {
+export function initAnimatedBackground(svgSelector = ".svg-background svg", stop1Id = "stop1", stop2Id = "stop2") {
     const svg = document.querySelector(svgSelector);
     const stop1 = document.getElementById(stop1Id);
     const stop2 = document.getElementById(stop2Id);
@@ -179,32 +244,31 @@ export function initAnimatedBackground(svgSelector = '.svg-background svg', stop
     let hue = 0;
     setInterval(() => {
         hue = (hue + 1) % 360;
-        stop1.setAttribute('stop-color', `hsl(${hue}, 100%, 60%)`);
-        stop2.setAttribute('stop-color', `hsl(${(hue + 120) % 360}, 100%, 60%)`);
+        stop1.setAttribute("stop-color", `hsl(${hue}, 100%, 60%)`);
+        stop2.setAttribute("stop-color", `hsl(${(hue + 120) % 360}, 100%, 60%)`);
     }, 50);
 
-    document.addEventListener('mousemove', e => {
+    document.addEventListener("mousemove", e => {
         const x = (e.clientX / window.innerWidth - 0.5) * 20;
         const y = (e.clientY / window.innerHeight - 0.5) * 20;
         svg.style.transform = `rotateX(${y}deg) rotateY(${x}deg) scale(1.05)`;
     });
 
-    document.addEventListener('mouseleave', () => svg.style.transform = 'rotateX(0deg) rotateY(0deg)');
-    document.addEventListener('scroll', () => {
-        const scrollY = window.scrollY;
-        const intensity = Math.min(scrollY / 1000, 1);
+    document.addEventListener("mouseout", () => svg.style.transform = "rotateX(0deg) rotateY(0deg)");
+    document.addEventListener("scroll", () => {
+        const intensity = Math.min(window.scrollY / 1000, 1);
         svg.style.transform += ` scale(${1 + intensity * 0.05})`;
     });
 
-    document.body.style.background = 'linear-gradient(135deg, #000428, #004e92)';
+    document.body.style.background = "linear-gradient(135deg, #000428, #004e92)";
 }
 
 export function initScrollAndParallax() {
-    const sections = document.querySelectorAll('section.animate-on-scroll, .scroll-reveal');
+    const sections = document.querySelectorAll("section.animate-on-scroll, .scroll-reveal");
     const observer = new IntersectionObserver(entries => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
-                entry.target.classList.add('visible');
+                entry.target.classList.add("visible");
                 observer.unobserve(entry.target);
             }
         });
@@ -212,8 +276,8 @@ export function initScrollAndParallax() {
 
     sections.forEach(s => observer.observe(s));
 
-    const bg = document.querySelector('.parallax-bg');
-    if (bg) document.addEventListener('mousemove', e => {
+    const bg = document.querySelector(".parallax-bg");
+    if (bg) document.addEventListener("mousemove", e => {
         const x = (e.clientX / window.innerWidth - 0.5) * 20;
         const y = (e.clientY / window.innerHeight - 0.5) * 20;
         bg.style.transform = `translate(${x}px, ${y}px)`;
@@ -221,36 +285,83 @@ export function initScrollAndParallax() {
 }
 
 // ============================
-// SignalR
+// SignalR (optional JS client)
 // ============================
 export async function startSignalR(hubUrl, onDataReceived = {}) {
-    const connection = new signalR.HubConnectionBuilder()
+    if (typeof signalR === "undefined") {
+        console.warn("⚠️ signalR global not found (JS client). If you only use the C# client, you can ignore this.");
+        return { connected: false, start: async () => { }, stop: async () => { } };
+    }
+
+    const conn = new signalR.HubConnectionBuilder()
         .withUrl(hubUrl, { transport: signalR.HttpTransportType.WebSockets })
         .withAutomaticReconnect()
         .configureLogging(signalR.LogLevel.Information)
         .build();
 
-    if (onDataReceived.crowd) connection.on('ReceiveCrowdInfo', onDataReceived.crowd);
-    if (onDataReceived.traffic) connection.on('ReceiveTrafficInfo', onDataReceived.traffic);
-    if (onDataReceived.suggestions) connection.on('ReceiveSuggestions', onDataReceived.suggestions);
-    if (onDataReceived.weatherForecasts) connection.on('ReceiveWeatherForecasts', onDataReceived.weatherForecasts);
+    if (onDataReceived.crowd) conn.on("ReceiveCrowdInfo", onDataReceived.crowd);
+    if (onDataReceived.traffic) conn.on("ReceiveTrafficInfo", onDataReceived.traffic);
+    if (onDataReceived.suggestions) conn.on("ReceiveSuggestions", onDataReceived.suggestions);
+    if (onDataReceived.weather) conn.on("ReceiveWeatherForecasts", onDataReceived.weather);
 
-    connection.onclose(err => console.warn('SignalR disconnected:', err));
+    conn.onclose(err => console.warn("SignalR disconnected:", err));
 
     try {
-        await connection.start();
-        console.log('✅ SignalR connected.');
+        await conn.start();
+        console.log("✅ SignalR connected (JS client).");
     } catch (err) {
-        console.error('❌ SignalR connection failed:', err);
+        console.error("❌ SignalR connection failed:", err);
         setTimeout(() => startSignalR(hubUrl, onDataReceived), 5000);
     }
 
-    window.outzenConnection = connection;
+    window.outzenConnection = conn;
+    return {
+        connected: true,
+        start: () => conn.start(),
+        stop: () => conn.stop()
+    };
 }
 
-// ---------------- Compatibility alias for Blazor
+// ============================
+// Default factory (keeps old usage pattern)
+// ============================
+export default function OutZenApp(opts = { mapId: "leafletMap", center: [50.89, 4.34], zoom: 13, enableChart: false }) {
+    initMap(opts.mapId, opts.center, opts.zoom);
+    if (opts.enableChart) initCrowdChart("crowdChart");
+
+    return {
+        addOrUpdateCrowdMarker,
+        removeCrowdMarker,
+        setFilterLevel,
+        showSuggestions,
+        addTrafficMarkers,
+        updateCrowdChart
+    };
+}
+export function bootOutZen(opts) {
+    const app = OutZenApp(
+        opts ?? { mapId: 'leafletMap', center: [50.89, 4.34], zoom: 13, enableChart: true }
+    );
+
+    window.OutZenInterop = {
+        addOrUpdateCrowdMarker: (id, lat, lng, level, info) => app.addOrUpdateCrowdMarker(id, lat, lng, level, info),
+        setFilter: (lvl) => app.setFilterLevel(lvl),
+        removeMarker: (id) => app.removeCrowdMarker(id)
+    };
+
+    return app; // optional but useful for debugging
+}
+// ---------------- Compatibility aliases for Blazor (optional)
 window.initScrollFade = initScrollAndParallax;
 
+window.mapInterop = {
+    init: function (elementId) {
+        initMap(elementId, [48.86, 2.35], 12);
+    },
+    updateTrafficMarkers: function (events) {
+        addTrafficMarkers(events || []);
+    }
+};
 
 
 

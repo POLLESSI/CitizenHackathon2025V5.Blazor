@@ -1,4 +1,4 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.Models;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Auths;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
@@ -92,12 +92,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
         private async Task InitSignalR(string token)
         {
             _hubConnection = new HubConnectionBuilder()
-                .WithUrl("https://localhost:7254/userhub", options =>
+                .WithUrl("https://localhost:7254/hubs/userHub", options =>
                 {
                     options.AccessTokenProvider = () => Task.FromResult(token);
                 })
                 .WithAutomaticReconnect(new[] { TimeSpan.Zero, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10) })
                 .Build();
+            await _hubConnection.StartAsync();
 
             _hubConnection.Reconnecting += error =>
             {
@@ -274,3 +275,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

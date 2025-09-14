@@ -1,5 +1,6 @@
-﻿@using CitizenHackathon2025V5.Blazor.Client.Services
+@using CitizenHackathon2025V5.Blazor.Client.Services
 @using CitizenHackathon2025V5.Blazor.Client.SignalR
+@using Blazored.Toast
 @inherits LayoutComponentBase
 
 <button class="btn btn-primary" @onclick="ShowTestToast">
@@ -13,7 +14,6 @@
 </div>
 
 <div class="dynamic-bg" style="background-image: url('@GetBackgroundImage()'); background-size: cover;">
-    <BlazoredToast />
 </div>
 
 <div class="app-container">
@@ -21,13 +21,14 @@
 
     <main class="main-content">
         <div class="page-content">
+            <BlazoredToasts Position="Blazored.Toast.Configuration.ToastPosition.TopRight" />
             @Body
         </div>
     </main>
     <div class="dynamic-bg @GetTimeClass()" style="background-image: url('@GetBackgroundImage()');"></div>
 
     <footer class="main-footer">
-        <p>© @DateTime.Now.Year - OutZen by CitizenHackathon2025 🇧🇪</p>
+        <p>� @DateTime.Now.Year - OutZen by CitizenHackathon2025</p>
     </footer>
 
     <canvas id="layoutBackgroundCanvas" width="800" height="400"></canvas>
@@ -183,3 +184,7 @@
 
 
 @* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@
+
+
+
+

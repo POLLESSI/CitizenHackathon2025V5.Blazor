@@ -1,4 +1,4 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.Models;
 using Microsoft.AspNetCore.Components;
 using Newtonsoft.Json;
 using System.Threading;
@@ -47,7 +47,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             }
             catch (TaskCanceledException)
             {
-                // Normal cancellation → we ignore
+                // Normal cancellation ? we ignore
             }
             catch (Exception ex)
             {
@@ -149,3 +149,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

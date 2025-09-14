@@ -1,0 +1,7 @@
+﻿/*wwwroot.css.themes.light.css*/
+:root {
+    --color-bg: #ffffff;
+    --color-bg-alt: #f6f8fa;
+    --color-fg: #111;
+    --ultra-border: 1px solid rgba(0,0,0,.06);
+}

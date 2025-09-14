@@ -1,4 +1,6 @@
-﻿/* Optional: Custom variant for paragraphs */
+﻿/*wwwroot.css.components.detail-container.css*/
+
+/* Optional: Custom variant for paragraphs */
 .detail-container.maroon p {
     background: rgba(135, 206, 250, 0.1);
     border-left: 3px solid deepskyblue;

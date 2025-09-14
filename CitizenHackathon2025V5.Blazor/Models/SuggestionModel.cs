@@ -1,4 +1,4 @@
-﻿namespace CitizenHackathon2025V5.Blazor.Client.Models
+namespace CitizenHackathon2025V5.Blazor.Client.Models
 {
     public class SuggestionModel
     {
@@ -87,3 +87,7 @@
 
 
 /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/
+
+
+
+

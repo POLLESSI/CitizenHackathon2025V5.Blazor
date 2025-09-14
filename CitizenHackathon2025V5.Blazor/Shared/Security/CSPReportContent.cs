@@ -1,8 +1,8 @@
-﻿namespace CitizenHackathon2025V5.Blazor.Client.Shared.Security
+namespace CitizenHackathon2025V5.Blazor.Client.Shared.Security
 {
     public class CspReportContent
     {
-#nullable disable
+    #nullable disable
         public string DocumentUri { get; set; }
         public string Referrer { get; set; }
         public string ViolatedDirective { get; set; }
@@ -17,3 +17,8 @@
         public string ScriptSample { get; set; } = string.Empty;
     }
 }
+
+
+
+
+

@@ -1,4 +1,6 @@
-﻿.page-layout {
+﻿/*wwwroot.css.base.layout.css*/
+
+.page-layout {
     display: grid;
     grid-template-rows: auto 1fr auto;
     min-height: 100vh;

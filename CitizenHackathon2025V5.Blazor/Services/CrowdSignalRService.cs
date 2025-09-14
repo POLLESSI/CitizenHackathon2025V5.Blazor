@@ -1,4 +1,4 @@
-﻿using System.Threading;
+using System.Threading;
 using System.Threading.Tasks;
 using CitizenHackathon2025V5.Blazor.Client.SignalR;
 
@@ -15,14 +15,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             await InitializeAsync(HubName.Crowd, ct);
 
             // Server -> Client Handlers
-            RegisterHandler<string>("notifynewCrowd", msg =>
+            RegisterHandler<string>("CrowdRefreshRequested", msg =>
             {
-                Console.WriteLine($"[Crowd] notifynewCrowd: {msg}");
+                Console.WriteLine($"[Crowd] CrowdRefreshRequested: {msg}");
                 // TODO: relay to UI / state container
             });
 
-            // If necessary: ​​ensure that the connection remains up
+            // If necessary: ??ensure that the connection remains up
             await EnsureConnectedAsync(ct: ct);
         }
     }
 }
+
+
+
+

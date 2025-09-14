@@ -1,0 +1,285 @@
+﻿/*wwwroot.css.overides.css*/
+
+/* ====== SAFE LIST OVERRIDES (v2) ====== */
+/* 1) Fine scope: only affects pages that add .page-list to the root */
+.page-list .table-wrapper {
+    /* wide but reasonable width */
+    width: min(1400px, 95vw);
+    min-width: 80vw;
+    margin: 0 auto;
+}
+
+/* 2) The table occupies the entire internal width */
+.page-list table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto; /* no "fixed" to avoid tight cells */
+}
+
+/* 3) Minimalist "dark" table styles (if Bootstrap is not present) */
+.page-list .table.table-dark {
+    background: #1e1e1e;
+    color: #f5f5f5;
+}
+
+.page-list .table.table-striped tbody tr:nth-child(odd) {
+    background: rgba(255,255,255,0.04);
+}
+
+.page-list .table th,
+.page-list .table td {
+    padding: .5rem .75rem;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    vertical-align: middle;
+    white-space: nowrap; /* avoid columns that are too high if the text is long */
+}
+
+/* 4) Small screens = 100% */
+@media (max-width: 900px) {
+    .page-list .table-wrapper {
+        width: 100%;
+        min-width: 100%;
+    }
+}
+
+/* 5) Do NOT touch .container/.card/.detail-container (deleted) */
+/* 6) Optional: Prevent a parent from hiding content */
+.page-list .table-wrapper {
+    overflow: auto;
+}
+/* already your case, we keep it here */
+.page-list {
+    display: grid;
+    gap: .75rem;
+}
+
+.table-wrapper {
+    height: 60vh;
+    overflow: auto;
+    border: 1px solid #444;
+    border-radius: 8px;
+}
+
+.styled-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+    .styled-table thead th {
+        position: sticky;
+        top: 0;
+        background: #1f1f1f;
+        z-index: 1;
+    }
+
+    .styled-table tbody tr:hover {
+        background: rgba(255,255,255,.05);
+    }
+
+    .styled-table td, .styled-table th {
+        padding: .6rem .75rem;
+        vertical-align: middle;
+    }
+
+    .styled-table .col-actions {
+        width: 1%;
+        white-space: nowrap;
+    }
+
+.badge {
+    display: inline-block;
+    padding: .2rem .5rem;
+    border-radius: 9999px;
+    font-size: .8rem;
+}
+
+.badge--lvl1 {
+    background: #1b5e20;
+}
+
+.badge--lvl2 {
+    background: #33691e;
+}
+
+.badge--lvl3 {
+    background: #f57f17;
+}
+
+.badge--lvl4 {
+    background: #e65100;
+}
+
+.badge--lvl5 {
+    background: #b71c1c;
+}
+
+.ellipsis {
+    max-width: 24ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.list-toolbar {
+    display: flex;
+    gap: .5rem;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.oz-input, .oz-select {
+    background: #121212;
+    color: #fff;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: .45rem .6rem;
+}
+.oz-empty {
+    padding: 1rem;
+    text-align: center;
+    color: #bbb;
+}
+.page-split {
+    display: grid;
+    grid-template-columns: 1fr minmax(320px, 420px);
+    gap: 1rem;
+}
+
+@media (max-width: 992px) {
+    .page-split {
+        grid-template-columns: 1fr;
+    }
+}
+/* === List Kit — safe overrides === */
+
+/* Comfortable width constraint for list pages */
+.page-list {
+    width: min(1280px, 96vw);
+    margin: 0 auto;
+}
+
+/* Toolbar at the top of the lists */
+.list-toolbar {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    justify-content: space-between;
+    margin: .5rem 0 1rem;
+}
+
+    .list-toolbar .left,
+    .list-toolbar .right {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+    }
+
+/* Compact search field */
+.input-compact {
+    height: 34px;
+    padding: 0 .6rem;
+    background: var(--color-bg-alt, #1e1e1e);
+    border: 1px solid rgba(255,255,255,.12);
+    color: var(--color-fg, #fff);
+    border-radius: 8px;
+}
+
+/* Chip buttons for quick filters */
+.chip {
+    border: 1px solid rgba(255,255,255,.16);
+    background: rgba(255,255,255,.06);
+    color: var(--color-fg, #fff);
+    padding: .25rem .6rem;
+    border-radius: 9999px;
+    font-size: .9rem;
+    cursor: pointer;
+}
+
+    .chip.active {
+        border-color: var(--color-accent, #00fff7);
+    }
+
+/* Table: sticky header + better readability */
+.styled-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+    .styled-table thead th {
+        position: sticky;
+        top: 0;
+        background: rgba(0,0,0,.45);
+        backdrop-filter: blur(6px);
+        z-index: 1;
+    }
+
+    .styled-table tbody tr:hover {
+        background: rgba(255,255,255,.04);
+    }
+
+/* Useful columns */
+.col-actions {
+    width: 120px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.col-narrow {
+    width: 120px;
+}
+
+.text-ellipsis {
+    max-width: 520px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Badges */
+.badge {
+    display: inline-block;
+    padding: .2rem .5rem;
+    border-radius: 6px;
+    font-size: .85rem;
+    line-height: 1;
+}
+
+.badge-info {
+    background: rgba(23,162,184,.18);
+    border: 1px solid rgba(23,162,184,.35);
+}
+
+.badge-ok {
+    background: rgba(40,167,69,.18);
+    border: 1px solid rgba(40,167,69,.35);
+}
+
+.badge-warn {
+    background: rgba(255,193,7,.18);
+    border: 1px solid rgba(255,193,7,.35);
+}
+
+.badge-danger {
+    background: rgba(220,53,69,.18);
+    border: 1px solid rgba(220,53,69,.35);
+}
+
+/* Empty state */
+.empty-state {
+    padding: 2rem;
+    text-align: center;
+    color: #aaa;
+    border: 1px dashed rgba(255,255,255,.14);
+    border-radius: 12px;
+    margin: 1rem 0;
+}
+
+/* “Drawer” detail */
+.detail-wrapper {
+    margin-top: 1rem;
+    padding: .75rem;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    background: rgba(255,255,255,.03);
+}

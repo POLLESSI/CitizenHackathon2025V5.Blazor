@@ -1,4 +1,4 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
@@ -26,7 +26,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 return;
 
             _hubConnection = new HubConnectionBuilder()
-                .WithUrl(_navigation.ToAbsoluteUri("/hubs/wazetraffic"))
+                // If your server does not expose "wazetraffic", use the mapped hub: "/hubs/trafficHub"
+                .WithUrl(_navigation.ToAbsoluteUri("/hubs/trafficHub"))
                 .WithAutomaticReconnect()
                 .Build();
 
@@ -39,11 +40,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             try
             {
                 await _hubConnection.StartAsync();
-                Console.WriteLine("✅ Connected to SignalR traffic hub.");
+                Console.WriteLine("? Connected to SignalR traffic hub.");
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"❌ Failed to connect to SignalR traffic hub: {ex.Message}");
+                Console.Error.WriteLine($"? Failed to connect to SignalR traffic hub: {ex.Message}");
             }
         }
 
@@ -146,3 +147,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

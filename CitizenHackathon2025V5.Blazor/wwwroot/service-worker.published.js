@@ -1,4 +1,6 @@
-﻿// For the production
+﻿//wwwroot.service - worker.published.js
+
+// For the production
 
 //// service-worker.published.js - Production Mode (PWA)
 

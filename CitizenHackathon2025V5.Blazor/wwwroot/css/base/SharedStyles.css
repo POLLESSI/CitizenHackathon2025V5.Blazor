@@ -1,4 +1,6 @@
-﻿.app-container {
+﻿/*wwwroot.css.base.SharedStyles.css*/
+
+.app-container {
     display: flex;
     min-height: 100vh;
 }

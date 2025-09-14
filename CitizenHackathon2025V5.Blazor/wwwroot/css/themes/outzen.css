@@ -1,4 +1,6 @@
-﻿:root {
+﻿/*wwwroot.css.themes.outzen.css*/
+
+:root {
     /* You can add OutZen-specific variables here if needed. */
 }
 
@@ -128,7 +130,7 @@ h1, h2 {
     position: fixed;
     top: 80px;
     right: 0;
-    width: 260px;
+    width: 560px;
     background-color: #f0f0f0;
     border-left: 2px solid #ccc;
     box-shadow: -2px 0 8px rgba(0,0,0,0.1);

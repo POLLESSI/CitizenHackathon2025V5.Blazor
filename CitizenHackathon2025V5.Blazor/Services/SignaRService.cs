@@ -1,6 +1,5 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Models;
-using CitizenHackathon2025V5.Blazor.Client.Shared.Suggestion;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using System;
@@ -121,7 +120,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                         if (OnNotify != null) await OnNotify(null);
                     });
 
-                    connection.On<SuggestionDTO>("ReceiveSuggestion", async (suggestion) =>
+                    connection.On<ClientSuggestionDTO>("ReceiveSuggestion", async (suggestion) =>
                     {
                         await _jsRuntime.InvokeVoidAsync("signalRClient.showToast", $"SuggestionHub: Suggestion received - {suggestion.Title}", "SuggestionHub");
                         if (OnNotify != null) await OnNotify(suggestion);
@@ -259,3 +258,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

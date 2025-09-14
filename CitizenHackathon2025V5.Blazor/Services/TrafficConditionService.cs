@@ -1,5 +1,6 @@
 ﻿using CitizenHackathon2025V5.Blazor.Client.Models;
 using CitizenHackathon2025V5.Blazor.Client.Utils;
+using System.Net;
 using System.Net.Http.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
@@ -8,89 +9,44 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     {
         private readonly HttpClient _httpClient;
 
+        // ✨ Inject the default client configured in Program.cs (BaseAddress = {api}/api/)
         public TrafficConditionService(IHttpClientFactory factory)
         {
-            _httpClient = factory.CreateClient("CitizenHackathonAPI");
+            _httpClient = factory.CreateClient("Default"); // BaseAddress = https://localhost:7254/api/
         }
 
-        /// <summary>
-        /// Retrieves the list of latest traffic conditions.
-        /// </summary>
-        /// <returns>Non-zero list of traffic conditions</returns>
         public async Task<List<TrafficConditionModel>> GetLatestTrafficConditionAsync()
         {
             try
             {
-                // HTTP GET call with automatic deserialization
-                var response = await _httpClient.GetAsync("trafficcondition/latest");
+                // ✅ No leading slash, relative to BaseAddress
+                //    Adjust the path to match your API controller route shown in Swagger.
+                //    Most likely: "trafficcondition/latest"
+                // BaseAddress = https://localhost:7254/api/  → do not prefix with "api/
+                var resp = await _httpClient.GetAsync("TrafficCondition/latest");
+                if (resp.StatusCode == HttpStatusCode.NotFound) return null; // no exceptions
+                resp.EnsureSuccessStatusCode();
 
-                if (!response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-                    throw new HttpRequestException($"API call failed with status {response.StatusCode}. Content: {content}");
-                }
-
-                var trafficConditions = await response.Content.ReadFromJsonAsync<List<TrafficConditionModel>>();
-
-                return trafficConditions?.ToNonNullList() ?? new List<TrafficConditionModel>();
-            }
-            catch (HttpRequestException httpEx)
-            {
-                // Specific HTTP errors
-                Console.Error.WriteLine($"HTTP error in GetLatestTrafficConditionAsync: {httpEx.Message}");
-                throw;
-            }
-            catch (NotSupportedException nsEx)
-            {
-                // Error if content is not JSON
-                Console.Error.WriteLine($"The content type is not supported: {nsEx.Message}");
-                throw;
+                var list = await resp.Content.ReadFromJsonAsync<List<TrafficConditionModel>>();
+                return list?.ToNonNullList() ?? new();
             }
             catch (Exception ex)
             {
-                // Other errors
                 Console.Error.WriteLine($"Unexpected error in GetLatestTrafficConditionAsync: {ex.Message}");
                 throw;
             }
         }
 
-        /// <summary>
-        /// Records a new traffic condition.
-        /// </summary>
-        /// <param name="trafficCondition">Condition to save</param>
-        /// <returns>Condition recorded with server info</returns>
-        public async Task<TrafficConditionModel> SaveTrafficConditionAsync(TrafficConditionModel trafficCondition)
+        public async Task<TrafficConditionModel> SaveTrafficConditionAsync(TrafficConditionModel dto)
         {
-            if (trafficCondition == null)
-                throw new ArgumentNullException(nameof(trafficCondition));
+            if (dto is null) throw new ArgumentNullException(nameof(dto));
 
-            try
-            {
-                var response = await _httpClient.PostAsJsonAsync("trafficcondition", trafficCondition);
+            // Likely "trafficcondition" (check Swagger)
+            var resp = await _httpClient.PostAsJsonAsync("TrafficCondition", dto);
+            resp.EnsureSuccessStatusCode();
 
-                if (!response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-                    throw new HttpRequestException($"API POST failed with status {response.StatusCode}. Content: {content}");
-                }
-
-                var savedCondition = await response.Content.ReadFromJsonAsync<TrafficConditionModel>();
-
-                return savedCondition ?? throw new InvalidOperationException("Response content was null");
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error in SaveTrafficConditionAsync: {ex.Message}");
-                throw;
-            }
-        }
-
-        /// <summary>
-        /// Updates a traffic condition (method to be implemented as needed).
-        /// </summary>
-        public Task<TrafficConditionModel?> UpdateTrafficConditionAsync(TrafficConditionModel trafficCondition)
-        {
-            throw new NotImplementedException("UpdateTrafficConditionAsync method is not implemented yet.");
+            var saved = await resp.Content.ReadFromJsonAsync<TrafficConditionModel>();
+            return saved ?? throw new InvalidOperationException("Response content was null");
         }
     }
 }
@@ -175,3 +131,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

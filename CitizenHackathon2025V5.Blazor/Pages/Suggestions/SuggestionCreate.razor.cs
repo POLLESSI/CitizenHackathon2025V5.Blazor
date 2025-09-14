@@ -1,4 +1,4 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.Models;
 using Microsoft.AspNetCore.Components;
 using Newtonsoft.Json;
 using System.Text;
@@ -7,15 +7,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
 {
     public partial class SuggestionCreate
     {
-        [Inject]
-        public HttpClient Client { get; set; }  // Injection HttpClient
-        [Inject]
-        public NavigationManager Navigation { get; set; }
+        [Inject] public HttpClient Client { get; set; } = default!;
+        [Inject] public NavigationManager Navigation { get; set; } = default!;
         private SuggestionModel NewSuggestion { get; set; } = new SuggestionModel();
 
-        protected override async Task OnInitializedAsync()
+        protected override Task OnInitializedAsync()
         {
             NewSuggestion = new SuggestionModel();
+            return Task.CompletedTask;
         }
         public async Task submit()
         {
@@ -98,3 +97,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

@@ -1,4 +1,4 @@
-﻿@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
 @using CitizenHackathon2025V5.Blazor.Client.Enums
 @inject IJSRuntime JSRuntime
 <h3>Leaflet Map Component</h3>
@@ -12,8 +12,8 @@
     private LeafletMapComponent? mapComponent;
 
 
-    // Appelée via @ref
-    public async Task UpdateMarkersAsync(List<TrafficEventDTO> events)
+    // Appel�e via @ref
+    public async Task UpdateMarkersAsync(List<ClientTrafficEventDTO> events)
     {
         if (!mapInitialized)
         {
@@ -27,7 +27,7 @@
     {
         if (firstRender && mapComponent is not null)
         {
-            var demoEvents = new List<TrafficEventDTO>
+            var demoEvents = new List<ClientTrafficEventDTO>
             {
                 new()
                 {
@@ -38,7 +38,7 @@
                     Longitude = 2.3522,
                     StartTime = DateTime.UtcNow,
                     DelayInSeconds = 3600,
-                    Level = (TrafficLevel)3,
+                    Level = (int)3,
 
                 }
             };
@@ -128,3 +128,7 @@
 
 
 @* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@
+
+
+
+

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Models
 {
@@ -111,3 +111,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Models
 
 
 /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/
+
+
+
+

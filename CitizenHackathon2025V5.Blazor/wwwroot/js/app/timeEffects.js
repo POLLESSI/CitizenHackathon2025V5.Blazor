@@ -1,4 +1,6 @@
-﻿export function initTimeBasedEffects() {
+﻿/*wwwroot / js / app / timeEffects.js*/
+
+export function initTimeBasedEffects() {
     const canvas = document.getElementById('bgCanvas');
     if (!canvas) return;
 

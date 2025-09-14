@@ -1,4 +1,4 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.Models;
 using Microsoft.AspNetCore.Components;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
@@ -49,7 +49,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             }
             catch (TaskCanceledException)
             {
-                // Normal cancellation → we ignore
+                // Normal cancellation ? we ignore
             }
             catch (Exception ex)
             {
@@ -146,3 +146,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

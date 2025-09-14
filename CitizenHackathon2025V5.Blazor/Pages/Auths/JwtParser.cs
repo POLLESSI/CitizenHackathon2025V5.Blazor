@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text;
 using System.Text.Json;
 
@@ -25,3 +25,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Auths
         public string Role { get; set; } = string.Empty;
     }
 }
+
+
+
+
+

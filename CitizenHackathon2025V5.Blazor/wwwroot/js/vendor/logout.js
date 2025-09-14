@@ -1,4 +1,6 @@
-﻿window.outzenLogout = {
+﻿/*wwwroot.logout.js*/
+
+window.outzenLogout = {
     autoLogout: async function (refreshToken) {
         try {
             await fetch("/api/auth/logout", {

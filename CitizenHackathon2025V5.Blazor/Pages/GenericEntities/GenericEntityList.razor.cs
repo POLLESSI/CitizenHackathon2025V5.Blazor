@@ -1,4 +1,4 @@
-﻿//using CitizenHackathon2025V4.Blazor.Client.Common.SignalR;
+//using CitizenHackathon2025V4.Blazor.Client.Common.SignalR;
 //using Microsoft.AspNetCore.Components;
 //using System.Net.Http.Json;
 
@@ -128,3 +128,7 @@
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

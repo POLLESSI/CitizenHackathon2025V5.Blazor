@@ -1,5 +1,146 @@
-ï»¿<h3>SuggestionView</h3>
+@page "/suggestionview"
+@using CitizenHackathon2025V5.Blazor.Client.Models;
+@using CitizenHackathon2025.Blazor.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.Constants
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@inject IJSRuntime js
+
+<span class="fas fa-certificate me-2"></span> Suggestions
+
+
+<div class="page-list">
+    <h3>Place List</h3>
+    <div class="list-toolbar">
+        <div class="left">
+            <input class="input-compact" placeholder="Rechercher..."
+                   @bind="_q" @bind:event="oninput" />
+            @if (!string.IsNullOrWhiteSpace(_q))
+            {
+                <span class="badge badge-info">“@_q”</span>
+            }
+        </div>
+
+        <div class="right">
+            <button class="chip @( _onlyRecent ? "active" : null )"@onclick="() => ToggleRecent()">Recent</button>
+        </div>
+    </div>
+        <div class="table-wrapper draggable-container"
+                @ref="ScrollContainerRef"
+                @onscroll="HandleScroll"
+                style="height: 300px; overflow-y: auto; border: 1px solid #444;">
+            <table class="table table-striped table-dark styled-table data-list">
+                <thead>
+                    <tr>
+                        <th class="col-narrow">Original Place</th>
+                        <th class="col-narrow">Suggested Alternative</th>
+                        <th class="col-narrow">Reason</th>
+                        <th class="col-actions"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (!FilterSuggestion(visibleSuggestions).Any())
+                    {
+                      <tr><td colspan="99"><div class="empty-state">Aucun incident.</div></td></tr>
+                    }
+                    else
+                    {
+                    @foreach (var su in FilterSuggestion(visibleSuggestions))
+                        {
+                            <tr>
+                                <td class="text-ellipsis" title="@su.OriginalPlace">@su.OriginalPlace</td>
+                                <td class="text-ellipsis" title="@su.SuggestedAlternative">@su.SuggestedAlternative</td>
+                                <td class="text-ellipsis" title="@su.Reason">@su.Reason</td>
+                                <td class="col-actions">
+                                    <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(su.Id)">Info</button>
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+
+</div>
+            
+
+<hr />
+
+@if (SelectedId > 0)
+{
+  <div class="detail-wrapper">
+    <div class="list-toolbar">
+      <div class="left"><span class="badge badge-info">Détail #@SelectedId</span></div>
+      <div class="right">
+        <button class="chip" @onclick="() => SelectedId = 0">Fermer</button>
+      </div>
+    </div>
+        <SuggestionDetail Id="@SelectedId" />
+  </div>
+}
+@if (!FilterSuggestion(visibleSuggestions).Any())
+{
+    <div class="oz-empty">No items for these filters.</div>
+}
+
 
 @code {
+#nullable disable
+    private List<SuggestionModel> allSuggestions = new(); // All elements
+    private List<SuggestionModel> visibleSuggestions = new(); // Those to display
+    private int batchSize = 5;
+    private int currentIndex = 0;
+    private ElementReference ScrollContainerRef;
 
+    protected override void OnInitialized()
+    {
+        var now = DateTime.UtcNow;
+        // Simulates a data source
+        for (int i = 1; i <= 50; i++)
+            allSuggestions.Add(new SuggestionModel
+            {
+                Id = i,
+                OriginalPlace = $"Original Place {i}",
+                SuggestedAlternative = i % 2 == 0 ? "One" : "Auther",
+                Reason = $"Re0ason {i}",
+                Date = now.AddMinutes(-i * 10)
+            });
+
+        LoadMoreItems();
+    }
+
+    private void LoadMoreItems()
+    {
+        var nextItems = allSuggestions.Skip(currentIndex).Take(batchSize);
+        visibleSuggestions.AddRange(nextItems);
+        currentIndex += batchSize;
+    }
+
+    private async Task HandleScroll()
+    {
+        var scrollTop = await js.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
+        var scrollHeight = await js.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
+        var clientHeight = await js.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
+
+        if (scrollTop + clientHeight >= scrollHeight - 5 && currentIndex < allSuggestions.Count)
+        {
+            LoadMoreItems();
+            StateHasChanged();
+        }
+    }
+    private string _q;
+    private bool _onlyRecent, _onlyFav;
+
+    private IEnumerable<SuggestionModel> FilterSuggestion(IEnumerable<SuggestionModel> source)
+    {
+        var q = _q?.Trim();
+        var cutoff = DateTime.UtcNow.AddHours(-6);
+
+        return source
+            .Where(x => string.IsNullOrEmpty(q)
+                        || (x.SuggestedAlternative ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
+                        || (x.Reason ?? "").Contains(q, StringComparison.OrdinalIgnoreCase))
+            .Where(x => !_onlyRecent || x.Date >= cutoff);
+    }
+
+    private void ToggleRecent() => _onlyRecent = !_onlyRecent;
 }

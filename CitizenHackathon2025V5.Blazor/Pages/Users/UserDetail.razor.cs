@@ -1,4 +1,4 @@
-﻿using System.Threading;
+using System.Threading;
 using CitizenHackathon2025V5.Blazor.Client.Models;
 using Microsoft.AspNetCore.Components;
 using Newtonsoft.Json;
@@ -133,3 +133,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

@@ -1,3 +1,5 @@
+<!--wwwroot/index.html-->
+
 <!DOCTYPE html>
 <html lang="fr-BE">
 <head>
@@ -22,42 +24,56 @@
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-    <!-- Base Styles -->
-    <link href="css/base/reset.css" rel="stylesheet" />
-    <link href="css/base/variables.css" rel="stylesheet" />
-    <link href="css/base/layout.css" rel="stylesheet" />
-    <link href="css/base/blazor-core.css" rel="stylesheet" />
-    <link href="css/base/app.css" rel="stylesheet" />
-    <link href="css/base/site.css" rel="stylesheet" />
-    <link href="css/base/SharedStyles.css" rel="stylesheet" />
+    <!-- Base Styles (keeps only what physically exists in wwwroot -->
+    <link href="/css/base/reset.css" rel="stylesheet" />
+    <link href="/css/base/variables.css" rel="stylesheet" />
+    <link href="/css/base/layout.css" rel="stylesheet" />
+    <link href="/css/base/blazor-core.css" rel="stylesheet" />
+    <link href="/css/base/app.css" rel="stylesheet" />
+    <link href="/css/base/site.css" rel="stylesheet" />
+    <link href="/css/base/SharedStyles.css" rel="stylesheet" />
 
     <!-- Animations -->
-    <link href="css/animations/site.variables.css" rel="stylesheet" />
-    <link href="css/animations/animations.css" rel="stylesheet" />
-    <link href="css/animations/pulseColors.css" rel="stylesheet" />
-    <link href="css/animations/visual-elements.css" rel="stylesheet" />
+    <link href="/css/animations/site-variables.css" rel="stylesheet">
+    <link href="/css/animations/animations.css" rel="stylesheet" />
+    <link href="/css/animations/pulseColors.css" rel="stylesheet" />
+    <link href="/css/animations/visual-elements.css" rel="stylesheet" />
 
     <!-- Components -->
-    <link href="css/components/button.css" rel="stylesheet" />
-    <link href="css/components/detail-container.css" rel="stylesheet" />
-    <link href="css/components/info.css" rel="stylesheet" />
-    <link href="css/components/map.css" rel="stylesheet" />
-    <link href="css/components/simulator.css" rel="stylesheet" />
+    <link href="/css/components/button.css" rel="stylesheet" />
+    <link href="/css/components/detail-container.css" rel="stylesheet" />
+    <link href="/css/components/info.css" rel="stylesheet" />
+    <link href="/css/components/map.css" rel="stylesheet" />
+    <link href="/css/base/simulator.css" rel="stylesheet">
+    <link href="css/components/panels.css" rel="stylesheet" />
 
     <!-- Theme -->
+    <link href="css/themes/light.css" rel="stylesheet" />
     <link href="css/themes/components.css" rel="stylesheet" />
     <link href="css/themes/global-styles.css" rel="stylesheet" />
     <link href="css/themes/outzen.css" rel="stylesheet" />
     <link href="css/themes/styles.css" rel="stylesheet" />
+    <!--<link href="css/outzen.bundle.css" rel="stylesheet" />-->
+    <!--<link href="css/overrides.css" rel="stylesheet" />-->
 
     <!-- External Styles -->
     <link href="css/external/blazored-toast.css" rel="stylesheet" />
-    <link href="css/external/open-iconic-bootstrap.min.css" rel="stylesheet" />
+    <!-- Open Iconic from CDN (avoids 404 local) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/open-iconic/1.1.1/font/css/open-iconic-bootstrap.min.css" rel="stylesheet" />
 
     <!-- Leaflet & MarkerCluster -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin />
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          crossorigin />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin defer></script>
+
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin />
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin defer></script>
+
+    <!-- Chart.js & Three.js (globals) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" crossorigin="anonymous" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous" defer></script>
 </head>
 
 <body>
@@ -78,35 +94,27 @@
     <div id="leafletMap" style="height: 600px; width: 100%;"></div>
     <canvas id="geometryCanvas" width="800" height="600"></canvas>
     <canvas id="crowdChart" width="400" height="200"></canvas>
-    <img src="wwwroot/images/day.png" alt="Day Background" style="display: none;" />
-    <!--<img src="wwwroot/images/night.png" alt="Night Background" style="display: none;" />
-    <img src="wwwroot/images/dawn.png" alt="Dawn Background" style="display: none;" />
-    <img src="wwwroot/images/sunset.png" alt="Sunset Background" style="display: none;" />-->
-    <img src="wwwroot/images/earth_texture.jpg" alt="Eart Texture" style="display: none;" />
 
-    <!-- External JS Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" crossorigin="anonymous" defer></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous" defer></script>
-    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin="anonymous" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js" crossorigin="anonymous" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous" defer></script>
+    <!-- Images (make sure these files exist in wwwroot/images) -->
+    <img src="/images/day.png" alt="Day Background" style="display:none;" />
+    <img src="/images/eart_texture.jpg" alt="Earth Texture" style="display:none;" />
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Minimal interop bridge -->
-    <script src="js/trafficInterop.js" defer></script>
-    <script src="js/interop.js" defer></script>
+    <script src="/js/trafficInterop.js" defer></script>
+    <script src="/js/interop.js" defer></script>
 
-    <!-- OutZen Modules -->
-    <script type="module" src="js/outzen.bundle.js"></script>
-    <script type="module" src="js/app/leafletOutZen.module.js"></script>
-    <script type="module" src="js/app/timeEffects.js"></script>
-    <script type="module" src="js/app/wasmUtils.js"></script>
-    <script type="module" src="js/app/earthRotation.js"></script>
-    <script type="module" src="js/app/ui.effects.js"></script>
-    <script type="module" src="js/core/SignalR.client.js"></script>
+    <!-- Application modules -->
+    <script type="module" src="/js/app/leafletOutZen.module.js"></script>
+    <script type="module" src="/js/app/timeEffects.js"></script>
+    <script type="module" src="/js/app/wasmUtils.js"></script>
+    <script type="module" src="/js/app/earthRotation.js"></script>
+    <script type="module" src="/js/app/ui.effects.js"></script>
+    <script type="module" src="/js/core/SignalR.client.js"></script>
 
-    <!-- Initialize OutZen App -->
-    <script type="module">
-        import OutZenApp from './js/app/LeafletOutZen.js';
+    <!-- Initialize OutZen App (Leaflet module expecting global L and Chart) -->
+    <!--<script type="module">
+        import OutZenApp from '/js/app/leafletOutZen.module.js';
 
         const app = OutZenApp({
             mapId: "leafletMap",
@@ -122,8 +130,7 @@
             setFilter: (lvl) => app.setFilterLevel(lvl),
             removeMarker: (id) => app.removeCrowdMarker(id)
         };
-    </script>
-
+    </script>-->
     <!-- Service Worker -->
     <script>
         if ('serviceWorker' in navigator && location.hostname !== "localhost") {

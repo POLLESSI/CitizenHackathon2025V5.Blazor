@@ -1,4 +1,5 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.Pages.Auths;
+using CitizenHackathon2025V5.Blazor.Client.Pages.Auths;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.JSInterop;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -6,23 +7,23 @@ using System.Text.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
-    public class AuthService
+    public class AuthService : IAuthService
     {
         private readonly HttpClient _httpClient;
         private readonly IJSRuntime _js;
+        private readonly AuthenticationStateProvider _provider;
 
         private const string JwtTokenKey = "jwt_token";
         private const string RefreshTokenKey = "refresh_token";
 
-        private const string TokenKey = "jwt_token";
-
-        public AuthService(HttpClient httpClient, IJSRuntime js)
+        public AuthService(HttpClient httpClient, IJSRuntime js, AuthenticationStateProvider provider)
         {
             _httpClient = httpClient;
             _js = js;
+            _provider = provider;
         }
 
-        // 🔹 Login with JWT recovery + RefreshToken
+        // ?? Login with JWT recovery + RefreshToken
         public async Task<bool> LoginAsync(string email, string password)
         {
             var payload = new { email, password };
@@ -48,7 +49,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             return true;
         }
 
-        // 🔹 Manual OR auto logout (via beforeunload in JS)
+        // ?? Manual OR auto logout (via beforeunload in JS)
         public async Task LogoutAsync()
         {
             var refreshToken = await _js.InvokeAsync<string>("localStorage.getItem", RefreshTokenKey);
@@ -66,48 +67,19 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             _httpClient.DefaultRequestHeaders.Authorization = null;
         }
 
-        // 🔹 Retrieve the JWT token in memory
-        public async Task<string?> GetTokenAsync()
+        // ?? Retrieve the JWT token in memory
+        public async Task<string?> GetAccessTokenAsync()
         {
+            // version pragmatique : lis le localStorage o� tu stockes le token � la connexion
             var token = await _js.InvokeAsync<string>("localStorage.getItem", JwtTokenKey);
             return string.IsNullOrWhiteSpace(token) ? null : token;
         }
 
-        // 🔹 Retrieve the refresh token (useful for auto refresh)
+        // ?? Retrieve the refresh token (useful for auto refresh)
         public async Task<string?> GetRefreshTokenAsync()
         {
             var token = await _js.InvokeAsync<string>("localStorage.getItem", RefreshTokenKey);
             return string.IsNullOrWhiteSpace(token) ? null : token;
-        }
-
-        // 🔹 Check current user (decoded JWT payload)
-        public async Task<JwtPayload?> GetCurrentUserAsync()
-        {
-            var token = await GetTokenAsync();
-            if (string.IsNullOrEmpty(token)) return null;
-
-            try
-            {
-                var payload = JwtParser.DecodePayload(token);
-
-                // Configure header if not already done
-                if (_httpClient.DefaultRequestHeaders.Authorization == null)
-                    _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-                return payload;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        public Task<string?> GetAccessTokenOrNullAsync()
-        {
-            // TODO:
-            // - either calls an /auth/token endpoint which reads the HttpOnly cookie and returns a JWT
-            // - either returns null if your hub does not request a JWT
-            return Task.FromResult<string?>(null);
         }
 
         // DTO to deserialize the login response
@@ -192,3 +164,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

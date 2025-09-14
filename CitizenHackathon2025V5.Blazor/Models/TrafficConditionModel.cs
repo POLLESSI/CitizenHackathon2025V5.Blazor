@@ -1,4 +1,4 @@
-﻿namespace CitizenHackathon2025V5.Blazor.Client.Models
+namespace CitizenHackathon2025V5.Blazor.Client.Models
 {
     public class TrafficConditionModel
     {
@@ -10,6 +10,7 @@
         public string IncidentType { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string Level { get; set; } = string.Empty;
+
     }
 }
 
@@ -90,3 +91,7 @@
 
 
 /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/
+
+
+
+

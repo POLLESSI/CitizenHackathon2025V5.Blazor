@@ -1,0 +1,19 @@
+﻿wwwroot.css.pages.pages.weather.css
+{
+    padding: 1rem;
+    background: var(--color-bg-alt);
+    border-radius: var(--radius-md);
+    border: var(--ultra-border);
+    box-shadow: var(--box-shadow-md);
+}
+.weather-layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: var(--spacing-md);
+}
+
+@media (max-width: 900px) {
+    .weather-layout {
+        grid-template-columns: 1fr;
+    }
+}

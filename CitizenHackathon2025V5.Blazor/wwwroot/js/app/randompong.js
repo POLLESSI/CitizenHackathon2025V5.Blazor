@@ -1,4 +1,6 @@
-﻿(() => {
+﻿/*wwwroot / js / app / randompong.js*/
+
+(() => {
     const canvas = document.getElementById('game');
     const ctx = canvas.getContext('2d');
     const field = { w: canvas.width, h: canvas.height, wall: 14 };

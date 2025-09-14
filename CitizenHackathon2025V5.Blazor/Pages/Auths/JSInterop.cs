@@ -1,4 +1,4 @@
-﻿using Microsoft.JSInterop;
+using Microsoft.JSInterop;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Auths
 {
@@ -18,3 +18,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Auths
             await _js!.InvokeVoidAsync("jsInterop.removeLocalStorage", key);
     }
 }
+
+
+
+
+

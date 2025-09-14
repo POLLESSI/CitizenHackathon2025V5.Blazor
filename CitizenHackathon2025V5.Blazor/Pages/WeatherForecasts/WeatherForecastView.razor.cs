@@ -1,4 +1,5 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.Models;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -9,9 +10,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 {
     public partial class WeatherForecastView
     {
-#nullable disable
+    #nullable disable
         [Inject]
-        public HttpClient Client { get; set; }  // Injection HttpClient
+        public HttpClient Client { get; set; }  
         [Inject] public WeatherForecastService WeatherForecastService { get; set; }
         [Inject] public NavigationManager Navigation { get; set; }
 
@@ -21,13 +22,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
         protected override async Task OnInitializedAsync()
         {
-            WeatherForecasts = new List<WeatherForecastModel>();
-
-            await GetWeatherForecast();
+            allWeatherForecasts = await WeatherForecastService.GetHistoryAsync(limit: 200);
+            LoadMoreItems();
 
             hubConnection = new HubConnectionBuilder()
-                .WithUrl(new Uri("https://localhost:7254/hubs/weatherforecastHub"))
+                .WithUrl("https://localhost:7254/hubs/weatherforecastHub")
+                .WithAutomaticReconnect()
                 .Build();
+
+            hubConnection.On<ClientWeatherForecastDTO>("NewWeatherForecast", dto => { /* update UI */ });
 
             await hubConnection.StartAsync();
         }
@@ -35,7 +38,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
         private async Task GetWeatherForecast()
         {
-            using (HttpResponseMessage message = await Client.GetAsync("weatherforecast"))
+            using (HttpResponseMessage message = await Client.GetAsync("WeatherForecast/all"))
             {
                 if (message.IsSuccessStatusCode)
                 {
@@ -123,3 +126,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

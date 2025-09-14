@@ -1,5 +1,6 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.Models;
 using CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions;
+using System.Net;
 using System.Net.Http.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
@@ -15,21 +16,39 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         }
         public async Task<IEnumerable<GptInteractionModel>> GetAllInteractions()
         {
-            var response = await _httpClient.GetAsync($"gpt/all");
-            if (response.IsSuccessStatusCode)
+            try
             {
-                return await response.Content.ReadFromJsonAsync<IEnumerable<GptInteractionModel>>();
+                var response = await _httpClient.GetAsync("Gpt/all");
+                if (response.StatusCode == HttpStatusCode.NotFound) return null;
+                response.EnsureSuccessStatusCode();
+                
+                var list = await response.Content.ReadFromJsonAsync<IEnumerable<GptInteractionModel>>();
+                return list ?? Enumerable.Empty<GptInteractionModel>();
             }
-            return Enumerable.Empty<GptInteractionModel>();
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in GetAllInteractions: {ex.Message}");
+                throw;
+            }
+            
         }
         public async Task<IEnumerable<GptInteractionModel>> GetById(int id)
         {
-            var response = await _httpClient.GetAsync($"gpt/{id}");
-            if (response.IsSuccessStatusCode)
+            try
             {
-                return await response.Content.ReadFromJsonAsync<IEnumerable<GptInteractionModel>>();
+                var response = await _httpClient.GetAsync($"Gpt/{id}");
+                if (response.StatusCode == HttpStatusCode.NotFound) return null;
+                response.EnsureSuccessStatusCode();
+                
+                var list = await response.Content.ReadFromJsonAsync<IEnumerable<GptInteractionModel>>();
+                return list ?? Enumerable.Empty<GptInteractionModel>();
             }
-            return Enumerable.Empty<GptInteractionModel>();
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in GetByIdAsync: {ex.Message}");
+                throw;
+            }
+            
         }
         //public async Task<IEnumerable<GptInteractionModel>> GetSuggestionsByForecastIdAsync(int id)
         //{
@@ -51,27 +70,57 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         //}
         public async Task AskGpt(GptInteractionModel prompt)
         {
-            var response = await _httpClient.PostAsJsonAsync("gpt/ask-gpt", prompt);
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                throw new Exception("Failed to save suggestion");
+                var response = await _httpClient.PostAsJsonAsync("Gpt/Ask-Gpt", prompt);
+                if (response.StatusCode == HttpStatusCode.NotFound) return;
+                response.EnsureSuccessStatusCode();
+
+                var list = await response.Content.ReadFromJsonAsync<IEnumerable<GptInteractionModel>>();
+                return;
             }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in AskGpt: {ex.Message}");
+                throw;
+            }
+            
         }
         public async Task Delete(int id)
         {
-            var response = await _httpClient.DeleteAsync($"gpt/{id}");
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                throw new Exception("Failed to delete suggestion");
+                var response = await _httpClient.DeleteAsync($"Gpt/{id}");
+                if (response.StatusCode == HttpStatusCode.NotFound) return;
+                response.EnsureSuccessStatusCode();
+
+                var list = await response.Content.ReadFromJsonAsync<IEnumerable<GptInteractionModel>>();
+                return;
             }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in DeleteAsync: {ex.Message}");
+                throw;
+            }
+            
         }
         public async Task ReplayInteraction(int id)
         {
-            var response = await _httpClient.PostAsJsonAsync($"gpt/replay/{id}", new { });
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                throw new Exception("Failed to replay interaction");
+                var response = await _httpClient.PostAsJsonAsync($"Gpt/Replay/{id}", new { });
+                if (response.StatusCode == HttpStatusCode.NotFound) return;
+                response.EnsureSuccessStatusCode();
+                
+                var list = await response.Content.ReadFromJsonAsync<IEnumerable<GptInteractionModel>>();
+                return;
             }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in ReplayInteraction: {ex.Message}");
+                throw;
+            }
+            
         }
     }
 }
@@ -163,3 +212,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

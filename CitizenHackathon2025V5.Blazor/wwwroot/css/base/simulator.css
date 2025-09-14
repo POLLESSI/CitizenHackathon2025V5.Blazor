@@ -1,4 +1,6 @@
-﻿.oz-simulator {
+﻿/*wwwroot.css.base.simulator.css*/
+
+.oz-simulator {
     border-radius: 1rem;
     background-color: rgba(0, 0, 0, 0.6);
     padding: 1.5rem;

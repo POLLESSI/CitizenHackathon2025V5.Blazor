@@ -1,4 +1,5 @@
-﻿{
+﻿//wwwroot/manifest.webmanifest
+{
   "name": "OutZen - CitizenHackathon2025",
   "short_name": "OutZen",
   "start_url": "/",

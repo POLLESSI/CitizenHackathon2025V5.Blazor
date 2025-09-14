@@ -1,4 +1,4 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.Models;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -27,15 +27,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             hubConnection = new HubConnectionBuilder()
                 .WithUrl(new Uri("https://localhost:7254/hubs/gptinteractionHub"))
+                .WithAutomaticReconnect()
                 .Build();
-
             await hubConnection.StartAsync();
+
+            using (var message = await Client.GetAsync("Gpt/all")) 
+            {
+                //... 
+            } // /api/gptinteraction
         }
         private void ClickInfo(int id) => SelectedId = id;
 
         private async Task GetGptInteractions()
         {
-            using (HttpResponseMessage message = await Client.GetAsync("gptinteraction"))
+            using (HttpResponseMessage message = await Client.GetAsync("Gpt/all"))
             {
                 if (message.IsSuccessStatusCode)
                 {
@@ -117,3 +122,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

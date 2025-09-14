@@ -1,6 +1,5 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
-using CitizenHackathon2025V5.Blazor.Client.Shared.CrowdInfo;
 using Microsoft.AspNetCore.Components;
 using System.Timers;
 
@@ -12,7 +11,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         //[Inject] private OutZenSignalRService SignalRService { get; set; } = default!;
         //[Inject] private Blazored.Toast.Services.IToastService ToastService { get; set; } = default!;
 
-        private List<TrafficEventDTO>? trafficEvents;
+        private List<ClientTrafficEventDTO>? trafficEvents;
         private System.Timers.Timer? _refreshTimer;
 
         protected override async Task OnInitializedAsync()
@@ -25,15 +24,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 
             SignalRService.OnCrowdInfoUpdated += OnCrowdInfoReceived;
 
-            await SignalRService.InitializeOutZenAsync(); // <-- méthode correcte de ton service
+            await SignalRService.InitializeOutZenAsync(); // <-- m�thode correcte de ton service
             await TrafficService.StartAsync();
 
             StartAutoRefresh();
         }
 
-        private void OnCrowdInfoReceived(CrowdInfoDTO data)
+        private void OnCrowdInfoReceived(ClientCrowdInfoDTO data)
         {
-            Console.WriteLine($"🧠 Received Crowd Info: {data.CrowdLevel}");
+            Console.WriteLine($"?? Received Crowd Info: {data.CrowdLevel}");
         }
 
         private void StartAutoRefresh()
@@ -138,3 +137,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

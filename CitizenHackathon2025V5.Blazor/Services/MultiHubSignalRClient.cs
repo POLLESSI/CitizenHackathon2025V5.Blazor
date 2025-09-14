@@ -1,10 +1,10 @@
-﻿using System;
+﻿using CitizenHackathon2025V5.Blazor.Client.SignalR;
+using Microsoft.AspNetCore.SignalR.Client;
+using System;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.SignalR.Client;
-using CitizenHackathon2025V5.Blazor.Client.SignalR;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
@@ -17,33 +17,35 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     public sealed class MultiHubSignalRClient : IAsyncDisposable
     {
         private readonly string _baseHubUrl;
-        private readonly Func<Task<string?>>? _accessTokenProviderAsync;
+        private Func<Task<string?>>? _getAccessToken;
 
         private readonly ConcurrentDictionary<HubName, HubConnection> _connections = new();
         private readonly ConcurrentDictionary<HubName, SemaphoreSlim> _locks = new();
 
-        public MultiHubSignalRClient(string baseHubUrl, Func<Task<string?>>? accessTokenProviderAsync = null)
+        public MultiHubSignalRClient(string baseHubUrl, Func<Task<string?>>? getAccessToken = null)
         {
             _baseHubUrl = baseHubUrl.TrimEnd('/');
-            _accessTokenProviderAsync = accessTokenProviderAsync;
+            _getAccessToken = getAccessToken;
         }
+
+        public void ConfigureAccessTokenProvider(Func<Task<string?>>? provider) => _getAccessToken = provider;
 
         public HubConnectionState GetState(HubName hub) =>
             _connections.TryGetValue(hub, out var conn) ? conn.State : HubConnectionState.Disconnected;
 
         public bool IsConnected(HubName hub) => GetState(hub) == HubConnectionState.Connected;
 
-        /// <summary>Connecte un hub (idempotent).</summary>
+        /// <summary>Connect a hub (idempotent).</summary>
         public async Task ConnectAsync(HubName hub, CancellationToken ct = default)
         {
             var gate = _locks.GetOrAdd(hub, _ => new SemaphoreSlim(1, 1));
-            await gate.WaitAsync(ct);
+            await gate.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                if (_connections.TryGetValue(hub, out var existing) && existing.State != HubConnectionState.Disconnected)
+                if (_connections.TryGetValue(hub, out var existing) &&
+                    existing.State != HubConnectionState.Disconnected)
                 {
                     if (existing.State == HubConnectionState.Connected) return;
-                    // Attempt to start if not connected
                     await existing.StartAsync(ct).ConfigureAwait(false);
                     return;
                 }
@@ -61,11 +63,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
         }
 
-        /// <summary>Connects multiple hubs in parallel.</summary>
+        /// <summary>Connect multiple hubs in parallel.</summary>
         public Task ConnectAsync(HubName[] hubs, CancellationToken ct = default)
             => Task.WhenAll(hubs.Select(h => ConnectAsync(h, ct)));
 
-        /// <summary>Ensures the connection of a hub (small backoff).</summary>
+        /// <summary>Ensure connection with a tiny backoff.</summary>
         public async Task EnsureConnectedAsync(HubName hub, int maxAttempts = 3, CancellationToken ct = default)
         {
             for (int attempt = 1; attempt <= maxAttempts; attempt++)
@@ -88,15 +90,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             throw new InvalidOperationException($"Unable to (re)connect hub {hub}");
         }
 
-        /// <summary>Cleanly disconnects a hub.</summary>
+        /// <summary>Cleanly disconnect a hub.</summary>
         public async Task DisconnectAsync(HubName hub)
         {
             if (_connections.TryRemove(hub, out var conn))
             {
                 try
                 {
-                    await conn.StopAsync();
-                    await conn.DisposeAsync();
+                    await conn.StopAsync().ConfigureAwait(false);
+                    await conn.DisposeAsync().ConfigureAwait(false);
                     Console.WriteLine($"[SignalR/Multi] DISCONNECTED -> {hub}");
                 }
                 catch { /* noop */ }
@@ -107,7 +109,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         public async Task DisconnectAllAsync()
         {
             var ops = _connections.Keys.Select(DisconnectAsync);
-            await Task.WhenAll(ops);
+            await Task.WhenAll(ops).ConfigureAwait(false);
         }
 
         // ---------------------------
@@ -121,11 +123,25 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             Console.WriteLine($"[SignalR/Multi] Handler registered: {hub}.{methodName} ({typeof(T).Name})");
         }
 
+        public void RegisterHandler<T>(HubName hub, string methodName, Func<T, Task> handler)
+        {
+            var conn = RequireConnection(hub);
+            conn.On(methodName, handler);
+            Console.WriteLine($"[SignalR/Multi] Handler registered: {hub}.{methodName} async ({typeof(T).Name})");
+        }
+
         public void RegisterHandler(HubName hub, string methodName, Action handler)
         {
             var conn = RequireConnection(hub);
             conn.On(methodName, handler);
             Console.WriteLine($"[SignalR/Multi] Handler registered: {hub}.{methodName} (no payload)");
+        }
+
+        public void RegisterHandler(HubName hub, string methodName, Func<Task> handler)
+        {
+            var conn = RequireConnection(hub);
+            conn.On(methodName, handler);
+            Console.WriteLine($"[SignalR/Multi] Handler registered: {hub}.{methodName} async (no payload)");
         }
 
         // ---------------------------
@@ -135,13 +151,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         public Task<TResult> InvokeAsync<TResult>(HubName hub, string methodName, CancellationToken ct = default, params object?[] args)
         {
             var conn = RequireConnection(hub);
-            return conn.InvokeAsync<TResult>(methodName, args, ct);
+            var payload = (args is { Length: > 0 }) ? args : Array.Empty<object?>();
+            return conn.InvokeCoreAsync<TResult>(methodName, payload, ct);
         }
 
         public Task SendAsync(HubName hub, string methodName, CancellationToken ct = default, params object?[] args)
         {
             var conn = RequireConnection(hub);
-            return conn.SendAsync(methodName, args, ct);
+            var payload = (args is { Length: > 0 }) ? args : Array.Empty<object?>();
+            return conn.SendAsync(methodName, payload, ct);
         }
 
         // ---------------------------
@@ -157,23 +175,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
         private HubConnection BuildConnection(HubName hub)
         {
+        #nullable disable
             var path = HubRoutes.GetPath(hub);
             var fullUrl = $"{_baseHubUrl}{path}";
 
             Func<Task<string>>? tokenFactory = null;
-            if (_accessTokenProviderAsync != null)
+            if (_getAccessToken is not null)
             {
-                tokenFactory = async () =>
-                {
-                    var t = await _accessTokenProviderAsync().ConfigureAwait(false);
-                    return t ?? string.Empty;
-                };
+                // bridge string? -> string for AccessTokenProvider
+                tokenFactory = async () => (await _getAccessToken().ConfigureAwait(false)) ?? string.Empty;
             }
 
             var builder = new HubConnectionBuilder()
                 .WithUrl(fullUrl, options =>
                 {
-                    if (tokenFactory != null)
+                    if (tokenFactory is not null)
                         options.AccessTokenProvider = tokenFactory;
                 })
                 .WithAutomaticReconnect();
@@ -202,8 +218,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
         public async ValueTask DisposeAsync()
         {
-            await DisconnectAllAsync();
+            await DisconnectAllAsync().ConfigureAwait(false);
             foreach (var gate in _locks.Values) gate.Dispose();
         }
     }
 }
+
+
+
+

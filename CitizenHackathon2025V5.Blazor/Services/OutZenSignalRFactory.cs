@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
@@ -12,6 +12,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             _userService = userService;
             _eventService = eventService;
         }
+        public Task<string?> GetAccessTokenAsync()
+         => _userService.GetAccessTokenAsync();
 
         public async Task<OutZenSignalRService> CreateAsync()
         {
@@ -23,6 +25,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 eventId: eventId
             );
         }
+
+        
     }
 }
 
@@ -95,3 +99,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
 
 // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.
+
+
+
+

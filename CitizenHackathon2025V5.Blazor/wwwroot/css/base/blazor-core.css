@@ -1,4 +1,6 @@
-﻿#blazor-error-ui {
+﻿/*wwwroot.css.base.blazor-core.css*/
+
+#blazor-error-ui {
     background: var(--color-danger);
     color: white;
     padding: 0.5rem 1rem;
