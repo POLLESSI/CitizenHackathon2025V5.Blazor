@@ -4,6 +4,7 @@ using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Newtonsoft.Json;
+using System.Runtime.Intrinsics.Arm;
 using System.Text.Json.Serialization;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
@@ -15,6 +16,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         public HttpClient Client { get; set; }  
         [Inject] public WeatherForecastService WeatherForecastService { get; set; }
         [Inject] public NavigationManager Navigation { get; set; }
+        [Inject] public IAuthService Auth { get; set; }
 
         public List<WeatherForecastModel> WeatherForecasts { get; set; } = new();
         public int SelectedId { get; set; }
@@ -25,8 +27,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             allWeatherForecasts = await WeatherForecastService.GetHistoryAsync(limit: 200);
             LoadMoreItems();
 
+            var apiBaseUrl = "https://localhost:7254";
+            var hubUrl = $"{apiBaseUrl.TrimEnd('/')}/hubs/weatherforecastHub";
             hubConnection = new HubConnectionBuilder()
-                .WithUrl("https://localhost:7254/hubs/weatherforecastHub")
+                .WithUrl(hubUrl, options =>
+                {
+                    options.AccessTokenProvider = async () =>
+                    {
+                        // Get your JWT here (via IAuthService, etc.)
+                        var token = await Auth.GetAccessTokenAsync();
+                        return token;
+                    };
+                })
                 .WithAutomaticReconnect()
                 .Build();
 
@@ -38,7 +50,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
         private async Task GetWeatherForecast()
         {
-            using (HttpResponseMessage message = await Client.GetAsync("WeatherForecast/all"))
+            using (HttpResponseMessage message = await Client.GetAsync("WeatherForecast/All"))
             {
                 if (message.IsSuccessStatusCode)
                 {

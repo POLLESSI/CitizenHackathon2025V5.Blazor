@@ -78,7 +78,7 @@
     #nullable disable
     private List<PlaceModel> allPlaces = new(); // All elements
     private List<PlaceModel> visiblePlaces = new(); // Those to display
-    private int batchSize = 5;
+    private int batchSize = 30;
     private int currentIndex = 0;
     private ElementReference ScrollContainerRef;
 
@@ -86,11 +86,11 @@
     {
         var now = DateTime.UtcNow;
         // Simulates a data source
-        for (int i = 1; i <= 50; i++)
+        for (int i = 1; i <= 100; i++)
             allPlaces.Add(new PlaceModel
             {
                 Id = i,
-                Name = $"Place {i}",
+                Name = "",
                 Type = "",
                 Capacity = "",
                 Tag = ""

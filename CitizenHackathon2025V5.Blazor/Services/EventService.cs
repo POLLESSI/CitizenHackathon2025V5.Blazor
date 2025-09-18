@@ -19,7 +19,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync("Event/Latest");
+                var response = await _httpClient.GetAsync("/event/latest");
                 if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
                 
@@ -37,12 +37,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("Event/Save", @event);
+                var response = await _httpClient.PostAsJsonAsync("/event/save", @event);
                 if (response.IsSuccessStatusCode)
                 {
                     return await response.Content.ReadFromJsonAsync<EventModel>();
                 }
-                throw new Exception("Failed to save event");
+                throw new Exception("Empty response body");
             }
             catch (Exception ex)
             {
@@ -55,7 +55,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync("Event/Uppcoming-Outdoor");
+                var response = await _httpClient.GetAsync("/event/upcoming-outdoor");
                 if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
                 
@@ -73,12 +73,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("Event", newEvent);
+                var response = await _httpClient.PostAsJsonAsync("/event", newEvent);
                 if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
                 
                 var createdEvent = await response.Content.ReadFromJsonAsync<EventModel>();
-                return createdEvent ?? throw new InvalidOperationException("Response content was null");
+                return createdEvent ?? throw new InvalidOperationException("Empty response body");
             }
             catch (Exception ex)
             {
@@ -91,7 +91,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"Event/{id}");
+                var response = await _httpClient.GetAsync($"/event/{id}");
                 if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
 
@@ -109,7 +109,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.PostAsync("Event/Archive-Expired", null);
+                var response = await _httpClient.PostAsync("/event/archive-expired", null);
                 if (response.StatusCode == HttpStatusCode.NotFound) return 0;
                 response.EnsureSuccessStatusCode();
 
@@ -130,6 +130,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         public EventModel UpdateEvent(EventModel @event)
         {
             return @event; // Placeholder for actual update logic
+        }
+        private sealed class ArchiveResult
+        {
+            public int ArchivedCount { get; set; }
         }
     }
 }

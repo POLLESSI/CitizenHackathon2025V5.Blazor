@@ -31,12 +31,26 @@
     --font-size-sm: 0.875rem;
     --font-size-md: 1rem;
     --font-size-lg: 1.5rem;
+    /* 🧱 background infos*/
+    --oz-bg: #0f1020;
+    --oz-card: #17182b;
+    --oz-text: #e6e8ef; 
+    --oz-accent: #5ad1ff;
     /* ✨ Ultra-luxe accents */
     --ultra-glow: 0 0 10px rgba(255, 215, 0, 0.6);
     --ultra-border: 1px solid rgba(255, 215, 0, 0.2);
     --ultra-blur: blur(10px);
 }
 
+body {
+    background: var(--oz-bg);
+    color: var(--oz-text);
+}
+
+.badge-info {
+    background: var(--oz-accent);
+    color: #071018;
+}
 
 
 

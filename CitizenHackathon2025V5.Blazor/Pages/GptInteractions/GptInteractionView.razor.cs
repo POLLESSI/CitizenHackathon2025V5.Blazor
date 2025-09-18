@@ -26,7 +26,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             await GetGptInteractions();
 
             hubConnection = new HubConnectionBuilder()
-                .WithUrl(new Uri("https://localhost:7254/hubs/gptinteractionHub"))
+                .WithUrl(Navigation.ToAbsoluteUri("/hubs/gptinteractionHub"))
                 .WithAutomaticReconnect()
                 .Build();
             await hubConnection.StartAsync();
@@ -40,7 +40,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         private async Task GetGptInteractions()
         {
-            using (HttpResponseMessage message = await Client.GetAsync("Gpt/all"))
+            using (HttpResponseMessage message = await Client.GetAsync("Gpt/All"))
             {
                 if (message.IsSuccessStatusCode)
                 {

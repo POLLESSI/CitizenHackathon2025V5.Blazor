@@ -39,6 +39,7 @@
                 </tr>
             </thead>
             <tbody>
+
                 @if (!FilterCrowd(visibleCrowdInfos).Any())
                     {
                         <tr><td colspan="99"><div class="empty-state">No incidents.</div></td></tr>
@@ -50,11 +51,15 @@
                             <tr>
                                 <td class="text-ellipsis" title="@co.LocationName">@co.LocationName</td>
                                 <td>
-                                    <span class="badge @($"badge--lvl{co.CrowdLevel}")">@co.CrowdLevel</span>
+                                <span class="crowd @($"crowd--{co.CrowdLevel}") oz-tip"
+                                      aria-label="@GetCrowdLabel(co.CrowdLevel)">
+                                    @co.CrowdLevel
+                                </span>
                                 </td>
                                 <td class="col-actions">
                                     <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(co.Id)">Info</button>
                                 </td>
+
                             </tr>
                         }
                     }
@@ -71,7 +76,7 @@
                 <button class="chip" @onclick="() => SelectedId = 0">Fermer</button>
             </div>
         </div>
-        <TrafficConditionDetail Id="@SelectedId" />
+        <CrowdInfoDetail Id="@SelectedId" />
     </div>
 }
 @if (!FilterCrowd(visibleCrowdInfos).Any())
@@ -148,6 +153,16 @@
     }
 
     private void ToggleRecent() => _onlyRecent = !_onlyRecent;
+    private static string GetCrowdLabel(int level) => level switch
+    {
+        0 => "No crowds",
+        1 => "Low attendance",
+        2 => "Moderate",
+        3 => "High",
+        4 => "Very high",
+        5 => "Saturated",
+        _ => "Unknown"
+    };
 }
 
 

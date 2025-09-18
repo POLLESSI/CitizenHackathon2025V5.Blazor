@@ -1,5 +1,4 @@
 <!--wwwroot/index.html-->
-
 <!DOCTYPE html>
 <html lang="fr-BE">
 <head>
@@ -26,7 +25,7 @@
 
     <!-- Base Styles (keeps only what physically exists in wwwroot -->
     <link href="/css/base/reset.css" rel="stylesheet" />
-    <link href="/css/base/variables.css" rel="stylesheet" />
+    <link href="/css/base/variables.css?v=2" rel="stylesheet" />
     <link href="/css/base/layout.css" rel="stylesheet" />
     <link href="/css/base/blazor-core.css" rel="stylesheet" />
     <link href="/css/base/app.css" rel="stylesheet" />
@@ -55,7 +54,6 @@
     <link href="css/themes/styles.css" rel="stylesheet" />
     <!--<link href="css/outzen.bundle.css" rel="stylesheet" />-->
     <!--<link href="css/overrides.css" rel="stylesheet" />-->
-
     <!-- External Styles -->
     <link href="css/external/blazored-toast.css" rel="stylesheet" />
     <!-- Open Iconic from CDN (avoids 404 local) -->
@@ -96,13 +94,16 @@
     <canvas id="crowdChart" width="400" height="200"></canvas>
 
     <!-- Images (make sure these files exist in wwwroot/images) -->
-    <img src="/images/day.png" alt="Day Background" style="display:none;" />
-    <img src="/images/eart_texture.jpg" alt="Earth Texture" style="display:none;" />
+    <img src="/images/day.jpg?v=2" alt="Day Background" style="display:none;" />
+    <img src="/images/night.jpg" alt="Day Background" style="display:none;" />
+    <img id="bgImage" alt="Background" style="display:none;" />
+
+    <img src="/images/earth_texture.jpg" alt="Earth Texture" style="display:none;" />
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Minimal interop bridge -->
     <script src="/js/trafficInterop.js" defer></script>
-    <script src="/js/interop.js" defer></script>
+    <script src="/js/vendor/interop.js" defer></script>
 
     <!-- Application modules -->
     <script type="module" src="/js/app/leafletOutZen.module.js"></script>
@@ -140,6 +141,20 @@
         } else {
             console.log("⚠️ Service Worker disabled in development.");
         }
+    </script>
+    <script>
+        (function () {
+            const hour = new Date().getHours();
+            const isNight = (hour < 7) || (hour >= 20); // adjust the threshold if you want
+            const src = isNight ? "/images/night.jpg" : "/images/day.jpg?v=2";
+            const img = document.getElementById("bgImage");
+            if (img) img.src = src;
+        })();
+    </script>
+    <script>
+        window.getScrollTop = (el) => el ? el.scrollTop || 0 : 0;
+        window.getScrollHeight = (el) => el ? el.scrollHeight || 0 : 0;
+        window.getClientHeight = (el) => el ? el.clientHeight || 0 : 0;
     </script>
 
     <!-- Blazor WebAssembly Boot Loader -->

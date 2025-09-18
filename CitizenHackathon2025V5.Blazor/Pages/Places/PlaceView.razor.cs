@@ -26,7 +26,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
             await GetPlace();
 
             hubConnection = new HubConnectionBuilder()
-                .WithUrl(new Uri("https://localhost:7254/hubs/placeHub"))
+                .WithUrl(Navigation.ToAbsoluteUri("/hubs/placeHub"))
                 .WithAutomaticReconnect()
                 .Build();
             await hubConnection.StartAsync();

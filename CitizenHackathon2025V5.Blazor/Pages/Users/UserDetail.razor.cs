@@ -33,7 +33,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
         {
             try
             {
-                HttpResponseMessage message = await Client!.GetAsync($"api/user/{Id}", token);
+                HttpResponseMessage message = await Client!.GetAsync($"/user/{Id}", token);
 
                 if (message.IsSuccessStatusCode)
                 {

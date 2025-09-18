@@ -13,40 +13,23 @@
 <PageTitle>OutZen - Home</PageTitle>
 
 <div class="page-list">
-    <h2>Welcome to the</h2>
+    <h1 class="index-title">Welcome to OutZen</h1>
 
-    <div class="index-hero scroll-fade">
-        <div class="index-svg-background">
-            <!-- Animated decorative SVG -->
-            <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
-                <circle cx="50" cy="50" r="40" fill="url(#gradient)" />
-                <defs>
-                    <radialGradient id="gradient">
-                        <stop offset="0%" stop-color="#00fff7" />
-                        <stop offset="100%" stop-color="#7f5af0" />
-                    </radialGradient>
-                </defs>
-            </svg>
-            <div class="index-noise-overlay"></div>
-        </div>
-
-        <h1 class="index-title">Welcome to OutZen</h1>
-        <p class="index-subtitle">
-            Explore events with peace of mind, even when the crowds get involved.
-        </p>
-
-        <button class="index-cta" @onclick="ScrollToSuggestions">
-            Discover the suggestions
-        </button>
-
-        <div class="earth-container scroll-fade">
-            <canvas id="rotatingEarth" width="50" height="50"></canvas>
-            <div class="earth-controls">
-                <label for="speedRange">Rotation Speed:</label>
-                <input type="range" id="speedRange" min="0" max="0.05" step="0.001" value="0.01" />
-            </div>
+    <div class="earth-container scroll-fade">
+        <canvas id="rotatingEarth" width="450" height="450"></canvas>
+        <div class="earth-controls">
+            <label for="speedRange">Rotation Speed:</label>
+            <input type="range" id="speedRange" min="0" max="0.20" step="0.001" value="0.01" />
         </div>
     </div>
+
+    <p class="index-subtitle">
+        Explore events with peace of mind, even when the crowds get involved.
+    </p>
+
+    <button class="index-cta" @onclick="ScrollToSuggestions">
+        Discover the suggestions
+    </button>
 
     <section class="index-section scroll-fade" id="suggestions">
         <h2>Suggestions Zen</h2>
@@ -65,7 +48,6 @@
         &copy; 2025 OutZen – Zen in the crowd, Zen in life.
     </footer>
 </div>
-
 
 @code {
     #nullable disable

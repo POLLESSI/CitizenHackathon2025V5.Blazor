@@ -45,10 +45,11 @@ builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, SimpleAuthStateProvider>();
 
 // Services applicatifs
-builder.Services.AddScoped(sp => new HttpClient
+builder.Services.AddHttpClient("ApiWithAuth", c =>
 {
-    BaseAddress = new Uri("https://localhost:7254/api/")
-});
+    c.BaseAddress = new Uri("https://localhost:7254/api/"); // note it /api/
+})
+.AddHttpMessageHandler<JwtAttachHandler>();
 builder.Services.AddScoped<CrowdInfoService>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<GptInteractionService>();
@@ -70,12 +71,11 @@ builder.Services.AddBlazoredToast();
 // Handler that adds Authorization: Bearer ...
 builder.Services.AddTransient<JwtAttachHandler>();
 
-// "Default" Client (all APIs -> with JWT + Polly)
-builder.Services.AddHttpClient("Default", client =>
+builder.Services.AddHttpClient("ApiWithAuth", c =>
 {
-    client.BaseAddress = new Uri(apiRestBase);
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
-    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+    c.BaseAddress = new Uri(apiRestBase); // ✅ /api/
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+    c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 })
 .AddHttpMessageHandler<JwtAttachHandler>()
 .AddPolicyHandler(GetRetryPolicy())
@@ -83,24 +83,28 @@ builder.Services.AddHttpClient("Default", client =>
 .AddPolicyHandler(GetCircuitBreakerPolicy());
 
 // "ApiRootAuth" Client (BASE = /) for /auth/hub-token (protected) ✅
-builder.Services.AddHttpClient("ApiRootAuth", client =>
- {
-    client.BaseAddress = new Uri(apiBaseUrl); // <-- NO /api/
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
-    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-     })
- .AddHttpMessageHandler<JwtAttachHandler>()           // needs the JWT
- .AddPolicyHandler(GetRetryPolicy())
- .AddPolicyHandler(GetTimeoutPolicy())
- .AddPolicyHandler(GetCircuitBreakerPolicy());
+builder.Services.AddHttpClient("Default", c =>
+{
+    c.BaseAddress = new Uri(apiRestBase);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+    c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+})
+.AddHttpMessageHandler<JwtAttachHandler>()
+.AddPolicyHandler(GetRetryPolicy())
+.AddPolicyHandler(GetTimeoutPolicy())
+.AddPolicyHandler(GetCircuitBreakerPolicy());
 
 // "Auth" Client (NO JWT handler -> avoids loop when AuthService is constructed)
-builder.Services.AddHttpClient("Auth", client =>
+builder.Services.AddHttpClient("ApiRootAuth", c =>
 {
-    client.BaseAddress = new Uri(apiRestBase);
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
-    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-});
+    c.BaseAddress = new Uri(apiBaseUrl); // ✅ pas de /api/
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+    c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+})
+.AddHttpMessageHandler<JwtAttachHandler>()
+.AddPolicyHandler(GetRetryPolicy())
+.AddPolicyHandler(GetTimeoutPolicy())
+.AddPolicyHandler(GetCircuitBreakerPolicy());
 
 // Provides HttpClient by default to services that inject "HttpClient"
 builder.Services.AddScoped(sp =>

@@ -87,7 +87,7 @@
 #nullable disable
     private List<SuggestionModel> allSuggestions = new(); // All elements
     private List<SuggestionModel> visibleSuggestions = new(); // Those to display
-    private int batchSize = 5;
+    private int batchSize = 20;
     private int currentIndex = 0;
     private ElementReference ScrollContainerRef;
 
@@ -101,7 +101,7 @@
                 Id = i,
                 OriginalPlace = $"Original Place {i}",
                 SuggestedAlternative = i % 2 == 0 ? "One" : "Auther",
-                Reason = $"Re0ason {i}",
+                Reason = $"Reason {i}",
                 Date = now.AddMinutes(-i * 10)
             });
 

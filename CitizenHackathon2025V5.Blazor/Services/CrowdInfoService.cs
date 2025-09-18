@@ -11,37 +11,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     {
 #nullable disable
         private readonly HttpClient _httpClient;
-        private readonly IHttpClientFactory _httpFactory;
 
-        public CrowdInfoService(IHttpClientFactory httpClientFactory)
+        public CrowdInfoService(IHttpClientFactory factory)
         {
-            _httpClient = httpClientFactory.CreateClient("ApiWithAuth");
-            _httpFactory = httpClientFactory;
-            
-        }
-
-        /// <summary>
-        /// Saves or updates a CrowdInfo.
-        /// </summary>
-        public async Task<ClientCrowdInfoDTO?> SaveCrowdInfoAsync(ClientCrowdInfoDTO dto)
-        {
-            try
-            {
-                if (dto is null) throw new ArgumentNullException(nameof(dto));
-                // we reuse _httpClient already configured
-                var resp = await _httpClient.PostAsJsonAsync("crowdinfo", dto);
-                resp.EnsureSuccessStatusCode();
-
-                var saved = await resp.Content.ReadFromJsonAsync<ClientCrowdInfoDTO>();
-                return saved ?? throw new InvalidOperationException("Response content was null");
-            }
-            catch (Exception ex)
-            {
-
-                Console.Error.WriteLine($"Unexpected error in SaveCrowdInfoAsync: {ex.Message}");
-                throw;
-            }
-            
+            _httpClient = factory.CreateClient("ApiWithAuth");
         }
 
         /// <summary>
@@ -51,37 +24,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-
                 var response = await _httpClient.GetAsync("CrowdInfo/all");
-                if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
-
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<ClientCrowdInfoDTO>>();
-
-                return list?.ToNonNullList() ?? new();
-            }
-            catch (Exception ex)
-            {
-
-                Console.Error.WriteLine($"Unexpected error in GetAllCrowdInfoAsync: {ex.Message}");
-                throw;
-            }
-            
-        }
-
-        /// <summary>
-        /// Retrieves a sorted CrowdInfo page (by date desc) from the API.
-        /// </summary>
-        public async Task<List<ClientCrowdInfoDTO>> GetAllCrowdInfoAsync(int pageIndex, int pageSize)
-        {
-            try
-            {
-                var response = await _httpClient.GetAsync("CrowdInfo/all");
-
-                if (response.StatusCode == HttpStatusCode.NotFound) return null;
-                var list = await response.Content.ReadFromJsonAsync<List<ClientCrowdInfoDTO>>();
-                
-                return new List<ClientCrowdInfoDTO>();
+                return await response.Content.ReadFromJsonAsync<IEnumerable<ClientCrowdInfoDTO>>()
+                       ?? Enumerable.Empty<ClientCrowdInfoDTO>();
             }
             catch (Exception ex)
             {
@@ -90,7 +36,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 throw;
             }
 
-            
         }
 
         /// <summary>
@@ -108,7 +53,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 Console.Error.WriteLine($"Unexpected error in GetAllCrowdInfoNonNullAsync: {ex.Message}");
                 throw;
             }
-            
+
         }
 
         /// <summary>
@@ -121,13 +66,66 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 var response = await _httpClient.GetAsync($"CrowdInfo/{id}");
                 if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
-
-                var item = await response.Content.ReadFromJsonAsync<ClientCrowdInfoDTO>();
-                return item;
+                return await response.Content.ReadFromJsonAsync<ClientCrowdInfoDTO>();
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in GetCrowdInfoByIdAsync: {ex.Message}");
+                throw;
+            }
+
+        }
+        public async Task<IEnumerable<ClientCrowdInfoDTO>> GetLatestAsync()
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync("CrowdInfo/latest");
+                response.EnsureSuccessStatusCode();
+                return await response.Content.ReadFromJsonAsync<IEnumerable<ClientCrowdInfoDTO>>()
+                       ?? Enumerable.Empty<ClientCrowdInfoDTO>();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in GetLatestAsync: {ex.Message}");
+                throw;
+            }
+
+        }
+
+        public async Task<IEnumerable<ClientCrowdInfoDTO>> GetByLocationAsync(string locationName)
+        {
+            try
+            {
+                var resp = await _httpClient.GetAsync($"CrowdInfo/by-location?locationName={Uri.EscapeDataString(locationName)}");
+                resp.EnsureSuccessStatusCode();
+                return await resp.Content.ReadFromJsonAsync<IEnumerable<ClientCrowdInfoDTO>>()
+                       ?? Enumerable.Empty<ClientCrowdInfoDTO>();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in GetByLocationAsync: {ex.Message}");
+                throw;
+            }
+            
+        }
+
+        /// <summary>
+        /// Saves or updates a CrowdInfo.
+        /// </summary>
+        public async Task<ClientCrowdInfoDTO?> SaveCrowdInfoAsync(ClientCrowdInfoDTO dto)
+        {
+            try
+            {
+                if (dto is null) throw new ArgumentNullException(nameof(dto));
+                // we reuse _httpClient already configured
+                var resp = await _httpClient.PostAsJsonAsync("CrowdInfo", dto);
+                resp.EnsureSuccessStatusCode();
+                return await resp.Content.ReadFromJsonAsync<ClientCrowdInfoDTO>();
+            }
+            catch (Exception ex)
+            {
+
+                Console.Error.WriteLine($"Unexpected error in SaveCrowdInfoAsync: {ex.Message}");
                 throw;
             }
             
@@ -140,11 +138,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.DeleteAsync($"CrowdInfo/archive/{id}");
-                response.EnsureSuccessStatusCode();
-
-                var deleted = await response.Content.ReadFromJsonAsync<bool>();
-                return deleted;
+                var resp = await _httpClient.DeleteAsync($"CrowdInfo/archive/{id}");
+                resp.EnsureSuccessStatusCode();
+                // Your controller returns { Message = ... } – if you want a bool, return Ok(true) on the API side instead.
+                return resp.IsSuccessStatusCode;
             }
             catch (Exception ex)
             {
@@ -157,11 +154,24 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         /// <summary>
         /// Method to implement if you want local update before server push.
         /// </summary>
-        public ClientCrowdInfoDTO UpdateCrowdInfo(ClientCrowdInfoDTO crowdInfo)
+        public ClientCrowdInfoDTO UpdateCrowdInfo(ClientCrowdInfoDTO dto)
+            => UpdateCrowdInfoAsync(dto).GetAwaiter().GetResult();
+
+        public async Task<ClientCrowdInfoDTO?> UpdateCrowdInfoAsync(ClientCrowdInfoDTO dto)
         {
-            // This method is not implemented in the original code snippet.
-            // You can implement it as needed, for example:
-            throw new NotImplementedException("UpdateCrowdInfo method is not implemented.");
+            try
+            {
+                var resp = await _httpClient.PutAsJsonAsync("CrowdInfo/update", dto);
+                if (resp.StatusCode == HttpStatusCode.NotFound) return null;
+                resp.EnsureSuccessStatusCode();
+                return await resp.Content.ReadFromJsonAsync<ClientCrowdInfoDTO>();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in UpdateCrowdInfoAsync: {ex.Message}");
+                throw;
+            }
+            
         }
     }
 }

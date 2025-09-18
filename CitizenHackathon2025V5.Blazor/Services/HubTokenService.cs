@@ -6,7 +6,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     public sealed class HubTokenService : IHubTokenService
     {
         private readonly IHttpClientFactory _factory;
-        public HubTokenService(IHttpClientFactory factory) => _factory = factory;
+        private readonly IAuthService _auth;
+
+        public HubTokenService(IHttpClientFactory factory, IAuthService auth)
+        {
+            _factory = factory;
+            _auth = auth;
+        }
 
         public async Task<string?> GetHubTokenAsync(CancellationToken ct = default)
         {
@@ -18,7 +24,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             var dto = await resp.Content.ReadFromJsonAsync<TokenDto>(cancellationToken: ct);
             return dto?.Token;
         }
-
+        public Task<string?> GetHubAccessTokenAsync() => _auth.GetAccessTokenAsync();
         private sealed class TokenDto { public string? Token { get; set; } }
     }
 }

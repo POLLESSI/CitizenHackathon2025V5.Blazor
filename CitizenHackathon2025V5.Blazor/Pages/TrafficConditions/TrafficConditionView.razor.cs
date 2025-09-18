@@ -26,12 +26,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             await GetTrafficCondition();
 
             hubConnection = new HubConnectionBuilder()
-                .WithUrl(new Uri("https://localhost:7254/hubs/trafficHub"))
+                .WithUrl(Navigation.ToAbsoluteUri("/hubs/trafficHub"))
+                .WithAutomaticReconnect()
                 .Build();
 
             await hubConnection.StartAsync();
 
-            using (var message = await Client.GetAsync("TrafficCondition/latest")) 
+            using (var message = await Client.GetAsync("TrafficCondition/Latest")) 
             { 
                 //...
             } // /api/trafficcondition/latest
@@ -40,7 +41,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 
         private async Task GetTrafficCondition()
         {
-            using (HttpResponseMessage message = await Client.GetAsync("TrafficCondition/latest"))
+            using (HttpResponseMessage message = await Client.GetAsync("TrafficCondition/Latest"))
             {
                 if (message.IsSuccessStatusCode)
                 {

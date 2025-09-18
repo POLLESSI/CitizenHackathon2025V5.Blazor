@@ -47,7 +47,7 @@
                         {
                             <tr>
                                 <td>@tr.IncidentType</td>
-                                <td>@tr.Level</td>
+                                <span class="lvl @($"lvl--{tr.Level}")">@tr.Level</span>
                                 <td>
                                     <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(tr.Id)">Info</button>
                                 </td>
@@ -81,7 +81,7 @@
 #nullable disable
     private List<TrafficConditionModel> allTrafficConditions = new(); // All elements
     private List<TrafficConditionModel> visibleTrafficConditions = new(); // Those to display
-    private int batchSize = 20;
+    private int batchSize = 30;
     private int currentIndex = 0;
     private ElementReference ScrollContainerRef;
 

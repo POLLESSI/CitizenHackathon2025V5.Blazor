@@ -26,9 +26,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
             await GetEvent();
 
             hubConnection = new HubConnectionBuilder()
-    .WithUrl(new Uri("https://localhost:7254/hubs/eventHub"))
-    .WithAutomaticReconnect()
-    .Build();
+                .WithUrl(Navigation.ToAbsoluteUri("/hubs/eventHub"))
+                .WithAutomaticReconnect()
+                .Build();
             await hubConnection.StartAsync();
 
             using (var message = await Client.GetAsync("Event/Latest")) 

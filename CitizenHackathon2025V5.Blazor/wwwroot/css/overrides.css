@@ -113,6 +113,24 @@
 .badge--lvl5 {
     background: #b71c1c;
 }
+.lvl {
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    font-weight: bold;
+    color: #fff;
+}
+
+.lvl--Low {
+    background: #28a745;
+}
+
+.lvl--Medium {
+    background: #ffc107;
+}
+
+.lvl--High {
+    background: #dc3545;
+}
 
 .ellipsis {
     max-width: 24ch;
@@ -140,6 +158,38 @@
     text-align: center;
     color: #bbb;
 }
+
+.oz-tip {
+    position: relative;
+}
+
+    .oz-tip:hover::after {
+        content: attr(aria-label);
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 6px);
+        transform: translateX(-50%);
+        white-space: nowrap;
+        background: rgba(0,0,0,.8);
+        color: #fff;
+        padding: .35rem .55rem;
+        border-radius: 6px;
+        font-size: .85rem;
+        pointer-events: none;
+        z-index: 20;
+    }
+
+    .oz-tip:hover::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        bottom: 100%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-top-color: rgba(0,0,0,.8);
+        margin-bottom: -1px;
+    }
+
 .page-split {
     display: grid;
     grid-template-columns: 1fr minmax(320px, 420px);
@@ -220,13 +270,14 @@
 
 /* Useful columns */
 .col-actions {
-    width: 120px;
+    width: 1%;
     text-align: right;
     white-space: nowrap;
 }
 
 .col-narrow {
     width: 120px;
+    white-space: nowrap;
 }
 
 .text-ellipsis {
@@ -282,4 +333,40 @@
     border: 1px solid rgba(255,255,255,.08);
     border-radius: 12px;
     background: rgba(255,255,255,.03);
+}
+
+.crowd {
+    padding: 0.3rem 0.6rem;
+    border-radius: 6px;
+    font-weight: bold;
+    color: #fff;
+    display: inline-block;
+    min-width: 2rem;
+    text-align: center;
+}
+
+/* Crowd Levels */
+.crowd--0 {
+    background-color: #6c757d; /* gray */
+}
+
+.crowd--1 {
+    background-color: #28a745; /* green = low attendance */
+}
+
+.crowd--2 {
+    background-color: #ffc107; /* yellow = moderate */
+    color: #000;
+}
+
+.crowd--3 {
+    background-color: #fd7e14; /* orange = high */
+}
+
+.crowd--4 {
+    background-color: #dc3545; /* red = saturated */
+}
+
+.crowd--5 {
+    background-color: #6610f2; /* purple = extreme / KO */
 }
