@@ -99,6 +99,57 @@ p {
     margin-bottom: var(--spacing-sm);
 }
 
+/* Cell with "sky blue" background */
+/*.info-cell {
+    background: #E3F2FD;*/ /* sky blue */
+/*}*/
+
+.btn {
+    background-color: var(--btn-bg, var(--color-primary));
+    color: var(--btn-fg, var(--color-fg));
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--btn-border, transparent);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+    .btn:hover {
+        background-color: var(--btn-bg-hover, var(--color-secondary));
+    }
+
+    /* Info variant (without !important, thanks to variables) */
+    .btn.info-dynamic {
+        --btn-bg: var(--info-color, #9E9E9E);
+        --btn-border: var(--info-color, #9E9E9E);
+        --btn-fg: #fff;
+        --btn-bg-hover: var(--info-color, #9E9E9E);
+    }
+
+/* Neutral Info button, color comes in inline-style */
+.crowdinfoview .btn.info-dynamic {
+    /* on garde border-radius, padding etc. de .btn */
+    background-color: var(--info-color, #9E9E9E) !important;
+    border: 1px solid var(--info-color, #9E9E9E) !important;
+    color: #fff !important;
+    transition: background-color .25s ease, border-color .25s ease, transform .12s ease;
+}
+
+    .btn.info-dynamic:hover {
+        filter: brightness(0.95);
+    }
+
+    .btn.info-dynamic:active {
+        transform: scale(.98);
+    }
+/* existing general rule */
+.btn:hover {
+    background-color: var(--color-secondary);
+}
+
+/* exception: .info-dynamic buttons keep their color */
+.btn.info-dynamic:hover {
+    background-color: var(--info-color, #9E9E9E)
 
 
 
@@ -145,4 +196,43 @@ p {
 
 
 
-/*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/

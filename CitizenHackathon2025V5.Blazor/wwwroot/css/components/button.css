@@ -1,6 +1,5 @@
 ﻿/*wwwroot.css.components.button.css*/
-
-.oz-btn {
+/*.oz-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -27,13 +26,13 @@
     .oz-btn[disabled] {
         opacity: 0.5;
         cursor: not-allowed;
-    }
+    }*/
 
     /* Icon in the button */
-    .oz-btn .icon {
+    /*.oz-btn .icon {
         margin-right: 0.5rem;
         display: inline-block;
-    }
+    }*/
 
 
 

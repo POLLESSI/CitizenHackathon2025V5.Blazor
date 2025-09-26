@@ -3,8 +3,7 @@
 @using CitizenHackathon2025.Blazor.DTOs
 @using CitizenHackathon2025V5.Blazor.Client.Constants
 @using CitizenHackathon2025V5.Blazor.Client.DTOs
-@using CitizenHackathon2025V5.Blazor.Client.Services
-@inject IJSRuntime JS
+@inject IJSRuntime js
 
 <span class="fas fa-certificate me-2"></span> WeatherForecasts
 
@@ -33,6 +32,7 @@
                     <tr>
                         <th>#</th>
                         <th class="col-narrow">TemperatureC</th>
+                        <th class="col-narrow">TemperatureC</th>
                         <th class="col-narrow">Summary</th>
                         <th class="col-actions"></th>
                     </tr>
@@ -40,7 +40,7 @@
                 <tbody>
                     @if (!FilterWeather(visibleWeatherForecasts).Any())
                     {
-                      <tr><td colspan="99"><div class="empty-state">Aucun incident.</div></td></tr>
+                      <tr><td colspan="99"><div class="empty-state">No weather forecast available at the moment.</div></td></tr>
                     }
                     else
                     {
@@ -48,6 +48,7 @@
                         {
                             <tr>
                                 <td>•</td>
+                                <td>@we.TemperatureC</td>
                                 <td>@we.TemperatureC</td>
                                 <td>@we.Summary</td>
                                 <td>
@@ -60,14 +61,16 @@
             </table>
         </div>
 </div>
+
+<button class="btn btn-primary" @onclick="GenerateOne">Générer une prévision</button>
            
 @if (SelectedId > 0)
 {
     <div class="detail-wrapper">
         <div class="list-toolbar">
-            <div class="left"><span class="badge badge-info">Détail #@SelectedId</span></div>
+            <div class="left"><span class="badge badge-info">Details #@SelectedId</span></div>
             <div class="right">
-                <button class="chip" @onclick="() => SelectedId = 0">Fermer</button>
+                <button class="chip" @onclick="() => SelectedId = 0">Closed</button>
             </div>
         </div>
         <WeatherForecastDetail Id="@SelectedId" />
@@ -79,71 +82,16 @@
 }
 
 @code {
-#nullable disable
-    private List<WeatherForecastModel> allWeatherForecasts = new(); // All elements
-    private List<WeatherForecastModel> visibleWeatherForecasts = new(); // Those to display
-    private int batchSize = 20;
-    private int currentIndex = 0;
-    private ElementReference ScrollContainerRef;
-
-    protected override void OnInitialized()
+    private async Task GenerateOne()
     {
-        var rnd = new Random();
-        // Simulates a data source
-        for (int i = 1; i <= 50; i++)
-            allWeatherForecasts.Add(new WeatherForecastModel
-            {
-                Id = i,
-                DateWeather = DateTime.UtcNow.AddHours(i), // ex: prochaines heures
-                TemperatureC = rnd.Next(-5, 35),           // -5 à 35 °C
-                Summary = i % 2 == 0 ? "Sunny" : "Rainy",
-                Humidity = rnd.Next(20, 100),              // en %
-                RainfallNm = (decimal)(rnd.NextDouble() * 20), // en mm
-                WindSpeedKmh = (decimal)(rnd.Next(0, 100))
-            });
-
-        LoadMoreItems();
-    }
-
-    private void LoadMoreItems()
-    {
-        var nextItems = allWeatherForecasts.Skip(currentIndex).Take(batchSize);
-        visibleWeatherForecasts.AddRange(nextItems);
-        currentIndex += batchSize;
-    }
-
-    private async Task HandleScroll()
-    {
-        var scrollTop = await JS.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
-        var scrollHeight = await JS.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
-        var clientHeight = await JS.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
-
-        if (scrollTop + clientHeight >= scrollHeight - 5)
+        var dto = await WeatherForecastService.GenerateNewForecastAsync();
+        if (dto is not null)
         {
-            LoadMoreItems();
-            StateHasChanged();   
+            allWeatherForecasts.Insert(0, dto);
+            visibleWeatherForecasts.Insert(0, dto);
+            StateHasChanged();
         }
     }
-    private string _q;
-    private bool _onlyRecent, _onlyFav;
-
-    private IEnumerable<WeatherForecastModel> FilterWeather(IEnumerable<WeatherForecastModel> source)
-    {
-        var q = _q?.Trim();
-        var cutoff = DateTime.UtcNow.AddHours(-6);
-
-        return source
-            .Where(x => string.IsNullOrEmpty(q)
-                        // ✅ Convertit les nombres en string pour les comparer
-                        || x.TemperatureC.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
-                        || x.Humidity.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
-                        || x.WindSpeedKmh.ToString().Contains(q, StringComparison.OrdinalIgnoreCase)
-                        || (x.Summary ?? "").Contains(q, StringComparison.OrdinalIgnoreCase))
-            .Where(x => !_onlyRecent || x.DateWeather >= cutoff);
-    }
-
-    private void ToggleRecent() => _onlyRecent = !_onlyRecent;
-
 }
 
 

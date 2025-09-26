@@ -4,7 +4,6 @@ using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
-using Microsoft.AspNetCore.Components.WebAssembly.Http;
 using Microsoft.JSInterop;
 using Polly;
 using Polly.Extensions.Http;
@@ -15,7 +14,7 @@ using System.Net.Http;
 // -----------------------------
 static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
     HttpPolicyExtensions.HandleTransientHttpError()
-        .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
+        .WaitAndRetryAsync(3, i => TimeSpan.FromSeconds(Math.Pow(2, i)));
 
 static IAsyncPolicy<HttpResponseMessage> GetTimeoutPolicy() =>
     Policy.TimeoutAsync<HttpResponseMessage>(10);
@@ -44,12 +43,62 @@ builder.Services.AddOptions();
 builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, SimpleAuthStateProvider>();
 
-// Services applicatifs
+// === Handler JWT (only once) ===
+builder.Services.AddTransient<JwtAttachHandler>();
+
+// === HttpClients (ONLY ONE REGISTRATION PER NAME) ===
+
+// 1) Application client to /api/* with JWT
 builder.Services.AddHttpClient("ApiWithAuth", c =>
 {
-    c.BaseAddress = new Uri("https://localhost:7254/api/"); // note it /api/
+    var baseUrl = apiRestBase.EndsWith("/") ? apiRestBase : apiRestBase + "/";
+    c.BaseAddress = new Uri(baseUrl); // ex: https://localhost:7254/api/
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+    c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 })
-.AddHttpMessageHandler<JwtAttachHandler>();
+.AddHttpMessageHandler<JwtAttachHandler>()  
+.AddPolicyHandler(GetRetryPolicy())
+.AddPolicyHandler(GetTimeoutPolicy())
+.AddPolicyHandler(GetCircuitBreakerPolicy());
+
+// 2) Default client (also /api/*) with JWT
+builder.Services.AddHttpClient("Default", c =>
+{
+    c.BaseAddress = new Uri(apiRestBase);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+    c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+})
+.AddHttpMessageHandler<JwtAttachHandler>()
+.AddPolicyHandler(GetRetryPolicy())
+.AddPolicyHandler(GetTimeoutPolicy())
+.AddPolicyHandler(GetCircuitBreakerPolicy());
+
+// 3) Root client for auth WITHOUT handler (login, hub-token, refresh)
+builder.Services.AddHttpClient("ApiRootAuth", c =>
+{
+    c.BaseAddress = new Uri(apiBaseUrl); 
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+    c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+})
+// .AddHttpMessageHandler<JwtAttachHandler>() // DO NOT add
+.AddPolicyHandler(GetRetryPolicy())
+.AddPolicyHandler(GetTimeoutPolicy())
+.AddPolicyHandler(GetCircuitBreakerPolicy());
+
+// Default HttpClient injected (when requesting "HttpClient")
+builder.Services.AddScoped(sp =>
+    sp.GetRequiredService<IHttpClientFactory>().CreateClient("Default"));
+
+// IAuthService uses the client without a handler
+builder.Services.AddScoped<IAuthService>(sp =>
+{
+    var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient("ApiRootAuth");
+    var js = sp.GetRequiredService<IJSRuntime>();
+    var provider = sp.GetRequiredService<AuthenticationStateProvider>();
+    return new AuthService(http, js, provider);
+});
+
+// Application services
 builder.Services.AddScoped<CrowdInfoService>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<GptInteractionService>();
@@ -63,64 +112,6 @@ builder.Services.AddScoped<IHubTokenService, HubTokenService>();
 
 // Toasts
 builder.Services.AddBlazoredToast();
-
-// =============================
-// HTTP CLIENTS
-// =============================
-
-// Handler that adds Authorization: Bearer ...
-builder.Services.AddTransient<JwtAttachHandler>();
-
-builder.Services.AddHttpClient("ApiWithAuth", c =>
-{
-    c.BaseAddress = new Uri(apiRestBase); // ✅ /api/
-    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
-    c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-})
-.AddHttpMessageHandler<JwtAttachHandler>()
-.AddPolicyHandler(GetRetryPolicy())
-.AddPolicyHandler(GetTimeoutPolicy())
-.AddPolicyHandler(GetCircuitBreakerPolicy());
-
-// "ApiRootAuth" Client (BASE = /) for /auth/hub-token (protected) ✅
-builder.Services.AddHttpClient("Default", c =>
-{
-    c.BaseAddress = new Uri(apiRestBase);
-    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
-    c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-})
-.AddHttpMessageHandler<JwtAttachHandler>()
-.AddPolicyHandler(GetRetryPolicy())
-.AddPolicyHandler(GetTimeoutPolicy())
-.AddPolicyHandler(GetCircuitBreakerPolicy());
-
-// "Auth" Client (NO JWT handler -> avoids loop when AuthService is constructed)
-builder.Services.AddHttpClient("ApiRootAuth", c =>
-{
-    c.BaseAddress = new Uri(apiBaseUrl); // ✅ pas de /api/
-    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
-    c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-})
-.AddHttpMessageHandler<JwtAttachHandler>()
-.AddPolicyHandler(GetRetryPolicy())
-.AddPolicyHandler(GetTimeoutPolicy())
-.AddPolicyHandler(GetCircuitBreakerPolicy());
-
-// Provides HttpClient by default to services that inject "HttpClient"
-builder.Services.AddScoped(sp =>
-    sp.GetRequiredService<IHttpClientFactory>().CreateClient("Default"));
-
-// Register IAuthService using the "Auth" client
-builder.Services.AddScoped<IAuthService>(sp =>
-{
-    var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient("Auth");
-    var js = sp.GetRequiredService<IJSRuntime>();
-    var provider = sp.GetRequiredService<AuthenticationStateProvider>();
-    return new AuthService(http, js, provider);
-});
-
-// ⚠️ DO NOT register the concrete type AuthService:
-// builder.Services.AddScoped<AuthService>(); // <-- deleted
 
 // =============================
 // SignalR multi-hubs
@@ -137,7 +128,6 @@ builder.Services.AddScoped(sp =>
 });
 
 await builder.Build().RunAsync();
-
 
 
 

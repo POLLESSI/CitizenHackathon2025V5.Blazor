@@ -1,17 +1,14 @@
 @page "/eventview"
-@using CitizenHackathon2025V5.Blazor.Client.Models;
-@using CitizenHackathon2025.Blazor.DTOs
-@using CitizenHackathon2025V5.Blazor.Client.Constants
 @using CitizenHackathon2025V5.Blazor.Client.DTOs
-@inject IJSRuntime js
+@using CitizenHackathon2025V5.Blazor.Client.Constants
 
 <span class="fas fa-certificate me-2"></span> Events
 
 <div class="page-list">
-    <h3>Events List</h3> 
+    <h3>Events List</h3>
     <div class="list-toolbar">
         <div class="left">
-            <input class="input-compact" placeholder="Rechercher..."
+            <input class="input-compact" placeholder="Search..."
                    @bind="_q" @bind:event="oninput" />
             @if (!string.IsNullOrWhiteSpace(_q))
             {
@@ -20,131 +17,63 @@
         </div>
 
         <div class="right">
-            <button class="chip @( _onlyRecent ? "active" : null )"
-                    @onclick="() => ToggleRecent()">
-                Récents
-            </button>
+            <button class="chip @( _onlyRecent ? "active" : null )" @onclick="() => ToggleRecent()"> Recents</button>
         </div>
     </div>
-        <div class="table-wrapper draggable-container"
-                @ref="ScrollContainerRef"
-                @onscroll="HandleScroll"
-                style="height: 300px; overflow-y: auto; border: 1px solid #444;">
-            <table class="table table-striped table-dark styled-table data-list">
-                <thead>
-                    <tr>
-                        <th class="col-narrow">Name</th>
-                        <th class="col-actions"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (!FilterEvent(visibleEvents).Any())
-                    {
-                        <tr><td colspan="99"><div class="empty-state">No incidents.</div></td></tr>
-                    }
-                    else
-                    {
+
+    <div class="table-wrapper draggable-container"
+         @ref="ScrollContainerRef"
+         @onscroll="HandleScroll"
+         style="height: 300px; overflow-y: auto; border: 1px solid #444;">
+        <table class="table table-striped table-dark styled-table data-list">
+            <thead>
+                <tr>
+                    <th class="col-narrow">#</th>
+                    <th class="col-narrow">Name</th>
+                    <th class="col-narrow">Date Event</th>
+                    <th class="col-actions">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!FilterEvent(visibleEvents).Any())
+                {
+                    <tr><td colspan="99"><div class="empty-state">No events available at the moment.</div></td></tr>
+                }
+                else
+                {
                     @foreach (var ev in FilterEvent(visibleEvents))
-                        {
-                            <tr>
+                    {
+                        <tr>
                             <td class="text-ellipsis" title="@ev.Name">@ev.Name</td>
+                            <td class="text-ellipsis" title="@ev.DateEvent">@ev.DateEvent</td>
                             <td class="col-actions">
                                 <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(ev.Id)">Info</button>
                             </td>
-                            </tr>
-                        }
+                        </tr>
                     }
-                </tbody>
-            </table>
-        </div>
- </div>
- @if (SelectedId > 0)
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (SelectedId > 0)
 {
     <div class="detail-wrapper">
         <div class="list-toolbar">
-            <div class="left"><span class="badge badge-info">Détail #@SelectedId</span></div>
+            <div class="left"><span class="badge badge-info">Details #@SelectedId</span></div>
             <div class="right">
-                <button class="chip" @onclick="() => SelectedId = 0">Fermer</button>
+                <button class="chip" @onclick="() => SelectedId = 0">Close</button>
             </div>
         </div>
         <EventDetail Id="@SelectedId" />
     </div>
 }
+
 @if (!FilterEvent(visibleEvents).Any())
 {
     <div class="oz-empty">No items for these filters.</div>
 }
-            
-@code {
-#nullable disable
-    private List<EventModel> allEvents = new(); // All elements
-    private List<EventModel> visibleEvents = new(); // Those to display
-    private int batchSize = 20;
-    private int currentIndex = 0;
-    private ElementReference ScrollContainerRef;
-
-    protected override void OnInitialized()
-    {
-        var now = DateTime.UtcNow;
-        var rnd = new Random();
-        // Simulates a data source
-        for (int i = 1; i <= 50; i++)
-        {
-            allEvents.Add(new EventModel
-            {
-                Id = i,
-                Name = "",
-                ExpectedCrowd = rnd.Next(50, 5000),
-                Latitude = rnd.NextDouble() * 180 - 90,
-                Longitude = rnd.NextDouble() * 360 - 180,
-                DateEvent = now.AddMinutes(-i * 10)
-            });
-        }
-
-        LoadMoreItems();
-    }
-
-    private void LoadMoreItems()
-    {
-        var nextItems = allEvents.Skip(currentIndex).Take(batchSize);
-        visibleEvents.AddRange(nextItems);
-        currentIndex += batchSize;
-    }
-
-    private async Task HandleScroll()
-    {
-        var scrollTop = await js.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
-        var scrollHeight = await js.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
-        var clientHeight = await js.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
-
-        if (scrollTop + clientHeight >= scrollHeight - 5)
-        {
-            if (currentIndex < allEvents.Count)
-            {
-                LoadMoreItems();
-                StateHasChanged();
-            }
-        }
-    }
-    private string _q;
-    private bool _onlyRecent, _onlyFav;
-
-    private IEnumerable<EventModel> FilterEvent(IEnumerable<EventModel> source)
-    {
-        var q = _q?.Trim();
-        var cutoff = DateTime.UtcNow.AddHours(-6);
-
-        return source
-            .Where(x => string.IsNullOrEmpty(q)
-                        || (x.Name ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
-                        || x.Latitude.ToString().Contains(q, StringComparison.OrdinalIgnoreCase))
-                        
-            .Where(x => !_onlyRecent || x.DateEvent >= cutoff);
-    }
-
-    private void ToggleRecent() => _onlyRecent = !_onlyRecent;
-}
-
 
 
 

@@ -20,9 +20,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Mapping
             // TrafficConditionDTO
             // -------------------
             TypeAdapterConfig<ClientTrafficConditionDTO, TrafficInfoUIDTO>.NewConfig()
-                .Map(dest => dest.Level, src => ParseTrafficLevel(src.Level))
-                .Map(dest => dest.Color, src => MapTrafficColor(ParseTrafficLevel(src.Level)))
-                .Map(dest => dest.Icon, src => MapTrafficIcon(ParseTrafficLevel(src.Level)));
+                .Map(dest => dest.Level, src => ParseTrafficLevel(src.CongestionLevel))
+                .Map(dest => dest.Color, src => MapTrafficColor(ParseTrafficLevel(src.CongestionLevel)))
+                .Map(dest => dest.Icon, src => MapTrafficIcon(ParseTrafficLevel(src.CongestionLevel)));
 
             // -------------------
             // WeatherForecastDTO
@@ -42,7 +42,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Mapping
                 .Map(dest => dest.Longitude, src => src.Longitude)
                 .Map(dest => dest.DistanceKm, src => src.DistanceKm)
                 .Map(dest => dest.Reason, src => src.Reason)
-                .Map(dest => dest.SuggestedAlternative, src => src.SuggestedAlternative);
+                .Map(dest => dest.SuggestedAlternative, src => src.SuggestedAlternatives);
         }
 
         // ==================================================

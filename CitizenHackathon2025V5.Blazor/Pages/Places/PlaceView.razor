@@ -1,6 +1,4 @@
 ﻿@page "/placeview"
-@using CitizenHackathon2025V5.Blazor.Client.Models;
-@using CitizenHackathon2025.Blazor.DTOs
 @using CitizenHackathon2025V5.Blazor.Client.Constants
 @using CitizenHackathon2025V5.Blazor.Client.DTOs
 @inject IJSRuntime js
@@ -11,7 +9,7 @@
     <h3>Place List</h3>
     <div class="list-toolbar">
         <div class="left">
-            <input class="input-compact" placeholder="Rechercher..."
+            <input class="input-compact" placeholder="Search..."
                    @bind="_q" @bind:event="oninput" />
             @if (!string.IsNullOrWhiteSpace(_q))
             {
@@ -31,20 +29,24 @@
                 <thead>
                     <tr>
                         <th class ="col-narrow">Name</th>
+                        <th class="col-narrow">Indoor</th>
+                        <th class="col-narrow">Type</th>
                         <th class="col-actions"></th>
                     </tr>
                 </thead>
                 <tbody>
                     @if (!FilterPlace(visiblePlaces).Any())
                     {
-                      <tr><td colspan="99"><div class="empty-state">Aucun incident.</div></td></tr>
+                      <tr><td colspan="99"><div class="empty-state">No places available at the moment.</div></td></tr>
                     }
                     else
                     {
-                    @foreach (var pl in FilterPlace(visiblePlaces))
+                        @foreach (var pl in FilterPlace(visiblePlaces))
                         {
                             <tr>
                             <td class="text-ellipsis" title="@pl.Name">@pl.Name</td>
+                            <td class="text-ellipsis" title="@pl.Indoor">@((pl.Indoor) ? "Yes" : "No")</td>
+                            <td class="text-ellipsis" title="@pl.Type">@pl.Type</td>
                             <td class="col-actions">
                                 <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(pl.Id)">Info</button>
                             </td>
@@ -60,7 +62,7 @@
 {
   <div class="detail-wrapper">
     <div class="list-toolbar">
-      <div class="left"><span class="badge badge-info">Détail #@SelectedId</span></div>
+      <div class="left"><span class="badge badge-info">Details #@SelectedId</span></div>
       <div class="right">
         <button class="chip" @onclick="() => SelectedId = 0">Fermer</button>
       </div>
@@ -74,64 +76,3 @@
     <div class="oz-empty">No items for these filters.</div>
 }
 
-@code {
-    #nullable disable
-    private List<PlaceModel> allPlaces = new(); // All elements
-    private List<PlaceModel> visiblePlaces = new(); // Those to display
-    private int batchSize = 30;
-    private int currentIndex = 0;
-    private ElementReference ScrollContainerRef;
-
-    protected override void OnInitialized()
-    {
-        var now = DateTime.UtcNow;
-        // Simulates a data source
-        for (int i = 1; i <= 100; i++)
-            allPlaces.Add(new PlaceModel
-            {
-                Id = i,
-                Name = "",
-                Type = "",
-                Capacity = "",
-                Tag = ""
-            });
-
-        LoadMoreItems();
-    }
-
-    private void LoadMoreItems()
-    {
-        var nextItems = allPlaces.Skip(currentIndex).Take(batchSize);
-        visiblePlaces.AddRange(nextItems);
-        currentIndex += batchSize;
-    }
-
-    private async Task HandleScroll()
-    {
-        var scrollTop = await js.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
-        var scrollHeight = await js.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
-        var clientHeight = await js.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
-
-        if (scrollTop + clientHeight >= scrollHeight - 5 && currentIndex < allPlaces.Count)
-        {
-            LoadMoreItems();
-            StateHasChanged();
-        }
-    }
-    private string _q;
-    private bool _onlyRecent, _onlyFav;
-
-    private IEnumerable<PlaceModel> FilterPlace(IEnumerable<PlaceModel> source)
-    {
-        var q = _q?.Trim();
-        var cutoff = DateTime.UtcNow.AddHours(-6);
-
-        return source
-            .Where(x => string.IsNullOrEmpty(q)
-                        || (x.Name ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
-                        || (x.Capacity ?? "").Contains(q, StringComparison.OrdinalIgnoreCase));
-
-    }
-
-    private void ToggleRecent() => _onlyRecent = !_onlyRecent;
-}

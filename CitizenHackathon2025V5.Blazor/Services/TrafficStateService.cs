@@ -1,10 +1,10 @@
-using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
     public class TrafficStateService
     {
-        public List<TrafficConditionModel> TrafficConditionList { get; private set; } = new();
+        public List<ClientTrafficConditionDTO> TrafficConditionList { get; private set; } = new();
 
         private readonly TrafficConditionService _api;
 

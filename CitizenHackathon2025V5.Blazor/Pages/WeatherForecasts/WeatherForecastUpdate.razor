@@ -1,0 +1,88 @@
+﻿@page "/weatherforecast/update"
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using Microsoft.AspNetCore.Components.Forms
+
+<h3>Update Weather Forecasts (live)</h3>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div>
+    <input class="form-control mb-2" placeholder="Filtrer..." @bind="_q" @bind:event="oninput" />
+    <div style="max-height: 360px; overflow-y:auto; border:1px solid #444; border-radius:6px;">
+      <table class="table table-dark table-striped">
+        <thead>
+          <tr>
+            <th>#</th><th>Date</th><th>°C</th><th>Résumé</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (!_items.Any())
+          {
+              <tr><td colspan="99">Aucune donnée.</td></tr>
+          }
+          else
+          {
+              @foreach (var it in Filter(_items))
+              {
+                  <tr class="@(it.Id == _editing?.Id ? "table-primary" : null)">
+                      <td>@it.Id</td>
+                      <td>@it.DateWeather.ToLocalTime().ToString("g")</td>
+                      <td>@it.TemperatureC</td>
+                      <td>@it.Summary</td>
+                      <td>
+                          <button class="btn btn-sm btn-outline-info" @onclick="() => Edit(it)">Edit</button>
+                      </td>
+                  </tr>
+              }
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div>
+        @if (_editing is null)
+        {
+            <div class="alert alert-secondary">Sélectionne une ligne pour l’éditer.</div>
+        }
+        else
+        {
+            <EditForm Model="_editing" OnValidSubmit="Save">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="card p-3">
+                    <div class="mb-2">
+                        <label>Date</label>
+                        <InputDate @bind-Value="_editing.DateWeather" class="form-control" />
+                        @* If necessary, explicit: <InputDate DateTime @bind-Value="_editing.DateWeather" ... /> *@
+                    </div>
+                    <div class="mb-2">
+                        <label>Température (°C)</label>
+                        <InputNumber @bind-Value="_editing.TemperatureC" class="form-control" />
+                    </div>
+                    <div class="mb-2">
+                        <label>Résumé</label>
+                        <InputText @bind-Value="_editing.Summary" class="form-control" />
+                    </div>
+                    <div class="mb-2">
+                        <label>Pluie (mm)</label>
+                        <InputNumber @bind-Value="_editing.RainfallMm" class="form-control" />
+                    </div>
+                    <div class="mb-2">
+                        <label>Humidité (%)</label>
+                        <InputNumber @bind-Value="_editing.Humidity" class="form-control" />
+                    </div>
+                    <div class="mb-3">
+                        <label>Vent (km/h)</label>
+                        <InputNumber @bind-Value="_editing.WindSpeedKmh" class="form-control" />
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success">Enregistrer</button>
+                        <button type="button" class="btn btn-secondary" @onclick="Cancel">Annuler</button>
+                    </div>
+                </div>
+            </EditForm>
+        }
+    </div>
+</div>

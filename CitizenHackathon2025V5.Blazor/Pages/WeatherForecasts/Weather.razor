@@ -7,11 +7,11 @@
 
 @if (forecasts is null)
 {
-    <p>Chargement…</p>
+    <p>Loading…</p>
 }
 else if (forecasts.Count == 0)
 {
-    <p>Aucune donnée.</p>
+    <p>No data available at the moment.</p>
 }
 else
 {
@@ -24,11 +24,10 @@ else
 }
 
 @code {
-    // ⬇️ le bon type ici
     private IReadOnlyList<ClientWeatherForecastDTO>? forecasts;
 
     protected override async Task OnInitializedAsync()
     {
-        forecasts = await WeatherSvc.GetAsync();
+        forecasts = await WeatherSvc.GetHistoryAsync();
     }
 }

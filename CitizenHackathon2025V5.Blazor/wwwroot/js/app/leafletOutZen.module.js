@@ -353,7 +353,7 @@ export function bootOutZen(opts) {
 }
 // ---------------- Compatibility aliases for Blazor (optional)
 window.initScrollFade = initScrollAndParallax;
-
+/*window.initCrowdChart = initCrowdChart;*/
 window.mapInterop = {
     init: function (elementId) {
         initMap(elementId, [48.86, 2.35], 12);

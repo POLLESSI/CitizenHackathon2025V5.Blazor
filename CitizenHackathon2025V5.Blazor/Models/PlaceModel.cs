@@ -2,7 +2,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Models
 {
     public class PlaceModel
     {
-#nullable disable
+    #nullable disable
         public int Id { get; set; }
         public string Name { get; set; }
 
@@ -10,7 +10,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Models
         public bool Indoor { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
-        public string Capacity { get; set; }
+        public int? Capacity { get; set; }
         public string Tag { get; set; }
     }
 }

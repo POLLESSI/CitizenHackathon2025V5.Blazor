@@ -1,8 +1,6 @@
-﻿@page "/crowdinfo"
-@using CitizenHackathon2025V5.Blazor.Client.Models
-@using CitizenHackathon2025.Blazor.DTOs
-@using CitizenHackathon2025V5.Blazor.Client.Constants
+﻿@page "/crowdinfoview"
 @using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.Utils
 @inject IJSRuntime js
 
 <span class="fas fa-certificate me-2"></span> Crowd Infos
@@ -11,7 +9,7 @@
     <h3>Crowd Infos</h3>
     <div class="list-toolbar">
         <div class="left">
-            <input class="input-compact" placeholder="Rechercher..."
+            <input class="input-compact" placeholder="Search..."
                    @bind="_q" @bind:event="oninput" />
             @if (!string.IsNullOrWhiteSpace(_q))
             {
@@ -26,6 +24,7 @@
             </button>
         </div>
     </div>
+
     <div class="table-wrapper draggable-container"
          @ref="ScrollContainerRef"
          @onscroll="HandleScroll"
@@ -39,34 +38,44 @@
                 </tr>
             </thead>
             <tbody>
-
                 @if (!FilterCrowd(visibleCrowdInfos).Any())
-                    {
-                        <tr><td colspan="99"><div class="empty-state">No incidents.</div></td></tr>
-                    }
-                    else
-                    {
+                {
+                    <tr><td colspan="99"><div class="empty-state">No Crowd Informations Available at the moment.</div></td></tr>
+                }
+                else
+                {
                     @foreach (var co in FilterCrowd(visibleCrowdInfos))
                     {
-                            <tr>
-                                <td class="text-ellipsis" title="@co.LocationName">@co.LocationName</td>
-                                <td>
+                        <tr>
+                            <td class="text-ellipsis" title="@co.LocationName">@co.LocationName</td>
+                            <td>
                                 <span class="crowd @($"crowd--{co.CrowdLevel}") oz-tip"
                                       aria-label="@GetCrowdLabel(co.CrowdLevel)">
                                     @co.CrowdLevel
                                 </span>
-                                </td>
-                                <td class="col-actions">
-                                    <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(co.Id)">Info</button>
-                                </td>
-
-                            </tr>
-                        }
+                            </td>
+                            <td class="col-actions info-cell">
+                                @{
+                                    var sev = CrowdInfoSeverityHelpers.GetSeverity(co);
+                                    var color = CrowdInfoSeverityHelpers.GetColor(sev);
+                                    var desc = CrowdInfoSeverityHelpers.GetDescription(sev);
+                                    var isUnknown = color == "#9E9E9E";
+                                }
+                                <button class="btn btn-sm info-dynamic"
+                                        style="--info-color:@InfoColor(co)"
+                                        title="@InfoDesc(co)"
+                                        @onclick="() => ClickInfo(co.Id)">
+                                    Info
+                                </button>
+                            </td>
+                        </tr>
                     }
+                }
             </tbody>
         </table>
     </div>
 </div>
+
 @if (SelectedId > 0)
 {
     <div class="detail-wrapper">
@@ -79,48 +88,38 @@
         <CrowdInfoDetail Id="@SelectedId" />
     </div>
 }
-@if (!FilterCrowd(visibleCrowdInfos).Any())
-{
-    <div class="oz-empty">No items for these filters.</div>
-}
-@if (!FilterCrowd(visibleCrowdInfos).Any())
-{
-    <div class="oz-empty">No items for these filters.</div>
-}
 
+@if (!FilterCrowd(visibleCrowdInfos).Any())
+{
+    <div class="oz-empty">No items for these filters.</div>
+}
 
 @code {
-#nullable disable
-    private List<CrowdInfoModel> allCrowdInfos = new();        
-    private List<CrowdInfoModel> visibleCrowdInfos = new();     
+    private List<ClientCrowdInfoDTO> allCrowdInfos = new();
+    private List<ClientCrowdInfoDTO> visibleCrowdInfos = new();
     private int batchSize = 20;
     private int currentIndex = 0;
     private ElementReference ScrollContainerRef;
-
-    protected override void OnInitialized()
-    {
-        var now = DateTime.UtcNow;
-        var rnd = new Random();
-        // Demo: données fictives
-        for (int i = 1; i <= 200; i++)
-            allCrowdInfos.Add(new CrowdInfoModel
-            {
-                Id = i,
-                LocationName = $"Name {i}",
-                Latitude = rnd.NextDouble() * 180 - 90,
-                Longitude = rnd.NextDouble() * 360 - 180,
-                CrowdLevel = rnd.Next(50, 5000),
-                Timestamp = now.AddMinutes(-i * 10)
-            });
-
-        LoadMoreItems();
-    }
 
     private void LoadMoreItems()
     {
         var nextItems = allCrowdInfos.Skip(currentIndex).Take(batchSize);
         visibleCrowdInfos.AddRange(nextItems);
         currentIndex += batchSize;
+    }
+
+    private IEnumerable<ClientCrowdInfoDTO> FilterCrowd(IEnumerable<ClientCrowdInfoDTO> source)
+    {
+        var q = _q?.Trim();
+        var cutoff = DateTime.UtcNow.AddHours(-6);
+
+        return source
+            .Where(x =>
+                string.IsNullOrEmpty(q) ||
+                (x.LocationName ?? "").Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                x.Latitude.ToString().Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                x.Longitude.ToString().Contains(q, StringComparison.OrdinalIgnoreCase))
+            .Where(x => !_onlyRecent || x.Timestamp >= cutoff);
     }
 
     private async Task HandleScroll()
@@ -137,22 +136,9 @@
     }
 
     private string _q;
-    private bool _onlyRecent, _onlyFav;
-
-    private IEnumerable<CrowdInfoModel> FilterCrowd(IEnumerable<CrowdInfoModel> source)
-    {
-        var q = _q?.Trim();
-        var cutoff = DateTime.UtcNow.AddHours(-6);
-
-        return source
-            .Where(x => string.IsNullOrEmpty(q)
-                        || (x.LocationName ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
-                        || x.Latitude.ToString().Contains(q, StringComparison.OrdinalIgnoreCase))
-                        
-            .Where(x => !_onlyRecent || x.Timestamp >= cutoff);
-    }
-
+    private bool _onlyRecent;
     private void ToggleRecent() => _onlyRecent = !_onlyRecent;
+
     private static string GetCrowdLabel(int level) => level switch
     {
         0 => "No crowds",
@@ -163,6 +149,13 @@
         5 => "Saturated",
         _ => "Unknown"
     };
+    private static string InfoColor(ClientCrowdInfoDTO co)
+        => CrowdInfoSeverityHelpers.GetColor(
+               CrowdInfoSeverityHelpers.GetSeverity(co));
+
+    private static string InfoDesc(ClientCrowdInfoDTO co)
+        => CrowdInfoSeverityHelpers.GetDescription(
+               CrowdInfoSeverityHelpers.GetSeverity(co));
 }
 
 

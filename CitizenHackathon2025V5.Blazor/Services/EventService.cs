@@ -1,66 +1,66 @@
-using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.Utils;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http.Json;
+using SharedDTOs = CitizenHackathon2025.Blazor.DTOs;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
     public class EventService
     {
-#nullable disable
+    #nullable disable
         private readonly HttpClient _httpClient;
+        private const string ApiEventBase = "api/Event";
         private string? _eventId;
 
 
-        public EventService(HttpClient httpClient)
+        public EventService(IHttpClientFactory factory)
         {
-            _httpClient = httpClient;
+            _httpClient = factory.CreateClient("ApiWithAuth");
         }
-        public async Task<IEnumerable<EventModel?>> GetLatestEventAsync()
+        public async Task<IEnumerable<ClientEventDTO?>> GetLatestEventAsync()
         {
             try
             {
-                var response = await _httpClient.GetAsync("/event/latest");
-                if (response.StatusCode == HttpStatusCode.NotFound) return null;
+                var response = await _httpClient.GetAsync($"{ApiEventBase}/latest");
                 response.EnsureSuccessStatusCode();
-                
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<EventModel?>>();
-                return list ?? Enumerable.Empty<EventModel>();
+                return await response.Content.ReadFromJsonAsync<IEnumerable<ClientEventDTO>>()
+                       ?? Enumerable.Empty<ClientEventDTO>();
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in GetLatestEventAsync: {ex.Message}");
-                throw;
+                return Enumerable.Empty<ClientEventDTO>();
             }
             
         }
-        public async Task<EventModel> SaveEventAsync(EventModel @event)
+        public async Task<ClientEventDTO> SaveEventAsync(ClientEventDTO @event)
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("/event/save", @event);
-                if (response.IsSuccessStatusCode)
-                {
-                    return await response.Content.ReadFromJsonAsync<EventModel>();
-                }
-                throw new Exception("Empty response body");
+                if (@event is null) throw new ArgumentNullException(nameof(@event));
+                var resp = await _httpClient.PostAsJsonAsync($"{ApiEventBase}", @event);
+                resp.EnsureSuccessStatusCode();
+                return await resp.Content.ReadFromJsonAsync<ClientEventDTO>();
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in SaveEventAsync: {ex.Message}");
-                throw;
+                return null;
             }
             
         }
-        public async Task<IEnumerable<EventModel>> GetUpcomingOutdoorEventsAsync()
+        public async Task<IEnumerable<ClientEventDTO>> GetUpcomingOutdoorEventsAsync()
         {
             try
             {
-                var response = await _httpClient.GetAsync("/event/upcoming-outdoor");
+                var response = await _httpClient.GetAsync($"{ApiEventBase}/upcoming-outdoor");
                 if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
                 
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<EventModel>>();
-                return list ?? Enumerable.Empty<EventModel>();
+                var list = await response.Content.ReadFromJsonAsync<IEnumerable<ClientEventDTO>>();
+                return list ?? Enumerable.Empty<ClientEventDTO>();
             }
             catch (Exception ex)
             {
@@ -69,15 +69,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
             
         }
-        public async Task<EventModel> CreateEventAsync(EventModel newEvent)
+        public async Task<ClientEventDTO> CreateEventAsync(ClientEventDTO newEvent)
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("/event", newEvent);
+                var response = await _httpClient.PostAsJsonAsync($"{ApiEventBase}", newEvent);
                 if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
                 
-                var createdEvent = await response.Content.ReadFromJsonAsync<EventModel>();
+                var createdEvent = await response.Content.ReadFromJsonAsync<ClientEventDTO>();
                 return createdEvent ?? throw new InvalidOperationException("Empty response body");
             }
             catch (Exception ex)
@@ -87,21 +87,19 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
             
         }
-        public async Task<EventModel?> GetByIdAsync(int id)
+        public async Task<ClientEventDTO?> GetByIdAsync(int id)
         {
             try
             {
-                var response = await _httpClient.GetAsync($"/event/{id}");
+                var response = await _httpClient.GetAsync($"{ApiEventBase}/{id}");
                 if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
-
-                var eventModel = await response.Content.ReadFromJsonAsync<EventModel>();
-                return eventModel ?? throw new InvalidOperationException("Id not existing");
+                return await response.Content.ReadFromJsonAsync<ClientEventDTO>();
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in GetByIdAsync: {ex.Message}");
-                throw;
+                return null;
             }
             
         }
@@ -109,7 +107,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.PostAsync("/event/archive-expired", null);
+                var response = await _httpClient.PostAsync($"{ApiEventBase}/archive-expired", null);
                 if (response.StatusCode == HttpStatusCode.NotFound) return 0;
                 response.EnsureSuccessStatusCode();
 
@@ -127,9 +125,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         public void SetCurrentEvent(string eventId) => _eventId = eventId;
 
         public string? GetCurrentEvent() => _eventId;
-        public EventModel UpdateEvent(EventModel @event)
+        public ClientEventDTO UpdateEvent(ClientEventDTO @event)
+            => UpdateEventAsync(@event).GetAwaiter().GetResult();
+        public async Task<ClientEventDTO?> UpdateEventAsync(ClientEventDTO @event)
         {
-            return @event; // Placeholder for actual update logic
+            try
+            {
+                var resp = await _httpClient.PutAsJsonAsync($"{ApiEventBase}/update", @event);
+                if (resp.StatusCode == HttpStatusCode.NotFound) return null;
+                resp.EnsureSuccessStatusCode();
+                return await resp.Content.ReadFromJsonAsync<ClientEventDTO>();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in UpdateEventAsync: {ex.Message}");
+                return null;
+            }
+
         }
         private sealed class ArchiveResult
         {

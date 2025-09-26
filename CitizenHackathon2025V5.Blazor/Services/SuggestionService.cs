@@ -1,35 +1,41 @@
 using CitizenHackathon2025V5.Blazor.Client.DTOs;
-using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.Utils;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http.Json;
 using static System.Net.WebRequestMethods;
+using SharedDTOs = CitizenHackathon2025.Blazor.DTOs;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
     public class SuggestionService
     {
-#nullable disable
+    #nullable disable
         private readonly HttpClient _httpClient;
+        private const string ApiSuggestionBase = "suggestion";
+        private string? _suggestionId;
 
-        public SuggestionService(HttpClient httpClient)
+        public SuggestionService(IHttpClientFactory factory)
         {
-            _httpClient = httpClient;
+            _httpClient = factory.CreateClient("ApiWithAuth"); ;
         }
-        public async Task<IEnumerable<SuggestionModel>> GetSuggestionsByUserAsync(int userId)
+        public async Task<IEnumerable<ClientSuggestionDTO>> GetSuggestionsByUserAsync(int userId)
         {
             try
             {
-                var response = await _httpClient.GetAsync($"Suggestions/user/{userId}");
-                if (response.StatusCode == HttpStatusCode.NotFound) return null;
+                var response = await _httpClient.GetAsync($"{ApiSuggestionBase}/user/{userId}");
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return Enumerable.Empty<ClientSuggestionDTO>();
+
                 response.EnsureSuccessStatusCode();
-                
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<SuggestionModel>>();
-                return list ?? Enumerable.Empty<SuggestionModel>();
+
+                return await response.Content.ReadFromJsonAsync<IEnumerable<ClientSuggestionDTO>>()
+                  ?? Enumerable.Empty<ClientSuggestionDTO>();
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in GetSuggestionByUserAsync: {ex.Message}");
-                throw;
+                return Enumerable.Empty<ClientSuggestionDTO>();
             }
             
         }
@@ -37,81 +43,70 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetFromJsonAsync<List<ClientSuggestionDTO>>($"Suggestions?lat={lat}&lng={lng}")
-                    ?? new List<ClientSuggestionDTO>();
-                return response;
+                var suggest = await _httpClient.GetFromJsonAsync<List<ClientSuggestionDTO>>(
+                    $"{ApiSuggestionBase}?lat={lat}&lng={lng}");
+
+                return suggest ?? new List<ClientSuggestionDTO>();
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Unexpected error in GetSuggestionNearbyAsync: {ex.Message}");
-                throw;
+                Console.Error.WriteLine($"Unexpected error in GetSuggestionsNearbyAsync: {ex.Message}");
+                return new List<ClientSuggestionDTO>();
             }
-            
         }
         public async Task<bool> SoftDeleteSuggestionAsync(int id)
         {
             try
             {
-                var response = await _httpClient.DeleteAsync($"Suggestion/{id}");
+                var response = await _httpClient.DeleteAsync($"{ApiSuggestionBase}/{id}");
                 if (response.StatusCode == HttpStatusCode.NotFound) return false;
                 response.EnsureSuccessStatusCode();
 
-                var isDeleted = await response.Content.ReadFromJsonAsync<bool>();
-                return isDeleted;
+                return await response.Content.ReadFromJsonAsync<bool>();
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in SoftDeletedSuggestionAsync: {ex.Message}");
-                throw;
+                return false;
             }
             
         }
-        public async Task<IEnumerable<SuggestionModel?>> GetLatestSuggestionAsync()
+        public async Task<IEnumerable<ClientSuggestionDTO?>> GetLatestSuggestionAsync()
         {
             try
             {
-                var response = await _httpClient.GetAsync("Suggestions/all");
-                if (response.StatusCode == HttpStatusCode.NotFound) return null;
+                var response = await _httpClient.GetAsync($"{ApiSuggestionBase}/all");
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return Enumerable.Empty<ClientSuggestionDTO>();
+
                 response.EnsureSuccessStatusCode();
-                
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<SuggestionModel>>();
-                return list ?? Enumerable.Empty<SuggestionModel>();
+
+                return await response.Content.ReadFromJsonAsync<IEnumerable<ClientSuggestionDTO>>()
+                       ?? Enumerable.Empty<ClientSuggestionDTO>();
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in GetLatestSuggestionAsync: {ex.Message}");
-                throw;
+                return Enumerable.Empty<ClientSuggestionDTO>();
             }
             
         }
-        public async Task<SuggestionModel> SaveSuggestionAsync(SuggestionModel @suggestion)
+        public async Task<ClientSuggestionDTO> SaveSuggestionAsync(ClientSuggestionDTO @suggestion)
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("Suggestion", @suggestion);
-                if (response.StatusCode == HttpStatusCode.NotFound) return null;
-                response.EnsureSuccessStatusCode();
-                
-                var saved = await response.Content.ReadFromJsonAsync<SuggestionModel>();
-                return saved ?? throw new InvalidOperationException("Response content was null");
+                var resp = await _httpClient.PostAsJsonAsync($"{ApiSuggestionBase}", suggestion);
+                if (resp.StatusCode == HttpStatusCode.NotFound) return null;
+
+                resp.EnsureSuccessStatusCode();
+                return await resp.Content.ReadFromJsonAsync<ClientSuggestionDTO>();
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in SaveSuggestionAsync: {ex.Message}");
-                throw;
+                return null;
             }
-            
         }
-        //public async SuggestionModel? UpdateSuggestion(SuggestionModel @suggestion)
-        //{
-        //                var response = await _httpClient.PutAsJsonAsync($"api/suggestions/update", @suggestion);
-        //    if (response.IsSuccessStatusCode)
-        //    {
-        //        return await response.Content.ReadFromJsonAsync<SuggestionModel>();
-        //    }
-        //    throw new Exception("Failed to update suggestion");
-        //    return null; // Placeholder for actual update logic
-        //}
     }
 }
 

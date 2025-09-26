@@ -9,8 +9,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
     public class CrowdInfoService
     {
-#nullable disable
+    #nullable disable
         private readonly HttpClient _httpClient;
+        private const string ApiCrowdBase = "api/CrowdInfo";
 
         public CrowdInfoService(IHttpClientFactory factory)
         {
@@ -24,7 +25,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync("CrowdInfo/all");
+                var response = await _httpClient.GetAsync($"{ApiCrowdBase}/all");
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadFromJsonAsync<IEnumerable<ClientCrowdInfoDTO>>()
                        ?? Enumerable.Empty<ClientCrowdInfoDTO>();
@@ -33,7 +34,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             {
 
                 Console.Error.WriteLine($"Unexpected error in GetAllCrowdInfoAsync: {ex.Message}");
-                throw;
+                return Enumerable.Empty<ClientCrowdInfoDTO>();
             }
 
         }
@@ -63,7 +64,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"CrowdInfo/{id}");
+                var response = await _httpClient.GetAsync($"{ApiCrowdBase}/{id}");
                 if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadFromJsonAsync<ClientCrowdInfoDTO>();
@@ -71,7 +72,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in GetCrowdInfoByIdAsync: {ex.Message}");
-                throw;
+                return null;
             }
 
         }
@@ -96,7 +97,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var resp = await _httpClient.GetAsync($"CrowdInfo/by-location?locationName={Uri.EscapeDataString(locationName)}");
+                var resp = await _httpClient.GetAsync($"{ApiCrowdBase}/by-location?locationName={Uri.EscapeDataString(locationName)}");
                 resp.EnsureSuccessStatusCode();
                 return await resp.Content.ReadFromJsonAsync<IEnumerable<ClientCrowdInfoDTO>>()
                        ?? Enumerable.Empty<ClientCrowdInfoDTO>();
@@ -104,7 +105,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in GetByLocationAsync: {ex.Message}");
-                throw;
+                return Enumerable.Empty<ClientCrowdInfoDTO>();
             }
             
         }
@@ -117,8 +118,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             try
             {
                 if (dto is null) throw new ArgumentNullException(nameof(dto));
-                // we reuse _httpClient already configured
-                var resp = await _httpClient.PostAsJsonAsync("CrowdInfo", dto);
+                var resp = await _httpClient.PostAsJsonAsync($"{ApiCrowdBase}", dto);
                 resp.EnsureSuccessStatusCode();
                 return await resp.Content.ReadFromJsonAsync<ClientCrowdInfoDTO>();
             }
@@ -126,7 +126,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             {
 
                 Console.Error.WriteLine($"Unexpected error in SaveCrowdInfoAsync: {ex.Message}");
-                throw;
+                return null;
             }
             
         }
@@ -138,15 +138,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var resp = await _httpClient.DeleteAsync($"CrowdInfo/archive/{id}");
-                resp.EnsureSuccessStatusCode();
-                // Your controller returns { Message = ... } – if you want a bool, return Ok(true) on the API side instead.
+                var resp = await _httpClient.DeleteAsync($"{ApiCrowdBase}/archive/{id}");
                 return resp.IsSuccessStatusCode;
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in DeleteCrowdInfoAsync: {ex.Message}");
-                throw;
+                return false;
             }
             
         }
@@ -161,7 +159,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var resp = await _httpClient.PutAsJsonAsync("CrowdInfo/update", dto);
+                var resp = await _httpClient.PutAsJsonAsync($"{ApiCrowdBase}/update", dto);
                 if (resp.StatusCode == HttpStatusCode.NotFound) return null;
                 resp.EnsureSuccessStatusCode();
                 return await resp.Content.ReadFromJsonAsync<ClientCrowdInfoDTO>();
@@ -169,7 +167,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in UpdateCrowdInfoAsync: {ex.Message}");
-                throw;
+                return null;
             }
             
         }

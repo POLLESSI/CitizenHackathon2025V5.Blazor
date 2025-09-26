@@ -1,26 +1,23 @@
-@inject Blazored.Toast.Services.IToastService ToastService
-
-@* <button class="btn btn-primary" @onclick="() => ToastService.ShowSuccess(" It works !", "Success" )">
-    Test the toast
-</button> *@
+@page "/crowdinfodetail/{Id:int}"
+@using System.Net.Http.Json
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
 
 <h3>Crowd Info Detail</h3>
 
-@* @if (CurrentCrowdInfo is not null)
-{
-    <div class="detail-container bordeaux-background">
-        <p>Name : @CurrentCrowdInfo.LocationName </p>
-        <p>Authority : @CurrentCrowdInfo.Latitude</p>
-        <p>License Number : @CurrentCrowdInfo.Longitude</p>
-        <p>URL : @CurrentCrowdInfo.CrowdLevel</p>
-        <p>Date : @CurrentCrowdInfo.Timestamp</p>
-    </div>
-} *@
-else
+@if (CurrentCrowdInfo is null)
 {
     <p>Loading Crowd Info details...</p>
 }
-
+else
+{
+    <div class="detail-container bordeaux-background">
+        <p><strong>Name:</strong> @CurrentCrowdInfo.LocationName</p>
+        <p><strong>Latitude:</strong> @CurrentCrowdInfo.Latitude</p>
+        <p><strong>Longitude:</strong> @CurrentCrowdInfo.Longitude</p>
+        <p><strong>Crowd Level:</strong> @CurrentCrowdInfo.CrowdLevel</p>
+        <p><strong>Date:</strong> @(CurrentCrowdInfo.Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss"))</p>
+    </div>
+}
 
 @code {
 

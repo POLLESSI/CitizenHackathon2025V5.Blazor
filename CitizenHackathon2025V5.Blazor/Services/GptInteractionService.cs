@@ -1,4 +1,4 @@
-using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions;
 using System.Net;
 using System.Net.Http.Json;
@@ -9,21 +9,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     {
 #nullable disable
         private readonly HttpClient _httpClient;
+        private const string Base = "api/gpt";
 
         public GptInteractionService(HttpClient httpClient)
         {
             _httpClient = httpClient;
         }
-        public async Task<IEnumerable<GptInteractionModel>> GetAllInteractions()
+        public async Task<IEnumerable<ClientGptInteractionDTO>> GetAllInteractions()
         {
             try
             {
-                var response = await _httpClient.GetAsync("Gpt/all");
-                if (response.StatusCode == HttpStatusCode.NotFound) return null;
+                var response = await _httpClient.GetAsync($"{Base}/all");
+                if (response.StatusCode == HttpStatusCode.NotFound) 
+                    return Enumerable.Empty<ClientGptInteractionDTO>();
                 response.EnsureSuccessStatusCode();
                 
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<GptInteractionModel>>();
-                return list ?? Enumerable.Empty<GptInteractionModel>();
+                var list = await response.Content.ReadFromJsonAsync<IEnumerable<ClientGptInteractionDTO>>();
+                return list ?? Enumerable.Empty<ClientGptInteractionDTO>();
             }
             catch (Exception ex)
             {
@@ -32,16 +34,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
             
         }
-        public async Task<IEnumerable<GptInteractionModel>> GetById(int id)
+        public async Task<IEnumerable<ClientGptInteractionDTO>> GetById(int id)
         {
             try
             {
-                var response = await _httpClient.GetAsync($"Gpt/{id}");
+                var response = await _httpClient.GetAsync($"{Base}/{id}");
                 if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
                 
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<GptInteractionModel>>();
-                return list ?? Enumerable.Empty<GptInteractionModel>();
+                var list = await response.Content.ReadFromJsonAsync<IEnumerable<ClientGptInteractionDTO>>();
+                return list ?? Enumerable.Empty<ClientGptInteractionDTO>();
             }
             catch (Exception ex)
             {
@@ -68,15 +70,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         //    }
         //    return Enumerable.Empty<GptInteractionModel>();
         //}
-        public async Task AskGpt(GptInteractionModel prompt)
+        public async Task AskGpt(ClientGptInteractionDTO prompt)
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("Gpt/Ask-Gpt", prompt);
+                var response = await _httpClient.PostAsJsonAsync($"{Base}/ask-gpt", prompt);
                 if (response.StatusCode == HttpStatusCode.NotFound) return;
                 response.EnsureSuccessStatusCode();
 
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<GptInteractionModel>>();
+                var list = await response.Content.ReadFromJsonAsync<IEnumerable<ClientGptInteractionDTO>>();
                 return;
             }
             catch (Exception ex)
@@ -90,11 +92,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.DeleteAsync($"Gpt/{id}");
+                var response = await _httpClient.DeleteAsync($"{Base}/{id}");
                 if (response.StatusCode == HttpStatusCode.NotFound) return;
                 response.EnsureSuccessStatusCode();
 
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<GptInteractionModel>>();
+                var list = await response.Content.ReadFromJsonAsync<IEnumerable<ClientGptInteractionDTO>>();
                 return;
             }
             catch (Exception ex)
@@ -108,11 +110,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync($"Gpt/Replay/{id}", new { });
+                var response = await _httpClient.PostAsJsonAsync($"{Base}/replay/{id}", new { });
                 if (response.StatusCode == HttpStatusCode.NotFound) return;
                 response.EnsureSuccessStatusCode();
                 
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<GptInteractionModel>>();
+                var list = await response.Content.ReadFromJsonAsync<IEnumerable<ClientGptInteractionDTO>>();
                 return;
             }
             catch (Exception ex)

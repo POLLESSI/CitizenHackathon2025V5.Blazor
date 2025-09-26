@@ -58,7 +58,21 @@
     <link href="css/external/blazored-toast.css" rel="stylesheet" />
     <!-- Open Iconic from CDN (avoids 404 local) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/open-iconic/1.1.1/font/css/open-iconic-bootstrap.min.css" rel="stylesheet" />
+    <!--Earth rotation images preload-->
+    <script>
+        (function () {
+            // Nuit = 22:00–07:00 (ajuste si besoin)
+            const h = new Date().getHours();
+            const isNight = (h >= 22 || h < 7);
 
+            const link = document.createElement('link');
+            link.rel = 'preload';
+            link.as = 'image';
+            link.href = isNight ? '/images/earth_texture_night.jpg'
+                : '/images/earth_texture.jpg';
+            document.head.appendChild(link);
+        })();
+    </script>
     <!-- Leaflet & MarkerCluster -->
     <link rel="stylesheet"
           href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -100,11 +114,6 @@
 
     <img src="/images/earth_texture.jpg" alt="Earth Texture" style="display:none;" />
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Minimal interop bridge -->
-    <script src="/js/trafficInterop.js" defer></script>
-    <script src="/js/vendor/interop.js" defer></script>
-
     <!-- Application modules -->
     <script type="module" src="/js/app/leafletOutZen.module.js"></script>
     <script type="module" src="/js/app/timeEffects.js"></script>
@@ -112,6 +121,7 @@
     <script type="module" src="/js/app/earthRotation.js"></script>
     <script type="module" src="/js/app/ui.effects.js"></script>
     <script type="module" src="/js/core/SignalR.client.js"></script>
+    <script src="/js/crowdbar.js" defer></script>
 
     <!-- Initialize OutZen App (Leaflet module expecting global L and Chart) -->
     <!--<script type="module">
@@ -132,6 +142,25 @@
             removeMarker: (id) => app.removeCrowdMarker(id)
         };
     </script>-->
+    <!-- Boot of the OutZen module and exposure of useful globals for Blazor -->
+    <script type="module">
+        import { bootOutZen, initCrowdChart } from '/js/app/leafletOutZen.module.js';
+
+        // Initialize the map + create window.OutZenInterop (used by your JS calls from Blazor)
+        bootOutZen({
+            mapId: 'leafletMap',
+            center: [50.89, 4.34],
+            zoom: 13,
+            enableChart: true // prepare the #crowdChart canvas
+        });
+
+        // If your C# does JS.InvokeVoidAsync("initCrowdChart", "crowdChart"),
+        // we expose the export of the module globally :
+        window.initCrowdChart = initCrowdChart;
+    </script>
+    <!-- Minimal interop bridge -->
+    <script src="/js/trafficInterop.js" defer></script>
+    <script src="/js/vendor/interop.js" defer></script>
     <!-- Service Worker -->
     <script>
         if ('serviceWorker' in navigator && location.hostname !== "localhost") {
@@ -145,10 +174,21 @@
     <script>
         (function () {
             const hour = new Date().getHours();
-            const isNight = (hour < 7) || (hour >= 20); // adjust the threshold if you want
-            const src = isNight ? "/images/night.jpg" : "/images/day.jpg?v=2";
-            const img = document.getElementById("bgImage");
-            if (img) img.src = src;
+            const isDay = hour >= 7 && hour < 20; // simple rule: 7am–8pm = day
+
+            // We select the "day" and "night" images which are already in your HTML
+            const dayImg = document.querySelector('img[src*="day.jpg"]');
+            const nightImg = document.querySelector('img[src*="night.jpg"]');
+
+            if (dayImg && nightImg) {
+                if (isDay) {
+                    dayImg.style.display = "block";
+                    nightImg.style.display = "none";
+                } else {
+                    dayImg.style.display = "none";
+                    nightImg.style.display = "block";
+                }
+            }
         })();
     </script>
     <script>

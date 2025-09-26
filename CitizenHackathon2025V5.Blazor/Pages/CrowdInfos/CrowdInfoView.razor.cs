@@ -1,8 +1,5 @@
-﻿using CitizenHackathon2025.Blazor.DTOs;
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
-using CitizenHackathon2025V5.Blazor.Client.Models;
+﻿using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
-using CitizenHackathon2025V5.Blazor.Client.SignalR;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
@@ -22,13 +19,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
 
         private const string ApiBase = "https://localhost:7254";
+        private IJSObjectReference? _outZen;
         public List<ClientCrowdInfoDTO> CrowdInfos { get; set; } = new();
         public int SelectedId { get; set; }
         public HubConnection hubConnection { get; set; }
         protected override async Task OnInitializedAsync()
         {
             // 1) REST initial
-            CrowdInfos = (await CrowdInfoService.GetAllCrowdInfoAsync()).ToList();
+            var fetched = (await CrowdInfoService.GetAllCrowdInfoAsync()).ToList();
+            CrowdInfos = fetched;
+            allCrowdInfos = fetched;
+            visibleCrowdInfos.Clear();
+            currentIndex = 0;
             LoadMoreItems();
 
             // 2) SignalR (Absolute URL on API side)
@@ -54,15 +56,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
             // handlers...
             hubConnection.On<ClientCrowdInfoDTO>("ReceiveCrowdUpdate", async dto =>
             {
-                var idx = CrowdInfos.FindIndex(c => c.Id == dto.Id);
-                if (idx < 0) CrowdInfos.Add(dto);
-                else CrowdInfos[idx] = dto;
+                void Upsert(List<ClientCrowdInfoDTO> list)
+                {
+                    var i = list.FindIndex(c => c.Id == dto.Id);
+                    if (i >= 0) list[i] = dto; else list.Add(dto);
+                }
+
+                Upsert(CrowdInfos);
+                Upsert(allCrowdInfos);
+
+                var j = visibleCrowdInfos.FindIndex(c => c.Id == dto.Id);
+                if (j >= 0) visibleCrowdInfos[j] = dto;
 
                 await JS.InvokeVoidAsync("window.OutZenInterop.addOrUpdateCrowdMarker",
                     dto.Id.ToString(), dto.Latitude, dto.Longitude, dto.CrowdLevel,
                     new { title = dto.LocationName, description = $"Maj {dto.Timestamp:HH:mm:ss}" });
 
-                StateHasChanged();
+                await InvokeAsync(StateHasChanged); // <-- important to refresh the UI
             });
 
             hubConnection.On<int>("CrowdInfoArchived", async id =>
@@ -82,7 +92,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
             var b = baseUrl.TrimEnd('/');
             var p = path.TrimStart('/'); // ex: "hubs/crowdHub"
 
-            // Si la base se termine déjà par "/hubs" ET le path commence par "hubs/", on évite le doublon
+            // If the base already ends with "/hubs" AND the path begins with "hubs/", we avoid the duplicate
             if (b.EndsWith("/hubs", StringComparison.OrdinalIgnoreCase) &&
                 p.StartsWith("hubs/", StringComparison.OrdinalIgnoreCase))
             {
@@ -93,10 +103,22 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
         }
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            if (firstRender)
+            if (!firstRender) return;
+
+            // 1) Import the module
+            _outZen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
+
+            // 2) Module boot (creates the map and exposes window.OutZenInterop)
+            await _outZen.InvokeVoidAsync("bootOutZen", new
             {
-                await JS.InvokeVoidAsync("initCrowdChart", "crowdChart");
-            }
+                mapId = "leafletMap",
+                center = new double[] { 50.89, 4.34 },
+                zoom = 13,
+                enableChart = true
+            });
+
+            // 3) Initializes the chart via the module export
+            await _outZen.InvokeVoidAsync("initCrowdChart", "crowdChart");
         }
         private void ClickInfo(int id) => SelectedId = id;
 
@@ -115,8 +137,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
         public async ValueTask DisposeAsync()
         {
-            try { await JS.InvokeVoidAsync("OutZenCharts.destroy", "crowdChart"); }
+            try
+            {
+                if (_outZen is not null)
+                {
+                    // optional: if you have a destroy function in the module
+                    await _outZen.DisposeAsync();
+                }
+            }
             catch { /* ignore */ }
+
             if (hubConnection is not null)
             {
                 try { await hubConnection.StopAsync(); } catch { }

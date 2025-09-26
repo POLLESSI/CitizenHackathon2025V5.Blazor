@@ -1,68 +1,97 @@
-using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.Utils;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Http.Json;
+using SharedDTOs = CitizenHackathon2025.Blazor.DTOs;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
     public class PlaceService
     {
-#nullable disable
+    #nullable disable
         private readonly HttpClient _httpClient;
+        private const string ApiPlaceBase = "api/Place";
+        private string? _placeId;
 
-        public PlaceService(HttpClient httpClient)
+        public PlaceService(IHttpClientFactory factory)
         {
-            _httpClient = httpClient;
+            _httpClient = factory.CreateClient("ApiWithAuth");
         }
-        public async Task<IEnumerable<PlaceModel?>> GetLatestPlaceAsync()
+        public async Task<IEnumerable<ClientPlaceDTO?>> GetLatestPlaceAsync()
         {
             try
             {
-                var response = await _httpClient.GetAsync("Place/Latest");
-                if (response.StatusCode == HttpStatusCode.NotFound) return null;
+                var response = await _httpClient.GetAsync($"{ApiPlaceBase}/Latest");
                 response.EnsureSuccessStatusCode();
-                
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<PlaceModel>>();
-                return list ?? Enumerable.Empty<PlaceModel>();
+
+                return await response.Content.ReadFromJsonAsync<IEnumerable<ClientPlaceDTO>>()
+                        ?? Enumerable.Empty<ClientPlaceDTO>();
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in GetLatestPlaceAsync: {ex.Message}");
-                throw;
+                return Enumerable.Empty<ClientPlaceDTO>();
             }
             
         }
-        public async Task<PlaceModel> SavePlaceAsync(PlaceModel @place)
+        public async Task<ClientPlaceDTO> SavePlaceAsync(ClientPlaceDTO @place)
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("Place", @place);
-                if (response.StatusCode == HttpStatusCode.NotFound) return null;
+                if (@place is null) throw new ArgumentNullException(nameof(@place));
+                var response = await _httpClient.PostAsJsonAsync($"{ApiPlaceBase}", @place);
                 response.EnsureSuccessStatusCode();
-                
-                var saved = await response.Content.ReadFromJsonAsync<PlaceModel>();
-                return saved ?? throw new InvalidOperationException("Response content was null");
+
+                return await response.Content.ReadFromJsonAsync<ClientPlaceDTO>();
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in SavePlaceAsync: {ex.Message}");
-                throw;
+                return null;
             }
             
         }
-        public PlaceModel? UpdatePlace(PlaceModel @place)
+        public async Task<int> ArchivePastPlacesAsync()
         {
             try
             {
-                // This method is not implemented in the original code.
-                // You can implement it based on your requirements.
-                throw new NotImplementedException("UpdatePlace method is not implemented.");
-            }
-            catch (Exception)
-            {
+                var response = await _httpClient.PostAsync($"{ApiPlaceBase}/archive-expired", null);
+                if (response.StatusCode == HttpStatusCode.NotFound) return 0;
+                response.EnsureSuccessStatusCode();
 
+                var archivedCount = await response.Content.ReadFromJsonAsync<int>();
+                return archivedCount;
+                ;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in ArchivePastPlacesAsync: {ex.Message}");
                 throw;
             }
-            
+
+        }
+        public ClientPlaceDTO? UpdatePlace(ClientPlaceDTO @place)
+            => UpdatePlaceAsync(@place).GetAwaiter().GetResult();
+        public async Task<ClientPlaceDTO?> UpdatePlaceAsync(ClientPlaceDTO @place)
+        {
+            try
+            {
+                var resp = await _httpClient.PutAsJsonAsync($"{ApiPlaceBase}/update", @place);
+                if (resp.StatusCode == HttpStatusCode.NotFound) return null;
+                resp.EnsureSuccessStatusCode();
+                return await resp.Content.ReadFromJsonAsync<ClientPlaceDTO>();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in UpdatePlaceAsync: {ex.Message}");
+                return null;
+            }
+
+        }
+        private sealed class ArchiveResult
+        {
+            public int ArchivedCount { get; set; }
         }
     }
 }
