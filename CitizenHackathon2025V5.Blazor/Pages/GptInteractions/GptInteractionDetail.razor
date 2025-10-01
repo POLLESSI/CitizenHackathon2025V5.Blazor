@@ -1,3 +1,6 @@
+@page "/gptinteraction/{Id:int}"
+@page "/gptinteractiondetail/{Id:int}"
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
 @inject Blazored.Toast.Services.IToastService ToastService
 
 @* <button class="btn btn-primary" @onclick="() => ToastService.ShowSuccess(" It works !", "Success" )">
@@ -10,14 +13,13 @@
 {
     <div class="detail-container bordeaux-background">
         <p>Prompt : @CurrentGptInteraction.Prompt</p>
-        <p>PromptHash : @CurrentGptInteraction.PromptHash</p>
         <p>Response : @CurrentGptInteraction.Response</p>
         <p>CreatedAt : @CurrentGptInteraction.CreatedAt</p>
     </div>
 }
 else
 {
-    <p>Loading Event details...</p>
+    <p>Loading GPT interaction details...</p>
 }
 
 

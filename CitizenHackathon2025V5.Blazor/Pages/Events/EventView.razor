@@ -19,6 +19,11 @@
         <div class="right">
             <button class="chip @( _onlyRecent ? "active" : null )" @onclick="() => ToggleRecent()"> Recents</button>
         </div>
+        <div>
+            <NavLink class="chip add-chip" href="/eventcreate">
+                Add
+            </NavLink>
+        </div>
     </div>
 
     <div class="table-wrapper draggable-container"
@@ -47,7 +52,7 @@
                             <td class="text-ellipsis" title="@ev.Name">@ev.Name</td>
                             <td class="text-ellipsis" title="@ev.DateEvent">@ev.DateEvent</td>
                             <td class="col-actions">
-                                <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(ev.Id)">Info</button>
+                                <button class="btn btn-sm btn-outline-info" @onclick="() => GoToDetail(ev.Id)">Info</button>
                             </td>
                         </tr>
                     }

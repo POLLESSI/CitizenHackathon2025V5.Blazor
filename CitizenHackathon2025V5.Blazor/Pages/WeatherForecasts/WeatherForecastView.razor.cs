@@ -2,6 +2,7 @@ using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
+//using CitizenHackathon2025.Shared.StaticConfig.Constants;
 using Microsoft.JSInterop;
 using Newtonsoft.Json;
 
@@ -63,6 +64,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
                 .WithAutomaticReconnect()
                 .Build();
 
+            //hubConnection = new HubConnectionBuilder()
+            //    .WithUrl($"{apiBaseUrl.TrimEnd('/')}{WeatherForecastHubMethods.HubPath}", options =>
+            //    {
+            //        // options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty; // if protected hub
+            //    })
+            //    .WithAutomaticReconnect()
+            //    .Build();
+
             // Handlers
             hubConnection.On<ClientWeatherForecastDTO>("ReceiveWeatherForecastUpdate", async dto =>
             {
@@ -95,7 +104,22 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
                 await InvokeAsync(StateHasChanged);
             });
 
-            try { await hubConnection.StartAsync(); }
+            //hubConnection.On<string>(WeatherForecastHubMethods.ToClient.NewWeatherForecast, payload =>
+            //{
+            //    Console.WriteLine($"NewWeatherForecast: {payload}");
+            //    // TODO: upsert météo + StateHasChanged()
+            //});
+            //hubConnection.On<string>(WeatherForecastHubMethods.ToClient.ReceiveForecast, payload =>
+            //{
+            //    Console.WriteLine($"ReceiveForecast: {payload}");
+            //});
+
+            try 
+            { 
+                await hubConnection.StartAsync();
+                //await hubConnection.InvokeAsync(WeatherForecastHubMethods.FromClient.RefreshWeatherForecast, "refresh-now");
+                //await hubConnection.InvokeAsync(WeatherForecastHubMethods.FromClient.Notify, "hello");
+            }
             catch (Exception ex) { Console.Error.WriteLine($"[WeatherForecastView] Hub start failed: {ex.Message}"); }
         }
         private void LoadMoreItems()

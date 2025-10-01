@@ -2,7 +2,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Models
 {
     public class TrafficConditionModel
     {
-#nullable disable
+    #nullable disable
         public int Id { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }

@@ -1,5 +1,4 @@
 using CitizenHackathon2025V5.Blazor.Client.DTOs;
-using CitizenHackathon2025V5.Blazor.Client.Models;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using System;
@@ -18,8 +17,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         // Events exposed in the interface (optional, depending on usage)
         public event Func<object, Task> OnNotify;
         public event Func<CrowdInfoUIDTO, Task> OnCrowdInfoUpdated;
-        public event Func<TrafficConditionModel, Task> OnTrafficUpdated;
-        public event Func<WeatherForecastModel, Task> OnWeatherForecastUpdated;
+        public event Func<ClientEventDTO, Task> OnEventUpdated;
+        public event Func<ClientTrafficConditionDTO, Task> OnTrafficUpdated;
+        public event Func<ClientWeatherForecastDTO, Task> OnWeatherForecastUpdated;
 
         public SignalRService(IJSRuntime jsRuntime)
         {

@@ -1,8 +1,10 @@
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.Pages.Auths;
+using Microsoft.JSInterop;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using Microsoft.JSInterop;
 using System.Threading.Tasks;
-using CitizenHackathon2025V5.Blazor.Client.Pages.Auths;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
@@ -40,6 +42,42 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 throw;
             }
             
+        }
+        public async Task<ClientUserDTO?> GetById(int id)
+        {
+            if (id <= 0)
+            {
+                Console.Error.WriteLine("GetById: invalid id.");
+                return null;
+            }
+
+            try
+            {
+                // 1) Get the token (same pattern as GetUsersAsync)
+                var token = await _authService.GetAccessTokenAsync();
+                if (string.IsNullOrEmpty(token))
+                    return null;
+
+                _httpClient.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", token);
+
+                // 2) API call (routes in UserController: [Route(\"api/[controller]\")] + [HttpGet(\"{id}\")])
+                // Your HttpClient must be configured with BaseAddress = "https://.../api/"
+                using var resp = await _httpClient.GetAsync($"user/{id}");
+
+                if (resp.StatusCode == HttpStatusCode.NotFound)
+                    return null;
+
+                resp.EnsureSuccessStatusCode();
+
+                var dto = await resp.Content.ReadFromJsonAsync<ClientUserDTO>();
+                return dto;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in GetById({id}): {ex.Message}");
+                return null;
+            }
         }
         public async Task SetAccessTokenAsync(string token)
         {

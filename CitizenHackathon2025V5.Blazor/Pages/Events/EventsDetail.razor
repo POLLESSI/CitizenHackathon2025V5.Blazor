@@ -1,3 +1,7 @@
+@page "/event/{Id:int}"
+@page "/eventdetail/{Id:int}"
+@inherits EventDetail
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
 @inject Blazored.Toast.Services.IToastService ToastService
 
 @* <button class="btn btn-primary" @onclick="() => ToastService.ShowSuccess(" It works !", "Success" )">
@@ -6,20 +10,20 @@
 
 <h3>Event Detail</h3>
 
-@* @if (CurrentEvent is not null)
+@if (CurrentEvent is not null)
 {
     <div class="detail-container bordeaux-background">
         <p>Name : @CurrentEvent.Name</p>
-        <p>Authority : @CurrentEvent.Latitude</p>
-        <p>License Number : @CurrentEvent.Longitude</p>
-        <p>URL : @CurrentEvent.DateEvent</p>
-        <p>Date : @CurrentEvent.ExpectedCrowd</p>
+        <p>Latitude : @CurrentEvent.Latitude</p>
+        <p>Longitude : @CurrentEvent.Longitude</p>
+        <p>Date Event : @CurrentEvent.DateEvent</p>
+        <p>Expected Crowd : @CurrentEvent.ExpectedCrowd</p>
         <p>Is Outdoor : @CurrentEvent.IsOutdoor</p>
     </div>
 }
- *@else
+else
 {
-<p>Loading Certification details...</p>
+<p>Loading Event details...</p>
 }
 
 

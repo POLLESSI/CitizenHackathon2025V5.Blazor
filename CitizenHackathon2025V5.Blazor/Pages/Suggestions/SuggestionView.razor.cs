@@ -1,5 +1,6 @@
 using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+//using CitizenHackathon2025.Shared.StaticConfig.Constants;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Newtonsoft.Json;
@@ -65,6 +66,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
                 .WithAutomaticReconnect()
                 .Build();
 
+            //var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
+            //hubConnection = new HubConnectionBuilder()
+            //    .WithUrl($"{apiBaseUrl}{SuggestionHubMethods.HubPath}", options =>
+            //    {
+            //        // If your hub is later protected, provide a token
+            //        options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
+            //    })
+            //    .WithAutomaticReconnect()
+            //    .Build();
+
             // Handlers
             hubConnection.On<ClientSuggestionDTO>("ReceiveSuggestionUpdate", async dto =>
             {
@@ -100,8 +111,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
                 await JS.InvokeVoidAsync("window.OutZenInterop.removeMarker", id.ToString());
                 await InvokeAsync(StateHasChanged);
             });
+            //hubConnection.On(SuggestionHubMethods.ToClient.NewSuggestion, () =>
+            //{
+            //    Console.WriteLine("NewSuggestion (no payload)");
+            //    InvokeAsync(StateHasChanged);
+            //});
 
-            try { await hubConnection.StartAsync(); }
+            //// Server -> Client (avec payload SuggestionDTO)
+            //hubConnection.On<SuggestionDTO>(SuggestionHubMethods.ToClient.ReceiveSuggestion, dto =>
+            //{
+            //    Console.WriteLine($"ReceiveSuggestion: {dto?.Title}");
+            //    // TODO: upsert dans ta liste + StateHasChanged
+            //});
+
+            try 
+            { 
+                await hubConnection.StartAsync();
+                //await hubConnection.InvokeAsync(SuggestionHubMethods.FromClient.RefreshSuggestion);
+                //var suggestion = new SuggestionDTO { /* init … */ };
+                //await hubConnection.InvokeAsync(SuggestionHubMethods.FromClient.SendSuggestion, suggestion);
+            }
             catch (Exception ex) { Console.Error.WriteLine($"[SuggestionView] Hub start failed: {ex.Message}"); }
         }
         private void LoadMoreItems()

@@ -1,8 +1,7 @@
-using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
-using System.Threading;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 {
@@ -11,7 +10,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 #nullable disable
         [Inject]
         public HttpClient? Client { get; set; }
-        public TrafficConditionModel? CurrentTrafficCondition { get; set; }
+        [Inject] public NavigationManager Nav { get; set; } = default!;
+        [Inject] public TrafficConditionService TrafficConditionService { get; set; } = default!;
+        public ClientTrafficConditionDTO? CurrentTrafficCondition { get; set; }
 
         [Parameter] public int Id { get; set; }
 
@@ -22,39 +23,29 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             _cts?.Cancel();
             _cts = new CancellationTokenSource();
 
+            if (Id <= 0)
+            {
+                var uri = new Uri(Nav.Uri);
+                var q = QueryHelpers.ParseQuery(uri.Query);
+                if (q.TryGetValue("id", out var idValues) && int.TryParse(idValues.ToString(), out var qid))
+                    Id = qid;
+            }
             if (Id > 0)
             {
-                await GetTrafficConditionAsync(_cts.Token);
-            }
-            else
-            {
-                CurrentTrafficCondition = null; // Reset if invalid Id
-            }
-        }
-        private async Task GetTrafficConditionAsync(CancellationToken token)
-        {
-            try
-            {
-                HttpResponseMessage message = await Client.GetAsync($"api/event/{Id}", token);
-
-                if (message.IsSuccessStatusCode)
+                try
                 {
-                    string json = await message.Content.ReadAsStringAsync(token);
-                    CurrentTrafficCondition = JsonConvert.DeserializeObject<TrafficConditionModel>(json);
+                    CurrentTrafficCondition = await TrafficConditionService
+                        .GetTrafficConditionByIdAsync(Id, _cts.Token);
                 }
-                else
+                catch (Exception ex)
                 {
+                    Console.Error.WriteLine($"[EventDetail] load {Id} failed: {ex.Message}");
                     CurrentTrafficCondition = null;
                 }
             }
-            catch (TaskCanceledException)
+            else
             {
-                // Normal cancellation ? we ignore
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error loading traffic condition {Id} : {ex.Message}");
-                CurrentTrafficCondition = null;
+                CurrentTrafficCondition = null; 
             }
         }
         public void Dispose()

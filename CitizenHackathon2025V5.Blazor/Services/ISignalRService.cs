@@ -1,5 +1,4 @@
 using CitizenHackathon2025V5.Blazor.Client.DTOs;
-using CitizenHackathon2025V5.Blazor.Client.Models;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
@@ -7,8 +6,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     {
         event Func<object, Task> OnNotify;
         event Func<CrowdInfoUIDTO, Task> OnCrowdInfoUpdated;
-        event Func<TrafficConditionModel, Task> OnTrafficUpdated;
-        event Func<WeatherForecastModel, Task> OnWeatherForecastUpdated;
+        event Func<ClientEventDTO, Task> OnEventUpdated;
+        event Func<ClientTrafficConditionDTO, Task> OnTrafficUpdated;
+        event Func<ClientWeatherForecastDTO, Task> OnWeatherForecastUpdated;
 
         Task StartAsync(string hubUrl, string hubEventName);
         Task StopAsync();

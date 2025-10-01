@@ -10,7 +10,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     public class TrafficConditionService
     {
         private readonly HttpClient _httpClient;
-        private const string ApiTrafficConditionBase = "api/TrafficCondition";
+        //private const string ApiTrafficConditionBase = "api/TrafficCondition";
         private string? _eventId;
 
         public TrafficConditionService(IHttpClientFactory factory)
@@ -40,9 +40,34 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
 
         }
-        public async Task GetTrafficConditionById(int id)
+        public async Task<ClientTrafficConditionDTO?> GetTrafficConditionByIdAsync(int id, CancellationToken ct = default)
         {
+            if (id <= 0)
+            {
+                Console.Error.WriteLine("GetTrafficConditionByIdAsync: invalid id.");
+                return null;
+            }
 
+            try
+            {
+                using var resp = await _httpClient.GetAsync($"TrafficCondition/{id}", ct);
+
+                if (resp.StatusCode == HttpStatusCode.NotFound)
+                    return null;
+
+                resp.EnsureSuccessStatusCode();
+
+                return await resp.Content.ReadFromJsonAsync<ClientTrafficConditionDTO>(cancellationToken: ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in GetTrafficConditionByIdAsync({id}): {ex.Message}");
+                return null;
+            }
         }
 
         public async Task<ClientTrafficConditionDTO> SaveTrafficConditionAsync(ClientTrafficConditionDTO dto)
@@ -60,7 +85,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{ApiTrafficConditionBase}/archive-expired", null);
+                var response = await _httpClient.PostAsync($"TrafficCondition/archive-expired", null);
                 if (response.StatusCode == HttpStatusCode.NotFound) return 0;
                 response.EnsureSuccessStatusCode();
 
@@ -81,7 +106,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var resp = await _httpClient.PutAsJsonAsync($"{ApiTrafficConditionBase}/update", @traffic);
+                var resp = await _httpClient.PutAsJsonAsync("TrafficCondition/update", @traffic);
                 if (resp.StatusCode == HttpStatusCode.NotFound) return null;
                 resp.EnsureSuccessStatusCode();
                 return await resp.Content.ReadFromJsonAsync<ClientTrafficConditionDTO>();

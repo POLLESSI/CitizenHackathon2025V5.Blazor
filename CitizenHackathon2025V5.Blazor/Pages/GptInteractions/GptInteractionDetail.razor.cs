@@ -1,7 +1,6 @@
-using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
-using Newtonsoft.Json;
-using System.Threading;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 {
@@ -9,7 +8,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
     {
 #nullable disable
         [Inject] public HttpClient Client { get; set; }
-        public GptInteractionModel? CurrentGptInteraction { get; set; }
+        [Inject] public GptInteractionService GptInteractionService { get; set; } = default!;
+        public ClientGptInteractionDTO? CurrentGptInteraction { get; set; }
 
         [Parameter] public int Id { get; set; }
 
@@ -22,40 +22,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             if (Id > 0)
             {
-                await GetGptInteractions(_cts.Token);
+                try
+                {
+                    CurrentGptInteraction = await GptInteractionService.GetByIdAsync(Id);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[EventDetail] load {Id} failed: {ex.Message}");
+                    CurrentGptInteraction = null;
+                }
             }
             else
             {
                 CurrentGptInteraction = null; // Reset if invalid Id
             }
         }
-        private async Task GetGptInteractions(CancellationToken token)
-        {
-            try
-            {
-                HttpResponseMessage message = await Client.GetAsync($"api/gptinteraction/{Id}", token);
-
-                if (message.IsSuccessStatusCode)
-                {
-                    string json = await message.Content.ReadAsStringAsync(token);
-                    CurrentGptInteraction = JsonConvert.DeserializeObject<GptInteractionModel>(json);
-                }
-                else
-                {
-                    CurrentGptInteraction = null;
-                }
-            }
-            catch (TaskCanceledException)
-            {
-                // Normal cancellation ? we ignore
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error loading gptinteraction {Id} : {ex.Message}");
-                CurrentGptInteraction = null;
-            }
-        }
-
         public void Dispose()
         {
             _cts?.Cancel();

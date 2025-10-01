@@ -11,7 +11,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     {
     #nullable disable
         private readonly HttpClient _httpClient;
-        private const string ApiEventBase = "api/Event";
+        //private const string ApiEventBase = "api/Event";
         private string? _eventId;
 
 
@@ -23,7 +23,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{ApiEventBase}/latest");
+                var response = await _httpClient.GetAsync("Event/latest");
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadFromJsonAsync<IEnumerable<ClientEventDTO>>()
                        ?? Enumerable.Empty<ClientEventDTO>();
@@ -40,7 +40,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             try
             {
                 if (@event is null) throw new ArgumentNullException(nameof(@event));
-                var resp = await _httpClient.PostAsJsonAsync($"{ApiEventBase}", @event);
+                var resp = await _httpClient.PostAsJsonAsync("Event", @event);
                 resp.EnsureSuccessStatusCode();
                 return await resp.Content.ReadFromJsonAsync<ClientEventDTO>();
             }
@@ -55,7 +55,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{ApiEventBase}/upcoming-outdoor");
+                var response = await _httpClient.GetAsync("Event/upcoming-outdoor");
                 if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
                 
@@ -73,7 +73,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync($"{ApiEventBase}", newEvent);
+                var response = await _httpClient.PostAsJsonAsync("Event", newEvent);
                 if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
                 
@@ -91,7 +91,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{ApiEventBase}/{id}");
+                var response = await _httpClient.GetAsync($"Event/{id}");
                 if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadFromJsonAsync<ClientEventDTO>();
@@ -107,7 +107,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{ApiEventBase}/archive-expired", null);
+                var response = await _httpClient.PostAsync("Event/archive-expired", null);
                 if (response.StatusCode == HttpStatusCode.NotFound) return 0;
                 response.EnsureSuccessStatusCode();
 
@@ -131,7 +131,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var resp = await _httpClient.PutAsJsonAsync($"{ApiEventBase}/update", @event);
+                var resp = await _httpClient.PutAsJsonAsync("Event/update", @event);
                 if (resp.StatusCode == HttpStatusCode.NotFound) return null;
                 resp.EnsureSuccessStatusCode();
                 return await resp.Content.ReadFromJsonAsync<ClientEventDTO>();

@@ -12,7 +12,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     {
     #nullable disable
         private readonly HttpClient _httpClient;
-        private const string ApiSuggestionBase = "suggestion";
+        //private const string ApiSuggestionBase = "suggestion";
         private string? _suggestionId;
 
         public SuggestionService(IHttpClientFactory factory)
@@ -23,7 +23,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{ApiSuggestionBase}/user/{userId}");
+                var response = await _httpClient.GetAsync($"suggestion/user/{userId}");
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return Enumerable.Empty<ClientSuggestionDTO>();
 
@@ -44,7 +44,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             try
             {
                 var suggest = await _httpClient.GetFromJsonAsync<List<ClientSuggestionDTO>>(
-                    $"{ApiSuggestionBase}?lat={lat}&lng={lng}");
+                    $"suggestion?lat={lat}&lng={lng}");
 
                 return suggest ?? new List<ClientSuggestionDTO>();
             }
@@ -54,11 +54,41 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 return new List<ClientSuggestionDTO>();
             }
         }
+        public async Task<ClientSuggestionDTO?> GetById(int id, CancellationToken ct)
+        {
+            if (id <= 0)
+            {
+                Console.Error.WriteLine("GetById: invalid id.");
+                return null;
+            }
+
+            try
+            {
+                using var resp = await _httpClient.GetAsync($"suggestion/{id}", ct);
+
+                if (resp.StatusCode == HttpStatusCode.NotFound)
+                    return null;
+
+                resp.EnsureSuccessStatusCode();
+
+                return await resp.Content.ReadFromJsonAsync<ClientSuggestionDTO>(cancellationToken: ct);
+            }
+            catch (OperationCanceledException)
+            {
+                // Request canceled: we follow the services pattern and return null
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in GetById({id}): {ex.Message}");
+                return null;
+            }
+        }
         public async Task<bool> SoftDeleteSuggestionAsync(int id)
         {
             try
             {
-                var response = await _httpClient.DeleteAsync($"{ApiSuggestionBase}/{id}");
+                var response = await _httpClient.DeleteAsync($"suggestion/{id}");
                 if (response.StatusCode == HttpStatusCode.NotFound) return false;
                 response.EnsureSuccessStatusCode();
 
@@ -75,7 +105,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{ApiSuggestionBase}/all");
+                var response = await _httpClient.GetAsync("suggestion/all");
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return Enumerable.Empty<ClientSuggestionDTO>();
 
@@ -95,7 +125,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var resp = await _httpClient.PostAsJsonAsync($"{ApiSuggestionBase}", suggestion);
+                var resp = await _httpClient.PostAsJsonAsync("suggestion", suggestion);
                 if (resp.StatusCode == HttpStatusCode.NotFound) return null;
 
                 resp.EnsureSuccessStatusCode();

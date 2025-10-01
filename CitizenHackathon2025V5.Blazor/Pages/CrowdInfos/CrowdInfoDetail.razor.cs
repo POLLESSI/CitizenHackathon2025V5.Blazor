@@ -1,9 +1,6 @@
 ﻿using CitizenHackathon2025V5.Blazor.Client.DTOs;
-using CitizenHackathon2025V5.Blazor.Client.Models;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
-//using Newtonsoft.Json;
-using System.Net.Http.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 {
@@ -20,58 +17,27 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
         private CancellationTokenSource _cts;
         protected override async Task OnParametersSetAsync()
         {
-            //_cts?.Cancel();
-            //_cts = new CancellationTokenSource();
-
-            //if (Id <= 0) { CurrentCrowdInfo = null; return; }
             _cts?.Cancel();
             _cts = new CancellationTokenSource();
 
-            CurrentCrowdInfo = (Id > 0)
-                ? await Crowd.GetCrowdInfoByIdAsync(Id)
-                : null;
-
-            try
+            if (Id > 0)
             {
-                var client = Http.CreateClient("ApiWithAuth"); // BaseAddress = https://localhost:7254/api/
-
-                CurrentCrowdInfo = await client.GetFromJsonAsync<ClientCrowdInfoDTO>(
-                    $"CrowdInfo/{Id}", _cts.Token);
+                try
+                {
+                    CurrentCrowdInfo = await Crowd.GetCrowdInfoByIdAsync(Id, _cts.Token);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Error loading Crowd Info {Id}: {ex.Message}");
+                    CurrentCrowdInfo = null;
+                }
             }
-            catch (TaskCanceledException) { }
-            catch (Exception ex)
+             else
             {
-                Console.Error.WriteLine($"Error loading Crowd Info {Id}: {ex.Message}");
                 CurrentCrowdInfo = null;
-            }
+            }   
         }
-        //private async Task GetCrowdInfoAsync(CancellationToken token)
-        //{
-        //    try
-        //    {
-        //        HttpResponseMessage message = await Client.GetAsync($"api/event/{Id}", token);
-
-        //        if (message.IsSuccessStatusCode)
-        //        {
-        //            string json = await message.Content.ReadAsStringAsync(token);
-        //            CurrentCrowdInfo = JsonConvert.DeserializeObject<CrowdInfoModel>(json);
-        //        }
-        //        else
-        //        {
-        //            CurrentCrowdInfo = null;
-        //        }
-        //    }
-        //    catch (TaskCanceledException)
-        //    {
-        //        // Normal cancellation ? we ignore
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Console.Error.WriteLine($"Error loading Crowd Info {Id} : {ex.Message}");
-        //        CurrentCrowdInfo = null;
-        //    }
-        //}
-
+        
         public void Dispose()
         {
             _cts?.Cancel();

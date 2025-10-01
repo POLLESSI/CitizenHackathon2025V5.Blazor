@@ -3,6 +3,7 @@ using CitizenHackathon2025V5.Blazor.Client.Pages.Auths;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
+//using CitizenHackathon2025.Shared.StaticConfig.Constants;
 using Microsoft.JSInterop;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
@@ -25,6 +26,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
         {
             var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "jwt_token");
 
+            //hubConnection = new HubConnectionBuilder()
+            //    .WithUrl($"{apiBaseUrl.TrimEnd('/')}{UserHubMethods.HubPath}", options =>
+            //    {
+            //        // options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty; // if auth later
+            //    })
+            //    .WithAutomaticReconnect()
+            //    .Build();
+
+
             if (!string.IsNullOrEmpty(token))
             {
                 try
@@ -45,6 +55,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
                     Console.Error.WriteLine($"UserView initialization error : {ex.Message}");
                 }
             }
+            //hubConnection.On<string>(UserHubMethods.ToClient.UserRegistered, email =>
+            //{
+            //    Console.WriteLine($"User registered: {email}");
+            //    // TODO: UI update / toast
+            //});
+
+            //// Startup
+            //await hubConnection.StartAsync();
+
+            //// Client -> Server
+            //await hubConnection.InvokeAsync(UserHubMethods.FromClient.NotifyUserRegistered, "alice@example.com");
         }
 
         private async Task<List<UserModel>?> GetUsersSecureAsync()

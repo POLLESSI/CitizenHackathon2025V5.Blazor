@@ -21,6 +21,11 @@
         <div class="right">
             <button class="chip @( _onlyRecent ? "active" : null )"@onclick="() => ToggleRecent()">Recents</button>
         </div>
+        <div>
+            <NavLink class="chip add-chip" href="/suggestioncreate">
+                Add
+            </NavLink>
+        </div>
     </div>
         <div class="table-wrapper draggable-container"
                 @ref="ScrollContainerRef"

@@ -66,6 +66,40 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                        ?? new List<ClientWeatherForecastDTO>();
             return list;
         }
+        public Task<ClientWeatherForecastDTO?> GetById(int id)
+            => GetByIdAsync(id, CancellationToken.None);
+
+        public async Task<ClientWeatherForecastDTO?> GetByIdAsync(int id, CancellationToken ct = default)
+        {
+            if (id <= 0)
+            {
+                Console.Error.WriteLine("GetByIdAsync: invalid id.");
+                return null;
+            }
+
+            try
+            {
+                using var resp = await _http.GetAsync($"WeatherForecast/{id}", ct);
+
+                if (resp.StatusCode == HttpStatusCode.NotFound)
+                    return null;
+
+                resp.EnsureSuccessStatusCode();
+
+                var dto = await resp.Content.ReadFromJsonAsync<ClientWeatherForecastDTO>(cancellationToken: ct);
+                return dto is null ? null : WeatherForecastUiEnricher.Enrich(dto);
+            }
+            catch (OperationCanceledException)
+            {
+                // request canceled
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in GetByIdAsync({id}): {ex.Message}");
+                return null;
+            }
+        }
 
         // (optional) if you add an [HttpPost] without a specific route on the API side
         public async Task<ClientWeatherForecastDTO?> SaveWeatherForecastAsync(ClientWeatherForecastDTO dto)

@@ -11,7 +11,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     {
     #nullable disable
         private readonly HttpClient _httpClient;
-        private const string ApiCrowdBase = "api/CrowdInfo";
+        //private const string ApiCrowdBase = "api/CrowdInfo";
 
         public CrowdInfoService(IHttpClientFactory factory)
         {
@@ -25,7 +25,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{ApiCrowdBase}/all");
+                var response = await _httpClient.GetAsync("CrowdInfo/all");
                 response.EnsureSuccessStatusCode();
                 return await response.Content.ReadFromJsonAsync<IEnumerable<ClientCrowdInfoDTO>>()
                        ?? Enumerable.Empty<ClientCrowdInfoDTO>();
@@ -60,21 +60,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         /// <summary>
         /// Retrieves a CrowdInfo by its ID.
         /// </summary>
-        public async Task<ClientCrowdInfoDTO?> GetCrowdInfoByIdAsync(int id)
+        public async Task<ClientCrowdInfoDTO?> GetCrowdInfoByIdAsync(int id, CancellationToken ct = default)
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{ApiCrowdBase}/{id}");
+                using var response = await _httpClient.GetAsync($"CrowdInfo/{id}", ct);
                 if (response.StatusCode == HttpStatusCode.NotFound) return null;
                 response.EnsureSuccessStatusCode();
-                return await response.Content.ReadFromJsonAsync<ClientCrowdInfoDTO>();
+                return await response.Content.ReadFromJsonAsync<ClientCrowdInfoDTO>(cancellationToken: ct);
             }
+            catch (OperationCanceledException) { return null; }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in GetCrowdInfoByIdAsync: {ex.Message}");
                 return null;
             }
-
         }
         public async Task<IEnumerable<ClientCrowdInfoDTO>> GetLatestAsync()
         {
@@ -97,7 +97,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var resp = await _httpClient.GetAsync($"{ApiCrowdBase}/by-location?locationName={Uri.EscapeDataString(locationName)}");
+                var resp = await _httpClient.GetAsync($"CrowdInfo/by-location?locationName={Uri.EscapeDataString(locationName)}");
                 resp.EnsureSuccessStatusCode();
                 return await resp.Content.ReadFromJsonAsync<IEnumerable<ClientCrowdInfoDTO>>()
                        ?? Enumerable.Empty<ClientCrowdInfoDTO>();
@@ -118,7 +118,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             try
             {
                 if (dto is null) throw new ArgumentNullException(nameof(dto));
-                var resp = await _httpClient.PostAsJsonAsync($"{ApiCrowdBase}", dto);
+                var resp = await _httpClient.PostAsJsonAsync("CrowdInfo", dto);
                 resp.EnsureSuccessStatusCode();
                 return await resp.Content.ReadFromJsonAsync<ClientCrowdInfoDTO>();
             }
@@ -138,7 +138,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var resp = await _httpClient.DeleteAsync($"{ApiCrowdBase}/archive/{id}");
+                var resp = await _httpClient.DeleteAsync($"CrowdInfo/archive/{id}");
                 return resp.IsSuccessStatusCode;
             }
             catch (Exception ex)
@@ -159,7 +159,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var resp = await _httpClient.PutAsJsonAsync($"{ApiCrowdBase}/update", dto);
+                var resp = await _httpClient.PutAsJsonAsync("CrowdInfo/update", dto);
                 if (resp.StatusCode == HttpStatusCode.NotFound) return null;
                 resp.EnsureSuccessStatusCode();
                 return await resp.Content.ReadFromJsonAsync<ClientCrowdInfoDTO>();

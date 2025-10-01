@@ -11,7 +11,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     {
     #nullable disable
         private readonly HttpClient _httpClient;
-        private const string ApiPlaceBase = "api/Place";
+        //private const string ApiPlaceBase = "api/Place";
         private string? _placeId;
 
         public PlaceService(IHttpClientFactory factory)
@@ -22,7 +22,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{ApiPlaceBase}/Latest");
+                var response = await _httpClient.GetAsync("Place/Latest");
                 response.EnsureSuccessStatusCode();
 
                 return await response.Content.ReadFromJsonAsync<IEnumerable<ClientPlaceDTO>>()
@@ -35,12 +35,42 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
             
         }
+        public async Task<ClientPlaceDTO?> GetPlaceByIdAsync(int id, CancellationToken ct)
+        {
+            if (id <= 0)
+            {
+                Console.Error.WriteLine("GetPlaceByIdAsync: invalid id.");
+                return null;
+            }
+
+            try
+            {
+                using var resp = await _httpClient.GetAsync($"Place/{id}", ct);
+
+                if (resp.StatusCode == HttpStatusCode.NotFound)
+                    return null; 
+
+                resp.EnsureSuccessStatusCode();
+
+                return await resp.Content.ReadFromJsonAsync<ClientPlaceDTO>(cancellationToken: ct);
+            }
+            catch (OperationCanceledException)
+            {
+                // request canceled -> follow the project pattern (no exception re-thrown)
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in GetPlaceByIdAsync({id}): {ex.Message}");
+                return null;
+            }
+        }
         public async Task<ClientPlaceDTO> SavePlaceAsync(ClientPlaceDTO @place)
         {
             try
             {
                 if (@place is null) throw new ArgumentNullException(nameof(@place));
-                var response = await _httpClient.PostAsJsonAsync($"{ApiPlaceBase}", @place);
+                var response = await _httpClient.PostAsJsonAsync("Place", @place);
                 response.EnsureSuccessStatusCode();
 
                 return await response.Content.ReadFromJsonAsync<ClientPlaceDTO>();
@@ -52,11 +82,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
             
         }
+
         public async Task<int> ArchivePastPlacesAsync()
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{ApiPlaceBase}/archive-expired", null);
+                var response = await _httpClient.PostAsync("Place/archive-expired", null);
                 if (response.StatusCode == HttpStatusCode.NotFound) return 0;
                 response.EnsureSuccessStatusCode();
 
@@ -77,7 +108,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var resp = await _httpClient.PutAsJsonAsync($"{ApiPlaceBase}/update", @place);
+                var resp = await _httpClient.PutAsJsonAsync("Place/update", @place);
                 if (resp.StatusCode == HttpStatusCode.NotFound) return null;
                 resp.EnsureSuccessStatusCode();
                 return await resp.Content.ReadFromJsonAsync<ClientPlaceDTO>();

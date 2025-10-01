@@ -1,16 +1,18 @@
-using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.Services;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.Components;
-using Newtonsoft.Json;
-using System.Threading;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 {
     public partial class PlaceDetail : ComponentBase, IDisposable
     {
-#nullable disable
+    #nullable disable
         [Inject]
         public HttpClient Client { get; set; }
-        public PlaceModel? CurrentPlace { get; set; }
+        [Inject] public PlaceService PlaceService { get; set; } = default!;
+        [Inject] public NavigationManager Nav { get; set; } = default!;
+        public ClientPlaceDTO? CurrentPlace { get; set; }
         [Parameter] public int Id { get; set; }
 
         private CancellationTokenSource? _cts;
@@ -20,41 +22,36 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
             _cts?.Cancel();
             _cts = new CancellationTokenSource();
 
+            if (Id <= 0)
+            {
+                var uri = new Uri(Nav.Uri);
+                var query = QueryHelpers.ParseQuery(uri.Query);
+                if (query.TryGetValue("id", out var idValues) &&
+                    int.TryParse(idValues.ToString(), out var qid))
+                {
+                    Id = qid;
+                }
+            }
+
             if (Id > 0)
             {
-                await GetPlaceAsync(_cts.Token);
+                try
+                {
+                    Console.WriteLine($"[PlaceDetail] Fetch Id={Id}");
+                    CurrentPlace = await PlaceService.GetPlaceByIdAsync(Id, _cts.Token);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[PlaceDetail] load {Id} failed: {ex.Message}");
+                    CurrentPlace = null;
+                }
             }
             else
             {
                 CurrentPlace = null; // Reset if invalid Id
             }
         }
-        private async Task GetPlaceAsync(CancellationToken token)
-        {
-            try
-            {
-                HttpResponseMessage message = await Client.GetAsync($"api/place/{Id}", token);
-
-                if (message.IsSuccessStatusCode)
-                {
-                    string json = await message.Content.ReadAsStringAsync(token);
-                    CurrentPlace = JsonConvert.DeserializeObject<PlaceModel>(json);
-                }
-                else
-                {
-                    CurrentPlace = null;
-                }
-            }
-            catch (TaskCanceledException)
-            {
-                // Normal cancellation ? we ignore
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error loading place {Id} : {ex.Message}");
-                CurrentPlace = null;
-            }
-        }
+        
         public void Dispose()
         {
             _cts?.Cancel();

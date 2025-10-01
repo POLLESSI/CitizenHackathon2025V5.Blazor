@@ -143,6 +143,34 @@
         };
     </script>-->
     <!-- Boot of the OutZen module and exposure of useful globals for Blazor -->
+    <script src="_content/Microsoft.AspNetCore.SignalR.Client/signalr.min.js"></script>
+    <script type="module">
+        import { OutZenEvents } from '/js/outzen-events.js';
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl(OutZenEvents.HubPath, { accessTokenFactory: () => window.getJwt?.() ?? "" })
+            .withAutomaticReconnect()
+            .build();
+
+        // Handlers
+        connection.on(OutZenEvents.ToClient.CrowdInfoUpdated, (dto) => {
+            console.log("CrowdInfoUpdated", dto);
+            // … update map/animations …
+        });
+
+        connection.on(OutZenEvents.ToClient.NewSuggestion, (sugg) => {
+            console.log("NewSuggestion", sugg);
+        });
+
+        await connection.start();
+
+        // Join an event group
+        const eventId = "12345";
+        await connection.invoke("JoinEventGroup", eventId);
+
+        // Example: build group name (if needed client side)
+        const group = OutZenEvents.Groups.buildEventGroup(eventId); // "event-12345"
+    </script>
     <script type="module">
         import { bootOutZen, initCrowdChart } from '/js/app/leafletOutZen.module.js';
 

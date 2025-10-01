@@ -1,0 +1,22 @@
+﻿@page "/messageview"
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.Utils
+@inject IJSRuntime js
+
+<h3>MessageView</h3>
+
+@code {
+    private ElementReference ScrollContainerRef;
+    private async Task HandleScroll()
+    {
+        var scrollTop = await js.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
+        var scrollHeight = await js.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
+        var clientHeight = await js.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
+
+        // if (scrollTop + clientHeight >= scrollHeight - 5 && currentIndex < allCrowdInfos.Count)
+        // {
+        //     LoadMoreItems();
+        //     StateHasChanged();
+        // }
+    }
+}

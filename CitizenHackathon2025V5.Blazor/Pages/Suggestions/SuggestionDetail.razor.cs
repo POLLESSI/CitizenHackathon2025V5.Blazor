@@ -1,7 +1,6 @@
-using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
-using Newtonsoft.Json;
-using System.Threading;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
 {
@@ -9,7 +8,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
     {
 #nullable disable
         [Inject] public HttpClient? Client { get; set; }
-        public SuggestionModel? CurrentSuggestion { get; set; }
+        [Inject] public SuggestionService SuggestionService { get; set; } = default!;
+        public ClientSuggestionDTO? CurrentSuggestion { get; set; }
         [Parameter] public int Id { get; set; }
 
         private CancellationTokenSource? _cts;
@@ -21,37 +21,19 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
 
             if (Id > 0)
             {
-                await GetSuggestionAsync(_cts.Token);
-            }
-            else
-            {
-                CurrentSuggestion = null; // Reset if invalid Id
-            }
-        }
-        private async Task GetSuggestionAsync(CancellationToken token)
-        {
-            try
-            {
-                HttpResponseMessage message = await Client.GetAsync($"api/suggestion/{Id}", token);
-
-                if (message.IsSuccessStatusCode)
+                try
                 {
-                    string json = await message.Content.ReadAsStringAsync(token);
-                    CurrentSuggestion = JsonConvert.DeserializeObject<SuggestionModel>(json);
+                    CurrentSuggestion = await SuggestionService.GetById(Id, _cts.Token);
                 }
-                else
+                catch (Exception ex)
                 {
+                    Console.Error.WriteLine($"[SuggestionDetail] load {Id} failed: {ex.Message}");
                     CurrentSuggestion = null;
                 }
             }
-            catch (TaskCanceledException)
+            else
             {
-                // Normal cancellation ? we ignore
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error loading suggestion {Id} : {ex.Message}");
-                CurrentSuggestion = null;
+                CurrentSuggestion = null; 
             }
         }
         public void Dispose()

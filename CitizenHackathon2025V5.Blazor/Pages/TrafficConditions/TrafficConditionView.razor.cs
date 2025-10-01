@@ -3,6 +3,7 @@ using CitizenHackathon2025V5.Blazor.Client.Models;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
+//using CitizenHackathon2025.Shared.StaticConfig.Constants;
 using Microsoft.JSInterop;
 using Newtonsoft.Json;
 
@@ -63,6 +64,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                 .WithAutomaticReconnect()
                 .Build();
 
+            //hubConnection = new HubConnectionBuilder()
+            //    .WithUrl($"{apiBaseUrl.TrimEnd('/')}{TrafficConditionHubMethods.HubPath}", options =>
+            //    {
+            //        // Si le hub est protégé plus tard:
+            //        options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
+            //    })
+            //    .WithAutomaticReconnect()
+            //    .Build();
+
+
             // Handlers
             hubConnection.On<ClientTrafficConditionDTO>("RefreshTraffic", async dto =>
             {
@@ -95,8 +106,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                 await JS.InvokeVoidAsync("window.OutZenInterop.removeMarker", id.ToString());
                 await InvokeAsync(StateHasChanged);
             });
+            //hubConnection.On(TrafficConditionHubMethods.ToClient.NotifyNewTraffic, () =>
+            //{
+            //    Console.WriteLine("notifynewtraffic");
+            //    // TODO: reload traffic data or trigger a /api/TrafficCondition/latest request
+            //    InvokeAsync(StateHasChanged);
+            //});
 
-            try { await hubConnection.StartAsync(); }
+
+            try 
+            { 
+                await hubConnection.StartAsync();
+                // Client -> Serveur (no arg)
+                //await hubConnection.InvokeAsync(TrafficConditionHubMethods.FromClient.RefreshTraffic);
+            }
             catch (Exception ex) { Console.Error.WriteLine($"[TrafficConditionView] Hub start failed: {ex.Message}"); }
         }
         private void LoadMoreItems()
@@ -133,7 +156,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             await _outZen.InvokeVoidAsync("initCrowdChart", "crowdChart");
         }
 
-        private void ClickInfo(int id) => SelectedId = id;
+        private void ClickInfo(int id)
+        {
+            if (id <= 0)
+            {
+                Console.WriteLine("[TrafficConditionView] Ignoring Info click: id <= 0 (payload without ID ?)");
+                return;
+            }
+            SelectedId = id;
+            Console.WriteLine($"[TrafficConditionView] SelectedId = {SelectedId}");
+        }
 
         private async Task HandleScroll()
         {

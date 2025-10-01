@@ -1,15 +1,15 @@
-using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
-using Newtonsoft.Json;
-using System.Threading;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 {
     public partial class WeatherForecastDetail : ComponentBase, IDisposable
     {
-#nullable disable
+    #nullable disable
         [Inject] public HttpClient? Client { get; set; }
-        public WeatherForecastModel? CurrentWeatherForecast { get; set; }
+        [Inject] public WeatherForecastService WeatherForecastService { get; set; } = default!;
+        public ClientWeatherForecastDTO? CurrentWeatherForecast { get; set; }
 
         [Parameter] public int Id { get; set; }
 
@@ -22,37 +22,19 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
             if (Id > 0)
             {
-                await GetWeatherForecastAsync(_cts.Token);
+                try
+                {
+                    CurrentWeatherForecast = await WeatherForecastService.GetByIdAsync(Id);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[WeatherForecastDetail] load {Id} failed: {ex.Message}");
+                    CurrentWeatherForecast = null;
+                }
             }
             else
             {
                 CurrentWeatherForecast = null; // Reset if invalid Id
-            }
-        }
-        private async Task GetWeatherForecastAsync(CancellationToken token)
-        {
-            try
-            {
-                HttpResponseMessage message = await Client.GetAsync($"api/event/{Id}", token);
-
-                if (message.IsSuccessStatusCode)
-                {
-                    string json = await message.Content.ReadAsStringAsync(token);
-                    CurrentWeatherForecast = JsonConvert.DeserializeObject<WeatherForecastModel>(json);
-                }
-                else
-                {
-                    CurrentWeatherForecast = null;
-                }
-            }
-            catch (TaskCanceledException)
-            {
-                // Normal cancellation ? we ignore
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error loading weather forecast {Id} : {ex.Message}");
-                CurrentWeatherForecast = null;
             }
         }
         public void Dispose()

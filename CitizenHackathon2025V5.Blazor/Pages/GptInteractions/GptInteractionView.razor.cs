@@ -62,6 +62,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 .WithAutomaticReconnect()
                 .Build();
 
+            //hubConnection = new HubConnectionBuilder()
+            //    .WithUrl(apiBaseUrl.TrimEnd('/') + GptInteractionHubMethods.HubPath, options =>
+            //    {
+            //        options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
+            //    })
+            //    .WithAutomaticReconnect()
+            //    .Build();
+
             // Handlers
             hubConnection.On<ClientGptInteractionDTO>("RefreshGPT", async dto =>
             {
@@ -94,6 +102,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 await JS.InvokeVoidAsync("window.OutZenInterop.removeMarker", id.ToString());
                 await InvokeAsync(StateHasChanged);
             });
+
+            //hubConnection.On<string>(GptInteractionHubMethods.ToClient.NotifyNewGpt, payload =>
+            //{
+            //    Console.WriteLine($"GPT notify: {payload}");
+            //    InvokeAsync(StateHasChanged);
+            //});
+
+            //// Client -> Serveur
+            //await hubConnection.InvokeAsync(GptInteractionHubMethods.FromClient.RefreshGpt, "refresh now");
 
             try { await hubConnection.StartAsync(); }
             catch (Exception ex) { Console.Error.WriteLine($"[GptInteractionView] Hub start failed: {ex.Message}"); }

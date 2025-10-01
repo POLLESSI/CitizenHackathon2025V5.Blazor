@@ -1,14 +1,15 @@
-using System.Threading;
-using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
-using Newtonsoft.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
 {
-    public partial class UserDetail
+    public partial class UserDetail : ComponentBase, IDisposable
     {
+    #nullable disable
         [Inject] public HttpClient? Client { get; set; }
-        public UserModel? CurrentUser { get; set; }
+        [Inject] public UserService UserService { get; set; } = default!;
+        public ClientUserDTO? CurrentUser { get; set; }
 
         [Parameter] public int Id { get; set; }
 
@@ -21,36 +22,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
 
             if (Id > 0)
             {
-                await GetUserAsync(_cts.Token);
-            }
-            else
-            {
-                CurrentUser = null;
-            }
-        }
-
-        protected async Task GetUserAsync(CancellationToken token)
-        {
-            try
-            {
-                HttpResponseMessage message = await Client!.GetAsync($"/user/{Id}", token);
-
-                if (message.IsSuccessStatusCode)
+                try
                 {
-                    string json = await message.Content.ReadAsStringAsync(token);
-                    CurrentUser = JsonConvert.DeserializeObject<UserModel>(json);
+                    CurrentUser = await UserService.GetById(Id);
                 }
-                else
+                catch (Exception ex)
                 {
+                    Console.Error.WriteLine($"[UserDetail] load {Id} failed: {ex.Message}");
                     CurrentUser = null;
                 }
             }
-            catch (TaskCanceledException)
+            else
             {
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error loading user {Id} : {ex.Message}");
                 CurrentUser = null;
             }
         }

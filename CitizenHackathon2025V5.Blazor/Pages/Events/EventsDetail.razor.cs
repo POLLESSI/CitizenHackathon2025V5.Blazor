@@ -1,15 +1,14 @@
-using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
-using Newtonsoft.Json;
-using System.Threading;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
 {
     public partial class EventDetail : ComponentBase, IDisposable
     {
-        [Inject] public HttpClient Client { get; set; }
+        [Inject] public EventService EventService { get; set; } = default!;
 
-        public EventModel? CurrentEvent { get; set; }
+        public ClientEventDTO? CurrentEvent { get; set; }
 
         [Parameter] public int Id { get; set; }
 
@@ -17,43 +16,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
 
         protected override async Task OnParametersSetAsync()
         {
-            // Cancels any previous request
             _cts?.Cancel();
             _cts = new CancellationTokenSource();
 
             if (Id > 0)
             {
-                await GetEventAsync(_cts.Token);
-            }
-            else
-            {
-                CurrentEvent = null; // Reset if invalid Id
-            }
-        }
-
-        private async Task GetEventAsync(CancellationToken token)
-        {
-            try
-            {
-                HttpResponseMessage message = await Client.GetAsync($"api/event/{Id}", token);
-
-                if (message.IsSuccessStatusCode)
+                try
                 {
-                    string json = await message.Content.ReadAsStringAsync(token);
-                    CurrentEvent = JsonConvert.DeserializeObject<EventModel>(json);
+                    CurrentEvent = await EventService.GetByIdAsync(Id);
                 }
-                else
+                catch (Exception ex)
                 {
+                    Console.Error.WriteLine($"[EventDetail] load {Id} failed: {ex.Message}");
                     CurrentEvent = null;
                 }
             }
-            catch (TaskCanceledException)
+            else
             {
-                // Normal cancellation ? we ignore
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error loading event {Id} : {ex.Message}");
                 CurrentEvent = null;
             }
         }
@@ -65,7 +44,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
         }
     }
 }
-
 
 
 

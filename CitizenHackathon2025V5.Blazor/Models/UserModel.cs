@@ -2,7 +2,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Models
 {
     public class UserModel
     {
-#nullable disable
+    #nullable disable
         public int Id { get; set; }
         public string Email { get; set; }
         public string PasswordHash { get; set; }

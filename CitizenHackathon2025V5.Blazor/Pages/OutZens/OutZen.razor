@@ -48,6 +48,23 @@
 
         // ?? Initialize the connection
         await _signalR.InitializeOutZenAsync();
+        // // C# Blazor side: subscription via stable names
+        // var conn = new HubConnectionBuilder()
+        //     .WithUrl(apiBase + OutZenEvents.HubPath, options =>
+        //     {
+        //         options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
+        //     })
+        //     .WithAutomaticReconnect()
+        //     .Build();
+
+        // conn.On<object>(OutZenEvents.ToClient.CrowdInfoUpdated, dto =>
+        // {
+        //     // Upsert + StateHasChanged
+        // });
+        // conn.On<object>(OutZenEvents.ToClient.WeatherUpdated, wx => { /* ... */ });
+
+        // await conn.StartAsync();
+        // await conn.InvokeAsync("JoinEventGroup", eventId);
     }
     private static int GetDensityFromLevel(string? level)
     {

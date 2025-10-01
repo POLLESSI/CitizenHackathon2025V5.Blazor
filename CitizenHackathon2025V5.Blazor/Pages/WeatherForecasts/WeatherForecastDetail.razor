@@ -1,3 +1,6 @@
+@page "/weatherforecast/{Id:int}"
+@page "/weatherforecastdetail/{Id:int}"
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
 @inject Blazored.Toast.Services.IToastService ToastService
 
 @* <button class="btn btn-primary" @onclick="() => ToastService.ShowSuccess(" It works !", "Success" )">
@@ -12,7 +15,7 @@
         <p>DateWeather : @CurrentWeatherForecast.DateWeather</p>
         <p>TemperatureC : @CurrentWeatherForecast.TemperatureC</p>
         <p>Summary : @CurrentWeatherForecast.Summary</p>
-        <p>RainfallNm : @CurrentWeatherForecast.RainfallNm</p>
+        <p>RainfallMm : @CurrentWeatherForecast.RainfallMm</p>
         <p>Humidity : @CurrentWeatherForecast.Humidity</p>
         <p>WindSpeedKmh : @CurrentWeatherForecast.WindSpeedKmh</p>
     </div>
@@ -23,9 +26,7 @@ else
 }
 
 
-@code {
 
-}
 
 
 

@@ -93,6 +93,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
                 await JS.InvokeVoidAsync("window.OutZenInterop.removeMarker", id.ToString());
                 await InvokeAsync(StateHasChanged);
             });
+            //hubConnection.On<string>(EventHubMethods.ToClient.NewEvent, payload =>
+            //{
+            //    // process payload (JSON, DTO, etc.)
+            //    Console.WriteLine($"NewEvent: {payload}");
+            //    InvokeAsync(StateHasChanged);
+            //});
+
+            //// Example of a call to the server
+            //await hubConnection.InvokeAsync(EventHubMethods.FromClient.RefreshEvent, "refresh now");
 
             try { await hubConnection.StartAsync(); }
             catch (Exception ex) { Console.Error.WriteLine($"[EventView] Hub start failed: {ex.Message}"); }
@@ -164,6 +173,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
                             || x.Latitude.ToString().Contains(q, StringComparison.OrdinalIgnoreCase))
                 .Where(x => !_onlyRecent || x.DateEvent >= cutoff);
         }
+
+        private void GoToDetail(int id) => Navigation.NavigateTo($"/event/{id}");
 
         private void ToggleRecent() => _onlyRecent = !_onlyRecent;
 

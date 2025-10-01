@@ -1,4 +1,4 @@
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+﻿using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions;
 using System.Net;
 using System.Net.Http.Json;
@@ -34,23 +34,32 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
             
         }
-        public async Task<IEnumerable<ClientGptInteractionDTO>> GetById(int id)
+        public async Task<ClientGptInteractionDTO?> GetByIdAsync(int id, CancellationToken ct = default)
         {
+            if (id <= 0) return null;
+
             try
             {
-                var response = await _httpClient.GetAsync($"{Base}/{id}");
-                if (response.StatusCode == HttpStatusCode.NotFound) return null;
+                using var response = await _httpClient.GetAsync($"{Base}/{id}", ct);
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return null;
+
                 response.EnsureSuccessStatusCode();
-                
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<ClientGptInteractionDTO>>();
-                return list ?? Enumerable.Empty<ClientGptInteractionDTO>();
+
+                // ⚠️ L’endpoint /api/gpt/{id} devrait renvoyer UN objet, pas une liste
+                var item = await response.Content.ReadFromJsonAsync<ClientGptInteractionDTO>(cancellationToken: ct);
+                return item;
+            }
+            catch (OperationCanceledException)
+            {
+                return null;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Unexpected error in GetByIdAsync: {ex.Message}");
-                throw;
+                Console.Error.WriteLine($"Unexpected error in GetByIdAsync({id}): {ex.Message}");
+                return null;
             }
-            
         }
         //public async Task<IEnumerable<GptInteractionModel>> GetSuggestionsByForecastIdAsync(int id)
         //{
