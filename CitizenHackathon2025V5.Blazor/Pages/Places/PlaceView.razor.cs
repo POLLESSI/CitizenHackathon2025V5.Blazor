@@ -1,5 +1,7 @@
 ﻿using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025.Shared.StaticConfig.Constants;
+using CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
@@ -9,10 +11,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
     public partial class PlaceView : ComponentBase, IAsyncDisposable
     {
 #nullable disable
+        [Inject] public HttpClient Client { get; set; }
         [Inject] public PlaceService PlaceService { get; set; }
+        [Inject] public NavigationManager Navigation { get; set; }
         [Inject] public IJSRuntime JS { get; set; }
+        [Inject] public IHubTokenService HubTokenService { get; set; }
+        [Inject] public IHttpClientFactory HttpFactory { get; set; }
+        [Inject] public IConfiguration Config { get; set; }
+        [Inject] public IAuthService Auth { get; set; }
+
+        private const string ApiBase = "https://localhost:7254";
+        private IJSObjectReference? _outZen;
 
         // Data
+        public HubConnection hubConnection { get; set; }
+        public List<ClientPlaceDTO> Places { get; set; } = new();
         private List<ClientPlaceDTO> allPlaces = new();
         private List<ClientPlaceDTO> visiblePlaces = new();
         private int currentIndex = 0;
@@ -21,25 +34,32 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         // UI state
         private ElementReference ScrollContainerRef;
         private string _q;
-        private bool _onlyRecent; // placeholder (si tu veux filtrer par date plus tard)
+        private bool _onlyRecent; // placeholder (if you want to filter by date later)
         private int SelectedId;
+
 
         protected override async Task OnInitializedAsync()
         {
-            //hubConnection = new HubConnectionBuilder()
-            //    .WithUrl(apiBaseUrl.TrimEnd('/') + PlaceHubMethods.HubPath, options =>
-            //    {
-            //        options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
-            //    })
-            //    .WithAutomaticReconnect()
-            //    .Build();
+            // 1) REST initial
+            var fetched = (await PlaceService.GetLatestPlaceAsync()).ToList();
+            Places = fetched;
+            allPlaces = fetched;
+            visiblePlaces.Clear();
+            currentIndex = 0;
+            LoadMoreItems();
+
+            // 2) SignalR
+            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
+
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(apiBaseUrl.TrimEnd('/') + PlaceHubMethods.HubPath, options =>
+                {
+                    options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
+                })
+                .WithAutomaticReconnect()
+                .Build();
             try
             {
-                var fetched = (await PlaceService.GetLatestPlaceAsync())
-                              .Where(p => p is not null)
-                              .Select(p => p!) 
-                              .ToList();
-
                 allPlaces = fetched;
                 visiblePlaces.Clear();
                 currentIndex = 0;
@@ -51,14 +71,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
                 allPlaces = new();
                 visiblePlaces = new();
             }
-            //hubConnection.On<string>(PlaceHubMethods.ToClient.NewPlace, payload =>
-            //{
-            //    Console.WriteLine($"PlaceHub NewPlace: {payload}");
-            //    InvokeAsync(StateHasChanged);
-            //});
-
-            //// Client -> Serveur
-            //await hubConnection.InvokeAsync(PlaceHubMethods.FromClient.RefreshPlace, "refresh places");
         }
         private void LoadMoreItems()
         {
@@ -113,3 +125,81 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.

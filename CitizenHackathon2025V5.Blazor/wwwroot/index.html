@@ -147,29 +147,25 @@
     <script type="module">
         import { OutZenEvents } from '/js/outzen-events.js';
 
-        const connection = new signalR.HubConnectionBuilder()
+        let signalRRef = window.signalR;
+        if (!signalRRef) {
+            try {
+                signalRRef = await import("https://esm.sh/@microsoft/signalr@7.0.5");
+                console.info("ℹ️ Fallback ESM SignalR loaded.");
+            } catch (e) {
+                console.error("❌ Unable to load SignalR (global & ESM failed):", e);
+                throw e; // stop here to avoid undefined usage
+            }
+        }
+
+        const connection = new signalRRef.HubConnectionBuilder()
             .withUrl(OutZenEvents.HubPath, { accessTokenFactory: () => window.getJwt?.() ?? "" })
             .withAutomaticReconnect()
             .build();
 
-        // Handlers
-        connection.on(OutZenEvents.ToClient.CrowdInfoUpdated, (dto) => {
-            console.log("CrowdInfoUpdated", dto);
-            // … update map/animations …
-        });
-
-        connection.on(OutZenEvents.ToClient.NewSuggestion, (sugg) => {
-            console.log("NewSuggestion", sugg);
-        });
-
+        // handlers…
         await connection.start();
-
-        // Join an event group
-        const eventId = "12345";
-        await connection.invoke("JoinEventGroup", eventId);
-
-        // Example: build group name (if needed client side)
-        const group = OutZenEvents.Groups.buildEventGroup(eventId); // "event-12345"
+        await connection.invoke("JoinEventGroup", "12345");
     </script>
     <script type="module">
         import { bootOutZen, initCrowdChart } from '/js/app/leafletOutZen.module.js';

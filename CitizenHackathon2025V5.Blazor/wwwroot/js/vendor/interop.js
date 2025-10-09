@@ -5,6 +5,11 @@ window.jsInterop = {
     getLocalStorage: (key) => localStorage.getItem(key),
     removeLocalStorage: (key) => localStorage.removeItem(key)
 };
+// Smooth scroll by id for Blazor JSInterop
+    window.scrollIntoViewById = (id, opts) => {
+        const el = document.getElementById(id);
+        if (el && el.scrollIntoView) el.scrollIntoView(opts || { behavior: 'smooth' });
+    };
 
 
 

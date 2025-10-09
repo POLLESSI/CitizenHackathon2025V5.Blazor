@@ -1,5 +1,7 @@
 ﻿using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants;
+using CitizenHackathon2025.Shared.StaticConfig.Constants;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
@@ -36,19 +38,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
             // 2) SignalR (Absolute URL on API side)
             var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? ApiBase.TrimEnd('/');
 
-            var hubPath = "/hubs/crowdHub";
-
-            var hubUrl = BuildHubUrl(apiBaseUrl, hubPath);
-
             hubConnection = new HubConnectionBuilder()
-                .WithUrl(hubUrl, options =>
+                .WithUrl($"{apiBaseUrl}{CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants.CrowdHubMethods.HubPath}", options => 
                 {
-                    options.AccessTokenProvider = async () =>
-                    {
-                        // Get your JWT here (via IAuthService, etc.)
-                        var token = await Auth.GetAccessTokenAsync();
-                        return token ?? string.Empty;
-                    };
+                    // If your hub is later protected, provide a token
+                    options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
                 })
                 .WithAutomaticReconnect()
                 .Build();

@@ -1,5 +1,7 @@
 using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025.Shared.StaticConfig.Constants;
+using CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Newtonsoft.Json;
@@ -11,7 +13,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
     {
 #nullable disable
         [Inject]
-        public HttpClient Client { get; set; }  // Injection HttpClient
+        public HttpClient Client { get; set; }  
         [Inject] public GptInteractionService GptInteractionService { get; set; }
         [Inject] public NavigationManager Navigation { get; set; }
         [Inject] public IJSRuntime JS { get; set; }
@@ -47,28 +49,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             // 2) SignalR
             var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? ApiBase.TrimEnd('/');
-            var hubPath = "/hubs/gpthub";
-            var hubUrl = BuildHubUrl(apiBaseUrl, hubPath);
 
             hubConnection = new HubConnectionBuilder()
-                .WithUrl(hubUrl, options =>
+                .WithUrl(apiBaseUrl.TrimEnd('/') + GptInteractionHubMethods.HubPath, options =>
                 {
-                    options.AccessTokenProvider = async () =>
-                    {
-                        var token = await Auth.GetAccessTokenAsync();
-                        return token ?? string.Empty;
-                    };
+                    options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
                 })
                 .WithAutomaticReconnect()
                 .Build();
-
-            //hubConnection = new HubConnectionBuilder()
-            //    .WithUrl(apiBaseUrl.TrimEnd('/') + GptInteractionHubMethods.HubPath, options =>
-            //    {
-            //        options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
-            //    })
-            //    .WithAutomaticReconnect()
-            //    .Build();
 
             // Handlers
             hubConnection.On<ClientGptInteractionDTO>("RefreshGPT", async dto =>

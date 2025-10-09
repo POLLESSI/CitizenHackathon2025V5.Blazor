@@ -56,7 +56,7 @@
 
     private async Task ScrollToSuggestions()
     {
-        await JS.InvokeVoidAsync("document.getElementById('suggestions').scrollIntoView", new { behavior = "smooth" });
+        await JS.InvokeVoidAsync("scrollIntoViewById", "suggestions", new { behavior = "smooth" });
     }
 
     protected override async Task OnInitializedAsync()

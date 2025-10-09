@@ -1,38 +1,54 @@
-using CitizenHackathon2025V5.Blazor.Client.Models;
+using CitizenHackathon2025.Shared.StaticConfig.Constants;
+using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Auths;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
-//using CitizenHackathon2025.Shared.StaticConfig.Constants;
 using Microsoft.JSInterop;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
 {
     public partial class UserView : ComponentBase
     {
+    #nullable disable
+        [Inject] public HttpClient Client { get; set; }
         [Inject] private AuthService AuthService { get; set; } = default!;
         [Inject] private UserService UserService { get; set; } = default!;
+        [Inject] public NavigationManager Navigation { get; set; }
         [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+        [Inject] public IHubTokenService HubTokenService { get; set; }
+        [Inject] public IHttpClientFactory HttpFactory { get; set; }
+        [Inject] public IConfiguration Config { get; set; }
+        [Inject] public IAuthService Auth { get; set; }
 
-        private UserModel? CurrentUser { get; set; }
-        private UserModel? SelectedUser { get; set; }
-        private List<UserModel> Users { get; set; } = new();
+        private const string ApiBase = "https://localhost:7254";
+        private IJSObjectReference? _outZen;
 
-        private HubConnection? _hubConnection;
+        private ClientUserDTO? CurrentUser { get; set; }
+        private ClientUserDTO? SelectedUser { get; set; }
+        private List<ClientUserDTO> Users { get; set; } = new();
+        private List<ClientUserDTO> allUsers = new();
+        private List<ClientUserDTO> visibleUsers = new();
+        private int currentIndex = 0;
+        private const int PageSize = 20;
+
+        private HubConnection? hubConnection;
 
         private string? _token;
 
         protected override async Task OnInitializedAsync()
         {
             var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "jwt_token");
+            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
 
-            //hubConnection = new HubConnectionBuilder()
-            //    .WithUrl($"{apiBaseUrl.TrimEnd('/')}{UserHubMethods.HubPath}", options =>
-            //    {
-            //        // options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty; // if auth later
-            //    })
-            //    .WithAutomaticReconnect()
-            //    .Build();
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl($"{apiBaseUrl.TrimEnd('/')}{UserHubMethods.HubPath}", options =>
+                {
+                     options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty; // if auth later
+                })
+                .WithAutomaticReconnect()
+                .Build();
 
 
             if (!string.IsNullOrEmpty(token))
@@ -41,13 +57,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
                 {
                     var payload = JwtParser.DecodePayload(token);
 
-                    CurrentUser = new UserModel
+                    CurrentUser = new ClientUserDTO
                     {
                         Email = payload.Email,
                         Role = payload.Role
                     };
 
-                    Users = await GetUsersSecureAsync() ?? new List<UserModel>();
+                    //Users = await GetUsersSecureAsync() ?? new List<ClientUserDTO>();
                     await InitSignalR(token);
                 }
                 catch (Exception ex)
@@ -68,14 +84,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
             //await hubConnection.InvokeAsync(UserHubMethods.FromClient.NotifyUserRegistered, "alice@example.com");
         }
 
-        private async Task<List<UserModel>?> GetUsersSecureAsync()
+        private async Task<List<ClientUserDTO>?> GetUsersSecureAsync()
         {
             try
             {
                 var jwtUsers = await UserService.GetUsersAsync();
-                if (jwtUsers == null) return new List<UserModel>();
+                if (jwtUsers == null) return new List<ClientUserDTO>();
 
-                return jwtUsers.Select(u => new UserModel
+                return jwtUsers.Select(u => new ClientUserDTO
                 {
                     Email = u.Email,
                     Role = u.Role
@@ -84,11 +100,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"User recovery error : {ex.Message}");
-                return new List<UserModel>();
+                return new List<ClientUserDTO>();
             }
         }
 
-        private void SelectUser(UserModel user)
+        private void SelectUser(ClientUserDTO user)
         {
             SelectedUser = user;
             InvokeAsync(StateHasChanged);
@@ -112,34 +128,34 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
         #region SignalR
         private async Task InitSignalR(string token)
         {
-            _hubConnection = new HubConnectionBuilder()
+            hubConnection = new HubConnectionBuilder()
                 .WithUrl("https://localhost:7254/hubs/userHub", options =>
                 {
                     options.AccessTokenProvider = () => Task.FromResult(token);
                 })
                 .WithAutomaticReconnect(new[] { TimeSpan.Zero, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(10) })
                 .Build();
-            await _hubConnection.StartAsync();
+            await hubConnection.StartAsync();
 
-            _hubConnection.Reconnecting += error =>
+            hubConnection.Reconnecting += error =>
             {
                 Console.WriteLine($"SignalR: reconnecting due to {error?.Message}");
                 return Task.CompletedTask;
             };
 
-            _hubConnection.Reconnected += connectionId =>
+            hubConnection.Reconnected += connectionId =>
             {
                 Console.WriteLine($"SignalR: reconnected with connectionId {connectionId}");
                 return Task.CompletedTask;
             };
 
-            _hubConnection.Closed += async error =>
+            hubConnection.Closed += async error =>
             {
                 Console.WriteLine($"SignalR: connection closed. Error: {error?.Message}");
                 await Task.Delay(5000);
                 try
                 {
-                    await _hubConnection.StartAsync();
+                    await hubConnection.StartAsync();
                     Console.WriteLine("SignalR: connection restarted successfully.");
                 }
                 catch (Exception ex)
@@ -148,7 +164,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
                 }
             };
 
-            _hubConnection.On<UserModel>("UserUpdated", (updatedUser) =>
+            hubConnection.On<ClientUserDTO>("UserUpdated", (updatedUser) =>
             {
                 if (CurrentUser == null) return; // Ignore updates if CurrentUser not defined
 
@@ -161,7 +177,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
 
             try
             {
-                await _hubConnection.StartAsync();
+                await hubConnection.StartAsync();
                 Console.WriteLine("SignalR: connection started successfully.");
             }
             catch (Exception ex)
@@ -181,12 +197,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
 
         private async Task DisconnectSignalR()
         {
-            if (_hubConnection != null)
+            if (hubConnection != null)
             {
                 try
                 {
-                    await _hubConnection.StopAsync();
-                    await _hubConnection.DisposeAsync();
+                    await hubConnection.StopAsync();
+                    await hubConnection.DisposeAsync();
                 }
                 catch (Exception ex)
                 {
@@ -194,7 +210,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
                 }
                 finally
                 {
-                    _hubConnection = null;
+                    hubConnection = null;
                 }
             }
         }

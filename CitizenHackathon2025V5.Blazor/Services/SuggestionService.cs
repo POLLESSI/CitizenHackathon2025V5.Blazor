@@ -12,7 +12,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     {
     #nullable disable
         private readonly HttpClient _httpClient;
-        //private const string ApiSuggestionBase = "suggestion";
         private string? _suggestionId;
 
         public SuggestionService(IHttpClientFactory factory)
@@ -23,7 +22,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"suggestion/user/{userId}");
+                var response = await _httpClient.GetAsync($"Suggestions/user/{userId}");
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return Enumerable.Empty<ClientSuggestionDTO>();
 
@@ -44,7 +43,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             try
             {
                 var suggest = await _httpClient.GetFromJsonAsync<List<ClientSuggestionDTO>>(
-                    $"suggestion?lat={lat}&lng={lng}");
+                    $"Suggestions?lat={lat}&lng={lng}");
 
                 return suggest ?? new List<ClientSuggestionDTO>();
             }
@@ -64,7 +63,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             try
             {
-                using var resp = await _httpClient.GetAsync($"suggestion/{id}", ct);
+                using var resp = await _httpClient.GetAsync($"Suggestions/{id}", ct);
 
                 if (resp.StatusCode == HttpStatusCode.NotFound)
                     return null;
@@ -88,7 +87,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.DeleteAsync($"suggestion/{id}");
+                var response = await _httpClient.DeleteAsync($"Suggestions/{id}");
                 if (response.StatusCode == HttpStatusCode.NotFound) return false;
                 response.EnsureSuccessStatusCode();
 
@@ -105,7 +104,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync("suggestion/all");
+                var response = await _httpClient.GetAsync("Suggestions/all");
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return Enumerable.Empty<ClientSuggestionDTO>();
 
@@ -125,7 +124,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var resp = await _httpClient.PostAsJsonAsync("suggestion", suggestion);
+                var resp = await _httpClient.PostAsJsonAsync("Suggestions", @suggestion);
                 if (resp.StatusCode == HttpStatusCode.NotFound) return null;
 
                 resp.EnsureSuccessStatusCode();

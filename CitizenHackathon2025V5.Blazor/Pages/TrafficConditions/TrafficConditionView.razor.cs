@@ -1,11 +1,10 @@
 using CitizenHackathon2025V5.Blazor.Client.DTOs;
-using CitizenHackathon2025V5.Blazor.Client.Models;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
-//using CitizenHackathon2025.Shared.StaticConfig.Constants;
+using CitizenHackathon2025.Shared.StaticConfig.Constants;
 using Microsoft.JSInterop;
-using Newtonsoft.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 {
@@ -13,7 +12,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
     {
 #nullable disable
         [Inject]
-        public HttpClient Client { get; set; }  // Injection HttpClient
+        public HttpClient Client { get; set; } 
         [Inject] public TrafficConditionService TrafficConditionService { get; set; }
         [Inject] public NavigationManager Navigation { get; set; }
         [Inject] public IJSRuntime JS { get; set; }
@@ -33,6 +32,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         public int SelectedId { get; set; }
         public HubConnection hubConnection { get; set; }
 
+        // Fields used by .razor
         private ElementReference ScrollContainerRef;
         private string _q;
         private bool _onlyRecent;
@@ -48,31 +48,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             LoadMoreItems();
 
             // 2) SignalR
-            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? ApiBase.TrimEnd('/');
-            var hubPath = "/hubs/traffichub";
-            var hubUrl = BuildHubUrl(apiBaseUrl, hubPath);
+            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
 
             hubConnection = new HubConnectionBuilder()
-                .WithUrl(hubUrl, options =>
+                .WithUrl($"{apiBaseUrl}{TrafficConditionHubMethods.HubPath}", options =>
                 {
-                    options.AccessTokenProvider = async () =>
-                    {
-                        var token = await Auth.GetAccessTokenAsync();
-                        return token ?? string.Empty;
-                    };
+                    // If your hub is later protected, provide a token
+                    options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
                 })
                 .WithAutomaticReconnect()
                 .Build();
-
-            //hubConnection = new HubConnectionBuilder()
-            //    .WithUrl($"{apiBaseUrl.TrimEnd('/')}{TrafficConditionHubMethods.HubPath}", options =>
-            //    {
-            //        // Si le hub est protégé plus tard:
-            //        options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
-            //    })
-            //    .WithAutomaticReconnect()
-            //    .Build();
-
 
             // Handlers
             hubConnection.On<ClientTrafficConditionDTO>("RefreshTraffic", async dto =>
@@ -127,17 +112,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             var next = allTrafficConditions.Skip(currentIndex).Take(PageSize).ToList();
             visibleTrafficConditions.AddRange(next);
             currentIndex += next.Count;
-        }
-        private static string BuildHubUrl(string baseUrl, string path)
-        {
-            var b = baseUrl.TrimEnd('/');
-            var p = path.TrimStart('/');
-            if (b.EndsWith("/hubs", StringComparison.OrdinalIgnoreCase) &&
-                p.StartsWith("hubs/", StringComparison.OrdinalIgnoreCase))
-            {
-                p = p.Substring("hubs/".Length);
-            }
-            return $"{b}/{p}";
         }
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {

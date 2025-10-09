@@ -2,7 +2,8 @@ using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
-//using CitizenHackathon2025.Shared.StaticConfig.Constants;
+using CitizenHackathon2025.Shared.StaticConfig.Constants;
+using CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants;
 using Microsoft.JSInterop;
 using Newtonsoft.Json;
 
@@ -49,28 +50,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
             // 2) SignalR
             var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? ApiBase.TrimEnd('/');
-            var hubPath = "/hubs/weatherforecastHub";
-            var hubUrl = BuildHubUrl(apiBaseUrl, hubPath);
 
             hubConnection = new HubConnectionBuilder()
-                .WithUrl(hubUrl, options =>
+                .WithUrl($"{apiBaseUrl.TrimEnd('/')}{WeatherForecastHubMethods.HubPath}", options =>
                 {
-                    options.AccessTokenProvider = async () =>
-                    {
-                        var token = await Auth.GetAccessTokenAsync();
-                        return token ?? string.Empty;
-                    };
+                    options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty; // if protected hub
                 })
                 .WithAutomaticReconnect()
                 .Build();
-
-            //hubConnection = new HubConnectionBuilder()
-            //    .WithUrl($"{apiBaseUrl.TrimEnd('/')}{WeatherForecastHubMethods.HubPath}", options =>
-            //    {
-            //        // options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty; // if protected hub
-            //    })
-            //    .WithAutomaticReconnect()
-            //    .Build();
 
             // Handlers
             hubConnection.On<ClientWeatherForecastDTO>("ReceiveWeatherForecastUpdate", async dto =>

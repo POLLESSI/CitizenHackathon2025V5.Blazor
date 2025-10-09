@@ -1,6 +1,7 @@
 using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
-//using CitizenHackathon2025.Shared.StaticConfig.Constants;
+using CitizenHackathon2025.Shared.StaticConfig.Constants;
+using CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Newtonsoft.Json;
@@ -50,34 +51,19 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
             LoadMoreItems();
 
             // 2) SignalR
-            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? ApiBase.TrimEnd('/');
-            var hubPath = "/hubs/suggestionHub";
-            var hubUrl = BuildHubUrl(apiBaseUrl, hubPath);
+            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
 
             hubConnection = new HubConnectionBuilder()
-                .WithUrl(hubUrl, options =>
+                .WithUrl($"{apiBaseUrl}{SuggestionHubMethods.HubPath}", options =>
                 {
-                    options.AccessTokenProvider = async () =>
-                    {
-                        var token = await Auth.GetAccessTokenAsync();
-                        return token ?? string.Empty;
-                    };
+                    // If your hub is later protected, provide a token
+                    options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
                 })
                 .WithAutomaticReconnect()
                 .Build();
 
-            //var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
-            //hubConnection = new HubConnectionBuilder()
-            //    .WithUrl($"{apiBaseUrl}{SuggestionHubMethods.HubPath}", options =>
-            //    {
-            //        // If your hub is later protected, provide a token
-            //        options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
-            //    })
-            //    .WithAutomaticReconnect()
-            //    .Build();
-
             // Handlers
-            hubConnection.On<ClientSuggestionDTO>("ReceiveSuggestionUpdate", async dto =>
+            hubConnection.On<ClientSuggestionDTO>(SuggestionHubMethods.ToClient.ReceiveSuggestion, async dto =>
             {
                 void Upsert(List<ClientSuggestionDTO> list)
                 {
@@ -94,22 +80,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
                 await JS.InvokeVoidAsync("window.OutZenInterop.addOrUpdateSuggestionMarker",
                     dto.Id.ToString(),
                     dto.Reason,
-                    dto.SuggestedAlternatives,       // <= was SuggestedAlternative
+                    dto.SuggestedAlternatives,
                     dto.OriginalPlace,
-                    new { title = dto.OriginalPlace, description = $"Maj {dto.DateSuggestion:HH:mm:ss}" } // <= was Date
-);
+                    new { title = dto.OriginalPlace, description = $"Maj {dto.DateSuggestion:HH:mm:ss}" });
 
                 await InvokeAsync(StateHasChanged);
             });
 
-            hubConnection.On<int>("SuggestionArchived", async id =>
+            hubConnection.On(SuggestionHubMethods.ToClient.NewSuggestion, () =>
             {
-                Suggestions.RemoveAll(c => c.Id == id);
-                allSuggestions.RemoveAll(c => c.Id == id);
-                visibleSuggestions.RemoveAll(c => c.Id == id);
-
-                await JS.InvokeVoidAsync("window.OutZenInterop.removeMarker", id.ToString());
-                await InvokeAsync(StateHasChanged);
+                // Optional: slight UI refresh
+                InvokeAsync(StateHasChanged);
             });
             //hubConnection.On(SuggestionHubMethods.ToClient.NewSuggestion, () =>
             //{
@@ -140,17 +121,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
             currentIndex += next.Count;
         }
 
-        private static string BuildHubUrl(string baseUrl, string path)
-        {
-            var b = baseUrl.TrimEnd('/');
-            var p = path.TrimStart('/');
-            if (b.EndsWith("/hubs", StringComparison.OrdinalIgnoreCase) &&
-                p.StartsWith("hubs/", StringComparison.OrdinalIgnoreCase))
-            {
-                p = p.Substring("hubs/".Length);
-            }
-            return $"{b}/{p}";
-        }
+        //private static string BuildHubUrl(string baseUrl, string path)
+        //{
+        //    var b = baseUrl.TrimEnd('/');
+        //    var p = path.TrimStart('/');
+        //    if (b.EndsWith("/hubs", StringComparison.OrdinalIgnoreCase) &&
+        //        p.StartsWith("hubs/", StringComparison.OrdinalIgnoreCase))
+        //    {
+        //        p = p.Substring("hubs/".Length);
+        //    }
+        //    return $"{b}/{p}";
+        //}
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (!firstRender) return;
