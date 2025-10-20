@@ -2,9 +2,9 @@
 
 :root {
     /* 🎨 Colors */
-    --color-primary: #1e90ff;
-    --color-primary-dark: #009acb;
-    --color-primary-light: #80e7ff;
+    --color-primary: #28a745;
+    --color-primary-dark: #218838;
+    --color-primary-light: #28a745;
     --color-secondary: #6c757d;
     --color-success: #28a745;
     --color-danger: #dc3545;
@@ -34,7 +34,7 @@
     /* 🧱 background infos*/
     --oz-bg: #0f1020;
     --oz-card: #17182b;
-    --oz-text: #e6e8ef; 
+    --oz-text: #e6e8ef;
     --oz-accent: #5ad1ff;
     /* ✨ Ultra-luxe accents */
     --ultra-glow: 0 0 10px rgba(255, 215, 0, 0.6);

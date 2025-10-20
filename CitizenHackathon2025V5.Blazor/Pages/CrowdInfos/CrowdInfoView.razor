@@ -1,12 +1,13 @@
 ﻿@page "/crowdinfoview"
 @using CitizenHackathon2025V5.Blazor.Client.DTOs
 @using CitizenHackathon2025V5.Blazor.Client.Utils
+@using CitizenHackathon2025V5.Blazor.Client.Enums
 @inject IJSRuntime js
 
 <span class="fas fa-certificate me-2"></span> Crowd Infos
 
 <div class="page-list">
-    <h3>Crowd Infos</h3>
+    @* <h3>Crowd Infos</h3> *@
     <div class="list-toolbar">
         <div class="left">
             <input class="input-compact" placeholder="Search..."
@@ -39,7 +40,7 @@
             <thead>
                 <tr>
                     <th class="col-narrow">Location Name</th>
-                    <th class="col-narrow">Crowd Level</th>
+                    <th class="col-narrow">Level</th>
                     <th class="col-actions"></th>
                 </tr>
             </thead>
@@ -67,8 +68,7 @@
                                     var desc = CrowdInfoSeverityHelpers.GetDescription(sev);
                                     var isUnknown = color == "#9E9E9E";
                                 }
-                                <button class="btn btn-sm info-dynamic"
-                                        style="--info-color:@InfoColor(co)"
+                                <button class="btn btn-sm info-chip @GetLevelCss(co.CrowdLevel) btn-glow"
                                         title="@InfoDesc(co)"
                                         @onclick="() => ClickInfo(co.Id)">
                                     Info
@@ -80,6 +80,15 @@
             </tbody>
         </table>
     </div>
+    @* <Globe Width="450" Height="450" ShowControls="true" CssClass="mt-2" /> *@
+    <div class="earth-container scroll-fade">
+        <canvas id="rotatingEarth" width="450" height="450"></canvas>
+        <div class="earth-controls">
+            <label for="speedRange">Rotation Speed:</label>
+            <input type="range" id="speedRange" min="0" max="0.20" step="0.001" value="0.01" />
+        </div>
+    </div>
+
 </div>
 
 @if (SelectedId > 0)
@@ -162,6 +171,22 @@
     private static string InfoDesc(ClientCrowdInfoDTO co)
         => CrowdInfoSeverityHelpers.GetDescription(
                CrowdInfoSeverityHelpers.GetSeverity(co));
+    private static string GetLevelCss(int level)
+    {
+        var safe = Math.Clamp(level, 0, 5);
+        return $"info--lvl{safe}";
+    }
+    private static string MapToCrowdClass(int level)
+    {
+        // Example: stretch 0..3 -> 0..5 (Low=1, Medium=2, High=3/4, Critical=5)
+        return level switch
+        {
+            <= 0 => "crowd--1",
+            1 => "crowd--2",
+            2 => "crowd--3",
+            _ => "crowd--5"
+        };
+    }
 }
 
 

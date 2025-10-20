@@ -2,12 +2,8 @@
 @inject IJSRuntime JS
 @inject Blazored.Toast.Services.IToastService ToastService
 
-@* <button class="btn btn-primary" @onclick="() => ToastService.ShowSuccess(" It works !", "Success" )">
-    Test the toast
-</button> *@
-
 <button class="btn btn-success" @onclick="TestSignalR">
-    ?? Tester la réception SignalR
+    ?? Test SignalR reception
 </button>
 
 <PageTitle>Presentation - OutZen</PageTitle>
@@ -72,9 +68,9 @@
             <button class="cta-button" @onclick="NavigateHome">Back to home</button>
         </section>
     </div>
-    <select @onchange="ChangeTheme">
+    @* <select @onchange="ChangeTheme">
         <option value="theme-ultraluxe">Ultra Luxe</option>
-    </select>
+    </select> *@
 </div>
 
 

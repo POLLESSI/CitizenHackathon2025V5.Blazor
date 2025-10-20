@@ -1,0 +1,76 @@
+﻿@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div class="globe-wrap @CssClass">
+    <canvas id="@CanvasId" width="@Width" height="@Height"></canvas>
+
+    @if (ShowControls)
+    {
+        <div class="globe-controls">
+            <div class="row">
+                <label for="@($"{CanvasId}-speed")">Vitesse</label>
+                <input type="range" id="@($"{CanvasId}-speed")" min="0" max="0.20" step="0.001" value="@StartSpeed"
+                       @oninput="@(async e => await JS.InvokeVoidAsync("setRotationSpeed", e.Value?.ToString()))" />
+            </div>
+            <div class="row">
+                <label for="@($"{CanvasId}-lights")">Lumières</label>
+                <input type="range"
+                       id="@($"{CanvasId}-lights")"
+                       min="1.2" max="3.0" step="0.1"
+                       value="@StartLights"
+                       @oninput="@(async e => await JS.InvokeVoidAsync("setLightsIntensity", e.Value?.ToString()))" />
+            </div>
+
+            <div class="row">
+                <label for="@($"{CanvasId}-halo")">Halo</label>
+                <input type="range"
+                       id="@($"{CanvasId}-halo")"
+                       min="0.2" max="1.2" step="0.05"
+                       value="@StartHalo"
+                       @oninput="@(async e => await JS.InvokeVoidAsync("setHaloStrength", e.Value?.ToString()))" />
+            </div>
+
+            <label class="toggle">
+                <input type="checkbox"
+                       @onchange="@(async e => await JS.InvokeVoidAsync("switchNightMode", (bool)e.Value!, false))" />
+                <span>Forcer la nuit</span>
+            </label>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string CanvasId { get; set; } = "rotatingEarth";
+    [Parameter] public int Width { get; set; } = 450;
+    [Parameter] public int Height { get; set; } = 450;
+    [Parameter] public bool ShowControls { get; set; } = true;
+    [Parameter] public string? CssClass { get; set; }
+
+    // Valeurs initiales
+    [Parameter] public double StartSpeed { get; set; } = 0.01;
+    [Parameter] public double StartLights { get; set; } = 2.4;
+    [Parameter] public double StartHalo { get; set; } = 0.7;
+    [Parameter] public string DayUrl { get; set; } = "/images/earth_texture.jpg";
+    [Parameter] public string NightUrl { get; set; } = "/images/earth_texture_night.jpg";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        await JS.InvokeVoidAsync("initEarth", new
+        {
+            canvasId = CanvasId,
+            dayUrl = DayUrl,
+            nightUrl = NightUrl
+        });
+
+        await JS.InvokeVoidAsync("setRotationSpeed", StartSpeed.ToString());
+        await JS.InvokeVoidAsync("setLightsIntensity", StartLights.ToString());
+        await JS.InvokeVoidAsync("setHaloStrength", StartHalo.ToString());
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("disposeEarth"); } catch { }
+    }
+}

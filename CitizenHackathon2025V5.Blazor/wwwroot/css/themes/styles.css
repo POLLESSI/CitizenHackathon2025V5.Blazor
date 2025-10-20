@@ -463,6 +463,63 @@ h1, h2 {
     margin-bottom: 2rem;
 }
 
+.globe-controls {
+    position: relative; /* if you want it under the canvas */
+    margin: .75rem auto 0;
+    max-width: 460px;
+    background: rgba(0,0,0,.55);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px;
+    padding: .75rem .9rem;
+    box-shadow: 0 6px 24px rgba(0,0,0,.35);
+    font-family: 'Poppins', sans-serif;
+}
+
+    .globe-controls .row {
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        gap: .75rem;
+        align-items: center;
+        margin: .35rem 0;
+    }
+
+    .globe-controls label {
+        font-size: .95rem;
+        color: #eaeaea;
+        white-space: nowrap;
+    }
+
+    .globe-controls input[type="range"] {
+        width: 100%;
+        accent-color: #00e5ee;
+        height: 4px;
+    }
+
+    .globe-controls .toggle {
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        margin-top: .4rem;
+        color: #eaeaea;
+        font-size: .95rem;
+    }
+
+        .globe-controls .toggle input {
+            width: 22px;
+            height: 22px;
+        }
+
+@media (max-width: 520px) {
+    .globe-controls {
+        margin: .75rem 1rem 0;
+    }
+
+        .globe-controls .row {
+            grid-template-columns: 1fr;
+        }
+}
+
 /* ================================================================
    ANIMATIONS
 ================================================================ */

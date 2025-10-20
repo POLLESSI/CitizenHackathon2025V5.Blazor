@@ -24,36 +24,36 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
     <!-- Base Styles (keeps only what physically exists in wwwroot -->
-    <link href="/css/base/reset.css" rel="stylesheet" />
+    <!--<link href="/css/base/reset.css" rel="stylesheet" />-->
     <link href="/css/base/variables.css?v=2" rel="stylesheet" />
-    <link href="/css/base/layout.css" rel="stylesheet" />
-    <link href="/css/base/blazor-core.css" rel="stylesheet" />
-    <link href="/css/base/app.css" rel="stylesheet" />
-    <link href="/css/base/site.css" rel="stylesheet" />
-    <link href="/css/base/SharedStyles.css" rel="stylesheet" />
-
+    <!--<link href="/css/base/layout.css" rel="stylesheet" />-->
+    <!--<link href="/css/base/blazor-core.css" rel="stylesheet" />-->
+    <!--<link href="/css/base/app.css" rel="stylesheet" />-->
+    <!--<link href="/css/base/site.css" rel="stylesheet" />-->
+    <!--<link href="/css/base/SharedStyles.css" rel="stylesheet" />-->
     <!-- Animations -->
     <link href="/css/animations/site-variables.css" rel="stylesheet">
     <link href="/css/animations/animations.css" rel="stylesheet" />
     <link href="/css/animations/pulseColors.css" rel="stylesheet" />
     <link href="/css/animations/visual-elements.css" rel="stylesheet" />
 
+    <!-- Theme -->
+    <!--<link href="css/themes/light.css" rel="stylesheet" />-->
+    <!--<link href="css/themes/components.css" rel="stylesheet" />-->
+    <!--<link href="css/themes/global-styles.css" rel="stylesheet" />-->
+    <link href="css/themes/outzen.css" rel="stylesheet" />
+    <link href="css/themes/styles.css" rel="stylesheet" />
+
     <!-- Components -->
-    <link href="/css/components/button.css" rel="stylesheet" />
     <link href="/css/components/detail-container.css" rel="stylesheet" />
     <link href="/css/components/info.css" rel="stylesheet" />
     <link href="/css/components/map.css" rel="stylesheet" />
     <link href="/css/base/simulator.css" rel="stylesheet">
     <link href="css/components/panels.css" rel="stylesheet" />
+    <link href="/css/components/table.css" rel="stylesheet" />
+    <link href="/css/components/button.css?v=3" rel="stylesheet" />
+    <link href="/css/components/globe.css" rel="stylesheet" />
 
-    <!-- Theme -->
-    <link href="css/themes/light.css" rel="stylesheet" />
-    <link href="css/themes/components.css" rel="stylesheet" />
-    <link href="css/themes/global-styles.css" rel="stylesheet" />
-    <link href="css/themes/outzen.css" rel="stylesheet" />
-    <link href="css/themes/styles.css" rel="stylesheet" />
-    <!--<link href="css/outzen.bundle.css" rel="stylesheet" />-->
-    <!--<link href="css/overrides.css" rel="stylesheet" />-->
     <!-- External Styles -->
     <link href="css/external/blazored-toast.css" rel="stylesheet" />
     <!-- Open Iconic from CDN (avoids 404 local) -->
@@ -121,6 +121,8 @@
     <script type="module" src="/js/app/earthRotation.js"></script>
     <script type="module" src="/js/app/ui.effects.js"></script>
     <script type="module" src="/js/core/SignalR.client.js"></script>
+    <script src="_content/Microsoft.AspNetCore.SignalR.Client/signalr.min.js"></script>
+    <script src="js/outzen.hub.js" type="module"></script>0
     <script src="/js/crowdbar.js" defer></script>
 
     <!-- Initialize OutZen App (Leaflet module expecting global L and Chart) -->

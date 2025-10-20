@@ -1,0 +1,33 @@
+﻿/*/wwwroot/css/components/globe.css*/
+.globe-wrap {
+    display: grid;
+    gap: .75rem;
+    place-items: center;
+    padding: .5rem;
+}
+
+.globe-controls {
+    display: grid;
+    gap: .5rem;
+    font-size: .9rem;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 10px;
+    padding: .6rem .8rem;
+    width: min(420px, 92vw);
+}
+
+    .globe-controls .row {
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        align-items: center;
+        gap: .6rem;
+    }
+
+.globe-fixed { /* if you want to have it everywhere, fix it at the bottom right */
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 20;
+    backdrop-filter: blur(6px);
+}

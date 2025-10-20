@@ -1,0 +1,43 @@
+﻿/* Scrollable container + wide by default */
+.page-list .table-wrapper {
+    width: min(1400px, 95vw);
+    min-width: 80vw;
+    margin: 0 auto;
+    height: 60vh; /* adjust if you want */
+    overflow: auto;
+    border: 1px solid #444;
+    border-radius: 8px;
+}
+
+/* Table = 100% de son conteneur */
+.styled-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+    /* Sticky header */
+    .styled-table thead th {
+        position: sticky;
+        top: 0;
+        background: #1f1f1f;
+        z-index: 1;
+    }
+
+    /* A little air */
+    .styled-table td, .styled-table th {
+        padding: .6rem .75rem;
+        vertical-align: middle;
+        white-space: nowrap;
+    }
+
+/* Compact “action” columns, but not all */
+.col-actions {
+    width: 1%;
+    white-space: nowrap;
+}
+
+/* If 120px is too small, expand “col-narrow” here */
+.col-narrow {
+    width: 300px; /* was 120px */
+}

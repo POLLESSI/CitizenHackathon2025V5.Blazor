@@ -8,7 +8,7 @@
 <span class="fas fa-certificate me-2"></span> Traffic Conditions
 
 <div class="page-list">
-    <h3>Traffic Conditions List</h3>
+    @* <h3>Traffic Conditions List</h3> *@
     <div class="list-toolbar">
         <div class="left">
             <input class="input-compact" placeholder="Search incident..."
@@ -56,16 +56,31 @@
                                 <td>•</td>
                                 <td>@tr.IncidentType</td>
                                 <td>@tr.Message</td>
-                                <span class="lvl @($"lvl--{tr.CongestionLevel}")">@tr.CongestionLevel</span>
-                                
+                                <!-- The level must be in a cell -->
                                 <td>
-                                    <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(tr.Id)">Info</button>
+                                    <span class="lvl @($"lvl--{tr.CongestionLevel}")">@tr.CongestionLevel</span>
+                                </td>
+
+                                <td>
+                                    <button class="btn btn-sm traffic-chip @GetTrafficCss(tr.CongestionLevel) btn-glow"
+                                            title="See details0"
+                                            @onclick="() => ClickInfo(tr.Id)">
+                                        Traffic
+                                    </button>
                                 </td>
                             </tr>
                         }
                     }
                 </tbody>
             </table>
+        </div>
+        @* <Globe Width="450" Height="450" ShowControls="true" CssClass="mt-2" /> *@
+        <div class="earth-container scroll-fade">
+            <canvas id="rotatingEarth" width="450" height="450"></canvas>
+            <div class="earth-controls">
+                <label for="speedRange">Rotation Speed:</label>
+                <input type="range" id="speedRange" min="0" max="0.20" step="0.001" value="0.01" />
+            </div>
         </div>
     </div>
 </div>
@@ -87,4 +102,29 @@
     <div class="oz-empty">No items for these filters.</div>
 }
 
+@code {
+    private static string GetTrafficCss(string? level)
+    {
+        if (string.IsNullOrWhiteSpace(level)) return "level--low";
+        var t = level.Trim().ToLowerInvariant();
+        return t switch
+        {
+            "low" or "1" or "freeflow" => "level--low",
+            "medium" or "2" or "moderate" => "level--medium",
+            "high" or "3" or "heavy" or "jammed" => "level--high",
+            _ => "level--unknown"
+        };
+    }
+
+    private static string GetTrafficCss(int? level)
+    {
+        return level switch
+        {
+            1 => "level--low",
+            2 => "level--medium",
+            3 => "level--high",
+            _ => "level--unknown"
+        };
+    }
+}
 

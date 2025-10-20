@@ -6,10 +6,6 @@
 @inject Blazored.Toast.Services.IToastService ToastService
 @inject IJSRuntime JS
 
-@* <button class="btn btn-primary" @onclick="() => ToastService.ShowSuccess(" It works !", "Success" )">
-    Test the toast
-</button> *@
-
 <PageTitle>OutZen - Home</PageTitle>
 
 <div class="page-list">
@@ -21,6 +17,31 @@
             <label for="speedRange">Rotation Speed:</label>
             <input type="range" id="speedRange" min="0" max="0.20" step="0.001" value="0.01" />
         </div>
+    </div>
+
+    <div class="globe-controls">
+        <div class="row">
+            <label for="speedRange">Speed</label>
+            <input type="range" id="speedRange" min="0" max="0.20" step="0.001" value="0.01" />
+        </div>
+
+        <div class="row">
+            <label for="lightsRange">Night lights</label>
+            <input type="range" id="lightsRange" min="1.2" max="3.0" step="0.1" value="2.4"
+                   oninput="window.setLightsIntensity && window.setLightsIntensity(this.value)" />
+        </div>
+
+        <div class="row">
+            <label for="haloRange">Halo</label>
+            <input type="range" id="haloRange" min="0.2" max="1.2" step="0.05" value="0.7"
+                   oninput="window.setHaloStrength && window.setHaloStrength(this.value)" />
+        </div>
+
+        <label class="toggle">
+            <input type="checkbox" id="forceNight"
+                   onchange="window.switchNightMode && window.switchNightMode(this.checked, false)" />
+            <span>Forcer la nuit</span>
+        </label>
     </div>
 
     <p class="index-subtitle">
@@ -38,9 +59,9 @@
         </p>
 
         <ul>
-            <li>?? Upper Sambre Natural Park</li>
-            <li>?? Outdoor yoga classes in Gosselies</li>
-            <li>?? Open-air theater – La Traviata</li>
+            <li>Upper Sambre Natural Park</li>
+            <li>Outdoor yoga classes in Gosselies</li>
+            <li>Open-air theater – La Traviata</li>
         </ul>
     </section>
 

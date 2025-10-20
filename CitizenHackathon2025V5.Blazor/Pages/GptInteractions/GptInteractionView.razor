@@ -6,7 +6,7 @@
 <span class="fas fa-certificate me-2"></span> Gpt Interactions
 
 <div class="page-list">
-    <h3>Gpt Interactions List</h3>
+    @* <h3>Gpt Interactions List</h3> *@
     <div class="list-toolbar">
         <div class="left">
             <input class="input-compact" placeholder="Search..."
@@ -60,13 +60,21 @@
                             <td class="text-ellipsis" title="@gp.Prompt">@gp.Prompt</td>
                             <td class="text-ellipsis" title="@gp.Response">@gp.Response</td>
                             <td class="col-actions">
-                                <button class="btn btn-sm btn-outline-info" @onclick="() => ClickInfo(gp.Id)">Info</button>
+                                <button class="btn btn-sm btn-glow ev-chip" @onclick="() => ClickInfo(gp.Id)">Info</button>
                             </td>
                         </tr>
                         }
                     }
                 </tbody>
             </table>
+        </div>
+        @* <Globe Width="450" Height="450" ShowControls="true" CssClass="mt-2" /> *@
+        <div class="earth-container scroll-fade">
+            <canvas id="rotatingEarth" width="450" height="450"></canvas>
+            <div class="earth-controls">
+                <label for="speedRange">Rotation Speed:</label>
+                <input type="range" id="speedRange" min="0" max="0.20" step="0.001" value="0.01" />
+            </div>
         </div>
 </div>
 

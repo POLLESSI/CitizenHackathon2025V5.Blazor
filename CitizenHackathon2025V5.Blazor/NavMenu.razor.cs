@@ -17,18 +17,18 @@ namespace CitizenHackathon2025V5.Blazor.Client
 
         private List<MenuItem> MenuItems => new()
         {
-            new MenuItem("Accueil", "/", "🏠"),
+            //new MenuItem("Statistics", "/statistics", "📊"),
             new MenuItem("Map", "/map", "🗺"),
+            new MenuItem("Accueil", "/", "🏠"),
             new MenuItem("Presentation", "/presentation", "🛡"),
-            new MenuItem("Statistics", "/statistics", "📊"),
-            new MenuItem("CrowdInfos", "/crowdinfoview", "✨"),
             new MenuItem("Events", "/eventview", "📅"),
+            new MenuItem("CrowdInfos", "/crowdinfoview", "✨"), 
             new MenuItem("GPT Interactions", "/gptinteractionview", "🤖"),
-            new MenuItem("Places", "/placeview", "📍"),
             new MenuItem("Suggestions", "/suggestionview", "💡"),
+            new MenuItem("Places", "/placeview", "📍"),
             new MenuItem("Traffic", "/trafficconditionview", "🚦"),
-            new MenuItem("Users", "/userview", "👤"),
             new MenuItem("Weather", "/weatherforecastview", "🌤"),
+            new MenuItem("Users", "/userview", "👤"),
             new MenuItem("Privacy", "/privacy", "🔐"),
             new MenuItem("Help", "/help", "❓")
         };

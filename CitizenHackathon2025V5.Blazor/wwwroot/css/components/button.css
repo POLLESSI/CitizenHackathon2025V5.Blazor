@@ -1,41 +1,313 @@
 ﻿/*wwwroot.css.components.button.css*/
-/*.oz-btn {
+/* Info button — rectangular base, slightly rounded corners */
+.btn.info-chip {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0.75rem 1.5rem;
+    padding: .45rem .8rem; /* more compact */
     font-weight: 600;
-    border: none;
-    border-radius: 9999px;
-    background-color: var(--color-primary);
+    border: 1px solid transparent;
+    border-radius: 8px; /* <— light corners */
+    background: var(--color-primary);
     color: #fff;
+    box-shadow: 0 2px 10px rgba(0,0,0,.15);
     cursor: pointer;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
-    transition: background-color 0.3s ease, transform 0.2s ease;
+    transition: filter .15s ease, transform .12s ease, background-color .2s ease;
 }
 
-    .oz-btn:hover {
-        background-color: var(--color-primary-dark);
-        transform: scale(1.05);
+    /* Fixed colors per level (0–5) */
+    .btn.info-chip.info--lvl0 {
+        background: #6c757d;
+        border-color: #6c757d;
+    }
+    /* grey (unknown/0) */
+    .btn.info-chip.info--lvl1,
+    .btn.info-chip.info--lvl2 {
+        background: #28a745;
+        border-color: #28a745;
+    }
+    /* green (1–2) */
+    .btn.info-chip.info--lvl3 {
+        background: #fd7e14;
+        border-color: #fd7e14;
+    }
+    /* orange (3) */
+    .btn.info-chip.info--lvl4 {
+        background: #dc3545;
+        border-color: #dc3545;
+    }
+    /* red (4) */
+    .btn.info-chip.info--lvl5 {
+        background: #170338;
+        border-color: #170338;
+    }
+    /* purple (5) */
+
+    /* Overview: Keep the color, just a slight lift */
+    .btn.info-chip:hover {
+        filter: brightness(1.05);
+        background: inherit !important;
+        border-color: inherit !important;
+        color: #fff !important;
     }
 
-    .oz-btn:active {
-        transform: scale(0.95);
+    /* Active: small tap feedback */
+    .btn.info-chip:active {
+        transform: scale(.98);
     }
 
-    .oz-btn[disabled] {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }*/
+/* Traffic button — Low/Medium/High */
 
-    /* Icon in the button */
-    /*.oz-btn .icon {
-        margin-right: 0.5rem;
-        display: inline-block;
-    }*/
+.btn.traffic-chip { /* base */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: .45rem .8rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: #6c757d;
+    color: #fff;
+    transition: filter .15s ease, transform .12s ease;
+}
 
+    .btn.traffic-chip.level--low {
+        background: #28a745;
+        border-color: #28a745;
+    }
+    /* green */
+    .btn.traffic-chip.level--medium {
+        background: #fd7e14;
+        border-color: #fd7e14;
+    }
+    /* orange */
+    .btn.traffic-chip.level--high {
+        background: #dc3545;
+        border-color: #dc3545;
+    }
+    /* red */
+    .btn.traffic-chip.level--unknown {
+        background: #4f5357;
+        border-color: #4f5357;
+    }
+    /* grey */
 
+    .btn.traffic-chip:hover {
+        filter: brightness(1.05);
+        background: inherit !important;
+        border-color: inherit !important;
+    }
 
+    .btn.traffic-chip:active {
+        transform: scale(.98);
+    }
+
+/* Weather button — severe vs. normal */
+.btn.wx-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: .45rem .8rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: #6c757d;
+    color: #fff;
+    transition: filter .15s ease, transform .12s ease;
+}
+
+    .btn.wx-chip.severe--false {
+        background: #28a745;
+        border-color: #28a745;
+    }
+    /* green */
+    .btn.wx-chip.severe--true {
+        background: #dc3545;
+        border-color: #dc3545;
+    }
+    /* red */
+
+    .btn.wx-chip:hover {
+        filter: brightness(1.05);
+        background: inherit !important;
+        border-color: inherit !important;
+    }
+
+    .btn.wx-chip:active {
+        transform: scale(.98);
+    }
+
+/* Keep green buttons on hover (don’t fall back to secondary) */
+.btn:not(.info-chip):not(.traffic-chip):hover {
+    background-color: var(--color-primary-dark);
+    border-color: var(--color-primary-dark);
+    color: #fff;
+}
+
+/*All*/
+
+.btn, .btn-primary {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+    .btn:hover, .btn-primary:hover {
+        background-color: #218838;
+        border-color: #218838;
+    }
+
+/* === Halo pulsant pour boutons === */
+
+/* Classe à ajouter sur les boutons qui doivent "rayonner" */
+.btn-glow {
+    /* Chaque bouton peut définir sa couleur dans --btn-color et --btn-color-rgb */
+    --btn-color: var(--color-primary);
+    --btn-color-rgb: 40, 167, 69; /* fallback = vert (28a745) */
+
+    position: relative;
+    isolation: isolate; /* pour que le :after reste sous le contenu */
+    box-shadow: 0 0 0.35rem rgba(var(--btn-color-rgb), .55), 0 0 0.9rem rgba(var(--btn-color-rgb), .35), 0 0 1.6rem rgba(var(--btn-color-rgb), .25);
+    animation: btnPulse 1.6s ease-in-out infinite;
+    will-change: box-shadow, transform;
+}
+
+    /* extra halo under the button (softer) */
+    .btn-glow::after {
+        content: "";
+        position: absolute;
+        inset: -6px;
+        border-radius: inherit;
+        z-index: -1;
+        box-shadow: 0 0 0.6rem rgba(var(--btn-color-rgb), .35), 0 0 1.8rem rgba(var(--btn-color-rgb), .25);
+    }
+
+/* Animation */
+@keyframes btnPulse {
+    0%, 100% {
+        transform: translateZ(0);
+        box-shadow: 0 0 0.35rem rgba(var(--btn-color-rgb), .55), 0 0 0.9rem rgba(var(--btn-color-rgb), .35), 0 0 1.6rem rgba(var(--btn-color-rgb), .25);
+    }
+
+    50% {
+        box-shadow: 0 0 0.6rem rgba(var(--btn-color-rgb), .7), 0 0 1.6rem rgba(var(--btn-color-rgb), .45), 0 0 2.6rem rgba(var(--btn-color-rgb), .35);
+    }
+}
+
+/* Accessibility: if the user prefers fewer animations */
+@media (prefers-reduced-motion: reduce) {
+    .btn-glow {
+        animation: none !important;
+    }
+}
+
+/* Recommended for touch: better visible targets and focus */
+.btn,
+.info-chip,
+.traffic-chip {
+    min-height: 42px; /* comfortable target on mobile */
+    padding: .45rem .9rem;
+    border-radius: 8px; /* soft angles, no pill */
+}
+
+    .btn:focus-visible,
+    .info-chip:focus-visible,
+    .traffic-chip:focus-visible {
+        outline: 3px solid rgba(255,255,255,.45);
+        outline-offset: 2px;
+    }
+    /* CrowdInfo (tes classes existantes) */
+    .info-chip.info--lvl0 {
+        --btn-color: #6c757d;
+        --btn-color-rgb: 108,117,125;
+    }
+
+    .info-chip.info--lvl1 {
+        --btn-color: #28a745;
+        --btn-color-rgb: 40,167,69;
+    }
+
+    .info-chip.info--lvl2 {
+        --btn-color: #28a745;
+        --btn-color-rgb: 40,167,69;
+    }
+
+    .info-chip.info--lvl3 {
+        --btn-color: #fd7e14;
+        --btn-color-rgb: 253,126,20;
+    }
+
+    .info-chip.info--lvl4 {
+        --btn-color: #dc3545;
+        --btn-color-rgb: 220,53,69;
+    }
+
+    .info-chip.info--lvl5 {
+        --btn-color: #2f0242;
+        --btn-color-rgb: 47,2,66;
+    }
+    /* ou #6610f2 => 102,16,242 */
+
+    /* TrafficCondition */
+    .traffic-chip.level--low {
+        --btn-color: #28a745;
+        --btn-color-rgb: 40,167,69;
+    }
+
+    .traffic-chip.level--medium {
+        --btn-color: #fd7e14;
+        --btn-color-rgb: 253,126,20;
+    }
+
+    .traffic-chip.level--high {
+        --btn-color: #dc3545;
+        --btn-color-rgb: 220,53,69;
+    }
+
+/* If you have generic .btn (EventView, PlaceView…) and you want green by default */
+.page-list .btn:not(.info-chip):not(.traffic-chip) {
+    --btn-color: #28a745;
+    --btn-color-rgb: 40,167,69;
+}
+
+/* generic halo: if you don't put any chips, it will be green */
+.btn-glow {
+    --btn-color: #28a745;
+    --btn-color-rgb: 40,167,69;
+}
+
+/* colors per view (optional, if you want to differentiate) */
+.ev-chip {
+    --btn-color: #28a745;
+    --btn-color-rgb: 40,167,69;
+}
+/* Green */
+.gpt-chip {
+    --btn-color: #28a745;
+    --btn-color-rgb: 40,167,69;
+}
+/* Green */
+.place-chip {
+    --btn-color: #28a745;
+    --btn-color-rgb: 40,167,69;
+}
+/* Green */
+.sugg-chip {
+    --btn-color: #28a745;
+    --btn-color-rgb: 40,167,69;
+}
+/* Green */
+
+/* button style (soft angles, readable) */
+.btn.btn-glow {
+    border-radius: 8px; /* rectangular with soft corners */
+    border: 1px solid var(--btn-color);
+    background: var(--btn-color);
+    color: #fff;
+}
+
+    .btn.btn-glow:hover {
+        filter: brightness(1.05);
+    }
 
 
 
