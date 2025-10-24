@@ -11,12 +11,12 @@ let earthDay = null, earthNight = null, atmosphere = null;
 let rotationSpeed = 0.01;
 
 let lightsIntensity = 2.8;   // 1.6 → 2.8 recommended
-let haloStrength = 0.7;    // 0–1
-let currentIsNight = null;   // avoid unnecessary blandness
+let haloStrength = 0.7;      // 0–1
+let currentIsNight = null;   // avoid unnecessary redundant updates
 let dayNightTimerId = null;  // for clearInterval
 
 // -----------------------------------------------------------
-// API principale
+// Public API
 // -----------------------------------------------------------
 export function initEarth(opts) {
     const canvasId = (opts && opts.canvasId) || "rotatingEarth";
@@ -26,14 +26,17 @@ export function initEarth(opts) {
     const dayUrl = (opts && opts.dayUrl) || "/images/earth_texture.jpg?v=1";
     const nightUrl = (opts && opts.nightUrl) || "/images/earth_texture_night.jpg?v=1";
 
-    disposeEarth(); // cleaning of a possible old globe
+    // Clean a previous globe if any
+    disposeEarth();
 
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 0.1, 1000);
     camera.position.z = 3;
 
     renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-    renderer.outputEncoding = THREE.sRGBEncoding;
+    // Three.js compatibility: r152+ uses outputColorSpace
+    if ("outputColorSpace" in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+    else renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.setSize(canvas.clientWidth, canvas.clientHeight);
 
     // Basic lighting
@@ -49,7 +52,7 @@ export function initEarth(opts) {
             makePlanet(dayTex, nightTex);
             animate();
 
-            // Speed ​​slider (optional)
+            // Optional: speed slider
             const speedControl = document.getElementById("speedRange");
             if (speedControl) {
                 speedControl.addEventListener("input", (e) => {
@@ -58,13 +61,13 @@ export function initEarth(opts) {
                 });
             }
 
-            // 1st simple setting (6 p.m.–6 a.m. = night) to avoid flash
+            // Initial coarse setup to avoid flash
             const h = new Date().getHours();
             setDayNight(h < 6 || h >= 18, true);
         })
         .catch(err => console.warn("⚠️ Échec de chargement texture :", err));
 
-    // Application with geolocation + regular updates
+    // Apply with geolocation + periodic updates
     resolveLocation({ fallbackLat: 48.8566, fallbackLon: 2.3522 }).then(applyDayNightNow);
 
     if (dayNightTimerId) clearInterval(dayNightTimerId);
@@ -82,14 +85,15 @@ export function disposeEarth() {
     window.removeEventListener('resize', onWindowResize);
     if (dayNightTimerId) { clearInterval(dayNightTimerId); dayNightTimerId = null; }
 
-    // destroys meshes cleanly
+    // destroy meshes cleanly
     const kill = (mesh) => {
         if (!mesh) return;
         try {
             mesh.geometry && mesh.geometry.dispose();
+            // MeshPhongMaterial may contain textures; let GC handle TextureLoader cache
             mesh.material && mesh.material.dispose();
             scene && scene.remove(mesh);
-        } catch { }
+        } catch { /* noop */ }
     };
     kill(earthDay); earthDay = null;
     kill(earthNight); earthNight = null;
@@ -103,7 +107,7 @@ export function setLightsIntensity(value) {
     lightsIntensity = Number(value) || lightsIntensity;
     if (earthNight && earthNight.material) {
         earthNight.material.emissiveIntensity = lightsIntensity;
-        earthNight.material.needsUpdate = true;   // <—
+        earthNight.material.needsUpdate = true;
     }
 }
 
@@ -115,31 +119,36 @@ export function setHaloStrength(value) {
     haloStrength = Number(value) || haloStrength;
     if (atmosphere && atmosphere.material && atmosphere.material.uniforms) {
         atmosphere.material.uniforms.uStrength.value = haloStrength;
-        atmosphere.material.needsUpdate = true;   // <—
+        atmosphere.material.needsUpdate = true;
     }
 }
 
-// Exhibition for Blazor / console
+// Optional global exposure for Blazor / console
 window.initEarth = initEarth;
 window.disposeEarth = disposeEarth;
-window.setLightsIntensity = setLightsIntensity;
-window.switchNightMode = switchNightMode;
-window.setHaloStrength = setHaloStrength; // exhibited at the DOM
-window.setRotationSpeed = (v) => { rotationSpeed = Number(v) || rotationSpeed; };
-window.setLightsIntensity = v => { setLightsIntensity(v); };
-window.setHaloStrength = v => { setHaloStrength(v); };
-window.switchNightMode = (on, immediate) => { switchNightMode(on, immediate); };
+window.setLightsIntensity = v => setLightsIntensity(v);
+window.switchNightMode = (on, immediate) => switchNightMode(on, immediate);
+window.setHaloStrength = v => setHaloStrength(v);
+window.setRotationSpeed = v => { rotationSpeed = Number(v) || rotationSpeed; };
 
-// Default value a little more “punchy”
+// Default a bit more “punchy”
 setLightsIntensity(2.4);
 
 // -----------------------------------------------------------
-// Construction of the globe
+// Globe construction
 // -----------------------------------------------------------
 function loadTex(loader, url) {
-    return new Promise((res, rej) => loader.load(url, res, undefined, rej));
-    dayTex.encoding = THREE.sRGBEncoding;
-    nightTex.encoding = THREE.sRGBEncoding;
+    // Ensure SRGB encoding/color space when texture is loaded
+    return new Promise((res, rej) => loader.load(
+        url,
+        tex => {
+            if ("colorSpace" in tex) tex.colorSpace = THREE.SRGBColorSpace;
+            else tex.encoding = THREE.sRGBEncoding;
+            res(tex);
+        },
+        undefined,
+        rej
+    ));
 }
 
 function makePlanet(dayTex, nightTex) {
@@ -148,7 +157,7 @@ function makePlanet(dayTex, nightTex) {
     if (earthNight) { earthNight.geometry.dispose(); earthNight.material.dispose(); scene.remove(earthNight); }
     if (atmosphere) { atmosphere.geometry.dispose(); atmosphere.material.dispose(); scene.remove(atmosphere); }
 
-    // Distinct geometries (avoids double .dispose on the same instance)
+    // Distinct geometries (avoid double .dispose on same instance)
     const geoDay = new THREE.SphereGeometry(1, 64, 64);
     const geoNight = new THREE.SphereGeometry(1, 64, 64);
     const geoHalo = new THREE.SphereGeometry(1.03, 64, 64);
@@ -172,7 +181,7 @@ function makePlanet(dayTex, nightTex) {
         transparent: true,
         opacity: 0.0,
         depthWrite: false,              // avoid crushing the halo
-        toneMapped: false       aged by setDayNight
+        toneMapped: false               // managed by setDayNight
     });
     earthNight = new THREE.Mesh(geoNight, nightMat);
     earthNight.renderOrder = 2;
@@ -195,7 +204,7 @@ function makePlanet(dayTex, nightTex) {
               vWorldPos = wp.xyz;
               gl_Position = projectionMatrix * viewMatrix * wp;
             }
-          `,
+        `,
         fragmentShader: `
             varying vec3 vNormal;
             varying vec3 vWorldPos;
@@ -204,20 +213,23 @@ function makePlanet(dayTex, nightTex) {
               vec3 V = normalize(cameraPosition - vWorldPos);
               float rim = 1.0 - max(0.0, dot(normalize(vNormal), V));
               rim = pow(rim, 3.0);
-              // un bleu plus punchy
-              vec3 color = vec3(0.35, 0.75, 1.0);
+              vec3 color = vec3(0.35, 0.75, 1.0); // punchier blue
               float a = rim * uStrength;
               gl_FragColor = vec4(color * a, a);
             }
-          `
+        `
     });
-    atmosphere = new THREE.Mesh(geoHalo, haloMat);
+    atmosphere = new THREE.Mesh(haloGeo, haloMat);
     atmosphere.renderOrder = 999;
     scene.add(atmosphere);
 
-    const glowTex = new THREE.TextureLoader().load('/images/glow-soft.png'); // make a small white radial PNG
-    glowTex.encoding = THREE.sRGBEncoding;
-    const glowMat = new THREE.SpriteMaterial({ map: glowTex, color: 0x66ccff, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    const glowTex = new THREE.TextureLoader().load('/images/glow-soft.png');
+    if ("colorSpace" in glowTex) glowTex.colorSpace = THREE.SRGBColorSpace;
+    else glowTex.encoding = THREE.sRGBEncoding;
+    const glowMat = new THREE.SpriteMaterial({
+        map: glowTex, color: 0x66ccff, transparent: true,
+        blending: THREE.AdditiveBlending, depthWrite: false
+    });
     const glow = new THREE.Sprite(glowMat);
     glow.scale.set(2.6, 2.6, 1);
     scene.add(glow);
@@ -234,9 +246,8 @@ function animate() {
     if (renderer && scene && camera) renderer.render(scene, camera);
 }
 
-setDayNight(true, true);
 function onWindowResize() {
-    const canvas = document.getElementById("rotatingEarth");
+    const canvas = renderer ? renderer.domElement : document.getElementById("rotatingEarth");
     if (!canvas || !camera || !renderer) return;
     const w = canvas.clientWidth || canvas.width || 450;
     const h = canvas.clientHeight || canvas.height || 450;

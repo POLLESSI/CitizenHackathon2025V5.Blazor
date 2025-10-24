@@ -31,6 +31,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="wwwroot\RSSGeoportail.html" />
+  </ItemGroup>
+
+  <ItemGroup>
 	<ProjectReference Include="..\CitizenHackathon2025.Blazor.DTOs\CitizenHackathon2025.Blazor.DTOs.csproj" />
 	<!--<ProjectReference Include="..\..\Citizenhackathon2025V2.API\CitizenHackathon2025.Shared\CitizenHackathon2025.Shared.csproj" />-->
   </ItemGroup>

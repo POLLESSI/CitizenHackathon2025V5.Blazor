@@ -150,8 +150,54 @@ p {
 /* exception: .info-dynamic buttons keep their color */
 .btn.info-dynamic:hover {
     background-color: var(--info-color, #9E9E9E)
+}
 
+.badge.crowd-badge {
+    font-weight: 600;
+    padding: .4rem .6rem;
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    border-radius: .5rem;
+    position: relative; 
+}
 
+/* “Pulse” effect for the critical level */
+.pulse-critical::after {
+    content: "";
+    position: absolute;
+    inset: -4px; /* slightly overflows for the halo */
+    border-radius: .6rem; /* match/override badge radius */
+    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.65); /* bootstrap danger #dc3545 */
+    animation: cc-pulse 1.4s ease-out infinite;
+    pointer-events: none;
+}
+
+/* Option: slight permanent glow to reinforce feedback */
+.pulse-critical {
+    box-shadow: 0 0 0.35rem rgba(220, 53, 69, 0.5);
+}
+
+@keyframes cc-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.65);
+    }
+
+    70% {
+        box-shadow: 0 0 0 14px rgba(220, 53, 69, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+    }
+}
+
+/* Respects accessibility preferences */
+@media (prefers-reduced-motion: reduce) {
+    .pulse-critical::after {
+        animation: none;
+    }
+}
 
 
 

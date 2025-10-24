@@ -1,0 +1,47 @@
+﻿@namespace CitizenHackathon2025V5.Blazor.Client.Components
+@inherits ComponentBase
+
+<span class="@BadgeClass" title="@Title" aria-label="@Title">
+    @Icon @Text
+</span>
+
+@code {
+    [Parameter] public int? Level { get; set; }
+    [Parameter] public string? Class { get; set; }
+
+    private bool IsCritical => Level == 4;
+
+    private string Title => Text is null or "" ? "No data" : $"Crowd level: {Text}";
+
+    private string Text => Level switch
+    {
+        1 => "Low",
+        2 => "Medium",
+        3 => "High",
+        4 => "Critical",
+        _ => "—"
+    };
+
+    private string Icon => Level switch
+    {
+        1 => "🟢",
+        2 => "🟡",
+        3 => "🟠",
+        4 => "🔴",
+        _ => "⚪"
+    };
+
+    private string BadgeClass => string.Join(" ", new[]{
+        "badge",
+        Level switch {
+            1 => "bg-success",
+            2 => "bg-info",
+            3 => "bg-warning text-dark",
+            4 => "bg-danger",
+            _ => "bg-secondary"
+        },
+        "crowd-badge",
+        IsCritical ? "pulse-critical" : null,
+        Class
+    }.Where(s => !string.IsNullOrWhiteSpace(s)));
+}

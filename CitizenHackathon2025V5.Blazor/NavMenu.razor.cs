@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Components;
+﻿//NavMenu.razor.cs
+using Microsoft.AspNetCore.Components;
 
 namespace CitizenHackathon2025V5.Blazor.Client
 {
@@ -17,12 +18,13 @@ namespace CitizenHackathon2025V5.Blazor.Client
 
         private List<MenuItem> MenuItems => new()
         {
-            //new MenuItem("Statistics", "/statistics", "📊"),
-            new MenuItem("Map", "/map", "🗺"),
             new MenuItem("Accueil", "/", "🏠"),
             new MenuItem("Presentation", "/presentation", "🛡"),
             new MenuItem("Events", "/eventview", "📅"),
-            new MenuItem("CrowdInfos", "/crowdinfoview", "✨"), 
+            new MenuItem("Crowd Calendar", "/crowdcalendar", "📆"),
+            new MenuItem("CrowdCalendar", "/crowdinfocalendar", "📆"),          
+            new MenuItem("Create CrowdCalendar", "/crowdinfocalendar/create", "➕"),
+            new MenuItem("CrowdInfos (legacy)", "/crowdinfoview", "✨"),
             new MenuItem("GPT Interactions", "/gptinteractionview", "🤖"),
             new MenuItem("Suggestions", "/suggestionview", "💡"),
             new MenuItem("Places", "/placeview", "📍"),
@@ -30,7 +32,8 @@ namespace CitizenHackathon2025V5.Blazor.Client
             new MenuItem("Weather", "/weatherforecastview", "🌤"),
             new MenuItem("Users", "/userview", "👤"),
             new MenuItem("Privacy", "/privacy", "🔐"),
-            new MenuItem("Help", "/help", "❓")
+            new MenuItem("Help", "/help", "❓"),
+            new MenuItem("Map", "/map", "🗺")
         };
 
         protected override void OnInitialized() =>

@@ -1,0 +1,74 @@
+﻿@* CrowdInfoCalendarView.razor *@
+@page "/crowdcalendar"
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.Components
+@inject CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService Svc
+@inject NavigationManager Nav
+
+<h3>Crowd Calendar</h3>
+
+<div class="mb-3 grid" style="grid-template-columns: repeat(6, minmax(180px, 1fr)); gap: 8px;">
+    <InputDate @bind-Value="from" class="form-control" />
+    <InputDate @bind-Value="to" class="form-control" />
+    <input class="form-control" placeholder="Region (ex: BE-WLX-NAM)" @bind="region" />
+    <input class="form-control" type="number" placeholder="PlaceId" @bind="placeId" />
+    <select class="form-select" @bind="activeFilter">
+        <option value="">active:any</option>
+        <option value="true">active:true</option>
+        <option value="false">active:false</option>
+    </select>
+    <button class="btn btn-primary" @onclick="Load">Search</button>
+</div>
+
+<div class="mb-2">
+    <button class="btn btn-success" @onclick="GoNew">+ New Entry</button>
+    <button class="btn btn-secondary ms-2" @onclick="LoadAll">Load All</button>
+</div>
+
+@if (items is null)
+{
+    <p>Loading…</p>
+}
+else if (items.Count == 0)
+{
+    <p>No entries.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm table-striped align-middle">
+            <thead>
+                <tr>
+                    <th>Id</th>
+                    <th>DateUtc</th>
+                    <th>Region</th>
+                    <th>PlaceId</th>
+                    <th>Event</th>
+                    <th>Level</th>
+                    <th>Active</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var e in items)
+                {
+                    <tr>
+                        <td>@e.Id</td>
+                        <td>@e.DateUtc.ToString("yyyy-MM-dd")</td>
+                        <td>@e.RegionCode</td>
+                        <td>@(e.PlaceId?.ToString() ?? "-")</td>
+                        <td>@(string.IsNullOrWhiteSpace(e.EventName) ? "-" : e.EventName)</td>
+                        <td>
+                            <CrowdLevelBadge Level="e.ExpectedLevel" /> @* ✅ component accepte int? *@
+                        </td>
+                        <td>@e.Active</td>
+                        <td>
+                            <button class="btn btn-link p-0" @onclick="() => GoDetail(e.Id)">Details</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+

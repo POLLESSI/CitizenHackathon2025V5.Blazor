@@ -1,3 +1,4 @@
+@* NavMenu.razor *@
 <nav class="nav-container">
     <div class="nav-header">
         <a href="/" class="logo"><b>Welcome</b></a>
@@ -6,8 +7,12 @@
         </button>
         <DarkModeToggle />
     </div>
+
     <NavLink href="/crowdinfoview" Match="NavLinkMatch.All">
         <span class="oi oi-people" aria-hidden="true"></span> CROWD INFO
+    </NavLink>
+    <NavLink href="/crowdcalendar" Match="NavLinkMatch.Prefix">
+        <span class="oi oi-calendar" aria-hidden="true"></span> Crowd Calendar
     </NavLink>
 
     <ul class="nav-links @(collapseNavMenu ? "collapsed" : "")">

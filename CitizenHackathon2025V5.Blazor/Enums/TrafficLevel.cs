@@ -2,10 +2,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Enums
 {
     public enum TrafficLevel
     {
-        FreeFlow = 0,
-        Moderate = 1,
-        Heavy = 2,
-        Jammed = 3
+        FreeFlow = 1,
+        Moderate = 2,
+        Heavy = 3,
+        Jammed = 4
     }
 }
 

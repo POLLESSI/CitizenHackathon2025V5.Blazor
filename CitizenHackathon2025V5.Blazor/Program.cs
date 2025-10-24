@@ -99,6 +99,7 @@ builder.Services.AddScoped<IAuthService>(sp =>
 });
 
 // Application services
+builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService>();
 builder.Services.AddScoped<CrowdInfoService>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<GptInteractionService>();
@@ -109,6 +110,7 @@ builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.UserSer
 builder.Services.AddScoped<TrafficStateService>();
 builder.Services.AddScoped<WeatherForecastService>();
 builder.Services.AddScoped<IHubTokenService, HubTokenService>();
+builder.Services.AddScoped<CrowdCalendarHubClient>();
 
 // Toasts
 builder.Services.AddBlazoredToast();
