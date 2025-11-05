@@ -1,4 +1,5 @@
 @page "/wasmcheck"
+@implements IAsyncDisposable
 @inject IJSRuntime JS
 
 <div class="page-list">
@@ -8,10 +9,18 @@
 
     <button class="btn btn-info" @onclick="CheckWasmAccess">Start verification</button>
 </div>
-
+<div class="earth-container scroll-fade">
+    <canvas id="@_canvasId" width="450" height="450"></canvas>
+    <div class="earth-controls">
+        <label for="@_speedId">Rotation Speed:</label>
+        <input id="@_speedId" type="range" min="0" max="0.20" step="0.001" value="0.01" />
+    </div>
+</div>
 
 @code {
     private string status = "On hold...";
+    private string _canvasId = $"rotatingEarth-{Guid.NewGuid():N}";
+    private string _speedId = $"speedRange-{Guid.NewGuid():N}";
 
     private async Task CheckWasmAccess()
     {
@@ -24,6 +33,22 @@
         {
             status = $"? Erreur JS : {ex.Message}";
         }
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        await JS.InvokeVoidAsync("initEarth", new
+        {
+            canvasId = _canvasId,
+            speedControlId = _speedId,
+            dayUrl = "/images/earth_texture.jpg?v=1",
+            nightUrl = "/images/earth_texture_night.jpg?v=1"
+        });
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("disposeEarth", _canvasId); } catch { }
     }
 }
 

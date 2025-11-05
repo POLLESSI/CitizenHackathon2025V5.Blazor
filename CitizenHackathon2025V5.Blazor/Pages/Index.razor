@@ -37,11 +37,11 @@
                    oninput="window.setHaloStrength && window.setHaloStrength(this.value)" />
         </div>
 
-        <label class="toggle">
+        @* <label class="toggle">
             <input type="checkbox" id="forceNight"
                    onchange="window.switchNightMode && window.switchNightMode(this.checked, false)" />
             <span>Forcer la nuit</span>
-        </label>
+        </label> *@
     </div>
 
     <p class="index-subtitle">
@@ -52,24 +52,26 @@
         Discover the suggestions
     </button>
 
-    <section class="index-section scroll-fade" id="suggestions">
-        <h2>Suggestions Zen</h2>
-        <p>
-            Here are some alternatives within a 25 km radius of the selected event:
-        </p>
+    <div>
+        <section class="index-section scroll-fade" id="suggestions">
+            <h2>Suggestions Zen</h2>
+            <p>
+                Here are some alternatives within a 25 km radius of the selected event:
+            </p>
 
-        <ul>
-            <li>Upper Sambre Natural Park</li>
-            <li>Outdoor yoga classes in Gosselies</li>
-            <li>Open-air theater – La Traviata</li>
-        </ul>
-    </section>
-
-    <footer class="index-footer">
-        &copy; 2025 OutZen – Zen in the crowd, Zen in life.
-    </footer>
+            <ul>
+                <li>Upper Sambre Natural Park</li>
+                <li>Outdoor yoga classes in Gosselies</li>
+                <li>Open-air theater – La Traviata</li>
+            </ul>
+        </section>
+    </div>
+    <div>
+        <footer class="index-footer">
+            &copy; 2025 OutZen – Zen in the crowd, Zen in life.
+        </footer>
+    </div>
 </div>
-
 @code {
     #nullable disable
     private List<ClientTrafficConditionDTO> TrafficConditionsList = new();

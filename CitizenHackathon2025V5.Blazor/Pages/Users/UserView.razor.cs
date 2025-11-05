@@ -32,6 +32,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
         private List<ClientUserDTO> visibleUsers = new();
         private int currentIndex = 0;
         private const int PageSize = 20;
+        private string _canvasId = $"rotatingEarth-{Guid.NewGuid():N}";
+        private string _speedId = $"speedRange-{Guid.NewGuid():N}";
 
         private HubConnection? hubConnection;
 
@@ -83,6 +85,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
             //// Client -> Server
             //await hubConnection.InvokeAsync(UserHubMethods.FromClient.NotifyUserRegistered, "alice@example.com");
         }
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (!firstRender) return;
+            await JSRuntime.InvokeVoidAsync("initEarth", new
+            {
+                canvasId = _canvasId,
+                speedControlId = _speedId,
+                dayUrl = "/images/earth_texture.jpg?v=1",
+                nightUrl = "/images/earth_texture_night.jpg?v=1"
+            });
+        }
+
 
         private async Task<List<ClientUserDTO>?> GetUsersSecureAsync()
         {
@@ -213,6 +227,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
                     hubConnection = null;
                 }
             }
+        }
+        public async ValueTask DisposeAsync()
+        {
+            try { await JSRuntime.InvokeVoidAsync("disposeEarth", _canvasId); } catch { }
         }
         #endregion
     }

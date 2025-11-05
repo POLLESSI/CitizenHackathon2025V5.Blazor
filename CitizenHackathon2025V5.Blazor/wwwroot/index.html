@@ -23,24 +23,14 @@
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-    <!-- Base Styles (keeps only what physically exists in wwwroot -->
-    <!--<link href="/css/base/reset.css" rel="stylesheet" />-->
+    <!-- Base Styles -->
     <link href="/css/base/variables.css?v=2" rel="stylesheet" />
-    <!--<link href="/css/base/layout.css" rel="stylesheet" />-->
-    <!--<link href="/css/base/blazor-core.css" rel="stylesheet" />-->
-    <!--<link href="/css/base/app.css" rel="stylesheet" />-->
-    <!--<link href="/css/base/site.css" rel="stylesheet" />-->
-    <!--<link href="/css/base/SharedStyles.css" rel="stylesheet" />-->
-    <!-- Animations -->
     <link href="/css/animations/site-variables.css" rel="stylesheet">
     <link href="/css/animations/animations.css" rel="stylesheet" />
     <link href="/css/animations/pulseColors.css" rel="stylesheet" />
     <link href="/css/animations/visual-elements.css" rel="stylesheet" />
 
     <!-- Theme -->
-    <!--<link href="css/themes/light.css" rel="stylesheet" />-->
-    <!--<link href="css/themes/components.css" rel="stylesheet" />-->
-    <!--<link href="css/themes/global-styles.css" rel="stylesheet" />-->
     <link href="css/themes/outzen.css" rel="stylesheet" />
     <link href="css/themes/styles.css" rel="stylesheet" />
 
@@ -56,40 +46,69 @@
 
     <!-- External Styles -->
     <link href="css/external/blazored-toast.css" rel="stylesheet" />
-    <!-- Open Iconic from CDN (avoids 404 local) -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/open-iconic/1.1.1/font/css/open-iconic-bootstrap.min.css" rel="stylesheet" />
-    <!--Earth rotation images preload-->
+
+    <style>
+        .outzen-crowd-marker {
+            background: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+        }
+
+            .outzen-crowd-marker > div {
+                line-height: 1 !important;
+            }
+    </style>
+
+    <!-- Preload image based on time -->
     <script>
         (function () {
-            // Nuit = 22:00–07:00 (ajuste si besoin)
             const h = new Date().getHours();
             const isNight = (h >= 22 || h < 7);
-
             const link = document.createElement('link');
             link.rel = 'preload';
             link.as = 'image';
-            link.href = isNight ? '/images/earth_texture_night.jpg'
-                : '/images/earth_texture.jpg';
+            link.href = isNight ? '/images/earth_texture_night.jpg' : '/images/earth_texture.jpg';
             document.head.appendChild(link);
         })();
     </script>
-    <!-- Leaflet & MarkerCluster -->
-    <link rel="stylesheet"
-          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-          crossorigin />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin defer></script>
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin />
-    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin defer></script>
+    <!-- Leaflet & MarkerCluster -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous" defer></script>
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="anonymous">
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin="anonymous" defer></script>
+
+    <!-- ADD: Diagnostic plugin cluster présent/absent -->
+    <script>
+        window.addEventListener('load', () => {
+            if (!window.L || (!L.MarkerClusterGroup && !L.markerClusterGroup)) {
+                console.warn("[OutZen] ⚠️ Leaflet Cluster plugin not detected; clusters disabled.");
+            } else {
+                console.log("[OutZen] ✅ Leaflet Cluster plugin detected.");
+            }
+        });
+    </script>
 
     <!-- Chart.js & Three.js (globals) -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" crossorigin="anonymous" defer></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous" defer></script>
-</head>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
 
+    <!-- SignalR global -->
+    <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.5/dist/browser/signalr.min.js"></script>
+
+    <!-- ADD: Helper global pour Blazor: isOutZenBooted() -->
+    <script>
+        // True si le boot est fait ET si le pont global OutZenInterop est exposé.
+        window.isOutZenBooted = function () {
+            try { return !!window.__outzenBootFlag && !!window.OutZenInterop; }
+            catch { return false; }
+        };
+    </script>
+</head>
 <body>
-    <!-- Root App + Loading -->
     <div id="app">
         <div class="loading-screen">
             <h1>OutZen</h1>
@@ -102,91 +121,23 @@
         </div>
     </div>
 
-    <!-- Map & Canvas -->
-    <div id="leafletMap" style="height: 600px; width: 100%;"></div>
-    <canvas id="geometryCanvas" width="800" height="600"></canvas>
-    <canvas id="crowdChart" width="400" height="200"></canvas>
-
-    <!-- Images (make sure these files exist in wwwroot/images) -->
+    <!-- Hidden Images -->
     <img src="/images/day.jpg?v=2" alt="Day Background" style="display:none;" />
-    <img src="/images/night.jpg" alt="Day Background" style="display:none;" />
+    <img src="/images/night.jpg" alt="Night Background" style="display:none;" />
     <img id="bgImage" alt="Background" style="display:none;" />
-
     <img src="/images/earth_texture.jpg" alt="Earth Texture" style="display:none;" />
 
-    <!-- Application modules -->
-    <script type="module" src="/js/app/leafletOutZen.module.js"></script>
+    <!-- === Utility / Visual Modules === -->
     <script type="module" src="/js/app/timeEffects.js"></script>
     <script type="module" src="/js/app/wasmUtils.js"></script>
     <script type="module" src="/js/app/earthRotation.js"></script>
     <script type="module" src="/js/app/ui.effects.js"></script>
-    <script type="module" src="/js/core/SignalR.client.js"></script>
-    <script src="_content/Microsoft.AspNetCore.SignalR.Client/signalr.min.js"></script>
-    <script src="js/outzen.hub.js" type="module"></script>0
-    <script src="/js/crowdbar.js" defer></script>
 
-    <!-- Initialize OutZen App (Leaflet module expecting global L and Chart) -->
-    <!--<script type="module">
-        import OutZenApp from '/js/app/leafletOutZen.module.js';
-
-        const app = OutZenApp({
-            mapId: "leafletMap",
-            center: [50.89, 4.34],
-            zoom: 13,
-            enableChart: true
-        });
-
-        // Expose to Blazor
-        window.OutZenInterop = {
-            addOrUpdateCrowdMarker: (id, lat, lng, level, info) =>
-                app.addOrUpdateCrowdMarker(id, lat, lng, level, info),
-            setFilter: (lvl) => app.setFilterLevel(lvl),
-            removeMarker: (id) => app.removeCrowdMarker(id)
-        };
-    </script>-->
-    <!-- Boot of the OutZen module and exposure of useful globals for Blazor -->
-    <script src="_content/Microsoft.AspNetCore.SignalR.Client/signalr.min.js"></script>
-    <script type="module">
-        import { OutZenEvents } from '/js/outzen-events.js';
-
-        let signalRRef = window.signalR;
-        if (!signalRRef) {
-            try {
-                signalRRef = await import("https://esm.sh/@microsoft/signalr@7.0.5");
-                console.info("ℹ️ Fallback ESM SignalR loaded.");
-            } catch (e) {
-                console.error("❌ Unable to load SignalR (global & ESM failed):", e);
-                throw e; // stop here to avoid undefined usage
-            }
-        }
-
-        const connection = new signalRRef.HubConnectionBuilder()
-            .withUrl(OutZenEvents.HubPath, { accessTokenFactory: () => window.getJwt?.() ?? "" })
-            .withAutomaticReconnect()
-            .build();
-
-        // handlers…
-        await connection.start();
-        await connection.invoke("JoinEventGroup", "12345");
-    </script>
-    <script type="module">
-        import { bootOutZen, initCrowdChart } from '/js/app/leafletOutZen.module.js';
-
-        // Initialize the map + create window.OutZenInterop (used by your JS calls from Blazor)
-        bootOutZen({
-            mapId: 'leafletMap',
-            center: [50.89, 4.34],
-            zoom: 13,
-            enableChart: true // prepare the #crowdChart canvas
-        });
-
-        // If your C# does JS.InvokeVoidAsync("initCrowdChart", "crowdChart"),
-        // we expose the export of the module globally :
-        window.initCrowdChart = initCrowdChart;
-    </script>
     <!-- Minimal interop bridge -->
     <script src="/js/trafficInterop.js" defer></script>
     <script src="/js/vendor/interop.js" defer></script>
+    <script src="/js/crowdbar.js" defer></script>
+
     <!-- Service Worker -->
     <script>
         if ('serviceWorker' in navigator && location.hostname !== "localhost") {
@@ -197,36 +148,57 @@
             console.log("⚠️ Service Worker disabled in development.");
         }
     </script>
+
+    <!-- Background (Day/Night switch) -->
     <script>
         (function () {
             const hour = new Date().getHours();
-            const isDay = hour >= 7 && hour < 20; // simple rule: 7am–8pm = day
-
-            // We select the "day" and "night" images which are already in your HTML
+            const isDay = hour >= 7 && hour < 20;
             const dayImg = document.querySelector('img[src*="day.jpg"]');
             const nightImg = document.querySelector('img[src*="night.jpg"]');
-
             if (dayImg && nightImg) {
-                if (isDay) {
-                    dayImg.style.display = "block";
-                    nightImg.style.display = "none";
-                } else {
-                    dayImg.style.display = "none";
-                    nightImg.style.display = "block";
-                }
+                dayImg.style.display = isDay ? "block" : "none";
+                nightImg.style.display = isDay ? "none" : "block";
             }
         })();
     </script>
+
+    <!-- Small helpers for Blazor -->
     <script>
         window.getScrollTop = (el) => el ? el.scrollTop || 0 : 0;
         window.getScrollHeight = (el) => el ? el.scrollHeight || 0 : 0;
         window.getClientHeight = (el) => el ? el.clientHeight || 0 : 0;
+        window.checkElementExists = (id) => !!document.getElementById(id);
     </script>
 
-    <!-- Blazor WebAssembly Boot Loader -->
+    <!-- === OutZen Core Modules (stable import, no cache-bust) === -->
+    <script>
+        window.OUTZEN_AUTOBOOT = window.OUTZEN_AUTOBOOT === true; // default off
+        window.__importLoopDisabled = window.__importLoopDisabled ?? false;
+    </script>
+
+    <!--<script type="module">
+        (async () => {
+            if (window.__importLoopDisabled) { console.info("[OutZen] import loop disabled (index.html)"); return; }
+            try {
+                const m = await import('/js/app/leafletOutZen.module.js');
+                console.log('OutZen Exports:', Object.keys(m));
+                if (window.OUTZEN_AUTOBOOT === true && typeof m.bootOutZen === 'function') {
+                    await m.bootOutZen({ mapId: 'leafletMap', enableChart: false });
+                    console.log('✅ OutZen auto-booted (index.html)');
+                }
+            } catch (e) {
+                console.error('[OutZen] import failed (index):', e);
+            }
+        })();
+    </script>-->
+    <script src="/js/outzen-interop.js" defer></script>
+
+    <!-- === Blazor Boot === -->
     <script src="_framework/blazor.webassembly.js"></script>
 </body>
 </html>
+
 
 
 

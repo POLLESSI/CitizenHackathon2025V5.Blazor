@@ -30,6 +30,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         private List<ClientGptInteractionDTO> visibleGptInteractions = new();  
         private int currentIndex = 0;
         private const int PageSize = 20;
+        private string _canvasId = $"rotatingEarth-{Guid.NewGuid():N}";
+        private string _speedId = $"speedRange-{Guid.NewGuid():N}";
+
         public int SelectedId { get; set; }
         public HubConnection hubConnection { get; set; }
 
@@ -134,6 +137,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 zoom = 13,
                 enableChart = true
             });
+            await JS.InvokeVoidAsync("initEarth", new
+            {
+                canvasId = _canvasId,
+                speedControlId = _speedId,
+                dayUrl = "/images/earth_texture.jpg?v=1",
+                nightUrl = "/images/earth_texture_night.jpg?v=1"
+            });
 
             await _outZen.InvokeVoidAsync("initCrowdChart", "crowdChart");
         }
@@ -188,6 +198,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 try { await hubConnection.StopAsync(); } catch { }
                 try { await hubConnection.DisposeAsync(); } catch { }
             }
+            try { await JS.InvokeVoidAsync("disposeEarth", _canvasId); } catch { }
         }
     }
 }

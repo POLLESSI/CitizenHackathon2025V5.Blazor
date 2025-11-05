@@ -2,8 +2,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Shared
 {
     public class SharedConstants
     {
-        public const int MaxCrowdLevel = 5;
-        public static readonly string[] TrafficLevels = new string[] { "Low", "Moderate", "Severe" };
+        public const int MaxCrowdLevel = 4;
+        public static readonly string[] TrafficLevels = new string[] { "Low", "Medium", "High", "Critical" };
     }
 }
 

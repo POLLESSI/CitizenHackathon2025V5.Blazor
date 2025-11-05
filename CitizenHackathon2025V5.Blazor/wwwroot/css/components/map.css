@@ -1,5 +1,4 @@
 ﻿/*wwwroot.css.components.map.css*/
-
 .map {
     height: 400px;
     width: 100%;
@@ -14,7 +13,250 @@
     margin-top: 1rem;
 }
 
+.crowd-page {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
 
+.map-host {
+    width: 100%;
+    height: 480px;
+    min-height: 480px;
+    background: #1b1b1b;
+    border: 2px solid #f1c40f;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.chart-panel {
+    height: 30vh;
+    min-height: 220px;
+}
+
+#crowdChart {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+#leafletMap, .map-host {
+    height: 420px;
+    min-height: 300px;
+}
+
+.earth-canvas {
+    width: 320px;
+    height: 320px;
+    display: block;
+    margin: 12px auto;
+}
+
+.list-panel {
+    max-height: 35vh;
+    overflow: auto;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.info-row {
+    padding: 6px 8px;
+    border-bottom: 1px dashed rgba(255,255,255,0.1);
+    cursor: pointer;
+}
+
+    .info-row:last-child {
+        border-bottom: none;
+    }
+
+    .info-row .title {
+        font-weight: 600;
+    }
+
+.info--lvl0, .info--lvl1 {
+    background: rgba(76,175,80,.06);
+}
+
+.info--lvl2, .info--lvl3 {
+    background: rgba(255,193,7,.06);
+}
+
+.info--lvl4, .info--lvl5 {
+    background: rgba(211,47,47,.06);
+}
+
+.info-item {
+    padding: 8px 10px;
+    border-bottom: 1px solid #333;
+    cursor: pointer;
+}
+
+    .info-item .name {
+        font-weight: 600;
+    }
+
+    .info-item .meta {
+        font-size: 12px;
+        opacity: 0.7;
+    }
+
+.custom-crowd-marker {
+    background: transparent !important;
+    border: none !important;
+}
+
+    .custom-crowd-marker > div {
+        animation: pulse 2s infinite;
+    }
+.outzen-legend__box {
+    background: #ffffff;
+    color: #111; /* dark text */
+    padding: 10px 12px;
+    border-radius: 10px;
+    box-shadow: 0 0 15px rgba(0,0,0,.2);
+    font-family: Poppins,system-ui,Segoe UI,Arial,sans-serif;
+    min-width: 180px;
+}
+
+.outzen-legend__title {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 700;
+    color: #111;
+}
+
+.outzen-legend__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 6px 0;
+    color: #222;
+}
+
+.outzen-legend__dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: inline-block;
+    flex: 0 0 18px;
+    border: 1px solid rgba(0,0,0,.25);
+}
+
+.outzen-legend__label {
+    font-size: 13px;
+    line-height: 1.2;
+    color: #222;
+}
+.leaflet-control .outzen-legend__box {
+    position: relative;
+    z-index: 401;
+}
+.leaflet-popup-content {
+    color: #111;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+/* --- Alarm animations for critical markers & clusters --- */
+@keyframes oz-alarm-flash {
+    0%, 100% {
+        filter: none;
+        box-shadow: 0 0 6px rgba(183,28,28,.45), 0 0 18px rgba(183,28,28,.25);
+    }
+
+    50% {
+        filter: brightness(1.25);
+        box-shadow: 0 0 10px rgba(183,28,28,.7), 0 0 26px rgba(183,28,28,.45);
+    }
+}
+
+@keyframes oz-alarm-ring {
+    0% {
+        transform: scale(1);
+        opacity: .7;
+    }
+
+    70% {
+        transform: scale(1.8);
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+/* Wrapper installed by L.divIcon (see JS below) */
+.outzen-crowd-marker {
+    position: relative;
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0 !important;
+}
+
+    .outzen-crowd-marker > .oz-core {
+        line-height: 1 !important;
+    }
+
+/* Alarm mode on individual marker (level 4) */
+.outzen-crowd-marker--alarm > .oz-core {
+    animation: oz-alarm-flash 900ms ease-in-out infinite;
+}
+
+.outzen-crowd-marker--alarm::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 2px solid rgba(183,28,28,.75); /* #B71C1C */
+    animation: oz-alarm-ring 1.2s ease-out infinite;
+    pointer-events: none;
+}
+
+/* Cluster — core + halo if at least one marker is critical */
+.outzen-cluster {
+    position: relative;
+}
+
+    .outzen-cluster .oz-cluster-core {
+        line-height: 1;
+    }
+
+.outzen-cluster--alarm .oz-cluster-core {
+    animation: oz-alarm-flash 900ms ease-in-out infinite;
+}
+
+.outzen-cluster--alarm::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 2px solid rgba(183,28,28,.75);
+    animation: oz-alarm-ring 1.2s ease-out infinite;
+    pointer-events: none;
+}
+
+/* Accessibility: comply with reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+    .outzen-crowd-marker--alarm > .oz-core,
+    .outzen-crowd-marker--alarm::after,
+    .outzen-cluster--alarm .oz-cluster-core,
+    .outzen-cluster--alarm::after {
+        animation: none !important;
+    }
+}
 
 
 

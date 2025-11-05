@@ -1,15 +1,60 @@
+@implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
 @inject Blazored.Toast.Services.IToastService ToastService
 
 <canvas id="crowdChart" width="400" height="200"></canvas>
 
+<button @onclick="TestMarkers">Test Markers</button>
+
+<div class="earth-container scroll-fade">
+    <canvas id="@_canvasId" width="450" height="450"></canvas>
+    <div class="earth-controls">
+        <label for="@_speedId">Rotation Speed:</label>
+        <input id="@_speedId" type="range" min="0" max="0.20" step="0.001" value="0.01" />
+    </div>
+</div>
+
+
 @code {
+    async Task TestMarkers()
+    {
+        var testData = new[]
+        {
+            new { Id=1, Lat=50.89, Lng=4.34, Level=2, Name="Parck" },
+            new { Id=2, Lat=50.88, Lng=4.35, Level=7, Name="Station" },
+            new { Id=3, Lat=50.90, Lng=4.33, Level=9, Name="Center" }
+        };
+
+        foreach (var t in testData)
+        {
+            await JSRuntime.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdMarker",
+                t.Id, t.Lat, t.Lng, t.Level,
+                new { title = t.Name, description = "Test" });
+        }
+    }
+}
+
+@code {
+    private string _canvasId = $"rotatingEarth-{Guid.NewGuid():N}";
+    private string _speedId = $"speedRange-{Guid.NewGuid():N}";
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             await JSRuntime.InvokeVoidAsync("initCrowdChart");
         }
+        if (!firstRender) return;
+        await JSRuntime.InvokeVoidAsync("initEarth", new
+        {
+            canvasId = _canvasId,
+            speedControlId = _speedId,
+            dayUrl = "/images/earth_texture.jpg?v=1",
+            nightUrl = "/images/earth_texture_night.jpg?v=1"
+        });
+    }
+    public async ValueTask DisposeAsync()
+    {
+        try { await JSRuntime.InvokeVoidAsync("disposeEarth", _canvasId); } catch { }
     }
 }
 

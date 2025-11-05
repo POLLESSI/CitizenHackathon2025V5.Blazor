@@ -3,15 +3,34 @@
 @using CitizenHackathon2025V5.Blazor.Client.Utils
 @using CitizenHackathon2025V5.Blazor.Client.Enums
 @inject IJSRuntime js
+@implements IAsyncDisposable
 
 <span class="fas fa-certificate me-2"></span> Crowd Infos
 
+<div class="crowd-page">
+    <div class="map-host" id="leafletMap" style="height:480px; min-height:480px;"></div>
+
+    <div class="chart-panel">
+        <canvas id="crowdChart"></canvas>
+    </div>
+
+    @* <div class="list-panel" @ref="ScrollContainerRef" @onscroll="HandleScroll">
+        @foreach (var co in visibleCrowdInfos)
+        {
+            <div class="info-row @GetLevelCss(co.CrowdLevel)" @onclick="@(() => ClickInfo(co.Id))">
+                <div class="title">@co.LocationName</div>
+                <div class="meta">(@co.Latitude, @co.Longitude) — @co.Timestamp.ToLocalTime().ToString("HH:mm:ss")</div>
+                <div class="desc">@InfoDesc(co)</div>
+            </div>
+        }
+    </div> *@
+</div>
+
+
 <div class="page-list">
-    @* <h3>Crowd Infos</h3> *@
     <div class="list-toolbar">
         <div class="left">
-            <input class="input-compact" placeholder="Search..."
-                   @bind="_q" @bind:event="oninput" />
+            <input class="input-compact" placeholder="Search..." @bind="Q" @bind:event="oninput" />
             @if (!string.IsNullOrWhiteSpace(_q))
             {
                 <span class="badge badge-info">“@_q”</span>
@@ -23,8 +42,8 @@
                     @onclick="() => ToggleRecent()">
                 Recent
             </button>
-            
         </div>
+
         <div>
             <NavLink class="chip add-chip" href="/crowdinfocreate">
                 Add
@@ -39,36 +58,27 @@
         <table class="table table-striped table-dark styled-table data-list">
             <thead>
                 <tr>
-                    <th class="col-narrow">Location Name</th>
-                    <th class="col-narrow">Level</th>
-                    <th class="col-actions"></th>
+                    <th>Location Name</th>
+                    <th>Level</th>
+                    <th></th>
                 </tr>
             </thead>
             <tbody>
                 @if (!FilterCrowd(visibleCrowdInfos).Any())
                 {
-                    <tr><td colspan="99"><div class="empty-state">No Crowd Informations Available at the moment.</div></td></tr>
+                    <tr><td colspan="3"><div class="empty-state">No Crowd Informations Available.</div></td></tr>
                 }
                 else
                 {
                     @foreach (var co in FilterCrowd(visibleCrowdInfos))
                     {
                         <tr>
-                            <td class="text-ellipsis" title="@co.LocationName">@co.LocationName</td>
+                            <td>@co.LocationName</td>
                             <td>
-                                <span class="crowd @($"crowd--{co.CrowdLevel}") oz-tip"
-                                      aria-label="@GetCrowdLabel(co.CrowdLevel)">
-                                    @co.CrowdLevel
-                                </span>
+                                <span class="crowd @($"crowd--{co.CrowdLevel}")">@co.CrowdLevel</span>
                             </td>
-                            <td class="col-actions info-cell">
-                                @{
-                                    var sev = CrowdInfoSeverityHelpers.GetSeverity(co);
-                                    var color = CrowdInfoSeverityHelpers.GetColor(sev);
-                                    var desc = CrowdInfoSeverityHelpers.GetDescription(sev);
-                                    var isUnknown = color == "#9E9E9E";
-                                }
-                                <button class="btn btn-sm info-chip @GetLevelCss(co.CrowdLevel) btn-glow"
+                            <td>
+                                <button class="btn btn-sm info-chip @GetLevelCss(co.CrowdLevel)"
                                         title="@InfoDesc(co)"
                                         @onclick="() => ClickInfo(co.Id)">
                                     Info
@@ -80,15 +90,19 @@
             </tbody>
         </table>
     </div>
-    @* <Globe Width="450" Height="450" ShowControls="true" CssClass="mt-2" /> *@
-    <div class="earth-container scroll-fade">
-        <canvas id="rotatingEarth" width="450" height="450"></canvas>
-        <div class="earth-controls">
-            <label for="speedRange">Rotation Speed:</label>
-            <input type="range" id="speedRange" min="0" max="0.20" step="0.001" value="0.01" />
-        </div>
+    <div>
+        <button @onclick="TestMarkers">Test Markers</button>
     </div>
-
+    <div>
+        <button @onclick="TestBoot">Test Boot</button>
+    </div>
+</div>
+<div class="earth-container scroll-fade">
+    <canvas id="@_canvasId" width="450" height="450"></canvas>
+    <div class="earth-controls">
+        <label for="@_speedId">Rotation Speed:</label>
+        <input id="@_speedId" type="range" min="0" max="0.20" step="0.001" value="0.01" />
+    </div>
 </div>
 
 @if (SelectedId > 0)
@@ -104,92 +118,30 @@
     </div>
 }
 
-@if (!FilterCrowd(visibleCrowdInfos).Any())
-{
-    <div class="oz-empty">No items for these filters.</div>
-}
-
 @code {
-    private List<ClientCrowdInfoDTO> allCrowdInfos = new();
-    private List<ClientCrowdInfoDTO> visibleCrowdInfos = new();
-    private int batchSize = 20;
-    private int currentIndex = 0;
-    private ElementReference ScrollContainerRef;
-
-    private void LoadMoreItems()
+    async Task TestMarkers()
     {
-        var nextItems = allCrowdInfos.Skip(currentIndex).Take(batchSize);
-        visibleCrowdInfos.AddRange(nextItems);
-        currentIndex += batchSize;
-    }
-
-    private IEnumerable<ClientCrowdInfoDTO> FilterCrowd(IEnumerable<ClientCrowdInfoDTO> source)
-    {
-        var q = _q?.Trim();
-        var cutoff = DateTime.UtcNow.AddHours(-6);
-
-        return source
-            .Where(x =>
-                string.IsNullOrEmpty(q) ||
-                (x.LocationName ?? "").Contains(q, StringComparison.OrdinalIgnoreCase) ||
-                x.Latitude.ToString().Contains(q, StringComparison.OrdinalIgnoreCase) ||
-                x.Longitude.ToString().Contains(q, StringComparison.OrdinalIgnoreCase))
-            .Where(x => !_onlyRecent || x.Timestamp >= cutoff);
-    }
-
-    private async Task HandleScroll()
-    {
-        var scrollTop = await js.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
-        var scrollHeight = await js.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
-        var clientHeight = await js.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
-
-        if (scrollTop + clientHeight >= scrollHeight - 5 && currentIndex < allCrowdInfos.Count)
+        var testData = new[]
         {
-            LoadMoreItems();
-            StateHasChanged();
+                new { Id=1, Lat=50.89, Lng=4.34, Level=2, Name="Parck" },
+                new { Id=2, Lat=50.88, Lng=4.35, Level=3, Name="Station" },
+                new { Id=3, Lat=50.90, Lng=4.33, Level=4, Name="Center" }
+                };
+
+        foreach (var t in testData)
+        {
+            await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdMarker",
+            t.Id, t.Lat, t.Lng, t.Level,
+            new { title = t.Name, description = "Test" });
         }
     }
-
-    private string _q;
-    private bool _onlyRecent;
-    private void ToggleRecent() => _onlyRecent = !_onlyRecent;
-
-    private static string GetCrowdLabel(int level) => level switch
+    async Task TestBoot()
     {
-        0 => "No crowds",
-        1 => "Low attendance",
-        2 => "Moderate",
-        3 => "High",
-        4 => "Very high",
-        5 => "Saturated",
-        _ => "Unknown"
-    };
-    private static string InfoColor(ClientCrowdInfoDTO co)
-        => CrowdInfoSeverityHelpers.GetColor(
-               CrowdInfoSeverityHelpers.GetSeverity(co));
-
-    private static string InfoDesc(ClientCrowdInfoDTO co)
-        => CrowdInfoSeverityHelpers.GetDescription(
-               CrowdInfoSeverityHelpers.GetSeverity(co));
-    private static string GetLevelCss(int level)
-    {
-        var safe = Math.Clamp(level, 0, 5);
-        return $"info--lvl{safe}";
-    }
-    private static string MapToCrowdClass(int level)
-    {
-        // Example: stretch 0..3 -> 0..5 (Low=1, Medium=2, High=3/4, Critical=5)
-        return level switch
-        {
-            <= 0 => "crowd--1",
-            1 => "crowd--2",
-            2 => "crowd--3",
-            _ => "crowd--5"
-        };
+        await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers");
+        await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdMarker", "999", 50.89, 4.34, 5,
+            new { title = "TEST", description = "debug" });
     }
 }
-
-
 
 
 

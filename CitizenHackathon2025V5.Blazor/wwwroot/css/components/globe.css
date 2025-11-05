@@ -2,7 +2,7 @@
 .globe-wrap {
     display: grid;
     gap: .75rem;
-    place-items: center;
+    place-items: left;
     padding: .5rem;
 }
 
@@ -20,7 +20,7 @@
     .globe-controls .row {
         display: grid;
         grid-template-columns: 140px 1fr;
-        align-items: center;
+        align-items: flex-start;
         gap: .6rem;
     }
 

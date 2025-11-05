@@ -35,6 +35,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         private ElementReference ScrollContainerRef;
         private string _q;
         private bool _onlyRecent; // placeholder (if you want to filter by date later)
+        private string _canvasId = $"rotatingEarth-{Guid.NewGuid():N}";
+        private string _speedId = $"speedRange-{Guid.NewGuid():N}";
+
         private int SelectedId;
 
 
@@ -71,6 +74,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
                 allPlaces = new();
                 visiblePlaces = new();
             }
+        }
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (!firstRender) return;
+            await JS.InvokeVoidAsync("initEarth", new
+            {
+                canvasId = _canvasId,
+                speedControlId = _speedId,
+                dayUrl = "/images/earth_texture.jpg?v=1",
+                nightUrl = "/images/earth_texture_night.jpg?v=1"
+            });
         }
         private void LoadMoreItems()
         {
@@ -122,6 +136,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         public async ValueTask DisposeAsync()
         {
             await Task.CompletedTask;
+            try { await JS.InvokeVoidAsync("disposeEarth", _canvasId); } catch { }
         }
     }
 }

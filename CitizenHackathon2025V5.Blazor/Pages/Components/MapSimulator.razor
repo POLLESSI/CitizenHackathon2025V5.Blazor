@@ -1,3 +1,4 @@
+@implements IAsyncDisposable
 @inject IJSRuntime JS
 
 <div class="page-list">
@@ -28,9 +29,18 @@
         }
     </div>
 </div>
+<div class="earth-container scroll-fade">
+    <canvas id="@_canvasId" width="450" height="450"></canvas>
+    <div class="earth-controls">
+        <label for="@_speedId">Rotation Speed:</label>
+        <input id="@_speedId" type="range" min="0" max="0.20" step="0.001" value="0.01" />
+    </div>
+</div>
 
 @code {
     private bool autoSimulationEnabled;
+    private string _canvasId = $"rotatingEarth-{Guid.NewGuid():N}";
+    private string _speedId = $"speedRange-{Guid.NewGuid():N}";
 
     private bool AutoSimulationEnabled
     {
@@ -57,6 +67,14 @@
         {
             simulatorModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/simulator.control.js");
         }
+        if (!firstRender) return;
+        await JS.InvokeVoidAsync("initEarth", new
+        {
+            canvasId = _canvasId,
+            speedControlId = _speedId,
+            dayUrl = "/images/earth_texture.jpg?v=1",
+            nightUrl = "/images/earth_texture_night.jpg?v=1"
+        });
     }
 
     private void ToggleCollapse() => isCollapsed = !isCollapsed;
@@ -100,6 +118,10 @@
             simulationTimer?.Dispose();
         }
     }
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("disposeEarth", _canvasId); } catch { }
+    }
 
     public void Dispose()
     {
@@ -107,6 +129,7 @@
         simulationTimer?.Dispose();
         simulatorModule?.DisposeAsync();
     }
+
 }
 
 
