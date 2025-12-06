@@ -1,0 +1,242 @@
+﻿@* Shared/MapSimulator.razor *@
+@implements IAsyncDisposable
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+
+<div class="page-list">
+    <div class="map-simulator-panel @(isCollapsed ? "collapsed" : "")">
+        <div class="header" @onclick="ToggleCollapse">
+            <span>🛰️ Simulateur OutZen</span>
+            <span class="toggle-btn">@(!isCollapsed ? "−" : "+")</span>
+        </div>
+        @if (!isCollapsed)
+        {
+            <div class="body">
+                <label>
+                    <input type="checkbox" @bind="AutoSimulationEnabled" />
+                    Automatic simulation every 5s
+                </label>
+
+                <div class="buttons">
+                    <button class="btn btn-sm btn-primary" @onclick="SimulateCrowd">👥 Crowd Event</button>
+                    <button class="btn btn-sm btn-warning" @onclick="SimulateTraffic">🚧 Traffic Event</button>
+                    <button class="btn btn-sm btn-primary" @onclick="SimulateWeatherForecast">⛅ Weather Forecast</button>
+                    <button class="btn btn-sm btn-secondary" @onclick="ToggleCollapse">Close</button>
+                </div>
+
+                <p>⚙️ Simulation : <strong>@(AutoSimulationEnabled ? "Enabled" : "Disabled")</strong></p>
+            </div>
+        }
+    </div>
+</div>
+
+
+@code {
+    // ---- State
+    private bool isCollapsed = true;
+    private bool _initialized; // first draft safeguard
+    private bool autoSimulationEnabled;
+
+    // ---- JS modules
+    private IJSObjectReference? _sim;      // simulator.control.js
+    private IJSObjectReference? _leaflet;  // fallback: leafletOutZen.module.js
+
+    // ---- timers
+    private PeriodicTimer? simulationTimer;
+    private CancellationTokenSource? cancellationTokenSource;
+
+    private bool AutoSimulationEnabled
+    {
+        get => autoSimulationEnabled;
+        set
+        {
+            if (autoSimulationEnabled != value)
+            {
+                autoSimulationEnabled = value;
+                _ = OnAutoSimulationChanged(value);
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _initialized) return;
+
+        // 1) Load the JS module (robust)
+        try
+        {
+            // ✅ use an ABSOLUTE path resolved from wwwroot
+            _sim = await JS.InvokeAsync<IJSObjectReference>("import", "/js/simulator.control.js");
+        }
+        catch (JSException ex)
+        {
+            Console.Error.WriteLine($"[MapSimulator] simulator.control import failed: {ex.Message}");
+            try
+            {
+                // Fallback if you have a merged module
+                _leaflet = await JS.InvokeAsync<IJSObjectReference>("import", "/js/leafletOutZen.module.js");
+                Console.WriteLine("[MapSimulator] Fallback to leafletOutZen.module.js loaded.");
+            }
+            catch (JSException ex2)
+            {
+                Console.Error.WriteLine($"[MapSimulator] Fallback import failed: {ex2.Message}");
+                // It doesn't explode: the page remains usable, but the sim buttons won't do anything.
+            }
+        }
+        _initialized = true;
+    }
+
+    private void ToggleCollapse() => isCollapsed = !isCollapsed;
+
+    // ---- Simulation calls
+    private async Task SimulateCrowd()
+    {
+        if (_sim is not null)
+            await _sim.InvokeVoidAsync("simulateCrowdEvent");
+        else if (_leaflet is not null)
+            await _leaflet.InvokeVoidAsync("simulateCrowdEvent");
+    }
+
+    private async Task SimulateTraffic()
+    {
+        if (_sim is not null)
+            await _sim.InvokeVoidAsync("simulateTrafficEvent");
+        else if (_leaflet is not null)
+            await _leaflet.InvokeVoidAsync("simulateTrafficEvent");
+    }
+
+    private async Task SimulateWeatherForecast()
+    {
+        if (_sim is not null)
+            await _sim.InvokeVoidAsync("simulateWeatherForecastEvent");
+        else if (_leaflet is not null)
+            await _leaflet.InvokeVoidAsync("simulateWeatherForecastEvent");
+    }
+
+    // ---- Auto simulation
+    private async Task OnAutoSimulationChanged(bool enabled)
+    {
+        if (enabled)
+        {
+            cancellationTokenSource = new();
+            simulationTimer = new(TimeSpan.FromSeconds(5));
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    while (await simulationTimer!.WaitForNextTickAsync(cancellationTokenSource!.Token))
+                    {
+                        await InvokeAsync(SimulateCrowd);
+                        await InvokeAsync(SimulateTraffic);
+                    }
+                }
+                catch (OperationCanceledException) { /* normal */ }
+            });
+        }
+        else
+        {
+            cancellationTokenSource?.Cancel();
+            simulationTimer?.Dispose();
+            cancellationTokenSource?.Dispose();
+            simulationTimer = null;
+            cancellationTokenSource = null;
+        }
+        await Task.CompletedTask;
+    }
+
+    // ---- Dispose
+    public async ValueTask DisposeAsync()
+    {
+        if (simulationTimer is not null)
+        {
+            try { cancellationTokenSource?.Cancel(); } catch { }
+            simulationTimer.Dispose();
+            cancellationTokenSource?.Dispose();
+        }
+
+        try { if (_sim is not null) await _sim.DisposeAsync(); } catch { }
+        try { if (_leaflet is not null) await _leaflet.DisposeAsync(); } catch { }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved. *@
+
+
+
+

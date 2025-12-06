@@ -1,8 +1,8 @@
-using CitizenHackathon2025.Shared.StaticConfig.Constants;
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+﻿using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Auths;
 using CitizenHackathon2025V5.Blazor.Client.Services;
-using CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants;
+using CitizenHackathon2025.Contracts.Hubs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
@@ -23,41 +23,45 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
         [Inject] public IAuthService Auth { get; set; }
 
         private const string ApiBase = "https://localhost:7254";
-        private IJSObjectReference? _outZen;
+        private IJSObjectReference _outZen;
 
-        private ClientUserDTO? CurrentUser { get; set; }
-        private ClientUserDTO? SelectedUser { get; set; }
+        private ClientUserDTO CurrentUser { get; set; }
+        private ClientUserDTO SelectedUser { get; set; }
         private List<ClientUserDTO> Users { get; set; } = new();
         private List<ClientUserDTO> allUsers = new();
         private List<ClientUserDTO> visibleUsers = new();
         private int currentIndex = 0;
         private const int PageSize = 20;
-        private string _canvasId = $"rotatingEarth-{Guid.NewGuid():N}";
         private string _speedId = $"speedRange-{Guid.NewGuid():N}";
 
-        private HubConnection? hubConnection;
+        private HubConnection hubConnection;
 
-        private string? _token;
+        private string _token;
 
         protected override async Task OnInitializedAsync()
         {
-            var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "jwt_token");
+            await LoadToken(); // charge _token depuis UserService
+
             var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
+            var hubBaseUrl = Config["SignalR:HubBase"]?.TrimEnd('/')
+                             ?? $"{apiBaseUrl}/hubs";
+
+            var url = $"{hubBaseUrl}{HubPaths.User}"; // => https://localhost:7254/hubs/userHub
 
             hubConnection = new HubConnectionBuilder()
-                .WithUrl($"{apiBaseUrl.TrimEnd('/')}{UserHubMethods.HubPath}", options =>
+                .WithUrl(url, options =>
                 {
-                     options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty; // if auth later
+                    options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
                 })
                 .WithAutomaticReconnect()
                 .Build();
 
-
-            if (!string.IsNullOrEmpty(token))
+            // 🔽 et ici on utilise _token, pas token
+            if (!string.IsNullOrEmpty(_token))
             {
                 try
                 {
-                    var payload = JwtParser.DecodePayload(token);
+                    var payload = JwtParser.DecodePayload(_token);
 
                     CurrentUser = new ClientUserDTO
                     {
@@ -65,40 +69,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
                         Role = payload.Role
                     };
 
-                    //Users = await GetUsersSecureAsync() ?? new List<ClientUserDTO>();
-                    await InitSignalR(token);
+                    await InitSignalR(_token);
                 }
                 catch (Exception ex)
                 {
                     Console.Error.WriteLine($"UserView initialization error : {ex.Message}");
                 }
             }
-            //hubConnection.On<string>(UserHubMethods.ToClient.UserRegistered, email =>
-            //{
-            //    Console.WriteLine($"User registered: {email}");
-            //    // TODO: UI update / toast
-            //});
-
-            //// Startup
-            //await hubConnection.StartAsync();
-
-            //// Client -> Server
-            //await hubConnection.InvokeAsync(UserHubMethods.FromClient.NotifyUserRegistered, "alice@example.com");
-        }
-        protected override async Task OnAfterRenderAsync(bool firstRender)
-        {
-            if (!firstRender) return;
-            await JSRuntime.InvokeVoidAsync("initEarth", new
-            {
-                canvasId = _canvasId,
-                speedControlId = _speedId,
-                dayUrl = "/images/earth_texture.jpg?v=1",
-                nightUrl = "/images/earth_texture_night.jpg?v=1"
-            });
         }
 
-
-        private async Task<List<ClientUserDTO>?> GetUsersSecureAsync()
+        private async Task<List<ClientUserDTO>> GetUsersSecureAsync()
         {
             try
             {
@@ -230,7 +210,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Users
         }
         public async ValueTask DisposeAsync()
         {
-            try { await JSRuntime.InvokeVoidAsync("disposeEarth", _canvasId); } catch { }
+            try
+            {
+                if (_outZen is not null)
+                {
+                    await _outZen.DisposeAsync();
+                }
+            }
+            catch { }
+
+            if (hubConnection is not null)
+            {
+                try { await hubConnection.StopAsync(); } catch { }
+                try { await hubConnection.DisposeAsync(); } catch { }
+            }
         }
         #endregion
     }

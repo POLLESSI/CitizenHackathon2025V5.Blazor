@@ -1,7 +1,7 @@
-@page "/event/{Id:int}"
+﻿@* @page "/event/{Id:int}" *@
 @page "/eventdetail/{Id:int}"
 @inherits EventDetail
-@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025.Blazor.DTOs;
 @inject Blazored.Toast.Services.IToastService ToastService
 
 <h3>Event Detail</h3>
@@ -16,6 +16,7 @@
         <p>Expected Crowd : @CurrentEvent.ExpectedCrowd</p>
         <p>Is Outdoor : @CurrentEvent.IsOutdoor</p>
     </div>
+    <NavLink class="chip" href="/eventview">← Back to list</NavLink>
 }
 else
 {

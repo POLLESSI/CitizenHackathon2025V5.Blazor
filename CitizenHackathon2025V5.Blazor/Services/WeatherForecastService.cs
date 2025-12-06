@@ -1,5 +1,8 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.DTOs;
+﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Utils;
+using CitizenHackathon2025.Contracts.Enums;
+using CitizenHackathon2025.Contracts.Hubs;
+using Microsoft.JSInterop;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
@@ -20,9 +23,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         // GET /api/WeatherForecast/all
         public async Task<List<ClientWeatherForecastDTO>> GetAllAsync()
         {
-            var list = await _http.GetFromJsonAsync<List<ClientWeatherForecastDTO>>("WeatherForecast/all")
-                       ?? new List<ClientWeatherForecastDTO>();
-            return list.Select(WeatherForecastUiEnricher.Enrich).ToList();
+            try
+            {
+                var list = await _http.GetFromJsonAsync<List<ClientWeatherForecastDTO>>("WeatherForecast/all")
+                           ?? new List<ClientWeatherForecastDTO>();
+                return list.Select(WeatherForecastUiEnricher.Enrich).ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[WF] GetAllAsync failed: {ex.Message}");
+                return new List<ClientWeatherForecastDTO>();
+            }
         }
 
         // GET /api/WeatherForecast/current
@@ -115,6 +126,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 // POST /api/WeatherForecast/generate
                 var resp = await _http.PostAsync("WeatherForecast/generate", content: null, ct);
                 resp.EnsureSuccessStatusCode();
+
                 return await resp.Content.ReadFromJsonAsync<ClientWeatherForecastDTO>(cancellationToken: ct);
             }
             catch (Exception ex)

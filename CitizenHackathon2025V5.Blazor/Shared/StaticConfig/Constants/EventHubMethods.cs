@@ -1,11 +1,13 @@
-﻿namespace CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants
+﻿using CitizenHackathon2025.Contracts.Hubs;
+
+namespace CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants
 {
     public static class EventHubMethods
     {
         /// <summary>
         /// Hub path (must match Blazor-side mapping: app.MapHub<EventHub>("/hubs/eventHub"))
         /// </summary>
-        public const string HubPath = "/hubs/eventHub";
+        public const string HubPath = HubPaths.Event;
 
         /// <summary>
         /// Calls made by the server to clients (Clients.SendAsync(...))

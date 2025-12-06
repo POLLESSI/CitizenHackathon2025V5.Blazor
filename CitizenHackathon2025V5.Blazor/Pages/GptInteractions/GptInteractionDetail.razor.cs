@@ -1,4 +1,4 @@
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 
@@ -9,11 +9,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 #nullable disable
         [Inject] public HttpClient Client { get; set; }
         [Inject] public GptInteractionService GptInteractionService { get; set; } = default!;
-        public ClientGptInteractionDTO? CurrentGptInteraction { get; set; }
+        public ClientGptInteractionDTO CurrentGptInteraction { get; set; }
 
         [Parameter] public int Id { get; set; }
 
-        private CancellationTokenSource? _cts;
+        private CancellationTokenSource _cts;
         protected override async Task OnParametersSetAsync()
         {
             // Cancels any previous request

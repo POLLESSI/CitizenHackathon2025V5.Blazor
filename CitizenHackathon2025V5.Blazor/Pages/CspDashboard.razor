@@ -1,15 +1,16 @@
-@page "/csp-dashboard"
+﻿@page "/csp-dashboard"
 @using System.Net.Http.Json
-@using CitizenHackathon2025V5.Blazor.Client.DTOs.Security
+@using CitizenHackathon2025.Blazor.DTOs
+@using CitizenHackathon2025.DTOs.Security
 @inject HttpClient Http
 
 <h3>??? CSP violations detected</h3>
 
-@if (reports == null)
+@if (reports is null)
 {
     <p><em>Loading...</em></p>
 }
-else if (!reports.Any())
+else if (reports.Count == 0)
 {
     <p>No CSP violations detected yet.</p>
 }
@@ -41,20 +42,24 @@ else
     </table>
 }
 
+<Globe />
+
 @code {
-    private List<CspReportContent> reports = new();
+    private List<CspReportContent>? reports; // nullable pendant le chargement
 
     protected override async Task OnInitializedAsync()
     {
-        reports = await Http.GetFromJsonAsync<List<CspReportContent>>("/csp-report/all");
+        // ✅ évite CS8601
+        reports = await Http.GetFromJsonAsync<List<CspReportContent>>("/csp-report/all") ?? new();
     }
 
     private async Task ClearReports()
     {
         await Http.DeleteAsync("/csp-report/clear");
-        reports.Clear();
+        reports = new(); // reset côté UI
     }
 }
+
 
 
 

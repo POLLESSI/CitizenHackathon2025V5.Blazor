@@ -1,17 +1,11 @@
 ﻿@page "/messageview"
-@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025.Blazor.DTOs;
 @using CitizenHackathon2025V5.Blazor.Client.Utils
 @inject IJSRuntime js
 
 <h3>MessageView</h3>
 
-<div class="earth-container scroll-fade">
-    <canvas id="rotatingEarth" width="450" height="450"></canvas>
-    <div class="earth-controls">
-        <label for="speedRange">Rotation Speed:</label>
-        <input type="range" id="speedRange" min="0" max="0.20" step="0.001" value="0.01" />
-    </div>
-</div>
+<Globe />
 
 @code {
     private ElementReference ScrollContainerRef;

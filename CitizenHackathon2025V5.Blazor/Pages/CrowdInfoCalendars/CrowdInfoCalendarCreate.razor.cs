@@ -1,5 +1,5 @@
 ﻿//Pages / CrowdInfoCalendars / CrowdInfoCalendarCreate.razor.cs
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Models;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;

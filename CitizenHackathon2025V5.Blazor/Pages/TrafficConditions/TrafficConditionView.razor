@@ -2,11 +2,13 @@
 @using CitizenHackathon2025V5.Blazor.Client.Models;
 @using CitizenHackathon2025.Blazor.DTOs
 @using CitizenHackathon2025V5.Blazor.Client.Constants
-@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025.Blazor.DTOs;
 @implements IAsyncDisposable
 @inject IJSRuntime js
 
 <span class="fas fa-certificate me-2"></span> Traffic Conditions
+
+<div class="map-host" id="trafficMap" style="height:480px;min-height:480px;width:100%;"></div>
 
 <div class="page-list">
     <div class="list-toolbar">
@@ -76,13 +78,8 @@
         </div>
     </div>
 </div>
-<div class="earth-container scroll-fade">
-    <canvas id="@_canvasId" width="450" height="450"></canvas>
-    <div class="earth-controls">
-        <label for="@_speedId">Rotation Speed:</label>
-        <input id="@_speedId" type="range" min="0" max="0.20" step="0.001" value="0.01" />
-    </div>
-</div>
+
+<Globe />
             
 @if (SelectedId > 0)
 {

@@ -39,6 +39,36 @@
             font-weight: bold;
             border-bottom: 2px solid #fff;
         }
+/* === HEADER / NAV GLOBAL === */
+.main-nav {
+    position: fixed; /* stays stuck at the top */
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000; /* >> globe, map, etc. */
+    background: rgba(8, 12, 20, 0.85);
+    backdrop-filter: blur(12px);
+}
+
+    /* Optional: if you want to constrain the nav's content to the center */
+    .main-nav .nav-container {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 0 .75rem;
+    }
+
+/* === Move the content so it doesn't go below the header === */
+/* You have <div class="app-container"><NavMenu /><main class="main-content">... */
+.app-container {
+    /* retains display:flex; min-height:100vh; already defined, we just ADD: */
+    padding-top: 64px; /* to be adjusted to the actual height of the NavMenu */
+}
+
+@media (max-width: 768px) {
+    .app-container {
+        padding-top: 72px; /* A little more if the menu is higher on mobile */
+    }
+}
 
 
 

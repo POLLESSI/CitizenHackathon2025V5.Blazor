@@ -1,540 +1,674 @@
-﻿// ============================
-// leafletOutZen.module.js (ESM, robust boot + readiness)
-// ============================
+﻿// wwwroot/js/app/leafletOutZen.module.js
 /* global L, Chart */
 "use strict";
 
-// --- module-eval guard + singleton bookkeeping (HMR-safe) ---
+// Global singleton to avoid duplicates in hot reload
 if (!window.__OutZenSingleton) {
     window.__OutZenSingleton = {
-        createdAt: Date.now(),
-        chartCreated: false,
-        mapCreated: false,
+        version: "2025.11.16",
         bootTs: 0,
-        loggedReeval: false
+        map: null,
+        cluster: null,
+        markers: new Map(),
+        chart: null,
+        initialized: false,
+        loggedReeval: false,
+        weatherLegend: null
     };
 } else if (!window.__OutZenSingleton.loggedReeval) {
     console.info("[OutZen] module re-evaluated — reusing singleton");
     window.__OutZenSingleton.loggedReeval = true;
 }
-window.__outzenModuleEvaled = true;
-window.__outzenBootFlag = window.__outzenBootFlag ?? false;
-window.__outzenBootTs = window.__outzenBootTs ?? 0;
-window.__outzenChartInstance = window.__outzenChartInstance ?? null;
 
-const OutZen = {
-    version: "2025.11.01",
-    initialized: false,
-    map: null,
-    cluster: null,
-    markers: new Map()
-};
+const S = window.__OutZenSingleton;
 
-/* ------------------------------------------------------------------ /
-/  UTILITIES                                                          /
-/ ------------------------------------------------------------------ */
-function _escapeHtml(s) {
-    return String(s ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#39;");
-}
-
-async function waitForElement(id, tries = 60, intervalMs = 150) { // ~9s
-    for (let i = 0; i < tries; i++) {
-        const el = document.getElementById(id);
-        if (el) { await new Promise(r => setTimeout(r, 0)); return true; }
-        await new Promise(r => setTimeout(r, intervalMs));
-    }
-    // last immediate check
-    return !!document.getElementById(id);
-}
-
-function safeDestroyChart() {
-    try {
-        const canvas = document.getElementById("crowdChart");
-        if (canvas && typeof Chart !== "undefined" && typeof Chart.getChart === "function") {
-            const existing = Chart.getChart(canvas);
-            if (existing) {
-                existing.destroy();
-                console.info("[OutZen] Destroyed existing Chart via Chart.getChart.");
-            }
-        }
-        if (typeof Chart !== "undefined" && Chart.instances) {
-            for (const k of Object.keys(Chart.instances)) {
-                try { Chart.instances[k]?.destroy?.(); delete Chart.instances[k]; } catch { }
-            }
-            console.info("[OutZen] Cleared Chart.instances fallback.");
-        }
-    } catch (err) {
-        console.warn("[OutZen] safeDestroyChart error:", err);
-    } finally {
-        try { window.__outzenChartInstance = null; } catch { }
-        try { window.__OutZenSingleton.chartCreated = false; } catch { }
-    }
-}
-
-/* ------------------------------------------------------------------ /
-/  MAP INITIALISATION                                                 /
-/ ------------------------------------------------------------------ */
-export function initMap(containerId = "leafletMap", center = [50.89, 4.34], zoom = 13) {
-    const el = document.getElementById(containerId);
-    if (!el) {
-        console.warn(`[OutZen] Element #${containerId} not found – skipping init.`);
+// ================================
+// Internal helpers
+// ================================
+function ensureLeaflet() {
+    const Leaflet = window.L;
+    if (!Leaflet) {
+        console.error("[OutZen] ❌ Global Leaflet (window.L) not found. Check /lib/leaflet/leaflet.js in index.html.");
         return null;
     }
-
-    // NEW: safety – ensure visible height
-    const h = el.clientHeight || parseInt(getComputedStyle(el).height, 10) || 0;
-    if (h < 150) {
-        el.style.minHeight = "480px";
-        el.style.height = "480px";
-        el.style.width = el.style.width || "100%";
-        console.info("[OutZen] Applied fallback height to map container (480px).");
-    }
-
-    if (OutZen.map && window.leafletMap === OutZen.map) {
-        // same instance already installed in the same container -> do nothing
-        console.info("[OutZen] initMap skipped: same container & map already set.");
-        return OutZen.map;
-    }
-
-    // Cleanup previous
-    try {
-        if (window.leafletMap && typeof window.leafletMap.remove === "function") {
-            window.leafletMap.remove();
-            console.info("[OutZen] Removed previous Leaflet map instance.");
-        }
-        delete window.leafletMap;
-    } catch (e) { console.warn("[OutZen] Leaflet cleanup failed:", e); }
-
-    if (typeof L === "undefined") throw new Error("Leaflet (L) is not loaded.");
-
-    const mapInstance = L.map(containerId).setView(center, zoom);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors", maxZoom: 19
-    }).addTo(mapInstance);
-
-    OutZen.map = mapInstance;
-    window.leafletMap = mapInstance;
-    window.__OutZenSingleton.mapCreated = true;
-
-    // NEW: reflow when the container changes size/visibility
-    try {
-        const ro = new ResizeObserver(() => {
-            try { mapInstance.invalidateSize(true); } catch { }
-        });
-        ro.observe(el);
-    } catch { }
-
-    console.info("[OutZen] Leaflet map initialized.");
-    return mapInstance;
+    return Leaflet;
 }
 
-/* ------------------------------------------------------------------ /
-/  ICONS & COLORS                                                     /
-/ ------------------------------------------------------------------ */
-function getColorFromLevel(level) {
-    const n = Number(level) || 0;
-    if (n === 1) return "#4CAF50";   // green
-    if (n === 2) return "#FF9800";   // orange (a bit more readable than #FFC107)
-    if (n === 3) return "#F44336";   // red
-    if (n === 4) return "#B71C1C";   // dark red
-    return "#9E9E9E";                // unknown / 0
-}
-
-function getCrowdIcon(level) {
-    const n = Number(level) || 0;
-    const color = getColorFromLevel(n);
-    const size = (n >= 4) ? 44 : (n === 3 ? 40 : (n === 2 ? 36 : (n === 1 ? 32 : 28)));
-    const alarm = (n === 4);
-
-    return L.divIcon({
-        className: "outzen-crowd-marker" + (alarm ? " outzen-crowd-marker--alarm" : ""),
-        html: `<div class="oz-core" style="
-      background:${color};
-      width:${size}px;height:${size}px;
-      border-radius:50%;
-      border:3px solid white;
-      box-shadow:0 2px 6px rgba(0,0,0,.4);
-      display:flex;align-items:center;justify-content:center;
-      color:#fff;font-weight:700;
-      font-family:Poppins,system-ui,Segoe UI,Arial,sans-serif;
-      font-size:${size > 36 ? '14px' : '12px'};
-      line-height:1;">${n}</div>`,
-        iconSize: [size, size],
-        iconAnchor: [Math.round(size / 2), Math.round(size / 2)],
-        popupAnchor: [0, -Math.round(size / 2)]
-    });
-}
-
-/* ------------------------------------------------------------------ /
-/  MARKERS                                                            /
-/ ------------------------------------------------------------------ */
-export function addOrUpdateCrowdMarker(id, lat, lng, level = 0, info = { title: "", description: "" }) {
-    if (!OutZen.map) { console.warn("[OutZen] map not initialized."); return; }
-    const before = OutZen.markers.size;
-    const nlat = Number(lat), nlng = Number(lng);
-    if (!Number.isFinite(nlat) || !Number.isFinite(nlng)) { 
-        console.warn("[OutZen] invalid lat/lng:", lat, lng); 
-        return; 
+function ensureContainer(mapId) {
+    const el = document.getElementById(mapId);
+    if (!el) {
+        console.warn("[OutZen] ❌ Map container not found:", mapId);
+        return null;
     }
+    return el;
+}
 
-    const key = String(id);
-    const existing = OutZen.markers.get(key);
-    if (existing) {
-        try { OutZen.map.removeLayer(existing.marker); } catch { }
-        if (existing.cluster) {
-            try { existing.cluster.removeLayer(existing.marker); } catch { }
+function ensureChartCanvas() {
+    const canvas = document.getElementById("crowdChart");
+    if (!canvas) {
+        console.warn("[OutZen] crowdChart canvas not found; chart disabled.");
+        return null;
+    }
+    return canvas;
+}
+
+function destroyChartIfAny() {
+    if (S.chart && typeof S.chart.destroy === "function") {
+        try {
+            S.chart.destroy();
+        } catch (err) {
+            console.warn("[OutZen] Failed to destroy previous Chart instance:", err);
         }
     }
-
-    const icon = getCrowdIcon(level);
-    const marker = L.marker([nlat, nlng], { icon, level })
-        .bindPopup(`
-            <div style="font-family:Poppins;padding:8px;">
-                <strong>${_escapeHtml(info?.title)}</strong><br>
-                ${_escapeHtml(info?.description)}<br><br>
-                <span style="color:${getColorFromLevel(level)};font-weight:bold;">Niveau ${level}</span>
-            </div>
-        `);
-    if (OutZen.cluster) {
-        OutZen.cluster.addLayer(marker);
-        OutZen.markers.set(key, { marker, level, cluster: OutZen.cluster });
-    } else {
-        marker.addTo(OutZen.map);
-        OutZen.markers.set(key, { marker, level });
-    }
-    // auto-fit: on the first marker added, or if the existing one has just been replaced
-    const after = OutZen.markers.size;
-    if ((before === 0 && after > 0) || !existing) {
-        try { fitToMarkers(); } catch { }
-    }
-    if (Number(level) === 4) {
-        marker.on('add', () => { try { marker.openPopup(); } catch { } });
-    }
+    S.chart = null;
 }
 
-export function removeCrowdMarker(id) {
-    const e = OutZen.markers.get(String(id));
-    if (!e) return;
-    try { OutZen.map.removeLayer(e.marker); } catch { }
-    if (e.cluster) try { e.cluster.removeLayer(e.marker); } catch { }
-    OutZen.markers.delete(String(id));
-}
-
-export function clearCrowdMarkers() {
-    if (!OutZen.map) return;
-    for (const { marker, cluster } of OutZen.markers.values()) {
-        try { OutZen.map.removeLayer(marker); } catch { }
-        if (cluster) try { cluster.removeLayer(marker); } catch { }
+export function setWeatherChart(points, metricType = "Temperature") {
+    if (!S.chart || !Array.isArray(points)) {
+        console.warn("[OutZen] setWeatherChart: no chart or invalid points");
+        return;
     }
-    OutZen.markers.clear();
-}
 
-/* ------------------------------------------------------------------ /
-/  VIEW HELPERS                                                       /
-/ ------------------------------------------------------------------ */
-export function fitToMarkers(padRatio = 0.12, opts = { minZoom: 3, maxZoom: 18, animate: true }) {
-    if (!OutZen.map) return;
+    const metric = (metricType || "Temperature").toLowerCase();
 
-    const doFit = () => {
-        let bounds = null;
+    const labels = [];
+    const values = [];
+    const bgColors = [];
 
-        // 1) If a cluster is present, use its bounds (more reliable when there are many items).
-        if (OutZen.cluster && typeof OutZen.cluster.getBounds === 'function') {
-            const b = OutZen.cluster.getBounds();
-            if (b && b.isValid && b.isValid()) bounds = b;
+    let datasetLabel = "Température (°C)";
+    if (metric === "humidity") {
+        datasetLabel = "Humidité (%)";
+    } else if (metric === "wind") {
+        datasetLabel = "Vent (km/h)";
+    }
+
+    for (const p of points) {
+        const label = p.label ?? "";
+        labels.push(label);
+
+        const isSevere = !!p.isSevere;
+        const t = Number(p.temperature ?? p.value ?? 0);
+        const h = Number(p.humidity ?? 0);
+        const w = Number(p.windSpeed ?? 0);
+
+        // The value is chosen based on the metric.
+        let val;
+        if (metric === "humidity") {
+            val = h || Number(p.value) || 0;
+        } else if (metric === "wind") {
+            val = w || Number(p.value) || 0;
+        } else {
+            // default temperature
+            val = t || Number(p.value) || 0;
+        }
+        values.push(val);
+
+        // Bar color
+        let color;
+        if (isSevere) {
+            color = "rgba(198,40,40,0.95)"; // bright red for severe cases
+        } else if (metric === "humidity") {
+            const isFog = h >= 95 && w <= 10;
+            if (isFog) color = "rgba(158,158,158,0.95)";      // fog (grey)
+            else if (val <= 30) color = "rgba(255,193,7,0.9)"; // dry -> yellow
+            else if (val <= 60) color = "rgba(76,175,80,0.85)";// comfort -> green
+            else if (val <= 80) color = "rgba(3,169,244,0.85)";// wet -> light blue
+            else color = "rgba(63,81,181,0.9)";                // saturated -> dark blue
+        } else if (metric === "wind") {
+            if (val < 15) color = "rgba(76,175,80,0.85)";      // calm
+            else if (val < 30) color = "rgba(3,169,244,0.85)"; // breeze
+            else if (val < 60) color = "rgba(255,152,0,0.9)";  // strong wind
+            else color = "rgba(244,67,54,0.95)";               // storm
+        } else {
+            // Temperature
+            if (t <= 0) color = "rgba(33,150,243,0.85)";       // cold (blue)
+            else if (t <= 15) color = "rgba(76,175,80,0.85)";  // fresh (green)
+            else if (t <= 25) color = "rgba(255,193,7,0.9)";   // soft (yellow)
+            else color = "rgba(244,67,54,0.9)";                // hot (red)
         }
 
-        // 2) fallback: bounds from the tracked markers
-        if (!bounds) {
-            const latlngs = [];
-            for (const { marker } of OutZen.markers.values()) {
-                try { latlngs.push(marker.getLatLng()); } catch { }
-            }
-            if (latlngs.length === 0) return;
-
-            if (latlngs.length === 1) {
-                const target = latlngs[0];
-                const z = Math.min(opts.maxZoom ?? 18, Math.max(opts.minZoom ?? 3, 15));
-                OutZen.map.setView(target, z, { animate: opts.animate !== false });
-                return;
-            }
-            bounds = L.latLngBounds(latlngs).pad(0.02);
-        }
-
-        const padX = Math.max(16, Math.round(padRatio * window.innerWidth));
-        const padY = Math.max(16, Math.round(padRatio * window.innerHeight));
-        OutZen.map.flyToBounds(bounds, {
-            paddingTopLeft: [padX, padY],
-            paddingBottomRight: [padX, padY],
-            maxZoom: opts.maxZoom ?? 17,
-            animate: opts.animate !== false
-        });
-    };
-
-    // Allow the cluster time to absorb the new markers.
-    requestAnimationFrame(() => setTimeout(doFit, 0));
-}
-
-export async function refreshMapSize() {
-    if (OutZen.map && typeof OutZen.map.invalidateSize === "function") {
-        OutZen.map.invalidateSize(true);
-        setTimeout(() => { try { OutZen.map.invalidateSize(true); } catch { } }, 200);
+        bgColors.push(color);
     }
+
+    const borderColors = bgColors.map(c =>
+        c.replace("0.85", "1").replace("0.9", "1").replace("0.95", "1")
+    );
+
+    const ds = S.chart.data.datasets[0];
+
+    S.chart.data.labels = labels;
+    ds.label = datasetLabel;
+    ds.data = values;
+    ds.backgroundColor = bgColors;
+    ds.borderColor = borderColors;
+    ds.borderWidth = 1.5;
+
+    // 🔴 IMPORTANT: S.chart.options.scales is no longer being touched here.
+    // The scale remains the one defined at creation (0..5, etc.).
+    // When everything is stable, we can reintroduce a more controlled y.min / y.max adjustment.
+
+    S.chart.update();
 }
 
-/* ------------------------------------------------------------------ /
-/  LEGEND                                                             /
-/ ------------------------------------------------------------------ */
-export function addCrowdLegend() {
-    if (!OutZen.map) return;
+
+function createWeatherLegendControl(L) {
     const legend = L.control({ position: "bottomright" });
-    legend.onAdd = function () {
-        const div = L.DomUtil.create("div", "info legend outzen-legend");
-        const labels = ["Level 1 (Low)", "Level 2 (Medium)", "Level 3 (High)", "Level 4 (Critical)"];
-        const colors = [getColorFromLevel(1), getColorFromLevel(2), getColorFromLevel(3), getColorFromLevel(4)];
-        let html = `<div class="outzen-legend__box">
-      <strong class="outzen-legend__title">Density</strong>`;
-        for (let i = 0; i < labels.length; i++) {
-            html += `<div class="outzen-legend__row">
-        <i class="outzen-legend__dot" style="background:${colors[i]}"></i>
-        <span class="outzen-legend__label">${labels[i]}</span>
-      </div>`;
-        }
-        html += `</div>`;
-        div.innerHTML = html;
+
+    legend.onAdd = function (map) {
+        const div = L.DomUtil.create("div", "oz-weather-legend");
+        div.innerHTML = `
+            <div class="oz-weather-legend-title">Météo</div>
+            <div class="oz-weather-legend-row">
+                <span class="oz-weather-emoji">☀️</span><span>Sunny</span>
+            </div>
+            <div class="oz-weather-legend-row">
+                <span class="oz-weather-emoji">☁️</span><span>Cloudy</span>
+            </div>
+            <div class="oz-weather-legend-row">
+                <span class="oz-weather-emoji">🌧️</span><span>Rain</span>
+            </div>
+            <div class="oz-weather-legend-row">
+                <span class="oz-weather-emoji">⛈️</span><span>Stormy</span>
+            </div>
+            <div class="oz-weather-legend-row">
+                <span class="oz-weather-emoji">🌫️</span><span>Foggy</span>
+            </div>
+            <div class="oz-weather-legend-row">
+                <span class="oz-weather-emoji">💨</span><span>Windy</span>
+            </div>
+            <div class="oz-weather-legend-row">
+                <span class="oz-weather-emoji">❄️</span><span>Snowy</span>
+            </div>
+        `;
         return div;
     };
-    legend.addTo(OutZen.map);
-}
-/* ------------------------------------------------------------------ /
-/  CHART                                                             /
-/ ------------------------------------------------------------------ */
-export async function initCrowdChart(config = null) {
-    if (typeof Chart === "undefined") { console.warn("[OutZen] Chart.js not present."); return null; }
-    const canvas = document.getElementById("crowdChart");
-    if (!canvas) { console.warn("[OutZen] canvas #crowdChart not found - chart creation skipped."); return null; }
-    if (window.__OutZenSingleton.chartCreated) {
-        console.info("[OutZen] Chart already created - skipping.");
-        return window.__outzenChartInstance;
-    }
-    safeDestroyChart();
-    try {
-        const ctx = canvas.getContext("2d");
-        const cfg = config ?? {
-            type: "line",
-            data: { labels: [], datasets: [{ label: "Crowd", data: [], tension: 0.25 }] },
-            options: { responsive: true, maintainAspectRatio: false }
-        };
-        const ch = new Chart(ctx, cfg);
-        window.__outzenChartInstance = ch;
-        window.__OutZenSingleton.chartCreated = true;
-        console.info("[OutZen] Chart initialized.");
-        return ch;
-    } catch (err) {
-        console.error("[OutZen] Chart init failed:", err);
-        return null;
-    }
+
+    return legend;
 }
 
-export function tryInitCrowdChartLater(retries = 6, intervalMs = 500, config = null) {
-    (async function attempt(n) {
-        if (n <= 0) return null;
-        const canvas = document.getElementById("crowdChart");
-        if (canvas) return await initCrowdChart(config);
-        await new Promise(r => setTimeout(r, intervalMs));
-        return attempt(n - 1);
-    })(retries);
+
+// ================================
+// API exported to Blazor
+// ================================
+
+export function isOutZenReady() {
+    return !!S.initialized && !!S.map;
 }
 
-export function destroyCrowdChart() { safeDestroyChart(); }
+/**
+ * OutZen main boot (called from CrowdInfoView.OnAfterRenderAsync)
+ * opts: { mapId, center, zoom, enableChart, force }
+ */
+export async function bootOutZen(options) {
+    const {
+        mapId = "leafletMap",
+        center = [50.89, 4.34],
+        zoom = 13,
+        enableChart = true,
+        force = true,
+        enableWeatherLegend = false
+    } = options || {};
 
-export function updateCrowdChart(value, canvasId = "crowdChart") {
-    const chart = window.__outzenChartInstance;
-    if (!chart) return;
-    const now = new Date().toLocaleTimeString();
-    const numeric = Number(String(value).replace("%", "").trim());
-    if (!Number.isFinite(numeric)) return;
-    chart.data.labels.push(now);
-    chart.data.datasets[0].data.push(numeric);
-    if (chart.data.labels.length > 20) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
-    chart.update();
-}
-/* ------------------------------------------------------------------ /
-/  BOOT                                                              /
-/ ------------------------------------------------------------------ */
-export async function bootOutZen(opts = {
-    mapId: "leafletMap",
-    center: [50.89, 4.34],
-    zoom: 13,
-    enableChart: false,
-    force: false
-}) {
-    // mutex "boot in progress" (avoids races)
-    if (!window.__OutZenSingleton.bootingPromise) {
-        window.__OutZenSingleton.bootingPromise = Promise.resolve();
+    const L = ensureLeaflet();
+    if (!L) return false;
+
+    const host = document.getElementById(mapId);
+    if (!host) {
+        console.info(`[OutZen] mapId='${mapId}' not found in DOM — bootOutZen skipped.`);
+        return false;
     }
 
-    if (OutZen.map) {
-        console.info("[OutZen] map already exists — skip boot (idempotent).");
-        return OutZen;
-    }
+    const container = ensureContainer(mapId);
+    if (!container) return false;
 
-    // serialize concurrent boots
-    const chain = window.__OutZenSingleton.bootingPromise.then(async () => {
-        if (OutZen.map) return OutZen; // recheck
-        // ... the existing boot code here ...
-    });
-    window.__OutZenSingleton.bootingPromise = chain.catch(() => { }).then(() => null);
-    return await chain;
-    // cooldown/hot-reload guard
-    if (!opts.force && window.__outzenBootFlag && ((Date.now() - (window.__outzenBootTs || 0)) < 800)) {
-        console.warn("[OutZen] bootOutZen skipped (cooldown).");
-        return OutZen;
-    }
-    if (!opts.force && window.__outzenBootFlag && OutZen.map) {
-        console.info("[OutZen] already booted – returning API.");
-        return OutZen;
-    }
+    console.log("[OutZen] bootOutZen: initializing map… (force:", force, ")");
 
-    window.__outzenBootTs = Date.now();
-
-    // Wait for container to exist (Blazor renders after first paint)
-    const ok = await waitForElement(opts.mapId ?? "leafletMap", 24, 150);
-    if (!ok) {
-        console.warn(`[OutZen] #${opts.mapId} not present after wait — retry later.`);
-        // NE PAS forcer. Re-tenter en douceur, seulement si rien n’a booté entre-temps.
-        setTimeout(() => {
-            try {
-                if (!window.__outzenBootFlag && !OutZen.map) {
-                    bootOutZen({ ...opts, force: false });
-                }
-            } catch { }
-        }, 250);
-        return OutZen;
-    }
-
-    // Init map
-    let mapInstance = null;
-    try {
-        mapInstance = initMap(opts.mapId, opts.center, opts.zoom);
-    } catch (err) {
-        console.error("[OutZen] initMap error:", err);
-    }
-    if (!mapInstance) {
-        console.warn("[OutZen] initMap returned null — abort boot.");
-        return OutZen; // do not set flag
-    }
-
-    // Chart + legend
-    try {
-        if (opts.enableChart) {
-            const created = await initCrowdChart(opts.chartConfig ?? null);
-            if (!created) tryInitCrowdChartLater(6, 500, opts.chartConfig ?? null);
+    // --- 1) Clean old map if present ---
+    if (S.map && force) {
+        try {
+            S.map.remove();
+        } catch (e) {
+            console.warn("[OutZen] map.remove() failed:", e);
         }
-        addCrowdLegend();
-    } catch (e) { console.warn("[OutZen] chart/legend init non-fatal:", e); }
+        S.map = null;
+    }
 
-    // marker clustering
-    try {
-        if (typeof L !== "undefined" && typeof L.markerClusterGroup === "function") {
-            OutZen.cluster = L.markerClusterGroup({
-                iconCreateFunction: function (cluster) {
-                    const childCount = cluster.getChildCount();
-                    const size = childCount < 10 ? 40 : childCount < 50 ? 50 : 60;
-                    let maxLevel = 0;
-                    cluster.getAllChildMarkers().forEach(m => maxLevel = Math.max(maxLevel, Number(m.options.level) || 0));
-                    const color = getColorFromLevel(maxLevel);
-                    const alarmCls = (maxLevel === 4) ? " outzen-cluster--alarm" : "";
+    // HACK standard Leaflet: reset the flag to allow a new map
+    const dom = L.DomUtil.get(mapId);
+    if (dom && dom._leaflet_id) {
+        dom._leaflet_id = null;
+    }
 
-                    return L.divIcon({
-                        className: "outzen-cluster" + alarmCls,
-                        html: `<div class="oz-cluster-core" style="
-                            background:${color};
-                            width:${size}px;height:${size}px;border-radius:50%;
-                            display:flex;align-items:center;justify-content:center;
-                            color:#fff;font-weight:700;">${childCount}</div>`,
-                        iconSize: [size, size]
-                    });
+    // --- 2) Re-create map ---
+    S.map = L.map(mapId).setView(center, zoom);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors",
+        maxZoom: 19
+    }).addTo(S.map);
+
+    // --- 3) Cluster ---
+    if (L.markerClusterGroup) {
+        if (!S.cluster) {
+            S.cluster = L.markerClusterGroup();
+        } else {
+            S.cluster.clearLayers();
+        }
+        S.map.addLayer(S.cluster);
+        console.log("[OutZen] MarkerCluster enabled.");
+    } else {
+        S.cluster = null;
+        console.warn("[OutZen] MarkerCluster plugin not found, fallback to plain markers.");
+    }
+
+    S.markers = new Map();
+
+    // --- 3b) Weather legend ---
+    if (enableWeatherLegend) {
+        if (S.weatherLegend) {
+            S.map.removeControl(S.weatherLegend);
+        }
+        S.weatherLegend = createWeatherLegendControl(L);
+        S.weatherLegend.addTo(S.map);
+    }
+
+    // --- 4) Chart ---
+    destroyChartIfAny();
+
+    if (enableChart && window.Chart) {
+        const canvas = ensureChartCanvas();
+        if (canvas) {
+            const ctx = canvas.getContext("2d");
+            S.chart = new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: "Crowd Level",
+                        data: []
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    animation: false,
+                    scales: {
+                        y: { beginAtZero: true, max: 5 }
+                    }
                 }
             });
-            if (OutZen.map) {
-                OutZen.map.addLayer(OutZen.cluster);
-                console.info("[OutZen] Cluster added to map.");
-            }
-        } else {
-            console.info("[OutZen] MarkerCluster not present; continuing without clusters.");
+            console.log("[OutZen] Chart initialized (or reinitialized).");
         }
-    } catch (e) { console.warn("[OutZen] cluster init non-fatal:", e); }
+    }
 
-    // expose OutZenInterop (non-module interop for Blazor)
-    window.OutZenInterop = Object.assign(window.OutZenInterop || {}, {
-        addOrUpdateCrowdMarker,
-        removeCrowdMarker,
-        clearCrowdMarkers,
-        fitToMarkers,
-        refreshMapSize,
-        initCrowdChart,
-        tryInitCrowdChartLater,
-        destroyCrowdChart,
-        updateCrowdChart
+    S.initialized = true;
+    S.bootTs = Date.now();
+    window.__outzenBootFlag = true;
+
+    console.log("[OutZen] ✅ bootOutZen completed.");
+    return true;
+}
+
+// ================================
+// Marker icon helpers (crowd / traffic levels)
+// ================================
+function normalizeLevel(level) {
+    const n = Number(level) || 0;
+    if (n < 0) return 0;
+    if (n > 4) return 4;
+    return n;
+}
+
+function getMarkerClassForLevel(level) {
+    const lvl = normalizeLevel(level);
+    // 0 = neutral / unknown
+    switch (lvl) {
+        case 1: return "oz-marker-lvl1"; // Low / Freeflow
+        case 2: return "oz-marker-lvl2"; // Medium / Moderate
+        case 3: return "oz-marker-lvl3"; // High / Heavy
+        case 4: return "oz-marker-lvl4"; // Critical / Jammed
+        default: return "oz-marker-lvl0";
+    }
+}
+
+function getWeatherEmoji(weatherType) {
+    const wt = (weatherType || "").toLowerCase();
+
+    if (wt.includes("clear") || wt.includes("sun")) return "☀️";
+    if (wt.includes("cloud")) return "☁️";
+    if (wt.includes("rain")) return "🌧️";
+    if (wt.includes("storm") || wt.includes("thunder")) return "⛈️";
+    if (wt.includes("snow")) return "❄️";
+    if (wt.includes("fog") || wt.includes("mist")) return "🌫️";
+
+    return "🌡️"; // by default
+}
+
+function buildMarkerIcon(L, level, isTraffic = false, weatherType = null) {
+    const lvlClass = getMarkerClassForLevel(level);
+    const trafficClass = isTraffic ? "oz-marker-traffic" : "";
+    const emoji = getWeatherEmoji(weatherType);
+
+    return L.divIcon({
+        className: `oz-marker ${lvlClass} ${trafficClass}`.trim(),
+        html: `<div class="oz-marker-inner">${emoji}</div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 26],
+        popupAnchor: [0, -26]
     });
-
-    // size fix after map is attached
-    try { mapInstance.invalidateSize(true); setTimeout(() => mapInstance.invalidateSize(true), 200); } catch { }
-
-    window.__outzenBootFlag = true; // flag only when map is OK
-    OutZen.initialized = true;
-    console.info("[OutZen] booted (flag set).");
-    return OutZen;
 }
 
-/* ------------------------------------------------------------------ /
-/  READINESS & DEBUG EXPORTS                                         /
-/ ------------------------------------------------------------------ */
-export function isOutZenBooted() { return !!window.__outzenBootFlag; }
-export function isOutZenReady() { return !!OutZen.map; }
-export function outzenState() {
-    return {
-        bootFlag: !!window.__outzenBootFlag,
-        hasMap: !!OutZen.map,
-        hasCluster: !!OutZen.cluster,
-        markersCount: OutZen.markers?.size ?? 0
+
+/**
+ * Adds or updates a crowd marker.
+ */
+export function addOrUpdateCrowdMarker(id, lat, lng, level, info) {
+    const L = ensureLeaflet();
+    if (!L || !S.map) return;
+
+    if (!S.markers) S.markers = new Map();
+
+    const key = String(id);
+    const existing = S.markers.get(key);
+
+    const popupHtml = buildPopupHtml(info);
+
+    const isTraffic = info?.isTraffic;
+    const weatherType = info?.weatherType ?? info?.WeatherType ?? null;
+
+    const icon = buildMarkerIcon(L, level, isTraffic, weatherType);
+
+    if (existing) {
+        existing.setLatLng([lat, lng]);
+        existing.setPopupContent(popupHtml);
+        existing._outzenLevel = level;
+        try {
+            existing.setIcon(icon); // 🔁 updates the color if the level changes
+        } catch (e) {
+            console.warn("[OutZen] Failed to update marker icon:", e);
+        }
+        return;
+    }
+
+    const opts = {
+        title: info?.title ?? key,
+        riseOnHover: true,
+        icon // 👈 plus the default blue icon
     };
+
+    const marker = L.marker([lat, lng], opts).bindPopup(popupHtml);
+    marker._outzenId = key;
+    marker._outzenLevel = level;
+
+    if (S.cluster) {
+        S.cluster.addLayer(marker);
+    } else {
+        marker.addTo(S.map);
+    }
+
+    S.markers.set(key, marker);
+    console.log("[OutZen] Marker added. Total markers:", S.markers.size);
 }
-export function debugOutZen() {
-    const canvas = document.getElementById("crowdChart");
-    const chart = (typeof Chart !== "undefined" && typeof Chart.getChart === "function") ? Chart.getChart(canvas) : window.__outzenChartInstance;
-    const info = {
-        bootFlag: !!window.__outzenBootFlag,
-        bootTs: window.__outzenBootTs,
-        hasChart: !!chart,
-        chartIds: Object.keys(Chart?.instances ?? {}),
-        OutZenInteropKeys: Object.keys(window.OutZenInterop ?? {})
-    };
-    console.table(info);
-    return info;
+
+
+/**
+ * Delete a marker.
+ */
+export function removeCrowdMarker(id) {
+    const L = ensureLeaflet();
+    if (!L || !S.map || !S.markers) return;
+
+    const key = String(id);
+    const marker = S.markers.get(key);
+    if (!marker) return;
+
+    if (S.cluster) {
+        S.cluster.removeLayer(marker);
+    } else {
+        S.map.removeLayer(marker);
+    }
+    S.markers.delete(key);
 }
 
-const _default = {
-    bootOutZen, debugOutZen, initCrowdChart, destroyCrowdChart, initMap,
-    isOutZenBooted, isOutZenReady, refreshMapSize, fitToMarkers, outzenState
-};
-export default _default;
+/**
+ * Delete all crowd markers.
+ */
+export function clearCrowdMarkers() {
+    if (!S.map || !S.markers) return;
 
-// Global helpers for C# InvokeAsync<bool>("isOutZenReady")
-window.isOutZenBooted = () => !!window.__outzenBootFlag;
-window.isOutZenReady = () => !!OutZen.map;
+    if (S.cluster) {
+        S.cluster.clearLayers();
+    } else {
+        for (const m of S.markers.values()) {
+            S.map.removeLayer(m);
+        }
+    }
+    S.markers.clear();
+}
 
-// Minimal CSS suggestion (keep in your CSS bundle):
-// .outzen-crowd-marker { background: transparent !important; border: none !important; padding: 0 !important; }
-// .outzen-crowd-marker > div { line-height: 1 !important; }
+// ================================
+// GPT markers (reuse crowd engine)
+// ================================
+export function addOrUpdateGptMarker(dto) {
+    const L = ensureLeaflet();
+    if (!L || !S.map || !dto) {
+        console.warn("[OutZen] addOrUpdateGptMarker: missing map or dto", { dto });
+        return;
+    }
 
-// End of module
+    // Tolerates camelCase / PascalCase from C#
+    const id = dto.id ?? dto.Id;
+    const lat = Number(dto.lat ?? dto.Latitude);
+    const lng = Number(dto.lng ?? dto.Longitude);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        console.warn("[OutZen] addOrUpdateGptMarker: invalid coordinates", { dto, lat, lng });
+        return;
+    }
+
+    const sourceType = dto.sourceType ?? dto.SourceType ?? "GPT";
+    const title = dto.title ?? dto.Prompt ?? `[${sourceType}] #${id}`;
+    const description = dto.description ?? dto.Response ?? "";
+    const crowdLevel = dto.crowdLevel ?? dto.CrowdLevel ?? 3; // neutral
+
+    // We reuse the same mechanism as for the crowd
+    addOrUpdateCrowdMarker(
+        id,
+        lat,
+        lng,
+        crowdLevel,
+        {
+            title,
+            description
+        }
+        
+    );
+
+    // Option: Auto cropping (gentle)
+    setTimeout(() => {
+        try {
+            fitToMarkers();
+        } catch (e) {
+            console.warn("[OutZen] fitToMarkers failed from GPT marker:", e);
+            console.log("[OutZen] GPT marker", { id, lat, lng, sourceType });
+        }
+    }, 50);
+}
+
+export function removeGptMarker(id) {
+    removeCrowdMarker(id);
+}
+
+
+
+/**
+ * Adjusts the viewport to all markers.
+ */
+export function fitToMarkers() {
+    if (!S.map || !S.markers || S.markers.size === 0) {
+        console.log("[OutZen] fitToMarkers: no markers.");
+        return;
+    }
+
+    const L = ensureLeaflet();
+    if (!L) return;
+
+    let bounds = null;
+
+    // 1) If the cluster is present AND contains layers
+    if (S.cluster && typeof S.cluster.getLayers === "function") {
+        const layers = S.cluster.getLayers();
+        if (Array.isArray(layers) && layers.length > 0) {
+            const b = S.cluster.getBounds();
+            if (b && typeof b.isValid === "function" && b.isValid()) {
+                bounds = b;
+            }
+        }
+    }
+
+    // 2) Fallback : We use S.markers markers
+    if (!bounds) {
+        const latlngs = [];
+        for (const m of S.markers.values()) {
+            try {
+                latlngs.push(m.getLatLng());
+            } catch { }
+        }
+        if (latlngs.length === 0) {
+            console.log("[OutZen] fitToMarkers: markers list empty.");
+            return;
+        }
+
+        if (latlngs.length === 1) {
+            const target = latlngs[0];
+            const z = Math.min(18, Math.max(3, 15));
+            S.map.setView(target, z, { animate: true });
+            return;
+        }
+
+        bounds = L.latLngBounds(latlngs).pad(0.1);
+    }
+
+    S.map.fitBounds(bounds, {
+        padding: [32, 32],
+        maxZoom: 17
+    });
+}
+
+export function debugDumpMarkers() {
+    console.log("[OutZen] debugDumpMarkers: map initialized =", !!S.map);
+    console.log("[OutZen] debugDumpMarkers: markers size =", S.markers ? S.markers.size : "null");
+    if (S.markers && S.markers.size > 0) {
+        for (const [key, m] of S.markers.entries()) {
+            try {
+                console.log("[OutZen] marker", key, m.getLatLng());
+            } catch (e) {
+                console.warn("[OutZen] marker", key, "getLatLng error:", e);
+            }
+        }
+    }
+}
+
+
+// Don't forget to export:
+//export {
+//    bootOutZen,
+//    addOrUpdateCrowdMarker,
+//    removeCrowdMarker,
+//    addOrUpdateGptMarker,
+//    removeGptMarker,
+//    fitToMarkers,
+//    refreshMapSize,
+//    disposeOutZen
+//};
+
+/**
+ * Force Leaflet to recalculate the size (useful after layout changes).
+ */
+export function refreshMapSize() {
+    if (!S.map) return;
+    setTimeout(() => {
+        S.map.invalidateSize();
+    }, 50);
+}
+
+// alert = { latitude, longitude, message, ... }
+export function notifyHeavyRain(alert) {
+    const L = ensureLeaflet();
+    if (!L || !S.map) {
+        console.warn("[OutZen] notifyHeavyRain: map not ready");
+        return;
+    }
+
+    const lat = alert.latitude ?? alert.Latitude;
+    const lon = alert.longitude ?? alert.Longitude;
+    const msg = alert.message ?? alert.Message ?? "Heavy rain alert";
+
+    if (lat == null || lon == null) {
+        console.warn("[OutZen] notifyHeavyRain: missing coordinates", alert);
+        return;
+    }
+
+    const marker = L.circleMarker([lat, lon], {
+        radius: 12,
+        className: "rain-alert-marker"
+    }).addTo(S.map);
+
+    marker.bindPopup(
+        `<div class="rain-alert-popup">
+            <strong>🌧 Heavy rain alert</strong><br/>
+            ${msg}
+        </div>`
+    ).openPopup();
+
+    // Gentle refocusing on the alert zone
+    const currentZoom = S.map.getZoom ? S.map.getZoom() : 10;
+    S.map.setView([lat, lon], Math.max(currentZoom, 11), { animate: true });
+}
+
+
+// ================================
+// Helpers UI / popup
+// ================================
+function buildPopupHtml(info) {
+    const title = info?.title ?? "Unknown";
+    const desc = info?.description ?? "";
+    return `<div class="outzen-popup">
+        <div class="title">${escapeHtml(title)}</div>
+        <div class="desc">${escapeHtml(desc)}</div>
+    </div>`;
+}
+
+function escapeHtml(str) {
+    if (!str) return "";
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
+if (!window.OutZenInterop) {
+    window.OutZenInterop = {};
+}
+window.OutZenInterop.isOutZenReady = isOutZenReady;
+window.OutZenInterop.disposeOutZen = disposeOutZen;
+/*window.__outzenBootFlag = true;*/
+export function disposeOutZen() {
+    if (S.map) {
+        try { S.map.remove(); } catch { }
+        S.map = null;
+    }
+    if (S.cluster) {
+        try { S.cluster.clearLayers(); } catch { }
+        S.cluster = null;
+    }
+    destroyChartIfAny();
+    if (S.markers) {
+        S.markers.clear();
+    }
+    S.initialized = false;
+}
+
+
 
 
 

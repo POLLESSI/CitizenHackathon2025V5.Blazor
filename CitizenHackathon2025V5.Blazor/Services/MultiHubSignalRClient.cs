@@ -179,7 +179,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             var path = HubRoutes.GetPath(hub);
             var fullUrl = $"{_baseHubUrl}{path}";
 
-            Func<Task<string>>? tokenFactory = null;
+            Func<Task<string>> tokenFactory = null;
             if (_getAccessToken is not null)
             {
                 // bridge string? -> string for AccessTokenProvider

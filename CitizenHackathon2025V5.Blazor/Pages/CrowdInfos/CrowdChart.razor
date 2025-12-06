@@ -1,4 +1,4 @@
-@implements IAsyncDisposable
+@* @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
 @inject Blazored.Toast.Services.IToastService ToastService
 
@@ -56,7 +56,7 @@
     {
         try { await JSRuntime.InvokeVoidAsync("disposeEarth", _canvasId); } catch { }
     }
-}
+} *@
 
 
 

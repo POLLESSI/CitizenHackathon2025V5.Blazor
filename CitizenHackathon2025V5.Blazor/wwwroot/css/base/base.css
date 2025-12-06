@@ -1,8 +1,5 @@
 ﻿/*wwwroot.css.base.base.css*/
 /* very light reset */
-* {
-    box-sizing: border-box;
-}
 
 html, body {
     height: 100%;

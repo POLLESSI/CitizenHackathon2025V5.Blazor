@@ -1,9 +1,9 @@
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Utils;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http.Json;
-using SharedDTOs = CitizenHackathon2025.Blazor.DTOs;
+//using CitizenHackathon2025.Blazor.DTOs;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
@@ -60,7 +60,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         /// <summary>
         /// Retrieves a CrowdInfo by its ID.
         /// </summary>
-        public async Task<ClientCrowdInfoDTO?> GetCrowdInfoByIdAsync(int id, CancellationToken ct = default)
+        public async Task<ClientCrowdInfoDTO> GetCrowdInfoByIdAsync(int id, CancellationToken ct = default)
         {
             try
             {
@@ -113,7 +113,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         /// <summary>
         /// Saves or updates a CrowdInfo.
         /// </summary>
-        public async Task<ClientCrowdInfoDTO?> SaveCrowdInfoAsync(ClientCrowdInfoDTO dto)
+        public async Task<ClientCrowdInfoDTO> SaveCrowdInfoAsync(ClientCrowdInfoDTO dto)
         {
             try
             {
@@ -155,7 +155,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         public ClientCrowdInfoDTO UpdateCrowdInfo(ClientCrowdInfoDTO dto)
             => UpdateCrowdInfoAsync(dto).GetAwaiter().GetResult();
 
-        public async Task<ClientCrowdInfoDTO?> UpdateCrowdInfoAsync(ClientCrowdInfoDTO dto)
+        public async Task<ClientCrowdInfoDTO> UpdateCrowdInfoAsync(ClientCrowdInfoDTO dto)
         {
             try
             {

@@ -1,5 +1,5 @@
 ﻿//CrowdInfoCalendarDetail.razor.cs
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Models;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
@@ -14,13 +14,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
         [Parameter] public int Id { get; set; }
         private CrowdInfoCalendarModel? model;
 
-        // strings pour saisir HH:mm
+        // strings to enter HH:mm
         private string? startStr;
         private string? endStr;
 
         protected override async Task OnInitializedAsync()
         {
             var dto = await Svc.GetByIdAsync(Id);
+
+            if (dto is null)
+            {
+                // 🧩 NotFound or null case: a minimal model is initialized
+                model = new CrowdInfoCalendarModel { Id = Id };
+                startStr = null;
+                endStr = null;
+                return;
+            }
+
             model = CrowdInfoCalendarModel.FromDto(dto);
             model.Id = Id;
 

@@ -1,4 +1,4 @@
-@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025.Blazor.DTOs;
 @using CitizenHackathon2025V5.Blazor.Client.Enums
 @using CitizenHackathon2025V5.Blazor.Client.Components
 @using Microsoft.AspNetCore.SignalR.Client
@@ -16,10 +16,11 @@
         <button @onclick="() => FilterLevel = (int)TrafficLevel.Heavy">Severe</button>
         <button @onclick="() => FilterLevel = (int)TrafficLevel.Jammed">Blocked</button>)
     </div>
-
 </div>
 
 <LeafletMapComponent @ref="map" />
+
+<Globe />
 
 @code {
     private HubConnection? hubConnection;

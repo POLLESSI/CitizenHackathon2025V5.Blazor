@@ -8,7 +8,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Models
 
         [Required(ErrorMessage = "Location name is required.")]
         [StringLength(100, ErrorMessage = "The name cannot exceed 100 characters.")]
-        public string LocationName { get; set; }
+        public string LocationName { get; set; } = string.Empty; 
 
         [Range(-90, 90, ErrorMessage = "Latitude must be between -90 and 90.")]
         public double Latitude { get; set; }

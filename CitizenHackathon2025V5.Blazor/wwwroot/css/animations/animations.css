@@ -96,6 +96,218 @@
     margin: 0 auto;
     filter: drop-shadow(0 0 24px rgba(0, 180, 255, .35));
 }
+/* ------------------------------
+   ANIMATIONS
+------------------------------ */
+/* --- Alarm animations for critical markers & clusters --- */
+@keyframes oz-alarm-flash {
+    0%, 100% {
+        filter: none;
+        box-shadow: 0 0 6px rgba(183,28,28,.45), 0 0 18px rgba(183,28,28,.25);
+    }
+
+    50% {
+        filter: brightness(1.25);
+        box-shadow: 0 0 10px rgba(183,28,28,.7), 0 0 26px rgba(183,28,28,.45);
+    }
+}
+
+@keyframes oz-alarm-ring {
+    0% {
+        transform: scale(1);
+        opacity: .7;
+    }
+
+    70% {
+        transform: scale(1.8);
+        opacity: 0;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+@keyframes fadeInDetail {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes cc-pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.65);
+    }
+
+    70% {
+        box-shadow: 0 0 0 14px rgba(220, 53, 69, 0);
+    }
+
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+    }
+}
+
+@keyframes hueShift {
+    from {
+        filter: hue-rotate(0deg);
+    }
+
+    to {
+        filter: hue-rotate(360deg);
+    }
+}
+
+.hue-shift {
+    animation: hueShift 30s linear infinite;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.1);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.pulse {
+    animation: pulse 2s infinite ease-in-out;
+}
+
+/* Gentle pulsation (Low / Freeflow) */
+@keyframes oz-pulse-low {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 4px rgba(40,167,69,0.55), 0 0 10px rgba(40,167,69,0.35);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.15);
+        box-shadow: 0 0 7px rgba(40,167,69,0.75), 0 0 18px rgba(40,167,69,0.45);
+        opacity: 0.9;
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 4px rgba(40,167,69,0.55), 0 0 10px rgba(40,167,69,0.35);
+        opacity: 1;
+    }
+}
+/* Animation */
+@keyframes btnPulse {
+    0%, 100% {
+        transform: translateZ(0);
+        box-shadow: 0 0 0.35rem rgba(var(--btn-color-rgb), .55), 0 0 0.9rem rgba(var(--btn-color-rgb), .35), 0 0 1.6rem rgba(var(--btn-color-rgb), .25);
+    }
+
+    50% {
+        box-shadow: 0 0 0.6rem rgba(var(--btn-color-rgb), .7), 0 0 1.6rem rgba(var(--btn-color-rgb), .45), 0 0 2.6rem rgba(var(--btn-color-rgb), .35);
+    }
+}
+
+/* Aggressive flashing (Critical / Jammed) */
+@keyframes oz-blink-critical {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 8px rgba(176, 42, 55, 0.8);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(1.25);
+        box-shadow: 0 0 16px rgba(176, 42, 55, 1);
+        opacity: 0.7;
+    }
+}
+/* Specific pulse animations */
+
+@keyframes pulse-green {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.9;
+        box-shadow: 0 0 8px #28a745aa;
+    }
+
+    50% {
+        transform: scale(1.4);
+        opacity: 0.4;
+        box-shadow: 0 0 20px #28a74555;
+    }
+}
+
+@keyframes pulse-orange {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.9;
+        box-shadow: 0 0 8px #fd7e14aa;
+    }
+
+    50% {
+        transform: scale(1.4);
+        opacity: 0.4;
+        box-shadow: 0 0 20px #fd7e1455;
+    }
+}
+
+@keyframes pulse-red {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.9;
+        box-shadow: 0 0 8px #dc3545aa;
+    }
+
+    50% {
+        transform: scale(1.4);
+        opacity: 0.4;
+        box-shadow: 0 0 20px #dc354555;
+    }
+}
+
+@keyframes pulse-gray {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.7;
+        box-shadow: 0 0 8px #6c757daa;
+    }
+
+    50% {
+        transform: scale(1.4);
+        opacity: 0.3;
+        box-shadow: 0 0 20px #6c757d55;
+    }
+}
+/* Traffic Low animation — wider, more visible */
+@keyframes oz-pulse-traffic-low {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 10px rgba(40,167,69,0.7), 0 0 22px rgba(40,167,69,0.45), 0 0 36px rgba(40,167,69,0.30);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.25);
+        box-shadow: 0 0 16px rgba(40,167,69,0.85), 0 0 34px rgba(40,167,69,0.55), 0 0 50px rgba(40,167,69,0.40);
+        opacity: 0.85;
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 10px rgba(40,167,69,0.7), 0 0 22px rgba(40,167,69,0.45), 0 0 36px rgba(40,167,69,0.30);
+        opacity: 1;
+    }
+}
 
 
 

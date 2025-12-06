@@ -1,9 +1,9 @@
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+﻿using System.Collections.Concurrent;
+using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
-using CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
-using CitizenHackathon2025.Shared.StaticConfig.Constants;
 using Microsoft.JSInterop;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
@@ -11,8 +11,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
     public partial class TrafficConditionView : IAsyncDisposable
     {
 #nullable disable
-        [Inject]
-        public HttpClient Client { get; set; } 
+        [Inject] public HttpClient Client { get; set; }
         [Inject] public TrafficConditionService TrafficConditionService { get; set; }
         [Inject] public NavigationManager Navigation { get; set; }
         [Inject] public IJSRuntime JS { get; set; }
@@ -22,121 +21,286 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         [Inject] public IAuthService Auth { get; set; }
 
         private const string ApiBase = "https://localhost:7254";
-        private IJSObjectReference? _outZen;
+
+        // ID unique pour la carte TrafficCondition
+        private const string MapId = "trafficMap";
+
+        private IJSObjectReference _outZen;
 
         public List<ClientTrafficConditionDTO> TrafficConditions { get; set; } = new();
-        private List<ClientTrafficConditionDTO> allTrafficConditions = new();
-        private List<ClientTrafficConditionDTO> visibleTrafficConditions = new();
+        private readonly List<ClientTrafficConditionDTO> allTrafficConditions = new();
+        private readonly List<ClientTrafficConditionDTO> visibleTrafficConditions = new();
+
         private int currentIndex = 0;
         private const int PageSize = 20;
-        private string _canvasId = $"rotatingEarth-{Guid.NewGuid():N}";
-        private string _speedId = $"speedRange-{Guid.NewGuid():N}";
-        public int SelectedId { get; set; }
-        public HubConnection hubConnection { get; set; }
 
-        // Fields used by .razor
+        private readonly ConcurrentQueue<ClientTrafficConditionDTO> _pendingHubUpdates = new();
+        private readonly string _speedId = $"speedRange-{Guid.NewGuid():N}";
+
+        public int SelectedId { get; set; }
+        private HubConnection hubConnection;
+
+        // Champs utilisés par le .razor
         private ElementReference ScrollContainerRef;
         private string _q;
         private bool _onlyRecent;
 
+        // État map / markers
+        private bool _booted;
+        private bool _markersSeeded;
+
         protected override async Task OnInitializedAsync()
         {
-            // 1) REST initial
+            // 1) REST initial : charge les dernières conditions en base
             var fetched = (await TrafficConditionService.GetLatestTrafficConditionAsync())?.ToList() ?? new();
+            Console.WriteLine($"[TrafficConditionView] Initial TrafficConditions count = {fetched.Count}");
+
             TrafficConditions = fetched;
-            allTrafficConditions = fetched;
+            allTrafficConditions.Clear();
+            allTrafficConditions.AddRange(fetched);
+
             visibleTrafficConditions.Clear();
             currentIndex = 0;
             LoadMoreItems();
 
-            // 2) SignalR
-            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
+            // 2) SignalR – même logique que WeatherForecastView
+            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? ApiBase;
+
+            // Si ApiBaseUrl termine par "/api", on le retire pour revenir à la racine (https://localhost:7254)
+            if (apiBaseUrl.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
+                apiBaseUrl = apiBaseUrl[..^4];
+
+            // URL finale : https://localhost:7254/hubs/trafficHub
+            var url = $"{apiBaseUrl}/hubs/{TrafficConditionHubMethods.HubPath}";
+
+            Console.WriteLine($"[Traffic-Client] Hub URL = {url}");
 
             hubConnection = new HubConnectionBuilder()
-                .WithUrl($"{apiBaseUrl}{TrafficConditionHubMethods.HubPath}", options =>
+                .WithUrl(url, options =>
                 {
-                    // If your hub is later protected, provide a token
                     options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
                 })
                 .WithAutomaticReconnect()
                 .Build();
 
-            // Handlers
-            hubConnection.On<ClientTrafficConditionDTO>("RefreshTraffic", async dto =>
-            {
-                if (dto is null) return;
-                void Upsert(List<ClientTrafficConditionDTO> list)
+            // === Event: une condition de trafic est ajoutée / mise à jour ===
+            hubConnection.On<ClientTrafficConditionDTO>(
+                TrafficConditionHubMethods.ToClient.TrafficUpdated,
+                async dto =>
                 {
-                    var i = list.FindIndex(g => g.Id == dto.Id);
-                    if (i >= 0) list[i] = dto; else list.Add(dto);
-                }
+                    if (dto is null) return;
 
-                Upsert(TrafficConditions);
-                Upsert(allTrafficConditions);
+                    void Upsert(List<ClientTrafficConditionDTO> list)
+                    {
+                        var i = list.FindIndex(g => g.Id == dto.Id);
+                        if (i >= 0)
+                            list[i] = dto;
+                        else
+                            list.Add(dto);
+                    }
 
-                var j = visibleTrafficConditions.FindIndex(c => c.Id == dto.Id);
-                if (j >= 0) visibleTrafficConditions[j] = dto;
+                    Upsert(TrafficConditions);
+                    Upsert(allTrafficConditions);
 
-                await JS.InvokeVoidAsync("window.OutZenInterop.addOrUpdateTrafficConditionMarker",
-                    dto.Id.ToString(), dto.IncidentType ?? "", dto.Message ?? "", dto.CongestionLevel ?? "", dto.DateCondition,
-                    new { title = dto.IncidentType ?? "", Message = $"Maj {dto.DateCondition:HH:mm:ss}" });
+                    var j = visibleTrafficConditions.FindIndex(c => c.Id == dto.Id);
+                    if (j >= 0)
+                        visibleTrafficConditions[j] = dto;
+                    else
+                        visibleTrafficConditions.Insert(0, dto);
 
-                await InvokeAsync(StateHasChanged);
-            });
+                    if (!_booted || _outZen is null)
+                    {
+                        _pendingHubUpdates.Enqueue(dto);
+                        await InvokeAsync(StateHasChanged);
+                        return;
+                    }
 
-            hubConnection.On<int>("TrafficConditionArchived", async id =>
+                    await AddOrUpdateTrafficMarkerAsync(dto, fit: true);
+                    await InvokeAsync(StateHasChanged);
+                });
+
+            // === Event: une condition est archivée / supprimée ===
+            hubConnection.On<int>(
+                TrafficConditionHubMethods.ToClient.TrafficCleared,
+                async id =>
+                {
+                    TrafficConditions.RemoveAll(c => c.Id == id);
+                    allTrafficConditions.RemoveAll(c => c.Id == id);
+                    visibleTrafficConditions.RemoveAll(c => c.Id == id);
+
+                    if (_booted && _outZen is not null)
+                    {
+                        try { await _outZen.InvokeVoidAsync("removeCrowdMarker", id.ToString()); } catch { }
+                        try { await _outZen.InvokeVoidAsync("fitToMarkers"); } catch { }
+                    }
+
+                    await InvokeAsync(StateHasChanged);
+                });
+
+            try
             {
-                TrafficConditions.RemoveAll(c => c.Id == id);
-                allTrafficConditions.RemoveAll(c => c.Id == id);
-                visibleTrafficConditions.RemoveAll(c => c.Id == id);
-
-                await JS.InvokeVoidAsync("window.OutZenInterop.removeMarker", id.ToString());
-                await InvokeAsync(StateHasChanged);
-            });
-            //hubConnection.On(TrafficConditionHubMethods.ToClient.NotifyNewTraffic, () =>
-            //{
-            //    Console.WriteLine("notifynewtraffic");
-            //    // TODO: reload traffic data or trigger a /api/TrafficCondition/latest request
-            //    InvokeAsync(StateHasChanged);
-            //});
-
-
-            try 
-            { 
                 await hubConnection.StartAsync();
-                // Client -> Serveur (no arg)
-                //await hubConnection.InvokeAsync(TrafficConditionHubMethods.FromClient.RefreshTraffic);
+                Console.WriteLine("[Traffic-Client] hubConnection.StartAsync() OK.");
             }
-            catch (Exception ex) { Console.Error.WriteLine($"[TrafficConditionView] Hub start failed: {ex.Message}"); }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[Traffic-Client] hubConnection.StartAsync() FAILED: {ex.Message}");
+            }
         }
+
+        /// <summary>
+        /// Ajoute ou met à jour un marker sur la carte pour une condition trafic donnée.
+        /// </summary>
+        private async Task AddOrUpdateTrafficMarkerAsync(ClientTrafficConditionDTO dto, bool fit = false)
+        {
+            Console.WriteLine($"[TrafficConditionView] AddOrUpdateTrafficMarkerAsync Id={dto.Id}, lat={dto.Latitude}, lon={dto.Longitude}");
+
+            if (_outZen is null)
+            {
+                Console.WriteLine("[TrafficConditionView] _outZen is null, skipping marker.");
+                return;
+            }
+
+            if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude))
+            {
+                Console.WriteLine($"[TrafficConditionView] Ignoring DTO {dto.Id}: invalid coords {dto.Latitude}, {dto.Longitude}");
+                return;
+            }
+
+            int baseLevel = 0;
+            if (dto.Level.HasValue && dto.Level.Value > 0)
+            {
+                baseLevel = dto.Level.Value;
+            }
+
+            int level;
+
+            if (baseLevel > 0)
+            {
+                level = baseLevel;
+            }
+            else
+            {
+                var raw = dto.CongestionLevel?.Trim().ToLowerInvariant();
+
+                level = raw switch
+                {
+                    "1" or "low" or "faible" or "freeflow" => 1, // ✅ Green
+                    "2" or "medium" or "moyen" or "moderate" => 2, // ✅ orange
+                    "3" or "high" or "heavy" or "jammed" => 3, // ✅ bright red
+                    "4" or "severe" or "sévère" => 4, // ✅ dark red
+                    _ => 0  // ✅ unknown -> gray
+                };
+            }
+
+
+            var desc = $"{dto.CongestionLevel ?? "N/A"}"
+                       + (string.IsNullOrWhiteSpace(dto.IncidentType) ? "" : $" • {dto.IncidentType}")
+                       + (string.IsNullOrWhiteSpace(dto.Message) ? "" : $" • {dto.Message}")
+                       + $" • {dto.DateCondition:yyyy-MM-dd HH:mm}";
+
+            await _outZen.InvokeVoidAsync(
+                "addOrUpdateCrowdMarker",
+                dto.Id.ToString(),
+                dto.Latitude,
+                dto.Longitude,
+                level,
+                new
+                {
+                    title = dto.IncidentType ?? "Traffic",
+                    description = desc,
+                    isTraffic = true
+                });
+
+            if (fit)
+            {
+                try { await _outZen.InvokeVoidAsync("fitToMarkers"); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// Remplit progressivement la liste visible (scroll infini).
+        /// </summary>
         private void LoadMoreItems()
         {
             var next = allTrafficConditions.Skip(currentIndex).Take(PageSize).ToList();
             visibleTrafficConditions.AddRange(next);
             currentIndex += next.Count;
         }
+
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            if (!firstRender) return;
-
-            _outZen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
-
-            await _outZen.InvokeVoidAsync("bootOutZen", new
+            // 1) Boot de la map au premier render
+            if (firstRender && !_booted)
             {
-                mapId = "leafletMap",
-                center = new double[] { 50.89, 4.34 },
-                zoom = 13,
-                enableChart = true
-            });
-            await JS.InvokeVoidAsync("initEarth", new
-            {
-                canvasId = _canvasId,
-                speedControlId = _speedId,
-                dayUrl = "/images/earth_texture.jpg?v=1",
-                nightUrl = "/images/earth_texture_night.jpg?v=1"
-            });
+                // 0) Attendre que le container avec le bon ID soit présent dans le DOM
+                for (var i = 0; i < 10; i++)
+                {
+                    var ok = await JS.InvokeAsync<bool>("checkElementExists", MapId);
+                    if (ok) break;
 
-            await _outZen.InvokeVoidAsync("initCrowdChart", "crowdChart");
+                    await Task.Delay(150);
+
+                    if (i == 9)
+                    {
+                        Console.WriteLine($"❌ [TrafficConditionView] Map container not found ({MapId}).");
+                        return;
+                    }
+                }
+
+                // 1) Import du module ESM LeafletOutZen
+                _outZen = await JS.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "/js/app/leafletOutZen.module.js");
+
+                var booted = await _outZen.InvokeAsync<bool>(
+                    "bootOutZen",
+                    new
+                    {
+                        mapId = MapId,
+                        center = new[] { 50.89, 4.34 },
+                        zoom = 13,
+                        enableChart = false,
+                        force = true
+                    });
+
+                if (!booted)
+                {
+                    Console.WriteLine("❌ [TrafficConditionView] OutZen boot failed.");
+                    return;
+                }
+
+                _booted = true;
+                Console.WriteLine("[TrafficConditionView] OutZen boot OK.");
+            }
+
+            // 2) Seed des markers : dès que map bootée + données dispo, une seule fois
+            if (_booted && !_markersSeeded && TrafficConditions.Count > 0 && _outZen is not null)
+            {
+                Console.WriteLine($"[TrafficConditionView] Seeding {TrafficConditions.Count} traffic markers…");
+
+                foreach (var traffic in TrafficConditions)
+                {
+                    await AddOrUpdateTrafficMarkerAsync(traffic, fit: false);
+                }
+
+                try { await _outZen.InvokeVoidAsync("refreshMapSize"); } catch { }
+                await Task.Delay(100);
+                try { await _outZen.InvokeVoidAsync("fitToMarkers"); } catch { }
+
+                // 🔍 DEBUG JS
+                try { await _outZen.InvokeVoidAsync("debugDumpMarkers"); } catch { }
+
+                // 3) Rejouer les updates reçues via SignalR avant le boot
+                while (_pendingHubUpdates.TryDequeue(out var dto))
+                {
+                    await AddOrUpdateTrafficMarkerAsync(dto, fit: false);
+                }
+
+                try { await _outZen.InvokeVoidAsync("fitToMarkers"); } catch { }
+
+                _markersSeeded = true;
+            }
         }
 
         private void ClickInfo(int id)
@@ -146,6 +310,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                 Console.WriteLine("[TrafficConditionView] Ignoring Info click: id <= 0 (payload without ID ?)");
                 return;
             }
+
             SelectedId = id;
             Console.WriteLine($"[TrafficConditionView] SelectedId = {SelectedId}");
         }
@@ -165,6 +330,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                 }
             }
         }
+
         private IEnumerable<ClientTrafficConditionDTO> FilterTraffic(IEnumerable<ClientTrafficConditionDTO> source)
             => FilterTrafficCondition(source);
 
@@ -174,10 +340,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             var cutoff = DateTime.UtcNow.AddHours(-6);
 
             return source
-                .Where(x => string.IsNullOrEmpty(q)
-                            || (!string.IsNullOrEmpty(x.IncidentType) && x.IncidentType.Contains(q, StringComparison.OrdinalIgnoreCase))
-                            || (!string.IsNullOrEmpty(x.Message) && x.Message.Contains(q, StringComparison.OrdinalIgnoreCase))
-                            || (!string.IsNullOrEmpty(x.CongestionLevel) && x.CongestionLevel.Contains(q, StringComparison.OrdinalIgnoreCase)))
+                .Where(x =>
+                    string.IsNullOrEmpty(q)
+                    || (!string.IsNullOrEmpty(x.IncidentType) && x.IncidentType.Contains(q, StringComparison.OrdinalIgnoreCase))
+                    || (!string.IsNullOrEmpty(x.Message) && x.Message.Contains(q, StringComparison.OrdinalIgnoreCase))
+                    || (!string.IsNullOrEmpty(x.CongestionLevel) && x.CongestionLevel.Contains(q, StringComparison.OrdinalIgnoreCase)))
                 .Where(x => !_onlyRecent || x.DateCondition >= cutoff);
         }
 
@@ -192,17 +359,22 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                     await _outZen.DisposeAsync();
                 }
             }
-            catch { /* ignore */ }
+            catch
+            {
+                // ignore
+            }
 
             if (hubConnection is not null)
             {
                 try { await hubConnection.StopAsync(); } catch { }
                 try { await hubConnection.DisposeAsync(); } catch { }
             }
-            try { await JS.InvokeVoidAsync("disposeEarth", _canvasId); } catch { }
         }
     }
 }
+
+
+
 
 
 

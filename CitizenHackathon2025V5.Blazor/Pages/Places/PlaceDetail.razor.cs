@@ -1,7 +1,7 @@
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.AspNetCore.Components;
+using CitizenHackathon2025.Blazor.DTOs;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 {
@@ -12,10 +12,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         public HttpClient Client { get; set; }
         [Inject] public PlaceService PlaceService { get; set; } = default!;
         [Inject] public NavigationManager Nav { get; set; } = default!;
-        public ClientPlaceDTO? CurrentPlace { get; set; }
+        public ClientPlaceDTO CurrentPlace { get; set; }
         [Parameter] public int Id { get; set; }
 
-        private CancellationTokenSource? _cts;
+        private CancellationTokenSource _cts;
         protected override async Task OnParametersSetAsync()
         {
             // Cancels any previous request

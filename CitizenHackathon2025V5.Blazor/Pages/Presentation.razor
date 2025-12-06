@@ -1,13 +1,14 @@
-@page "/presentation"
+﻿@page "/presentation"
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @inject Blazored.Toast.Services.IToastService ToastService
-
-<button class="btn btn-success" @onclick="TestSignalR">
-    ?? Test SignalR reception
-</button>
+@inject NavigationManager Navigation
 
 <PageTitle>Presentation - OutZen</PageTitle>
+
+<button class="btn btn-success" @onclick="TestSignalR">
+    🔄 Test SignalR reception
+</button>
 
 <div class="page-list">
     <div class="presentation-container">
@@ -21,18 +22,10 @@
         <section class="features">
             <h2>What OutZen does</h2>
             <ul>
-                <li>
-                    ?? <strong>Real-time suggestions</strong> depending on your location and preferences.
-                </li>
-                <li>
-                    ??? <strong>Weather Analysis</strong> to adapt your activities to the climate.
-                </li>
-                <li>
-                    ?? <strong>Traffic status</strong> to avoid traffic jams and optimize your journey.
-                </li>
-                <li>
-                    ?? <strong>Crowd density</strong> analyzed to avoid overloaded places.
-                </li>
+                <li>💡 <strong>Real-time suggestions</strong> depending on your location and preferences.</li>
+                <li>🌦️ <strong>Weather Analysis</strong> to adapt your activities to the climate.</li>
+                <li>🚗 <strong>Traffic status</strong> to avoid traffic jams and optimize your journey.</li>
+                <li>👥 <strong>Crowd density</strong> analyzed to avoid overloaded places.</li>
             </ul>
         </section>
 
@@ -42,17 +35,21 @@
                 OutZen uses artificial intelligence connected to real-time weather, traffic, and crowd APIs to offer you seamless and enjoyable alternatives.
             </p>
         </section>
+
         <section class="scroll-reveal description">
             <p>
                 OutZen is a smart app that guides you toward the best travel experience.
-                By analyzing travel times, traffic, and weather in real time, it offers optimized suggestions to avoid crowds and make the most of your outing.
+                By analyzing travel times, traffic, and weather in real time, it offers optimized suggestions
+                to avoid crowds and make the most of your outing.
             </p>
         </section>
 
         <section class="scroll-reveal simulator">
             <h2>Crowd simulator</h2>
             <input type="range" min="0" max="100" @bind="CrowdLevel" />
-            <p class="level-indicator" style="color:@LevelColor">Affluence actuelle : @CrowdLevel%</p>
+            <p class="level-indicator" style="color:@LevelColor">
+                Affluence actuelle : @CrowdLevel%
+            </p>
             <div class="bar" style="width:@CrowdLevel%; background-color:@LevelColor;"></div>
         </section>
 
@@ -63,55 +60,36 @@
 
         <section class="call-to-action">
             <h2>Why choose OutZen?</h2>
-            <p>
-                Because a successful trip starts with good information.
-            </p>
+            <p>Because a successful trip starts with good information.</p>
             <button class="cta-button" @onclick="NavigateHome">Back to home</button>
         </section>
     </div>
-    @* <select @onchange="ChangeTheme">
-        <option value="theme-ultraluxe">Ultra Luxe</option>
-    </select> *@
 </div>
-
-
-<div id="map"></div>
 
 <MapSimulator />
 
-<div class="earth-container scroll-fade">
-    <canvas id="@_canvasId" width="450" height="450"></canvas>
-    <div class="earth-controls">
-        <label for="@_speedId">Rotation Speed:</label>
-        <input id="@_speedId" type="range" min="0" max="0.20" step="0.001" value="0.01" />
-    </div>
+<div class="earth-wrapper">
+    <Globe />
 </div>
 
 @code {
 #nullable disable
-    [Inject]
-    NavigationManager Navigation { get; set; }
     private string _canvasId = $"rotatingEarth-{Guid.NewGuid():N}";
     private string _speedId = $"speedRange-{Guid.NewGuid():N}";
 
-    protected override Task OnInitializedAsync()
-    {
-        // synchronous logic
-        return Task.CompletedTask;
-    }
-    private void NavigateHome()
-    {
-        Navigation.NavigateTo("/");
-    }
     private int CrowdLevel { get; set; } = 30;
 
     private string LevelColor =>
         CrowdLevel < 30 ? "green" :
         CrowdLevel < 70 ? "orange" : "red";
+
+    protected override Task OnInitializedAsync() => Task.CompletedTask;
+
+    private void NavigateHome() => Navigation.NavigateTo("/");
+
     private async Task ChangeTheme(ChangeEventArgs e)
-    {
-        await JS.InvokeVoidAsync("setTheme", e.Value?.ToString());
-    }
+        => await JS.InvokeVoidAsync("setTheme", e.Value?.ToString());
+
     private async Task TestSignalR()
     {
         var fakeData = new
@@ -119,54 +97,34 @@
             latitude = 50.895,
             longitude = 4.3415,
             level = 2,
-            description = "?? Cork simulation",
+            description = "🔧 Cork simulation",
             timestamp = DateTime.Now
         };
 
         await JS.InvokeVoidAsync("trafficInterop.updateTrafficMarkers", new[] { fakeData });
     }
-    // protected override async Task OnAfterRenderAsync(bool firstRender)
-    // {
-    //     if (!firstRender) return;
-           
-    //     try
-    //     {
-    //         await JS.InvokeVoidAsync("initializeLeafletMap");
-    //         await JS.InvokeVoidAsync("initScrollAnimations");
-    //         await JS.InvokeVoidAsync("startOutzenConnection");
-    //     }
-           // catch (Exception ex)
-           //  {
-           //      Console.WriteLine("Erreur JS interop : " + ex.Message);
-           //  }
-    // }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            Console.WriteLine("Presentation.razor: JS initialisation via init.js");
-            await JS.InvokeVoidAsync("import", "./js/init.js");
-            await JS.InvokeVoidAsync("outzen.init");
-        }
         if (!firstRender) return;
-        await JS.InvokeVoidAsync("initEarth", new
-        {
-            canvasId = _canvasId,
-            speedControlId = _speedId,
-            dayUrl = "/images/earth_texture.jpg?v=1",
-            nightUrl = "/images/earth_texture_night.jpg?v=1"
-        });
+
+        // 1) Init OutZen front (Leaflet + scroll + multi-hub)
+        await JS.InvokeVoidAsync("outzen.initPresentation"); // see section 3
     }
+
     [JSInvokable]
     public async Task OnCrowdInfoReceived(string dataJson)
     {
-        // Deserializes and processes received SignalR data
+        // TODO: Deserialise & bind if you want to show something on the page
+        await Task.CompletedTask;
     }
+
     public async ValueTask DisposeAsync()
     {
         try { await JS.InvokeVoidAsync("disposeEarth", _canvasId); } catch { }
     }
 }
+
 
 
 

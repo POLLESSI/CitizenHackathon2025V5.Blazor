@@ -10,9 +10,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Models
         public string IncidentType { get; set; } = "";
         public string Description { get; set; } = "";
         public string CongestionLevel { get; set; } = "";
-        public string? Location { get; set; } = "";
-        public byte? Level { get; set; }
-        public string? Message { get; set; } = "";
+        public string Message { get; set; } = "";
 
     }
 }

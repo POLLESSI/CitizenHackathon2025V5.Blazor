@@ -1,6 +1,8 @@
 @page "/crowd-signalr"
-@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025.Blazor.DTOs;
 @using Microsoft.AspNetCore.SignalR.Client
+@using CitizenHackathon2025.Contracts.Hubs;
+@using ContractsCrowdHubMethods = CitizenHackathon2025.Contracts.Hubs.CrowdHubMethods
 
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
@@ -19,7 +21,7 @@
             .WithAutomaticReconnect()
             .Build();
 
-        _hubConnection.On<ClientCrowdInfoDTO>(CrowdHubMethods.ReceiveCrowdUpdate, async crowd =>
+        _hubConnection.On<ClientCrowdInfoDTO>(CitizenHackathon2025.Blazor.DTOs.CrowdHubMethods.ReceiveCrowdUpdate, async crowd =>
          {
             Console.WriteLine($"?? Update Crowd received: {crowd.LocationName} ({crowd.CrowdLevel})");
             await JS.InvokeVoidAsync("window.OutZenInterop.addOrUpdateCrowdMarker",

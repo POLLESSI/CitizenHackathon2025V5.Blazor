@@ -1,11 +1,10 @@
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
-using CitizenHackathon2025.Shared.StaticConfig.Constants;
-using CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants;
+using CitizenHackathon2025.Contracts.Hubs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Newtonsoft.Json;
 using Microsoft.JSInterop;
+using CitizenHackathon2025.Blazor.DTOs;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
 {
@@ -23,13 +22,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
         [Inject] public IAuthService Auth { get; set; }
 
         private const string ApiBase = "https://localhost:7254";
-        private IJSObjectReference? _outZen;
+        private IJSObjectReference _outZen;
         public List<ClientSuggestionDTO> Suggestions { get; set; }
         private List<ClientSuggestionDTO> allSuggestions = new();
         private List<ClientSuggestionDTO> visibleSuggestions = new();
         private int currentIndex = 0;
         private const int PageSize = 100;
-        private string _canvasId = $"rotatingEarth-{Guid.NewGuid():N}";
         private string _speedId = $"speedRange-{Guid.NewGuid():N}";
 
         public int SelectedId { get; set; }
@@ -54,15 +52,19 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
 
             // 2) SignalR
             var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
+            var hubBaseUrl = Config["SignalR:HubBase"]?.TrimEnd('/')
+                             ?? $"{apiBaseUrl}/hubs"; // fallback if no specific configuration
+
+            var url = $"{hubBaseUrl}{HubPaths.Suggestion}"; // => https://.../hubs/suggestions
 
             hubConnection = new HubConnectionBuilder()
-                .WithUrl($"{apiBaseUrl}{SuggestionHubMethods.HubPath}", options =>
+                .WithUrl(url, options =>
                 {
-                    // If your hub is later protected, provide a token
                     options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
                 })
                 .WithAutomaticReconnect()
                 .Build();
+
 
             // Handlers
             hubConnection.On<ClientSuggestionDTO>(SuggestionHubMethods.ToClient.ReceiveSuggestion, async dto =>
@@ -147,14 +149,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
                 zoom = 13,
                 enableChart = true
             });
-            await JS.InvokeVoidAsync("initEarth", new
-            {
-                canvasId = _canvasId,
-                speedControlId = _speedId,
-                dayUrl = "/images/earth_texture.jpg?v=1",
-                nightUrl = "/images/earth_texture_night.jpg?v=1"
-            });
-
+            
             await _outZen.InvokeVoidAsync("initCrowdChart", "crowdChart");
         }
         private void ClickInfo(int id) => SelectedId = id;
@@ -209,7 +204,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
                 try { await hubConnection.StopAsync(); } catch { }
                 try { await hubConnection.DisposeAsync(); } catch { }
             }
-            try { await JS.InvokeVoidAsync("disposeEarth", _canvasId); } catch { }
         }
     }
 }

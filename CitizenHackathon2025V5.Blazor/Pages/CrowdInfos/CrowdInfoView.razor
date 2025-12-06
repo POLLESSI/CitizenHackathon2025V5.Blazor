@@ -1,5 +1,5 @@
 ﻿@page "/crowdinfoview"
-@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025.Blazor.DTOs;
 @using CitizenHackathon2025V5.Blazor.Client.Utils
 @using CitizenHackathon2025V5.Blazor.Client.Enums
 @inject IJSRuntime js
@@ -97,13 +97,8 @@
         <button @onclick="TestBoot">Test Boot</button>
     </div>
 </div>
-<div class="earth-container scroll-fade">
-    <canvas id="@_canvasId" width="450" height="450"></canvas>
-    <div class="earth-controls">
-        <label for="@_speedId">Rotation Speed:</label>
-        <input id="@_speedId" type="range" min="0" max="0.20" step="0.001" value="0.01" />
-    </div>
-</div>
+
+<Globe />
 
 @if (SelectedId > 0)
 {
@@ -121,26 +116,35 @@
 @code {
     async Task TestMarkers()
     {
+        if (_outzen is null) return;
+
         var testData = new[]
         {
-                new { Id=1, Lat=50.89, Lng=4.34, Level=2, Name="Parck" },
-                new { Id=2, Lat=50.88, Lng=4.35, Level=3, Name="Station" },
-                new { Id=3, Lat=50.90, Lng=4.33, Level=4, Name="Center" }
-                };
+        new { Id=1, Lat=50.89, Lng=4.34, Level=2, Name="Parck" },
+        new { Id=2, Lat=50.88, Lng=4.35, Level=3, Name="Station" },
+        new { Id=3, Lat=50.90, Lng=4.33, Level=4, Name="Center" }
+    };
 
         foreach (var t in testData)
         {
-            await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdMarker",
-            t.Id, t.Lat, t.Lng, t.Level,
-            new { title = t.Name, description = "Test" });
+            await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
+                t.Id, t.Lat, t.Lng, t.Level,
+                new { title = t.Name, description = "Test" });
         }
+
+        try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
     }
+
     async Task TestBoot()
     {
-        await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers");
-        await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdMarker", "999", 50.89, 4.34, 5,
+        if (_outzen is null) return;
+
+        await _outzen.InvokeVoidAsync("clearCrowdMarkers");
+        await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker", "999", 50.89, 4.34, 5,
             new { title = "TEST", description = "debug" });
+        try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
     }
+
 }
 
 

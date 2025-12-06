@@ -1,7 +1,6 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.DTOs;
+﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
-using CitizenHackathon2025.Shared.StaticConfig.Constants;
-using CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants;
+using CitizenHackathon2025.Contracts.Hubs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
@@ -21,7 +20,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Messages
         [Inject] public IAuthService Auth { get; set; }
 
         private const string ApiBase = "https://localhost:7254";
-        private IJSObjectReference? _message;
+        private IJSObjectReference _message;
         public int SelectedId { get; set; }
         public HubConnection hubConnection { get; set; }
 
@@ -35,21 +34,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Messages
             //currentIndex = 0;
             //LoadMoreItems();
             // 2) SignalR (Absolute URL on API side)
-            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? ApiBase.TrimEnd('/');
-            var hubPath = "/hubs/messageHub";
-            var hubUrl = BuildHubUrl(apiBaseUrl, hubPath);
+            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
+            var hubBaseUrl = Config["SignalR:HubBase"]?.TrimEnd('/')
+                             ?? $"{apiBaseUrl}/hubs"; // fallback if no specific configuration
+
+            var url = $"{hubBaseUrl}{HubPaths.Message}"; // => https://localhost:7254/hubs/messageHub
+
             hubConnection = new HubConnectionBuilder()
-                .WithUrl(hubUrl, options =>
+                .WithUrl(url, options =>
                 {
-                    options.AccessTokenProvider = async () =>
-                    {
-                        // Get your JWT here (via IAuthService, etc.)
-                        var token = await Auth.GetAccessTokenAsync();
-                        return token ?? string.Empty;
-                    };
+                    options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
                 })
                 .WithAutomaticReconnect()
                 .Build();
+
             //// AISuggestionHub
             //hubConnection = new HubConnectionBuilder()
             //    .WithUrl(apiBaseUrl + TourismeHubMethods.HubPath)

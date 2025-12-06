@@ -3,7 +3,7 @@
     public static class TrafficConditionHubMethods
     {
         /// <summary>Hub Path — Must match the MapHub on the Blazor side.</summary>
-        public const string HubPath = "/hubs/trafficHub";
+        public const string HubPath = "trafficHub";
 
         /// <summary>Events sent by the server to clients.</summary>
         public static class ToClient

@@ -1,4 +1,4 @@
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Auths;
 using Microsoft.JSInterop;
 using System.Net;
@@ -43,7 +43,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
             
         }
-        public async Task<ClientUserDTO?> GetById(int id)
+        public async Task<ClientUserDTO> GetById(int id)
         {
             if (id <= 0)
             {
@@ -93,7 +93,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             
         }
 
-        public async Task<string?> GetAccessTokenAsync()
+        public async Task<string> GetAccessTokenAsync()
         {
             try
             {

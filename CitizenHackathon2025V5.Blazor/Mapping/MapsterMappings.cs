@@ -1,4 +1,4 @@
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Enums;
 using Mapster;
 
@@ -70,11 +70,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Mapping
         // Overload 2: source exposes an int (0..10 or already 0..3)
         private static CrowdLevelEnum ParseCrowdLevel(int level)
         {
-            // si c'est déjà l'énum 0..3, ça tombe juste
+            // If it's already enum 0..3, it works out perfectly.
             if (level <= 1) return CrowdLevelEnum.Low;
             if (level == 2 || level == 3) return CrowdLevelEnum.Medium;
 
-            // sinon, bucketing 0..10 par ex.
+            // otherwise, bucketing 0..10 for example.
             if (level <= 3) return CrowdLevelEnum.Low;
             if (level <= 6) return CrowdLevelEnum.Medium;
             if (level <= 8) return CrowdLevelEnum.High;
@@ -105,7 +105,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Mapping
         // ==================================================
         // Helpers - Traffic
         // ==================================================
-        private static int ParseTrafficLevel(string level) =>
+        private static int ParseTrafficLevel(string? level) =>
             int.TryParse(level, out var result) ? result : 1; // Défaut = 1 (Low)
 
         private static string MapTrafficColor(int level) =>
@@ -121,31 +121,32 @@ namespace CitizenHackathon2025V5.Blazor.Client.Mapping
         // ==================================================
         // Helpers - Weather
         // ==================================================
-        private static string MapWeatherIcon(string summary) =>
-            summary?.ToLower() switch
-            {
-                "sunny" => "sun",
-                "clear" => "sun",
-                "partlycloudy" => "cloud-sun",
-                "cloudy" => "cloud",
-                "rain" => "cloud-rain",
-                "thunderstorm" => "bolt",
-                "snow" => "snowflake",
-                _ => "question"
-            };
-
-        private static string MapWeatherColor(string summary) =>
-            summary?.ToLower() switch
-            {
-                "sunny" => "yellow",
-                "clear" => "yellow",
-                "partlycloudy" => "lightgray",
-                "cloudy" => "gray",
-                "rain" => "blue",
-                "thunderstorm" => "purple",
-                "snow" => "white",
-                _ => "darkgray"
-            };
+        public static string MapWeatherIcon(string? summary)
+            => string.IsNullOrWhiteSpace(summary) ? "unknown" :
+               summary.ToLower() switch
+               {
+                   "sunny" => "sun",
+                   "clear" => "sun",
+                   "partlycloudy" => "cloud-sun",
+                   "cloudy" => "cloud",
+                   "rain" => "cloud-rain",
+                   "thunderstorm" => "bolt",
+                   "snow" => "snowflake",
+                   _ => "question"
+               };
+        private static string MapWeatherColor(string? summary)
+            => string.IsNullOrWhiteSpace(summary) ? "darkgray" :
+               summary.ToLower() switch
+               {
+                   "sunny" => "yellow",
+                   "clear" => "yellow",
+                   "partlycloudy" => "lightgray",
+                   "cloudy" => "gray",
+                   "rain" => "blue",
+                   "thunderstorm" => "purple",
+                   "snow" => "white",
+                   _ => "darkgray"
+               };
     }
 }
 

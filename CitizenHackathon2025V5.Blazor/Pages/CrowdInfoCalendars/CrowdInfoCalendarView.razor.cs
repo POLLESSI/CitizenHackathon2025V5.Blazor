@@ -1,6 +1,5 @@
 ﻿//CrowdInfoCalendarView.razor.cs
-
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using static CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService;
@@ -16,7 +15,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
         private string? region;
         private int? placeId;
         private string? activeFilter; // "", "true", "false"
-        private string _canvasId = $"rotatingEarth-{Guid.NewGuid():N}";
         private string _speedId = $"speedRange-{Guid.NewGuid():N}";
 
         protected override async Task OnInitializedAsync()
@@ -41,12 +39,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
         private async Task Load()
         {
             bool? active = activeFilter switch { "true" => true, "false" => false, _ => (bool?)null };
-            items = (await Svc.ListAsync(from, to, region, placeId, active)).ToList();
+
+            // ✅ Safe-null + empty list
+            items = (await Svc.ListAsync(from, to, region, placeId, active))?.ToList() ?? new List<ClientCrowdInfoCalendarDTO>();
         }
 
         private async Task LoadAll()
         {
-            items = (await Svc.GetAllAsync()).ToList();
+            // ✅ Safe-null + empty list
+            items = (await Svc.GetAllAsync())?.ToList() ?? new List<ClientCrowdInfoCalendarDTO>();
         }
         //public async ValueTask DisposeAsync()
         //{

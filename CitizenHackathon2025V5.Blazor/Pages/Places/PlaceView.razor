@@ -1,10 +1,13 @@
 ﻿@page "/placeview"
 @using CitizenHackathon2025V5.Blazor.Client.Constants
 @using CitizenHackathon2025V5.Blazor.Client.Pages.Places
-@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025.Blazor.DTOs;
 @implements IAsyncDisposable
 
 <span class="fas fa-certificate me-2"></span> Places
+
+<!-- === MAP PANEL === -->
+<div class="map-host" id="placeMap" style="height:480px;min-height:480px; width:100%;"></div>
 
 <div class="page-list">
     @* <h3>Place List</h3> *@
@@ -30,7 +33,7 @@
             </NavLink>
         </div>
     </div>
-
+    <div id="leafletMap" class="map"></div>
     <div class="table-wrapper draggable-container"
          @ref="ScrollContainerRef"
          @onscroll="HandleScroll"
@@ -72,13 +75,8 @@
         </table>
     </div>
 </div>
-<div class="earth-container scroll-fade">
-    <canvas id="@_canvasId" width="450" height="450"></canvas>
-    <div class="earth-controls">
-        <label for="@_speedId">Rotation Speed:</label>
-        <input id="@_speedId" type="range" min="0" max="0.20" step="0.001" value="0.01" />
-    </div>
-</div>
+
+<Globe />
 
 @if (SelectedId > 0)
 {

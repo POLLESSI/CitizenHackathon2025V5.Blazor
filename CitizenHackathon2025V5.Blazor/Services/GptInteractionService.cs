@@ -1,4 +1,4 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.DTOs;
+﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions;
 using System.Net;
 using System.Net.Http.Json;
@@ -9,7 +9,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     {
 #nullable disable
         private readonly HttpClient _httpClient;
-        private const string Base = "api/gpt";
+        //private const string Base = "api/gpt";
 
         public GptInteractionService(HttpClient httpClient)
         {
@@ -19,7 +19,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{Base}/all");
+                var response = await _httpClient.GetAsync("Gpt/all");
                 if (response.StatusCode == HttpStatusCode.NotFound) 
                     return Enumerable.Empty<ClientGptInteractionDTO>();
                 response.EnsureSuccessStatusCode();
@@ -34,13 +34,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
             
         }
-        public async Task<ClientGptInteractionDTO?> GetByIdAsync(int id, CancellationToken ct = default)
+        public async Task<ClientGptInteractionDTO> GetByIdAsync(int id, CancellationToken ct = default)
         {
             if (id <= 0) return null;
 
             try
             {
-                using var response = await _httpClient.GetAsync($"{Base}/{id}", ct);
+                using var response = await _httpClient.GetAsync($"Gpt/{id}", ct);
 
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return null;
@@ -83,7 +83,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync($"{Base}/ask-gpt", prompt);
+                var response = await _httpClient.PostAsJsonAsync("Gpt/ask-gpt", prompt);
                 if (response.StatusCode == HttpStatusCode.NotFound) return;
                 response.EnsureSuccessStatusCode();
 
@@ -101,7 +101,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.DeleteAsync($"{Base}/{id}");
+                var response = await _httpClient.DeleteAsync($"Gpt/{id}");
                 if (response.StatusCode == HttpStatusCode.NotFound) return;
                 response.EnsureSuccessStatusCode();
 
@@ -119,7 +119,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync($"{Base}/replay/{id}", new { });
+                var response = await _httpClient.PostAsJsonAsync($"Gpt/replay/{id}", new { });
                 if (response.StatusCode == HttpStatusCode.NotFound) return;
                 response.EnsureSuccessStatusCode();
                 

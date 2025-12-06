@@ -1,4 +1,4 @@
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.WebUtilities;
@@ -9,14 +9,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
     {
 #nullable disable
         [Inject]
-        public HttpClient? Client { get; set; }
+        public HttpClient Client { get; set; }
         [Inject] public NavigationManager Nav { get; set; } = default!;
         [Inject] public TrafficConditionService TrafficConditionService { get; set; } = default!;
-        public ClientTrafficConditionDTO? CurrentTrafficCondition { get; set; }
+        public ClientTrafficConditionDTO CurrentTrafficCondition { get; set; }
 
         [Parameter] public int Id { get; set; }
 
-        private CancellationTokenSource? _cts;
+        private CancellationTokenSource _cts;
         protected override async Task OnParametersSetAsync()
         {
             // Cancels any previous request

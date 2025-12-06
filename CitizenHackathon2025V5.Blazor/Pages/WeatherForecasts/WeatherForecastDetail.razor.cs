@@ -1,4 +1,4 @@
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 
@@ -7,13 +7,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
     public partial class WeatherForecastDetail : ComponentBase, IDisposable
     {
     #nullable disable
-        [Inject] public HttpClient? Client { get; set; }
+        [Inject] public HttpClient Client { get; set; }
         [Inject] public WeatherForecastService WeatherForecastService { get; set; } = default!;
-        public ClientWeatherForecastDTO? CurrentWeatherForecast { get; set; }
+        public ClientWeatherForecastDTO CurrentWeatherForecast { get; set; }
 
         [Parameter] public int Id { get; set; }
 
-        private CancellationTokenSource? _cts;
+        private CancellationTokenSource _cts;
         protected override async Task OnParametersSetAsync()
         {
             // Cancels any previous request

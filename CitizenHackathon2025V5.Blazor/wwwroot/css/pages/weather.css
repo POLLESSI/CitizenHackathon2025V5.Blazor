@@ -1,4 +1,6 @@
-﻿wwwroot.css.pages.pages.weather.css
+﻿/*wwwroot/CSS/pages/weather.css*/
+
+wwwroot.css.pages.pages.weather.css
 {
     padding: 1rem;
     background: var(--color-bg-alt);
@@ -11,6 +13,40 @@
     grid-template-columns: 1fr 320px;
     gap: var(--spacing-md);
 }
+.oz-marker {
+    border-radius: 50%;
+}
+
+.oz-marker-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px; /* legible */
+    line-height: 1;
+}
+
+/* you keep the colors by level, e.g.you keep the colors by level, e.g. : */
+
+.oz-marker-lvl1 .oz-marker-inner {
+    background: #2e7d32;
+    color: #fff;
+}
+
+.oz-marker-lvl2 .oz-marker-inner {
+    background: #f9a825;
+    color: #000;
+}
+
+.oz-marker-lvl3 .oz-marker-inner {
+    background: #f57c00;
+    color: #000;
+}
+
+.oz-marker-lvl4 .oz-marker-inner {
+    background: #c62828;
+    color: #fff;
+}
+
 
 @media (max-width: 900px) {
     .weather-layout {

@@ -1,4 +1,5 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.DTOs;
+﻿using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025.Contracts.Enums;
 using CitizenHackathon2025V5.Blazor.Client.Enums;
 using CitizenHackathon2025V5.Blazor.Client.Utils;
 
@@ -9,15 +10,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Utils
         public static ClientWeatherForecastDTO Enrich(ClientWeatherForecastDTO dto)
         {
             // 1) Type from summary
-            var type = WeatherForecastSeverityHelper.GetWeatherType(dto);
+            var type = WeatherForecastSeverityHelper.ToEnum(dto.Summary ?? string.Empty); // ✅ remplace GetWeatherType
 
-            // 2) Purely UI fields
+            // 2) Purely UI
             dto.WeatherMain = type.ToString();
             dto.Icon = WeatherForecastSeverityHelper.GetIcon(type);
-            dto.IconUrl = IconUrlFrom(type);     // eg: local mapping, not OpenWeather required
+            dto.IconUrl = IconUrlFrom(type);
             dto.Description = WeatherForecastSeverityHelper.GetDescription(type);
 
-            // 3) Simple severity (examples — adapt your thresholds)
+            // 3) Simple severity
             dto.IsSevere =
                 dto.WindSpeedKmh >= 60
                 || dto.RainfallMm >= 10
@@ -27,11 +28,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Utils
         }
 
         private static string IconUrlFrom(WeatherType type)
-        {
-            // Put your own pictograms (wwwroot/images/weather/…)
-            var name = type.ToString().ToLowerInvariant();
-            return $"/images/weather/{name}.svg";
-        }
+            => $"/images/weather/{type.ToString().ToLowerInvariant()}.svg";
     }
 }
 

@@ -4,7 +4,7 @@
     /* You can add OutZen-specific variables here if needed. */
 }
 
-body {
+[data-theme="outzen"] body {
     font-family: 'Poppins', sans-serif;
     margin: 0;
     background: linear-gradient(135deg, #2c113f, #000000);
@@ -12,9 +12,14 @@ body {
     overflow-x: hidden;
 }
 
-    body.night-mode {
-        background-image: url('/images/icons/night.png');
+[data-theme="outzen"] a {
+    color: var(--color-highlight);
+}
+
+    [data-theme="outzen"] a:hover {
+        color: var(--color-primary);
     }
+   
 
 .scroll-container {
     scroll-behavior: smooth;
@@ -79,7 +84,8 @@ section {
         transform: none;
     }
 
-h1, h2 {
+[data-theme="outzen"] h1,
+[data-theme="outzen"] h2 {
     font-weight: 600;
     color: #FFD700;
     text-shadow: 0 0 8px #fff5cc;
@@ -126,42 +132,261 @@ h1, h2 {
     border-radius: 8px;
 }
 
-.map-simulator-panel {
-    position: fixed;
-    top: 80px;
-    right: 0;
-    width: 560px;
-    background-color: #f0f0f0;
-    border-left: 2px solid #ccc;
-    box-shadow: -2px 0 8px rgba(0,0,0,0.1);
-    font-family: 'Poppins', sans-serif;
-    transition: transform 0.3s ease-in-out;
-    z-index: 9999;
+
+/* ============================
+   OutZen map markers (Crowd + Traffic)
+   Colors aligned on the info-chip / traffic-chip buttons
+   ============================ */
+
+/* Base bubble marker */
+.oz-marker {
+    border-radius: 50%;
+    transform: translate3d(0, 0, 0);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.4);
 }
 
-    .map-simulator-panel.collapsed {
-        transform: translateX(230px);
+.oz-marker-inner {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid #ffffff;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+/* 0 = neutral / unknown (grey) */
+.oz-marker-lvl0 .oz-marker-inner {
+    background: #9e9e9e; /* grey */
+}
+
+/* 1 = Low / Freeflow (green) + gentle pulsation to attract attention */
+.oz-marker-lvl1 .oz-marker-inner {
+    background: #4caf50;
+    animation: oz-pulse-low 1.4s ease-in-out infinite;
+}
+
+/* 2 = Medium / Moderate (orange) */
+.oz-marker-lvl2 .oz-marker-inner {
+    background: #f44336;
+    animation: oz-pulse-low 1.4s ease-in-out infinite;
+}
+
+/* 3 = High / Heavy (red) */
+.oz-marker-lvl3 .oz-marker-inner {
+    background: #dc3545;
+    animation: oz-pulse-low 1.4s ease-in-out infinite;
+}
+
+/* 4 = Critical / Jammed (dark red flashing) */
+.oz-marker-lvl4 .oz-marker-inner {
+    background: #b71c1c; /* dark red */
+    color: #fff;
+    animation: oz-blink-critical 0.9s infinite alternate;
+}
+.oz-marker-traffic .oz-marker-inner {
+    border-width: 3px;
+    border-color: #000; /* sharper outline */
+}
+
+/* =======================================================
+   TRAFFIC OVERLAY
+   - applies a different style only if the class
+     .oz-marker-traffic is present in addition to the level.
+   ======================================================= */
+
+/* 1 = Freeflow / Low Traffic : large halo + more pronounced pulsation */
+.oz-marker-traffic.oz-marker-lvl1 .oz-marker-inner {
+    animation: oz-pulse-traffic-low 1.2s ease-in-out infinite !important;
+    box-shadow: 0 0 10px rgba(40,167,69,0.7), 0 0 22px rgba(40,167,69,0.45), 0 0 36px rgba(40,167,69,0.30);
+}
+
+/* 2 = Moderate : faint, non-pulsating halo */
+.oz-marker-traffic.oz-marker-lvl2 .oz-marker-inner {
+    box-shadow: 0 0 8px rgba(253,126,20,0.45), 0 0 18px rgba(253,126,20,0.25);
+}
+
+/* 3 = Heavy : intense static red */
+.oz-marker-traffic.oz-marker-lvl3 .oz-marker-inner {
+    box-shadow: 0 0 10px rgba(220,53,69,0.55), 0 0 20px rgba(220,53,69,0.30);
+}
+
+/* 4 = Jammed : keep animation critical dark red */
+.oz-marker-traffic.oz-marker-lvl4 .oz-marker-inner {
+    animation: oz-blink-critical 0.9s infinite alternate !important;
+}
+.oz-simulator {
+    border-radius: 1rem;
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 1.5rem;
+    border: 1px solid var(--color-primary-dark);
+    box-shadow: inset 0 0 10px rgba(0, 255, 255, 0.1), 0 0 20px rgba(0, 255, 255, 0.2);
+    color: #fff;
+    margin-bottom: 1.5rem;
+}
+
+    .oz-simulator h3 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: var(--color-primary-light);
     }
 
-    .map-simulator-panel .header {
-        padding: 10px;
-        background-color: #ddd;
-        font-weight: bold;
-        cursor: pointer;
+    .oz-simulator .gauge {
+        height: 12px;
+        width: 100%;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .oz-simulator .gauge-fill {
+        height: 100%;
+        width: 0%;
+        background-color: var(--color-warning);
+        transition: width 0.6s ease;
+    }
+
+    .oz-simulator .labels {
+        margin-top: 0.5rem;
         display: flex;
         justify-content: space-between;
-        align-items: center;
+        font-size: 0.9rem;
+        color: #ccc;
     }
 
-    .map-simulator-panel .body {
-        padding: 10px;
+.oz-weather-legend {
+    background: rgba(0, 0, 0, 0.78);
+    color: #f5f5f5;
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.6);
+    max-width: 200px;
+}
+
+.oz-weather-legend-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.15);
+    padding-bottom: 2px;
+}
+
+.oz-weather-legend-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+.oz-weather-emoji {
+    width: 18px;
+    text-align: center;
+}
+
+/* Level 4 = critical -> flashes */
+.oz-marker-lvl4 .oz-marker-inner {
+    animation: oz-blink-warning 0.9s infinite;
+}
+
+.rain-alert-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 2000;
+    background: #b00020;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1.25rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    animation: rain-alert-blink 1s ease-in-out infinite alternate;
+    cursor: pointer;
+}
+
+.rain-alert-icon {
+    font-size: 1.75rem;
+    margin-right: 0.75rem;
+}
+
+.rain-alert-text {
+    font-size: 0.95rem;
+}
+
+.rain-alert-sensitive {
+    font-weight: 600;
+    margin-top: 0.25rem;
+}
+
+.rain-alert-details {
+    margin-top: 0.15rem;
+    font-size: 0.85rem;
+    opacity: 0.9;
+}
+
+.rain-alert-marker {
+    stroke: #ffffff;
+    stroke-width: 2px;
+    fill: #ff1744;
+    animation: rain-marker-pulse 1s ease-in-out infinite alternate;
+}
+
+.rain-alert-popup {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+@keyframes rain-marker-pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
     }
 
-    .map-simulator-panel .buttons {
-        margin-top: 10px;
-        display: flex;
-        gap: 8px;
+    100% {
+        transform: scale(1.4);
+        opacity: 0.4;
     }
+}
+
+@keyframes rain-alert-blink {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0.35;
+    }
+}
+
+@keyframes oz-blink-warning {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 4px rgba(255,255,255,0.4);
+    }
+
+    50% {
+        transform: scale(1.18);
+        box-shadow: 0 0 12px rgba(255,255,255,0.95);
+    }
+}
+
+/* Reduced animations if the user prefers less movement */
+@media (prefers-reduced-motion: reduce) {
+    .oz-marker-lvl1 .oz-marker-inner,
+    .oz-marker-lvl4 .oz-marker-inner {
+        animation: none !important;
+    }
+}
+
+
+
+
+
 
 
 

@@ -8,9 +8,11 @@ import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/thr
 /* =============================
    Leaflet & SignalR
 =============================*/
-import L from 'https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.esm.js';
-import 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js';
-import * as signalR from 'https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js';
+/*import L from 'https://unpkg.com/leaflet@1.9.4/dist/leaflet-src.esm.js';*/
+const L = window.L;
+/*import 'https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js';*/
+/*import * as signalR from 'https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/7.0.5/signalr.min.js';*/
+const signalR = window.signalR;
 
 /* =============================
    Map Logic

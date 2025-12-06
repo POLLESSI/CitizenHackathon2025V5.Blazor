@@ -3,10 +3,6 @@
 @using Blazored.Toast
 @inherits LayoutComponentBase
 
-<button class="btn btn-primary" @onclick="ShowTestToast">
-    Test the toast
-</button>
-
 <PageTitle>OutZen CitizenHackathon 2025</PageTitle>
 
 <div class="background-svg">
@@ -22,9 +18,10 @@
     <main class="main-content">
         <div class="page-content">
             <BlazoredToasts Position="Blazored.Toast.Configuration.ToastPosition.TopRight" />
-            @Body
+            @Body  
         </div>
     </main>
+
     <div class="dynamic-bg @GetTimeClass()" style="background-image: url('@GetBackgroundImage()');"></div>
 
     <footer class="main-footer">
@@ -33,10 +30,7 @@
 
     <canvas id="layoutBackgroundCanvas" width="800" height="400"></canvas>
 </div>
-<div class="page">
-  <div class="sidebar">@Body</div>
-  @* <Globe CssClass="globe-fixed" ShowControls="true" /> *@
-</div>
+
 <!-- Decorative SVGs -->
 @* <div class="svg-background">
     <svg viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">
@@ -110,6 +104,7 @@
 @* <BlazoredToast ToastId="Toast2" Position="ToastPosition.BottomRight" /> *@
 
 @code {
+    // ShowTestToast, GetBackgroundImage(), GetTimeClass() etc...
 }
 
 

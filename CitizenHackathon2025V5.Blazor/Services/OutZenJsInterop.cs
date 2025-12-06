@@ -1,5 +1,5 @@
 ﻿// Client/Services/OutZenJsInterop.cs
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025.Blazor.DTOs;
 using Microsoft.JSInterop;
 
 public sealed class OutZenJsInterop : IAsyncDisposable

@@ -1,4 +1,4 @@
-<!--wwwroot/index.html-->
+<!-- wwwroot/index.html -->
 <!DOCTYPE html>
 <html lang="fr-BE">
 <head>
@@ -14,39 +14,56 @@
     <meta http-equiv="Cache-Control" content="no-cache" />
     <meta http-equiv="Pragma" content="no-cache" />
 
-    <!-- Favicon & PWA -->
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="icon" type="image/png" href="favicon.png" />
-    <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
-    <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512.png" />
-
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;700&display=swap" rel="stylesheet" />
 
-    <!-- Base Styles -->
-    <link href="/css/base/variables.css?v=2" rel="stylesheet" />
-    <link href="/css/animations/site-variables.css" rel="stylesheet">
-    <link href="/css/animations/animations.css" rel="stylesheet" />
-    <link href="/css/animations/pulseColors.css" rel="stylesheet" />
-    <link href="/css/animations/visual-elements.css" rel="stylesheet" />
+    <!-- 1. Reset & basic variables    -->
+    <link href="/CSS/base/reset.css" rel="stylesheet" />
+    <link href="/CSS/base/variables.css?v=2" rel="stylesheet" />
 
-    <!-- Theme -->
-    <link href="css/themes/outzen.css" rel="stylesheet" />
-    <link href="css/themes/styles.css" rel="stylesheet" />
+    <!-- 2. Basic structure / layout / typography -->
+    <link href="/CSS/base/base.css" rel="stylesheet" />
+    <link href="/CSS/base/site.css" rel="stylesheet" />
+    <link href="/CSS/base/app.css" rel="stylesheet" />
+    <link href="/CSS/base/blazor-core.css" rel="stylesheet" />
+    <link href="/CSS/base/layout.css" rel="stylesheet" />
+    <link href="/CSS/base/SharedStyles.css" rel="stylesheet" />
+    <link href="/CSS/base/simulator.css" rel="stylesheet" />
 
-    <!-- Components -->
-    <link href="/css/components/detail-container.css" rel="stylesheet" />
-    <link href="/css/components/info.css" rel="stylesheet" />
-    <link href="/css/components/map.css" rel="stylesheet" />
-    <link href="/css/base/simulator.css" rel="stylesheet">
-    <link href="css/components/panels.css" rel="stylesheet" />
-    <link href="/css/components/table.css" rel="stylesheet" />
-    <link href="/css/components/button.css?v=3" rel="stylesheet" />
-    <link href="/css/components/globe.css" rel="stylesheet" />
+    <!-- 3. Themes (variables per theme, then OutZen) -->
+    <link href="/CSS/themes/light.css" rel="stylesheet" />
+    <link href="/CSS/themes/outzen.css" rel="stylesheet" />
 
-    <!-- External Styles -->
-    <link href="css/external/blazored-toast.css" rel="stylesheet" />
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/open-iconic/1.1.1/font/css/open-iconic-bootstrap.min.css" rel="stylesheet" />
+    <!-- 4. Animations (keyframes + helpers) -->
+    <link href="/CSS/animations/animations.css" rel="stylesheet" />
+    <link href="/CSS/animations/pulseColors.css" rel="stylesheet" />
+    <link href="/CSS/animations/visual-elements.css" rel="stylesheet" />
+
+    <!-- 5. Generic components    -->
+    <link href="/CSS/components/button.css?v=3" rel="stylesheet" />
+    <link href="/CSS/components/detail-container.css" rel="stylesheet" />
+    <link href="/CSS/components/info.css" rel="stylesheet" />
+    <link href="/CSS/components/panels.css" rel="stylesheet" />
+    <link href="/CSS/components/table.css" rel="stylesheet" />
+    <link href="/CSS/components/suggestion.css" rel="stylesheet" />
+    <link href="/CSS/components/globe.css" rel="stylesheet" />
+
+    <!-- 6. Card components / OutZen (Leaflet, legends, markers) -->
+    <link href="/CSS/components/map.css" rel="stylesheet" />
+
+    <!-- 7. Specific pages -->
+    <link href="/CSS/pages/crowd.css" rel="stylesheet" />
+    <link href="/CSS/pages/Suggestion.css" rel="stylesheet" />
+    <link href="/CSS/pages/traffic.css" rel="stylesheet" />
+    <link href="/CSS/pages/weather.css" rel="stylesheet" />
+
+    <!-- 8. External Styles -->
+    <link href="/CSS/external/blazored-toast.css" rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/open-iconic/1.1.1/font/css/open-iconic-bootstrap.min.css"
+          rel="stylesheet" />
+
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
 
     <style>
         .outzen-crowd-marker {
@@ -60,28 +77,65 @@
             }
     </style>
 
-    <!-- Preload image based on time -->
-    <script>
-        (function () {
-            const h = new Date().getHours();
-            const isNight = (h >= 22 || h < 7);
-            const link = document.createElement('link');
-            link.rel = 'preload';
-            link.as = 'image';
-            link.href = isNight ? '/images/earth_texture_night.jpg' : '/images/earth_texture.jpg';
-            document.head.appendChild(link);
-        })();
-    </script>
+    <!-- Leaflet -->
+    <link rel="stylesheet" href="/lib/leaflet/leaflet.css" />
 
-    <!-- Leaflet & MarkerCluster -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous">
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous" defer></script>
+    <!-- MarkerCluster (paths aligned with your current tree) -->
+    <link rel="stylesheet" href="/lib/leaflet.markercluster/MarkerCluster.css" />
+    <link rel="stylesheet" href="/lib/leaflet.markercluster/MarkerCluster.Default.css" />
 
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="anonymous">
-    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin="anonymous" defer></script>
+    <script src="/lib/leaflet/leaflet.js"></script>
+    <script src="/lib/leaflet.markercluster/leaflet.markercluster.js"></script>
 
-    <!-- ADD: Diagnostic plugin cluster présent/absent -->
+    <style>
+        /* Minimal Leaflet fallback to ensure you see something even if leaflet.css doesn't load. */
+        .leaflet-container {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            outline: 0;
+            background: #1b1b1b;
+        }
+
+        .leaflet-pane,
+        .leaflet-tile,
+        .leaflet-marker-icon,
+        .leaflet-marker-shadow,
+        .leaflet-tile-container,
+        .leaflet-pane > svg,
+        .leaflet-pane > canvas,
+        .leaflet-zoom-box,
+        .leaflet-image-layer,
+        .leaflet-layer {
+            position: absolute;
+            left: 0;
+            top: 0;
+        }
+
+        .leaflet-control {
+            position: relative;
+            z-index: 800;
+            pointer-events: auto;
+        }
+
+        .leaflet-marker-icon,
+        .leaflet-marker-shadow,
+        .leaflet-pane > canvas,
+        .leaflet-pane > svg {
+            pointer-events: none;
+        }
+
+        .leaflet-zoom-animated {
+            transition: transform 0.25s;
+        }
+
+        .leaflet-marker-pane img,
+        .leaflet-shadow-pane img {
+            max-width: none !important;
+        }
+    </style>
+
+    <!-- Diagnostic plugin cluster present/absent -->
     <script>
         window.addEventListener('load', () => {
             if (!window.L || (!L.MarkerClusterGroup && !L.markerClusterGroup)) {
@@ -96,12 +150,15 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
 
-    <!-- SignalR global -->
+    <!-- Interop Chart Crowd -->
+    <script src="/js/app/crowdChart.js"></script>
+
+    <!-- SignalR global (only one version) -->
     <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.5/dist/browser/signalr.min.js"></script>
 
-    <!-- ADD: Helper global pour Blazor: isOutZenBooted() -->
+    <!-- Helper global pour Blazor: isOutZenBooted() -->
     <script>
-        // True si le boot est fait ET si le pont global OutZenInterop est exposé.
+        // True if the boot is done AND if the global OutZenInterop bridge is exposed.
         window.isOutZenBooted = function () {
             try { return !!window.__outzenBootFlag && !!window.OutZenInterop; }
             catch { return false; }
@@ -133,6 +190,11 @@
     <script type="module" src="/js/app/earthRotation.js"></script>
     <script type="module" src="/js/app/ui.effects.js"></script>
 
+    <!-- OutZen Leaflet module -->
+    <script type="module" src="/js/app/leafletOutZen.module.js"></script>
+
+    <!-- Interop JS non-ESM -->
+    <script src="/js/outzen-interop.js"></script>
     <!-- Minimal interop bridge -->
     <script src="/js/trafficInterop.js" defer></script>
     <script src="/js/vendor/interop.js" defer></script>
@@ -153,21 +215,44 @@
     <script>
         (function () {
             const hour = new Date().getHours();
-            const isDay = hour >= 7 && hour < 20;
-            const dayImg = document.querySelector('img[src*="day.jpg"]');
-            const nightImg = document.querySelector('img[src*="night.jpg"]');
-            if (dayImg && nightImg) {
-                dayImg.style.display = isDay ? "block" : "none";
-                nightImg.style.display = isDay ? "none" : "block";
+            // Consistent night window for everything (globe + background)
+            const isNight = (hour >= 20 || hour < 7);
+
+            // 1) Global flag for the entire OutZen ecosystem
+            window.OutZenIsNight = isNight;
+
+            // 2) Class on <body> for your CSS theme
+            document.addEventListener('DOMContentLoaded', function () {
+                const body = document.body;
+                if (!body) return;
+                body.classList.toggle('night-mode', isNight);
+                body.classList.toggle('day-mode', !isNight);
+            });
+
+            // 3) Preload globe texture (day or night)
+            const texLink = document.createElement('link');
+            texLink.rel = 'preload';
+            texLink.as = 'image';
+            texLink.href = isNight
+                ? '/images/earth_texture_night.jpg'
+                : '/images/earth_texture.jpg';
+            document.head.appendChild(texLink);
+
+            // 4) Background image (day.jpg / night.jpg) via #bgImage
+            const bg = document.getElementById('bgImage');
+            if (bg) {
+                bg.src = isNight ? '/images/night.jpg' : '/images/day.jpg?v=2';
+                bg.style.display = 'block';
             }
         })();
     </script>
 
+
     <!-- Small helpers for Blazor -->
     <script>
-        window.getScrollTop = (el) => el ? el.scrollTop || 0 : 0;
-        window.getScrollHeight = (el) => el ? el.scrollHeight || 0 : 0;
-        window.getClientHeight = (el) => el ? el.clientHeight || 0 : 0;
+        window.getScrollTop = (el) => Math.trunc((el?.scrollTop ?? window.scrollY ?? 0) || 0);
+        window.getScrollHeight = (el) => Math.trunc(el?.scrollHeight ?? document.scrollingElement?.scrollHeight ?? 0);
+        window.getClientHeight = (el) => Math.trunc(el?.clientHeight ?? document.documentElement?.clientHeight ?? 0);
         window.checkElementExists = (id) => !!document.getElementById(id);
     </script>
 
@@ -177,7 +262,8 @@
         window.__importLoopDisabled = window.__importLoopDisabled ?? false;
     </script>
 
-    <!--<script type="module">
+    <!--
+    <script type="module">
         (async () => {
             if (window.__importLoopDisabled) { console.info("[OutZen] import loop disabled (index.html)"); return; }
             try {
@@ -191,9 +277,8 @@
                 console.error('[OutZen] import failed (index):', e);
             }
         })();
-    </script>-->
-    <script src="/js/outzen-interop.js" defer></script>
-
+    </script>
+    -->
     <!-- === Blazor Boot === -->
     <script src="_framework/blazor.webassembly.js"></script>
 </body>

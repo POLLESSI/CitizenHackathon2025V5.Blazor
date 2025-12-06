@@ -18,10 +18,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Utils
         /// </summary>
         public static List<T> ToNonNullStructList<T>(this IEnumerable<T?> source) where T : struct
         {
-            return source
-                .Where(x => x.HasValue)
-                .Select(x => x.Value)
-                .ToList();
+            var result = new List<T>();
+            foreach (var item in source)
+            {
+                if (item.HasValue)
+                    result.Add(item.Value); // sure after the if
+            }
+            return result;
         }
 
         public static List<T> ToNonNullList<T>(this IEnumerable<T?> source, Action<string>? logger = null) where T : class

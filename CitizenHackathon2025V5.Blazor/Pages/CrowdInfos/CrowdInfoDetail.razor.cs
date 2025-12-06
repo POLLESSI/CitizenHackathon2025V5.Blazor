@@ -1,4 +1,4 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.DTOs;
+﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 
@@ -10,7 +10,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
         [Inject] public HttpClient Client { get; set; }
         [Inject] public IHttpClientFactory Http { get; set; } = default!;
         [Inject] public CrowdInfoService Crowd { get; set; } = default!;
-        public ClientCrowdInfoDTO? CurrentCrowdInfo { get; set; }
+        public ClientCrowdInfoDTO CurrentCrowdInfo { get; set; }
 
         [Parameter] public int Id { get; set; }
 

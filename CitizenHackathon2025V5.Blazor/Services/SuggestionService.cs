@@ -1,10 +1,10 @@
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Utils;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http.Json;
 using static System.Net.WebRequestMethods;
-using SharedDTOs = CitizenHackathon2025.Blazor.DTOs;
+//using CitizenHackathon2025.Blazor.DTOs;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
@@ -12,7 +12,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     {
     #nullable disable
         private readonly HttpClient _httpClient;
-        private string? _suggestionId;
+        private string _suggestionId;
 
         public SuggestionService(IHttpClientFactory factory)
         {
@@ -53,7 +53,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 return new List<ClientSuggestionDTO>();
             }
         }
-        public async Task<ClientSuggestionDTO?> GetById(int id, CancellationToken ct)
+        public async Task<ClientSuggestionDTO> GetById(int id, CancellationToken ct)
         {
             if (id <= 0)
             {
@@ -100,7 +100,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
             
         }
-        public async Task<IEnumerable<ClientSuggestionDTO?>> GetLatestSuggestionAsync()
+        public async Task<IEnumerable<ClientSuggestionDTO>> GetLatestSuggestionAsync()
         {
             try
             {

@@ -1,9 +1,9 @@
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Utils;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http.Json;
-using SharedDTOs = CitizenHackathon2025.Blazor.DTOs;
+//using CitizenHackathon2025.Blazor.DTOs;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
@@ -12,13 +12,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     #nullable disable
         private readonly HttpClient _httpClient;
         //private const string ApiPlaceBase = "api/Place";
-        private string? _placeId;
+        private string _placeId;
 
         public PlaceService(IHttpClientFactory factory)
         {
             _httpClient = factory.CreateClient("ApiWithAuth");
         }
-        public async Task<IEnumerable<ClientPlaceDTO?>> GetLatestPlaceAsync()
+        public async Task<IEnumerable<ClientPlaceDTO>> GetLatestPlaceAsync()
         {
             try
             {
@@ -35,7 +35,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
             
         }
-        public async Task<ClientPlaceDTO?> GetPlaceByIdAsync(int id, CancellationToken ct)
+        public async Task<ClientPlaceDTO> GetPlaceByIdAsync(int id, CancellationToken ct)
         {
             if (id <= 0)
             {
@@ -102,9 +102,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
 
         }
-        public ClientPlaceDTO? UpdatePlace(ClientPlaceDTO @place)
+        public ClientPlaceDTO UpdatePlace(ClientPlaceDTO @place)
             => UpdatePlaceAsync(@place).GetAwaiter().GetResult();
-        public async Task<ClientPlaceDTO?> UpdatePlaceAsync(ClientPlaceDTO @place)
+        public async Task<ClientPlaceDTO> UpdatePlaceAsync(ClientPlaceDTO @place)
         {
             try
             {

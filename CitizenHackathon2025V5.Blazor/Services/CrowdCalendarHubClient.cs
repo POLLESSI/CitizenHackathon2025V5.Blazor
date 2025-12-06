@@ -1,5 +1,5 @@
 ﻿// Services/CrowdCalendarHubClient.cs
-using CitizenHackathon2025V5.Blazor.Client.Shared.StaticConfig.Constants;
+using CitizenHackathon2025.Contracts.Hubs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 

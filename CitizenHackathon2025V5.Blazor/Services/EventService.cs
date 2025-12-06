@@ -1,9 +1,9 @@
-using CitizenHackathon2025V5.Blazor.Client.DTOs;
+using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Utils;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Http.Json;
-using SharedDTOs = CitizenHackathon2025.Blazor.DTOs;
+//using CitizenHackathon2025.Blazor.DTOs;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
@@ -12,14 +12,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     #nullable disable
         private readonly HttpClient _httpClient;
         //private const string ApiEventBase = "api/Event";
-        private string? _eventId;
+        private string _eventId;
 
 
         public EventService(IHttpClientFactory factory)
         {
             _httpClient = factory.CreateClient("ApiWithAuth");
         }
-        public async Task<IEnumerable<ClientEventDTO?>> GetLatestEventAsync()
+        public async Task<IEnumerable<ClientEventDTO>> GetLatestEventAsync()
         {
             try
             {
@@ -87,7 +87,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
             
         }
-        public async Task<ClientEventDTO?> GetByIdAsync(int id)
+        public async Task<ClientEventDTO> GetByIdAsync(int id)
         {
             try
             {
@@ -124,10 +124,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         }
         public void SetCurrentEvent(string eventId) => _eventId = eventId;
 
-        public string? GetCurrentEvent() => _eventId;
+        public string GetCurrentEvent() => _eventId;
         public ClientEventDTO UpdateEvent(ClientEventDTO @event)
             => UpdateEventAsync(@event).GetAwaiter().GetResult();
-        public async Task<ClientEventDTO?> UpdateEventAsync(ClientEventDTO @event)
+        public async Task<ClientEventDTO> UpdateEventAsync(ClientEventDTO @event)
         {
             try
             {

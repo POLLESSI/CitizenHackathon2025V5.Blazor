@@ -1,0 +1,35 @@
+﻿@* Shared/WeatherAlertBanner.razor *@
+@using CitizenHackathon2025.Blazor.DTOs
+
+@if (Alert is not null)
+{
+    <div class="rain-alert-banner" @onclick="DismissAsync">
+        <div class="rain-alert-icon">⚠️</div>
+        <div class="rain-alert-text">
+            <strong>Risque de pluies intenses</strong>
+            <div>@Alert.Message</div>
+
+            @if (Alert.IsNearSensitiveArea && !string.IsNullOrWhiteSpace(Alert.SensitiveAreaName))
+            {
+                <div class="rain-alert-sensitive">
+                    Zone sensible : @Alert.SensitiveAreaName
+                </div>
+            }
+
+            <div class="rain-alert-details">
+                Dernière heure : @Alert.Total1h:F1 mm – 72h : @Alert.Total72h:F1 mm
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public CitizenHackathon2025.Contracts.DTOs.RainAlertDTO? Alert { get; set; }
+    [Parameter] public EventCallback OnDismiss { get; set; }
+
+    private async Task DismissAsync()
+    {
+        if (OnDismiss.HasDelegate)
+            await OnDismiss.InvokeAsync();
+    }
+}
