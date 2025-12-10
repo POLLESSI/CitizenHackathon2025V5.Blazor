@@ -28,7 +28,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
         protected override async Task OnInitializedAsync()
         {
-            // Snapshot initial
+            // Initial snapshot
             _items = await Wx.GetAllAsync();
 
             // ==== SignalR ====
@@ -49,7 +49,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
                 var i = _items.FindIndex(x => x.Id == dto.Id);
                 if (i >= 0) _items[i] = dto; else _items.Insert(0, dto);
 
-                // si on édite la même ligne, refléter l’update
+                // If we edit the same line, reflect the update
                 if (_editing?.Id == dto.Id)
                 {
                     _editing = dto;
@@ -57,7 +57,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
                 await InvokeAsync(StateHasChanged);
             });
 
-            try { await _hub.StartAsync(); } catch { /* log si besoin */ }
+            try { await _hub.StartAsync(); } catch { /* log if necessary */ }
         }
 
         protected IEnumerable<ClientWeatherForecastDTO> Filter(IEnumerable<ClientWeatherForecastDTO> src)
@@ -105,7 +105,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
             _editing = updated;
             StateHasChanged();
-            // Le hub re-diffusera aussi l’update aux autres clients
+            // The hub will also redistribute the update to other clients
         }
 
         public async ValueTask DisposeAsync()

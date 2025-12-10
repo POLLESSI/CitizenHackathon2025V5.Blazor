@@ -8,7 +8,7 @@
 @if (CurrentSuggestion is not null)
 {
     <div class="detail-container bordeaux-background">
-        <p>Id User : @CurrentSuggestion.User_Id</p>
+        <p>Id User : @CurrentSuggestion.UserId</p>
         <p>Date : @CurrentSuggestion.DateSuggestion</p>
         <p>Original Place : @CurrentSuggestion.OriginalPlace</p>
         <p>Suggested Alternative : @CurrentSuggestion.SuggestedAlternatives</p>
@@ -21,9 +21,6 @@ else
 }
 
 
-@code {
-
-}
 
 
 

@@ -2,7 +2,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Models
 {
     public class SuggestionModel
     {
-#nullable disable
+    #nullable disable
         public int Id { get; set; }
         public int User_Id { get; set; }
         public DateTime DateSuggestion { get; set; }

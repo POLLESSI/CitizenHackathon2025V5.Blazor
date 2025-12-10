@@ -1,34 +1,26 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.Services;
+﻿using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.Services;
 using CitizenHackathon2025.Contracts.Hubs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
-using Newtonsoft.Json;
 using Microsoft.JSInterop;
-using CitizenHackathon2025.Blazor.DTOs;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 {
     public partial class GptInteractionView : IAsyncDisposable
     {
 #nullable disable
-        [Inject]
-        public HttpClient Client { get; set; }  
+        [Inject] public HttpClient Client { get; set; }
         [Inject] public GptInteractionService GptInteractionService { get; set; }
         [Inject] public NavigationManager Navigation { get; set; }
         [Inject] public IJSRuntime JS { get; set; }
-        [Inject] public IHubTokenService HubTokenService { get; set; }
-        [Inject] public IHttpClientFactory HttpFactory { get; set; }
         [Inject] public IConfiguration Config { get; set; }
         [Inject] public IAuthService Auth { get; set; }
 
-        private const string ApiBase = "https://localhost:7254";
-        private IJSObjectReference _outZen;
-        private bool _mapReady;
-
         public List<ClientGptInteractionDTO> GptInteractions { get; set; } = new();
-        private List<ClientGptInteractionDTO> allGptInteractions = new();      
+        private List<ClientGptInteractionDTO> allGptInteractions = new();
         private List<ClientGptInteractionDTO> visibleGptInteractions = new();
-        private readonly List<ClientGptInteractionDTO> _pendingMarkers = new();
+
         private int currentIndex = 0;
         private const int PageSize = 20;
         private string _speedId = $"speedRange-{Guid.NewGuid():N}";
@@ -50,11 +42,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             currentIndex = 0;
             LoadMoreItems();
 
-            // 2) SignalR GPT
-            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
+            await InvokeAsync(StateHasChanged);
 
-            // Full path to the GPT hub
-            var url = $"{apiBaseUrl}{HubPaths.GptInteraction}"; // => https://localhost:7254/hubs/gptHub
+            // 2) SignalR GPT (only to refresh the list)
+            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
+            var hubBaseUrl = (Config["SignalR:HubBase"] ?? apiBaseUrl).TrimEnd('/');
+
+            var hubPath = HubPaths.GptInteraction.Trim('/'); // "gptHub"
+            var url = $"{hubBaseUrl}/hubs/{hubPath}";
 
             hubConnection = new HubConnectionBuilder()
                 .WithUrl(url, options =>
@@ -83,19 +78,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 var j = visibleGptInteractions.FindIndex(c => c.Id == dto.Id);
                 if (j >= 0) visibleGptInteractions[j] = dto;
 
-                // Marker: only if we have coordinates
-                if (dto.Latitude.HasValue && dto.Longitude.HasValue)
-                {
-                    if (_mapReady && _outZen is not null)
-                    {
-                        await AddOrUpdateGptMarkerAsync(dto);
-                    }
-                    else
-                    {
-                        _pendingMarkers.Add(dto);
-                    }
-                }
-
                 await InvokeAsync(StateHasChanged);
             });
 
@@ -104,15 +86,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 GptInteractions.RemoveAll(c => c.Id == id);
                 allGptInteractions.RemoveAll(c => c.Id == id);
                 visibleGptInteractions.RemoveAll(c => c.Id == id);
-
-                if (_mapReady && _outZen is not null)
-                {
-                    await _outZen.InvokeVoidAsync("removeGptMarker", id);
-                }
-
                 await InvokeAsync(StateHasChanged);
             });
-
 
             try
             {
@@ -130,73 +105,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             visibleGptInteractions.AddRange(next);
             currentIndex += next.Count;
         }
-        //private static string BuildHubUrl(string baseUrl, string path)
-        //{
-        //    var b = baseUrl.TrimEnd('/');
-        //    var p = path.TrimStart('/');
-        //    if (b.EndsWith("/hubs", StringComparison.OrdinalIgnoreCase) &&
-        //        p.StartsWith("hubs/", StringComparison.OrdinalIgnoreCase))
-        //    {
-        //        p = p.Substring("hubs/".Length);
-        //    }
-        //    return $"{b}/{p}";
-        //}
-        private async Task AddOrUpdateGptMarkerAsync(ClientGptInteractionDTO dto)
-        {
-            if (_outZen is null) return;
-            if (!dto.Latitude.HasValue || !dto.Longitude.HasValue) return;
-
-            await _outZen.InvokeVoidAsync("addOrUpdateGptMarker", new
-            {
-                id = dto.Id,
-                lat = dto.Latitude.Value,
-                lng = dto.Longitude.Value,
-                sourceType = dto.SourceType ?? "GPT",
-                title = dto.Prompt ?? "",
-                description = dto.Response ?? "",
-                crowdLevel = dto.CrowdLevel ?? 3
-            });
-        }
-
-        protected override async Task OnAfterRenderAsync(bool firstRender)
-        {
-            if (!firstRender) return;
-
-            var hasMap = await JS.InvokeAsync<bool>("checkElementExists", "leafletMap");
-            if (!hasMap) return;
-
-            _outZen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
-
-            await _outZen.InvokeVoidAsync("bootOutZen", new
-            {
-                mapId = "leafletMap",
-                center = new double[] { 50.89, 4.34 },
-                zoom = 13,
-                enableChart = false,
-                force = true
-            });
-
-            _mapReady = true;
-
-            // 1) Push interactions already loaded from REST
-            foreach (var dto in visibleGptInteractions.Where(x => x.Latitude.HasValue && x.Longitude.HasValue))
-            {
-                await AddOrUpdateGptMarkerAsync(dto);
-            }
-
-            // 2) Replay pending markers (if SignaR received events before the map was ready)
-            foreach (var dto in _pendingMarkers.ToList())
-            {
-                await AddOrUpdateGptMarkerAsync(dto);
-                _pendingMarkers.Remove(dto);
-            }
-            // 3) Global reframing after batch
-            if (visibleGptInteractions.Any(x => x.Latitude.HasValue && x.Longitude.HasValue))
-            {
-                await _outZen.InvokeVoidAsync("fitToMarkers");
-            }
-        }
-
 
         private void ClickInfo(int id) => SelectedId = id;
 
@@ -215,6 +123,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 }
             }
         }
+
         private IEnumerable<ClientGptInteractionDTO> FilterGpt(IEnumerable<ClientGptInteractionDTO> source)
             => FilterGptInteraction(source);
 
@@ -234,15 +143,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         public async ValueTask DisposeAsync()
         {
-            try
-            {
-                if (_outZen is not null)
-                {
-                    await _outZen.DisposeAsync();
-                }
-            }
-            catch { /* ignore */ }
-
             if (hubConnection is not null)
             {
                 try { await hubConnection.StopAsync(); } catch { }
@@ -251,6 +151,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         }
     }
 }
+
 
 
 

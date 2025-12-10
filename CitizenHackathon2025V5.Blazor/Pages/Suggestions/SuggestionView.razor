@@ -49,9 +49,10 @@
                 }
                 else
                 {
-                @foreach (var su in FilterSuggestion(visibleSuggestions))
+                    @foreach (var (su, index) in FilterSuggestion(visibleSuggestions).Select((s, i) => (s, i + 1)))
                     {
                         <tr>
+                            <td>@index</td>
                             <td class="text-ellipsis" title="@su.OriginalPlace">@su.OriginalPlace</td>
                             <td class="text-ellipsis" title="@su.SuggestedAlternatives">@su.SuggestedAlternatives</td>
                             <td class="text-ellipsis" title="@su.Reason">@su.Reason</td>
@@ -89,3 +90,115 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                @* /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/ *@

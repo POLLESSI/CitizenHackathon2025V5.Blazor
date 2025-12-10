@@ -129,6 +129,7 @@ builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<GptInteractionService>();
 builder.Services.AddScoped<PlaceService>();
 builder.Services.AddScoped<SuggestionService>();
+builder.Services.AddScoped<SuggestionMapService>();
 builder.Services.AddScoped<TrafficConditionService>();
 builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.UserService>();
 builder.Services.AddScoped<TrafficStateService>();
@@ -158,6 +159,19 @@ builder.Services.AddScoped(sp =>
 // Run
 // =============================
 await builder.Build().RunAsync();
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

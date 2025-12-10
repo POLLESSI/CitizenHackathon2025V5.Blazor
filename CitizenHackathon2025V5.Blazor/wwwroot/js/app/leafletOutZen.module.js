@@ -5,7 +5,7 @@
 // Global singleton to avoid duplicates in hot reload
 if (!window.__OutZenSingleton) {
     window.__OutZenSingleton = {
-        version: "2025.11.16",
+        version: "2025.12.09",
         bootTs: 0,
         map: null,
         cluster: null,
@@ -75,11 +75,11 @@ export function setWeatherChart(points, metricType = "Temperature") {
     const values = [];
     const bgColors = [];
 
-    let datasetLabel = "Température (°C)";
+    let datasetLabel = "Temperature (°C)";
     if (metric === "humidity") {
-        datasetLabel = "Humidité (%)";
+        datasetLabel = "Humidity (%)";
     } else if (metric === "wind") {
-        datasetLabel = "Vent (km/h)";
+        datasetLabel = "Wind (km/h)";
     }
 
     for (const p of points) {
@@ -343,10 +343,24 @@ function getWeatherEmoji(weatherType) {
     return "🌡️"; // by default
 }
 
-function buildMarkerIcon(L, level, isTraffic = false, weatherType = null) {
+function buildMarkerIcon(
+    L,
+    level,
+    isTraffic = false,
+    weatherType = null,
+    iconOverride = null
+) {
     const lvlClass = getMarkerClassForLevel(level);
     const trafficClass = isTraffic ? "oz-marker-traffic" : "";
-    const emoji = getWeatherEmoji(weatherType);
+
+    let emoji = "";
+    if (iconOverride) {
+        emoji = iconOverride;                       // ex: "🚦", "👥", "💡"
+    } else if (weatherType) {
+        emoji = getWeatherEmoji(weatherType);       // weather only if necessary
+    } else {
+        emoji = "";                                 // pure colorful circle
+    }
 
     return L.divIcon({
         className: `oz-marker ${lvlClass} ${trafficClass}`.trim(),
@@ -356,6 +370,8 @@ function buildMarkerIcon(L, level, isTraffic = false, weatherType = null) {
         popupAnchor: [0, -26]
     });
 }
+
+
 
 
 /**
@@ -374,8 +390,9 @@ export function addOrUpdateCrowdMarker(id, lat, lng, level, info) {
 
     const isTraffic = info?.isTraffic;
     const weatherType = info?.weatherType ?? info?.WeatherType ?? null;
+    const iconOverride = info?.icon ?? info?.Icon ?? null; 
 
-    const icon = buildMarkerIcon(L, level, isTraffic, weatherType);
+    const icon = buildMarkerIcon(L, level, isTraffic, weatherType, iconOverride);
 
     if (existing) {
         existing.setLatLng([lat, lng]);
@@ -449,50 +466,78 @@ export function clearCrowdMarkers() {
 // GPT markers (reuse crowd engine)
 // ================================
 export function addOrUpdateGptMarker(dto) {
+    console.log("[OutZen] addOrUpdateGptMarker called with:", dto);
     const L = ensureLeaflet();
-    if (!L || !S.map || !dto) {
-        console.warn("[OutZen] addOrUpdateGptMarker: missing map or dto", { dto });
+    if (!L || !S.map || !dto) return;
+
+    const id =
+        dto.id ??
+        dto.Id;
+
+    const lat =
+        dto.lat ??
+        dto.Latitude ??
+        dto.latitude;   // 👈 camelCase de Blazor
+
+    const lng =
+        dto.lng ??
+        dto.Longitude ??
+        dto.longitude;  // 👈 camelCase de Blazor
+
+    const latNum = Number(lat);
+    const lngNum = Number(lng);
+
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+        console.warn("[OutZen] addOrUpdateGptMarker: invalid coordinates", { dto, latNum, lngNum });
         return;
     }
 
-    // Tolerates camelCase / PascalCase from C#
-    const id = dto.id ?? dto.Id;
-    const lat = Number(dto.lat ?? dto.Latitude);
-    const lng = Number(dto.lng ?? dto.Longitude);
+    const sourceType =
+        dto.sourceType ??
+        dto.SourceType ??
+        "GPT";
 
-    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        console.warn("[OutZen] addOrUpdateGptMarker: invalid coordinates", { dto, lat, lng });
-        return;
-    }
+    const title =
+        dto.title ??
+        dto.Title ??
+        dto.Prompt ??
+        `[${sourceType}] #${id}`;
 
-    const sourceType = dto.sourceType ?? dto.SourceType ?? "GPT";
-    const title = dto.title ?? dto.Prompt ?? `[${sourceType}] #${id}`;
-    const description = dto.description ?? dto.Response ?? "";
-    const crowdLevel = dto.crowdLevel ?? dto.CrowdLevel ?? 3; // neutral
+    const description =
+        dto.description ??
+        dto.Description ??
+        dto.Response ??
+        "";
 
-    // We reuse the same mechanism as for the crowd
+    const crowdLevel =
+        dto.crowdLevel ??
+        dto.CrowdLevel ??
+        3;
+
+    const iconOverride = sourceType === "Suggestion" ? "💡" : null;
+
     addOrUpdateCrowdMarker(
         id,
-        lat,
-        lng,
+        latNum,
+        lngNum,
         crowdLevel,
         {
             title,
-            description
+            description,
+            icon: iconOverride
         }
-        
     );
 
-    // Option: Auto cropping (gentle)
     setTimeout(() => {
         try {
             fitToMarkers();
         } catch (e) {
             console.warn("[OutZen] fitToMarkers failed from GPT marker:", e);
-            console.log("[OutZen] GPT marker", { id, lat, lng, sourceType });
+            console.log("[OutZen] GPT marker", { id, lat: latNum, lng: lngNum, sourceType });
         }
     }, 50);
 }
+
 
 export function removeGptMarker(id) {
     removeCrowdMarker(id);

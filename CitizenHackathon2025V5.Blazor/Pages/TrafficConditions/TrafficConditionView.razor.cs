@@ -40,18 +40,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         public int SelectedId { get; set; }
         private HubConnection hubConnection;
 
-        // Champs utilisés par le .razor
+        // Fields used by the .razor
         private ElementReference ScrollContainerRef;
         private string _q;
         private bool _onlyRecent;
 
-        // État map / markers
+        // State map / markers
         private bool _booted;
         private bool _markersSeeded;
 
         protected override async Task OnInitializedAsync()
         {
-            // 1) REST initial : charge les dernières conditions en base
+            // 1) Initial REST: loads the latest conditions into the database
             var fetched = (await TrafficConditionService.GetLatestTrafficConditionAsync())?.ToList() ?? new();
             Console.WriteLine($"[TrafficConditionView] Initial TrafficConditions count = {fetched.Count}");
 
@@ -63,14 +63,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             currentIndex = 0;
             LoadMoreItems();
 
-            // 2) SignalR – même logique que WeatherForecastView
+            // 2) SignalR – same logic as WeatherForecastView
             var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? ApiBase;
 
-            // Si ApiBaseUrl termine par "/api", on le retire pour revenir à la racine (https://localhost:7254)
+            // If ApiBaseUrl ends with "/api", we remove it to return to the root directory (https://localhost:7254)
             if (apiBaseUrl.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
                 apiBaseUrl = apiBaseUrl[..^4];
 
-            // URL finale : https://localhost:7254/hubs/trafficHub
+            // Final URL : https://localhost:7254/hubs/trafficHub
             var url = $"{apiBaseUrl}/hubs/{TrafficConditionHubMethods.HubPath}";
 
             Console.WriteLine($"[Traffic-Client] Hub URL = {url}");
@@ -83,7 +83,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                 .WithAutomaticReconnect()
                 .Build();
 
-            // === Event: une condition de trafic est ajoutée / mise à jour ===
+            // === Event: a traffic condition is added/updated ===
             hubConnection.On<ClientTrafficConditionDTO>(
                 TrafficConditionHubMethods.ToClient.TrafficUpdated,
                 async dto =>
@@ -119,7 +119,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                     await InvokeAsync(StateHasChanged);
                 });
 
-            // === Event: une condition est archivée / supprimée ===
+            // === Event: a condition is archived / deleted ===
             hubConnection.On<int>(
                 TrafficConditionHubMethods.ToClient.TrafficCleared,
                 async id =>
@@ -149,7 +149,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         }
 
         /// <summary>
-        /// Ajoute ou met à jour un marker sur la carte pour une condition trafic donnée.
+        /// Adds or updates a marker on the map for a given traffic condition.
         /// </summary>
         private async Task AddOrUpdateTrafficMarkerAsync(ClientTrafficConditionDTO dto, bool fit = false)
         {
@@ -210,6 +210,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                     title = dto.IncidentType ?? "Traffic",
                     description = desc,
                     isTraffic = true
+                    // icon = "🚦"
                 });
 
             if (fit)
@@ -219,7 +220,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         }
 
         /// <summary>
-        /// Remplit progressivement la liste visible (scroll infini).
+        /// Gradually fills the visible list (infinite scroll).
         /// </summary>
         private void LoadMoreItems()
         {
@@ -230,10 +231,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            // 1) Boot de la map au premier render
+            // 1) Boot the map at the first render
             if (firstRender && !_booted)
             {
-                // 0) Attendre que le container avec le bon ID soit présent dans le DOM
+                // 0) Wait until the container with the correct ID is present in the DOM
                 for (var i = 0; i < 10; i++)
                 {
                     var ok = await JS.InvokeAsync<bool>("checkElementExists", MapId);
@@ -248,7 +249,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                     }
                 }
 
-                // 1) Import du module ESM LeafletOutZen
+                // 1) Importing the LeafletOutZen ESM module
                 _outZen = await JS.InvokeAsync<IJSObjectReference>(
                     "import",
                     "/js/app/leafletOutZen.module.js");
@@ -274,7 +275,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                 Console.WriteLine("[TrafficConditionView] OutZen boot OK.");
             }
 
-            // 2) Seed des markers : dès que map bootée + données dispo, une seule fois
+            // 2) Marker seeds: as soon as the map boots and data is available, only once.
             if (_booted && !_markersSeeded && TrafficConditions.Count > 0 && _outZen is not null)
             {
                 Console.WriteLine($"[TrafficConditionView] Seeding {TrafficConditions.Count} traffic markers…");
@@ -291,7 +292,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                 // 🔍 DEBUG JS
                 try { await _outZen.InvokeVoidAsync("debugDumpMarkers"); } catch { }
 
-                // 3) Rejouer les updates reçues via SignalR avant le boot
+                // 3) Replay the updates received via SignalR before booting
                 while (_pendingHubUpdates.TryDequeue(out var dto))
                 {
                     await AddOrUpdateTrafficMarkerAsync(dto, fit: false);

@@ -46,21 +46,34 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
         private readonly ConcurrentQueue<ClientEventDTO> _pendingHubUpdates = new();
         protected override async Task OnInitializedAsync()
         {
-            // 1) REST initial
+            // 1) Initial REST
             var fetched = (await EventService.GetLatestEventAsync()).Where(e => e != null).Select(e => e!).ToList();
+
+            Console.WriteLine($"[EventView] fetched events: {fetched.Count}");
+
+            if (fetched.Count > 0)
+            {
+                var first = fetched[0];
+                Console.WriteLine($"[EventView] first event: Id={first.Id}, Name={first.Name}, Lat={first.Latitude}, Lng={first.Longitude}");
+            }
+
             Events = fetched;
             allEvents = fetched;
             visibleEvents.Clear();
             currentIndex = 0;
             LoadMoreItems();
+
             await InvokeAsync(StateHasChanged);
 
             // 2) SignalR
             var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
-            var hubBaseUrl = Config["SignalR:HubBase"]?.TrimEnd('/')
-                             ?? $"{apiBaseUrl}/hubs"; // fallback if no specific configuration
+            var hubBaseUrl = (Config["SignalR:HubBase"] ?? apiBaseUrl).TrimEnd('/');
 
-            var url = $"{hubBaseUrl}{HubPaths.Event}"; // => https://.../hubs/events
+            // EventHubMethods.HubPath = "events"
+            var hubPath = EventHubMethods.HubPath.TrimStart('/'); // "events"
+
+            var url = $"{hubBaseUrl}/hubs/{hubPath}";
+            // => https://localhost:7254/hubs/events
 
             hubConnection = new HubConnectionBuilder()
                 .WithUrl(url, options =>
@@ -144,96 +157,111 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            if (!firstRender || _booted)
-                return;
-
-            // 0) Wait until the #leafletMap container actually exists in the DOM
-            for (var i = 0; i < 40; i++) // ~6s max
+            // 1) First render: we only load the map (NOT the markers)
+            if (firstRender && !_booted)
             {
-                var ok = await JS.InvokeAsync<bool>("checkElementExists", "leafletMap");
-                if (ok)
-                    break;
-
-                await Task.Delay(150);
-
-                if (i == 39)
+                // 0) Wait for the #leafletMap container to exist.
+                for (var i = 0; i < 40; i++) // ~6s max
                 {
-                    Console.WriteLine("❌ [EventView] Map container #leafletMap not found after retries.");
-                    return;
+                    var ok = await JS.InvokeAsync<bool>("checkElementExists", "leafletMap");
+                    if (ok)
+                        break;
+
+                    await Task.Delay(150);
+
+                    if (i == 39)
+                    {
+                        Console.WriteLine("❌ [EventView] Map container #leafletMap not found after retries.");
+                        return;
+                    }
                 }
-            }
 
-            // 1) Import ESM OutZen
-            _outzen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
+                // 1) Importing the ES module
+                _outzen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
 
-            var height = await JS.InvokeAsync<int>("eval",
-                "document.getElementById('leafletMap')?.clientHeight || 0");
-            await JS.InvokeVoidAsync("console.log", "Map element height:", height);
+                var height = await JS.InvokeAsync<int>("eval",
+                    "document.getElementById('leafletMap')?.clientHeight || 0");
+                await JS.InvokeVoidAsync("console.log", "Map element height:", height);
 
-            // 2) Single boot (force: true to ensure the map is recreated cleanly)
-            try
-            {
-                await _outzen.InvokeVoidAsync("bootOutZen", new
-                {
-                    mapId = "leafletMap",
-                    center = new[] { 50.89, 4.34 },
-                    zoom = 13,
-                    enableChart = false,
-                    force = true
-                });
-            }
-            catch (JSException jsEx)
-            {
-                Console.Error.WriteLine($"❌ [EventView] bootOutZen JS error: {jsEx.Message}");
-                return;
-            }
-
-            // 3) Polling for readiness (without restarting bootOutZen in a loop)
-            var ready = false;
-            for (var i = 0; i < 40; i++)
-            {
+                // 2) Booting the map
                 try
                 {
-                    ready = await _outzen.InvokeAsync<bool>("isOutZenReady");
-                    if (ready)
-                        break;
+                    await _outzen.InvokeVoidAsync("bootOutZen", new
+                    {
+                        mapId = "leafletMap",
+                        center = new[] { 50.89, 4.34 },
+                        zoom = 13,
+                        enableChart = false,
+                        force = true
+                    });
                 }
-                catch
+                catch (JSException jsEx)
                 {
-                    // Ignore, we'll try again
+                    Console.Error.WriteLine($"❌ [EventView] bootOutZen JS error: {jsEx.Message}");
+                    return;
                 }
 
-                await Task.Delay(150);
+                // 3) Polling for readiness (without restarting bootOutZen)
+                var ready = false;
+                for (var i = 0; i < 40; i++)
+                {
+                    try
+                    {
+                        ready = await _outzen.InvokeAsync<bool>("isOutZenReady");
+                        if (ready)
+                            break;
+                    }
+                    catch
+                    {
+                        // Ignore, retry
+                    }
+
+                    await Task.Delay(150);
+                }
+
+                if (!ready)
+                {
+                    Console.WriteLine("❌ [EventView] OutZen not ready after boot / polling.");
+                    return;
+                }
+
+                // 4) Small size correction
+                try { await _outzen.InvokeVoidAsync("refreshMapSize"); } catch { }
+
+                _booted = true;
+                return; // 👉 We DO NOT synchronize the markers in this first pass
             }
 
-            if (!ready)
+            // 2) In the following renders :
+            //    - The map is already booted.
+            //    - events may have happened
+            //    => We apply the markers ONCE when we have data
+            if (_booted && !_initialDataApplied && allEvents.Any())
             {
-                Console.WriteLine("❌ [EventView] OutZen not ready after boot / polling.");
-                return;
+                Console.WriteLine($"[EventView] OnAfterRenderAsync: applying initial markers, allEvents={allEvents.Count}");
+                await SyncMapMarkersAsync(fit: true);
+                _initialDataApplied = true;
+
+                // Flush any pending SignalR updates
+                while (_pendingHubUpdates.TryDequeue(out var dto))
+                {
+                    var lvl = MapCrowdLevelFromExpected(dto.ExpectedCrowd);
+                    try
+                    {
+                        await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
+                            dto.Id.ToString(), dto.Latitude, dto.Longitude, lvl,
+                            new { title = dto.Name, description = $"Event {dto.DateEvent:yyyy-MM-dd HH:mm}" });
+                    }
+                    catch (JSException ex)
+                    {
+                        Console.Error.WriteLine($"[EventView] Buffered hub marker failed: {ex.Message}");
+                    }
+                }
+
+                try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
             }
-
-            // 4) Refresh + initial marker synchronization
-            try { await _outzen.InvokeVoidAsync("refreshMapSize"); } catch { }
-
-            await SyncMapMarkersAsync(fit: true);
-
-            // Flush any queued SignalR updates (as in your current version).
-            while (_pendingHubUpdates.TryDequeue(out var dto))
-            {
-                var lvl = MapCrowdLevelFromExpected(dto.ExpectedCrowd);
-                await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
-                    dto.Id.ToString(), dto.Latitude, dto.Longitude, lvl,
-                    new { title = dto.Name, description = $"Event {dto.DateEvent:yyyy-MM-dd HH:mm}" });
-            }
-            try
-            {
-                await _outzen.InvokeVoidAsync("fitToMarkers");
-            }
-            catch { }
-
-            _initialDataApplied = true;
-            _booted = true;
         }
+
 
         private async Task SafeRefreshMap()
         {
@@ -262,24 +290,43 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
 
         private async Task SyncMapMarkersAsync(bool fit = true)
         {
-            if (_outzen is null) return;
+            if (_outzen is null)
+            {
+                Console.WriteLine("[EventView] SyncMapMarkersAsync: _outzen is null");
+                return;
+            }
+
+            // 🔎 Data source for the map
+            var baseSource = visibleEvents.Any() ? visibleEvents : allEvents;
+            var source = FilterEvent(baseSource).ToList();
+
+            Console.WriteLine($"[EventView] SyncMapMarkersAsync: visible={visibleEvents.Count}, all={allEvents.Count}, source(filtered)={source.Count}");
 
             try
             {
                 // 1) Clean up existing markers
                 await _outzen.InvokeVoidAsync("clearCrowdMarkers");
 
-                // 2) Replace the visible markers
-                foreach (var ev in FilterEvent(visibleEvents))
+                // 2) Adding markers
+                foreach (var ev in source)
                 {
                     var lvl = MapCrowdLevelFromExpected(ev.ExpectedCrowd);
-                    await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
-                        ev.Id.ToString(), ev.Latitude, ev.Longitude, lvl,
-                        new { title = ev.Name, description = $"{ev.DateEvent:yyyy-MM-dd HH:mm}" });
+
+                    await _outzen.InvokeVoidAsync(
+                        "addOrUpdateCrowdMarker",
+                        ev.Id.ToString(),
+                        ev.Latitude,
+                        ev.Longitude,
+                        lvl,
+                        new
+                        {
+                            title = ev.Name,
+                            description = $"{ev.DateEvent:yyyy-MM-dd HH:mm}"
+                        });
                 }
 
-                // 3) Card alignment (optional)
-                if (visibleEvents.Any())
+                // 3) Adjusting the view if there is at least one marker
+                if (source.Any())
                 {
                     await _outzen.InvokeVoidAsync("refreshMapSize");
 
@@ -290,26 +337,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
                         await _outzen.InvokeVoidAsync("fitToMarkers");
                     }
                 }
+                else
+                {
+                    Console.WriteLine("[EventView] SyncMapMarkersAsync: aucune donnée pour la carte.");
+                }
             }
             catch (JSException jsex)
             {
                 Console.Error.WriteLine($"❌ JSInterop failed in SyncMapMarkersAsync: {jsex.Message}");
             }
-            try
-            {
-                await _outzen.InvokeVoidAsync("refreshMapSize");
-                await _outzen.InvokeVoidAsync("fitToMarkers");
-                await Task.Delay(150);
-                await _outzen.InvokeVoidAsync("fitToMarkers");
-            }
-            catch (JSException jsex)
-            {
-                Console.Error.WriteLine($"[WARN] refreshMap/fitToMarkers failed: {jsex.Message}");
-            }
-
         }
-
-
         private void LoadMoreItems()
         {
             var next = allEvents.Skip(currentIndex).Take(PageSize).ToList();

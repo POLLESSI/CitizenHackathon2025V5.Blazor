@@ -104,14 +104,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync("Suggestions/all");
-                if (response.StatusCode == HttpStatusCode.NotFound)
-                    return Enumerable.Empty<ClientSuggestionDTO>();
+                //var response = await _httpClient.GetAsync("Suggestions/all");
+                //if (response.StatusCode == HttpStatusCode.NotFound)
+                //    return Enumerable.Empty<ClientSuggestionDTO>();
 
-                response.EnsureSuccessStatusCode();
+                //response.EnsureSuccessStatusCode();
 
-                return await response.Content.ReadFromJsonAsync<IEnumerable<ClientSuggestionDTO>>()
-                       ?? Enumerable.Empty<ClientSuggestionDTO>();
+                //return await response.Content.ReadFromJsonAsync<IEnumerable<ClientSuggestionDTO>>()
+                //       ?? Enumerable.Empty<ClientSuggestionDTO>();
+
+                // The call is consistent with what you're testing in Swagger.
+                var result = await _httpClient.GetFromJsonAsync<List<ClientSuggestionDTO>>(
+                    "Suggestions/all?all=true");
+
+                return result ?? Enumerable.Empty<ClientSuggestionDTO>();
             }
             catch (Exception ex)
             {
