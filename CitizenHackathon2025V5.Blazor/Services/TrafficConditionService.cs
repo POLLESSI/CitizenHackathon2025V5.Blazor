@@ -17,28 +17,28 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         }
 
         // ✅ Never return null again: always a list
-        public async Task<List<ClientTrafficConditionDTO>> GetLatestTrafficConditionAsync()
+        public async Task<List<ClientTrafficConditionDTO>> GetLatestTrafficConditionAsync(CancellationToken ct = default)
         {
             try
             {
-                var resp = await _httpClient.GetAsync("TrafficCondition/latest");
+                using var resp = await _httpClient.GetAsync("TrafficCondition/latest", ct);
 
-                // ✅ NotFound => empty list (not null)
                 if (resp.StatusCode == HttpStatusCode.NotFound)
-                    return new List<ClientTrafficConditionDTO>();
+                    return new();
 
                 resp.EnsureSuccessStatusCode();
 
-                var list = await resp.Content.ReadFromJsonAsync<List<ClientTrafficConditionDTO>>();
-
-                // ✅ Normalise to non-null
-                return list?.ToNonNullList() ?? new List<ClientTrafficConditionDTO>();
+                var list = await resp.Content.ReadFromJsonAsync<List<ClientTrafficConditionDTO>>(cancellationToken: ct);
+                return list?.ToNonNullList() ?? new();
+            }
+            catch (OperationCanceledException)
+            {
+                return new();
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in GetLatestTrafficConditionAsync: {ex.Message}");
-                // ✅ Erreur => empty list (no dummy elements)
-                return new List<ClientTrafficConditionDTO>();
+                return new();
             }
         }
 

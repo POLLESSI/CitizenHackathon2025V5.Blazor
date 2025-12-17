@@ -22,6 +22,286 @@ if (!window.__OutZenSingleton) {
 
 const S = window.__OutZenSingleton;
 
+// ==========================================
+// BUNDLED MARKERS (Event + Place + Crowd)
+// ==========================================
+
+// Extend singleton (no breaking change)
+S.bundleMarkers = S.bundleMarkers || new Map(); // key -> Leaflet marker
+S.bundleRadiusMeters = S.bundleRadiusMeters || 80; // default, can be overridden
+S.bundleLastInput = S.bundleLastInput || null;
+
+// Small haversine in meters
+function haversineMeters(aLat, aLng, bLat, bLng) {
+    const R = 6371000;
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(bLat - aLat);
+    const dLng = toRad(bLng - aLng);
+    const s1 = Math.sin(dLat / 2);
+    const s2 = Math.sin(dLng / 2);
+    const aa = s1 * s1 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * s2 * s2;
+    return 2 * R * Math.asin(Math.sqrt(aa));
+}
+
+// Stable key for a bundle (canonical point rounded to avoid float noise)
+function bundleKey(lat, lng) {
+    return `${lat.toFixed(6)}:${lng.toFixed(6)}`;
+}
+
+function getLatestCrowd(crowds) {
+    if (!crowds || crowds.length === 0) return null;
+    return crowds
+        .slice()
+        .sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp))[0];
+}
+
+function buildBundles(input, radiusMeters) {
+    const events = input?.events || [];
+    const places = input?.places || [];
+    const crowds = input?.crowds || [];
+
+    const bundles = [];
+
+    // 1) Seed bundles with Events (canonical point = event coords)
+    for (const ev of events) {
+        if (ev?.Latitude == null || ev?.Longitude == null) continue;
+        bundles.push({
+            lat: ev.Latitude,
+            lng: ev.Longitude,
+            event: ev,
+            place: null,
+            crowds: []
+        });
+    }
+
+    // 2) Attach Places to nearest existing bundle (else create new)
+    for (const pl of places) {
+        if (pl?.Latitude == null || pl?.Longitude == null) continue;
+
+        let bestIdx = -1;
+        let bestD = Infinity;
+        for (let i = 0; i < bundles.length; i++) {
+            const b = bundles[i];
+            const d = haversineMeters(pl.Latitude, pl.Longitude, b.lat, b.lng);
+            if (d < bestD) { bestD = d; bestIdx = i; }
+        }
+
+        if (bestIdx >= 0 && bestD <= radiusMeters) {
+            // keep the first place if already set (or replace if you prefer)
+            bundles[bestIdx].place = bundles[bestIdx].place || pl;
+        } else {
+            bundles.push({
+                lat: pl.Latitude,
+                lng: pl.Longitude,
+                event: null,
+                place: pl,
+                crowds: []
+            });
+        }
+    }
+
+    // 3) Attach Crowds to nearest bundle (else create new)
+    for (const cr of crowds) {
+        if (cr?.Latitude == null || cr?.Longitude == null) continue;
+
+        let bestIdx = -1;
+        let bestD = Infinity;
+        for (let i = 0; i < bundles.length; i++) {
+            const b = bundles[i];
+            const d = haversineMeters(cr.Latitude, cr.Longitude, b.lat, b.lng);
+            if (d < bestD) { bestD = d; bestIdx = i; }
+        }
+
+        if (bestIdx >= 0 && bestD <= radiusMeters) {
+            bundles[bestIdx].crowds.push(cr);
+        } else {
+            bundles.push({
+                lat: cr.Latitude,
+                lng: cr.Longitude,
+                event: null,
+                place: null,
+                crowds: [cr]
+            });
+        }
+    }
+
+    // 4) Compute summary fields used by icon/popup
+    for (const b of bundles) {
+        const latest = getLatestCrowd(b.crowds);
+        const crowdLevelMax = b.crowds.reduce((m, c) => Math.max(m, (c?.CrowdLevel ?? 0)), 0);
+
+        b.latestCrowd = latest;
+        b.crowdLevelMax = crowdLevelMax;
+
+        // count "types" present (E/P/C) (not count of crowd rows)
+        b.typesCount =
+            (b.event ? 1 : 0) +
+            (b.place ? 1 : 0) +
+            (b.crowds && b.crowds.length > 0 ? 1 : 0);
+
+        b.key = bundleKey(b.lat, b.lng);
+    }
+
+    return bundles;
+}
+
+// Light icon color scale (no CSS dependency required)
+function levelClass(level) {
+    // match your levels 0..3/4 etc. adapt as needed
+    if (level >= 3) return "oz-bundle--high";
+    if (level === 2) return "oz-bundle--med";
+    if (level === 1) return "oz-bundle--low";
+    return "oz-bundle--none";
+}
+
+function buildBundleIconHtml(b) {
+    const parts = [];
+    if (b.event) parts.push("E");
+    if (b.place) parts.push("P");
+    if (b.crowds && b.crowds.length) parts.push("C");
+
+    const badge = b.typesCount || 1;
+    const cls = levelClass(b.crowdLevelMax);
+
+    return `
+      <div class="oz-bundle ${cls}">
+        <div class="oz-bundle__badge">${badge}</div>
+        <div class="oz-bundle__tags">${parts.join("·")}</div>
+      </div>
+    `;
+}
+
+function makeBundleIcon(L, b) {
+    // iconSize tuned for cluster readability
+    return L.divIcon({
+        className: "oz-bundle-icon",
+        html: buildBundleIconHtml(b),
+        iconSize: [42, 42],
+        iconAnchor: [21, 21],
+        popupAnchor: [0, -18]
+    });
+}
+
+function bundlePopupHtml(b) {
+    const ev = b.event ? `
+      <div class="oz-pop__section">
+        <div class="oz-pop__title">🎟 Event</div>
+        <div><b>${escapeHtml(b.event.Name ?? "Event")}</b></div>
+        <div>Date: ${b.event.DateEvent ? new Date(b.event.DateEvent).toLocaleDateString() : "-"}</div>
+        <div>Expected: ${b.event.ExpectedCrowd ?? "-"}</div>
+        <div>Outdoor: ${b.event.IsOutdoor ? "Yes" : "No"}</div>
+      </div>
+    ` : "";
+
+    const pl = b.place ? `
+      <div class="oz-pop__section">
+        <div class="oz-pop__title">📍 Place</div>
+        <div><b>${escapeHtml(b.place.Name ?? b.place.LocationName ?? "Place")}</b></div>
+        <div>Type: ${escapeHtml(b.place.Type ?? "-")}</div>
+        <div>Capacity: ${b.place.Capacity ?? "-"}</div>
+        <div>Active: ${b.place.Active ? "Yes" : "No"}</div>
+      </div>
+    ` : "";
+
+    const cr = b.latestCrowd ? `
+      <div class="oz-pop__section">
+        <div class="oz-pop__title">👥 Crowd</div>
+        <div><b>${escapeHtml(b.latestCrowd.LocationName ?? "CrowdInfo")}</b></div>
+        <div>Level: ${b.latestCrowd.CrowdLevel ?? "-"}</div>
+        <div>At: ${b.latestCrowd.Timestamp ? new Date(b.latestCrowd.Timestamp).toLocaleString() : "-"}</div>
+        <div>Samples: ${b.crowds?.length ?? 0}</div>
+      </div>
+    ` : "";
+
+    return `
+      <div class="oz-pop">
+        ${ev}${pl}${cr}
+      </div>
+    `;
+}
+
+function escapeHtml(s) {
+    if (s == null) return "";
+    return String(s)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+}
+
+// Update or create ONE bundle marker
+function updateBundleMarker(L, b) {
+    if (!S.map) return;
+    if (!S.cluster) return;
+
+    const key = b.key || bundleKey(b.lat, b.lng);
+    let mk = S.bundleMarkers.get(key);
+
+    const icon = makeBundleIcon(L, b);
+    const popup = bundlePopupHtml(b);
+
+    if (!mk) {
+        mk = L.marker([b.lat, b.lng], { icon });
+
+        mk.bindPopup(popup, {
+            maxWidth: 360,
+            closeButton: true,
+            autoPan: true
+        });
+
+        // attach data for debugging / later use
+        mk.__oz_bundleKey = key;
+        mk.__oz_bundle = b;
+
+        S.cluster.addLayer(mk);
+        S.bundleMarkers.set(key, mk);
+        return;
+    }
+
+    // If canonical point moved (rare), update position
+    mk.setLatLng([b.lat, b.lng]);
+    mk.setIcon(icon);
+
+    // Keep popup updated
+    if (mk.getPopup()) mk.setPopupContent(popup);
+    else mk.bindPopup(popup);
+
+    mk.__oz_bundle = b;
+}
+
+// Main API: create/update bundles and clean removed ones
+function addOrUpdateBundleMarkers(input, radiusMeters) {
+    const Leaflet = ensureLeaflet();
+    if (!Leaflet) return;
+
+    // allow call without radius
+    const radius = Number.isFinite(radiusMeters) ? radiusMeters : (S.bundleRadiusMeters || 80);
+
+    S.bundleLastInput = input;
+
+    const bundles = buildBundles(input, radius);
+
+    // Track keys in this pass
+    const seen = new Set();
+    for (const b of bundles) {
+        seen.add(b.key);
+        updateBundleMarker(Leaflet, b);
+    }
+
+    // Remove bundle markers not present anymore
+    for (const [key, mk] of S.bundleMarkers.entries()) {
+        if (!seen.has(key)) {
+            try {
+                // remove from cluster cleanly
+                S.cluster.removeLayer(mk);
+            } catch (e) { /* ignore */ }
+            S.bundleMarkers.delete(key);
+        }
+    }
+}
+
+
 // ================================
 // Internal helpers
 // ================================
@@ -214,7 +494,8 @@ export async function bootOutZen(options) {
 
     const host = document.getElementById(mapId);
     if (!host) {
-        console.info(`[OutZen] mapId='${mapId}' not found in DOM — bootOutZen skipped.`);
+        console.info(`[OutZen] bootOutZen skipped: #${mapId} not found. Available map divs:`,
+            [...document.querySelectorAll("div[id]")].map(x => x.id).slice(0, 50));
         return false;
     }
 
@@ -370,10 +651,6 @@ function buildMarkerIcon(
         popupAnchor: [0, -26]
     });
 }
-
-
-
-
 /**
  * Adds or updates a crowd marker.
  */
@@ -381,12 +658,20 @@ export function addOrUpdateCrowdMarker(id, lat, lng, level, info) {
     const L = ensureLeaflet();
     if (!L || !S.map) return;
 
+    const latNum = Number(lat);
+    const lngNum = Number(lng);
+
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+        console.warn("[OutZen] addOrUpdateCrowdMarker: invalid coords", { id, lat, lng, latNum, lngNum, info });
+        return;
+    }
+
     if (!S.markers) S.markers = new Map();
 
     const key = String(id);
     const existing = S.markers.get(key);
 
-    const popupHtml = buildPopupHtml(info);
+    const popupHtml = buildPopupHtml(info ?? {});
 
     const isTraffic = info?.isTraffic;
     const weatherType = info?.weatherType ?? info?.WeatherType ?? null;
@@ -412,7 +697,7 @@ export function addOrUpdateCrowdMarker(id, lat, lng, level, info) {
         icon // 👈 plus the default blue icon
     };
 
-    const marker = L.marker([lat, lng], opts).bindPopup(popupHtml);
+    const marker = L.marker([latNum, lngNum], opts).bindPopup(popupHtml);
     marker._outzenId = key;
     marker._outzenLevel = level;
 
@@ -425,8 +710,6 @@ export function addOrUpdateCrowdMarker(id, lat, lng, level, info) {
     S.markers.set(key, marker);
     console.log("[OutZen] Marker added. Total markers:", S.markers.size);
 }
-
-
 /**
  * Delete a marker.
  */
@@ -454,6 +737,7 @@ export function clearCrowdMarkers() {
 
     if (S.cluster) {
         S.cluster.clearLayers();
+        if (S.bundleMarkers) S.bundleMarkers.clear();
     } else {
         for (const m of S.markers.values()) {
             S.map.removeLayer(m);
@@ -466,84 +750,38 @@ export function clearCrowdMarkers() {
 // GPT markers (reuse crowd engine)
 // ================================
 export function addOrUpdateGptMarker(dto) {
-    console.log("[OutZen] addOrUpdateGptMarker called with:", dto);
     const L = ensureLeaflet();
     if (!L || !S.map || !dto) return;
 
-    const id =
-        dto.id ??
-        dto.Id;
+    const id = dto.id ?? dto.Id;
 
-    const lat =
-        dto.lat ??
-        dto.Latitude ??
-        dto.latitude;   // 👈 camelCase de Blazor
-
-    const lng =
-        dto.lng ??
-        dto.Longitude ??
-        dto.longitude;  // 👈 camelCase de Blazor
+    const lat = dto.lat ?? dto.Latitude ?? dto.latitude;
+    const lng = dto.lng ?? dto.Longitude ?? dto.longitude;
 
     const latNum = Number(lat);
     const lngNum = Number(lng);
 
+    const crowdLevel = dto.crowdLevel ?? dto.CrowdLevel ?? 3;
+
+    console.log("[OutZen] GPT marker parsed", { id, lat: latNum, lng: lngNum, crowdLevel });
+
     if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
-        console.warn("[OutZen] addOrUpdateGptMarker: invalid coordinates", { dto, latNum, lngNum });
+        console.error("[OutZen] invalid coords", { id, lat, lng, latType: typeof lat, lngType: typeof lng, latNum, lngNum, info });
         return;
     }
 
-    const sourceType =
-        dto.sourceType ??
-        dto.SourceType ??
-        "GPT";
+    const sourceType = dto.sourceType ?? dto.SourceType ?? "GPT";
+    const title = dto.title ?? dto.Title ?? dto.Prompt ?? `[${sourceType}] #${id}`;
+    const description = dto.description ?? dto.Description ?? dto.Response ?? "";
 
-    const title =
-        dto.title ??
-        dto.Title ??
-        dto.Prompt ??
-        `[${sourceType}] #${id}`;
+    addOrUpdateCrowdMarker(id, latNum, lngNum, crowdLevel, { title, description });
 
-    const description =
-        dto.description ??
-        dto.Description ??
-        dto.Response ??
-        "";
-
-    const crowdLevel =
-        dto.crowdLevel ??
-        dto.CrowdLevel ??
-        3;
-
-    const iconOverride = sourceType === "Suggestion" ? "💡" : null;
-
-    addOrUpdateCrowdMarker(
-        id,
-        latNum,
-        lngNum,
-        crowdLevel,
-        {
-            title,
-            description,
-            icon: iconOverride
-        }
-    );
-
-    setTimeout(() => {
-        try {
-            fitToMarkers();
-        } catch (e) {
-            console.warn("[OutZen] fitToMarkers failed from GPT marker:", e);
-            console.log("[OutZen] GPT marker", { id, lat: latNum, lng: lngNum, sourceType });
-        }
-    }, 50);
+    setTimeout(() => { try { fitToMarkers(); } catch { } }, 50);
 }
-
 
 export function removeGptMarker(id) {
     removeCrowdMarker(id);
 }
-
-
 
 /**
  * Adjusts the viewport to all markers.
@@ -613,19 +851,6 @@ export function debugDumpMarkers() {
     }
 }
 
-
-// Don't forget to export:
-//export {
-//    bootOutZen,
-//    addOrUpdateCrowdMarker,
-//    removeCrowdMarker,
-//    addOrUpdateGptMarker,
-//    removeGptMarker,
-//    fitToMarkers,
-//    refreshMapSize,
-//    disposeOutZen
-//};
-
 /**
  * Force Leaflet to recalculate the size (useful after layout changes).
  */
@@ -670,7 +895,6 @@ export function notifyHeavyRain(alert) {
     S.map.setView([lat, lon], Math.max(currentZoom, 11), { animate: true });
 }
 
-
 // ================================
 // Helpers UI / popup
 // ================================
@@ -695,7 +919,6 @@ if (!window.OutZenInterop) {
     window.OutZenInterop = {};
 }
 window.OutZenInterop.isOutZenReady = isOutZenReady;
-window.OutZenInterop.disposeOutZen = disposeOutZen;
 /*window.__outzenBootFlag = true;*/
 export function disposeOutZen() {
     if (S.map) {
@@ -710,8 +933,20 @@ export function disposeOutZen() {
     if (S.markers) {
         S.markers.clear();
     }
+    if (S.bundleMarkers) S.bundleMarkers.clear();
     S.initialized = false;
 }
+window.OutZenInterop.disposeOutZen = disposeOutZen;
+
+window.OutZen = window.OutZen || {};
+window.OutZen.addOrUpdateBundleMarkers = addOrUpdateBundleMarkers;
+window.OutZen.updateBundleMarker = function (bundle) {
+    const Leaflet = ensureLeaflet();
+    if (!Leaflet) return;
+    updateBundleMarker(Leaflet, bundle);
+};
+
+
 
 
 

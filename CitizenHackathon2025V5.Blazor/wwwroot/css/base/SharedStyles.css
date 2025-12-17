@@ -1,74 +1,218 @@
 ﻿/*wwwroot.css.base.SharedStyles.css*/
+:root {
+    --nav-h: 56px;
+    --nav-bg-top: rgba(8,12,20,.70);
+    --nav-bg-bottom: rgba(8,12,20,.45);
+    --nav-blur: 14px;
+    --nav-border: rgba(255,255,255,.08);
+    --nav-radius: 14px;
+    --drawer-w: min(360px, 86vw);
+    --overlay: rgba(0,0,0,.55);
+}
 
+/* Layout offset (Your app container can remain the same.) */
 .app-container {
-    display: flex;
-    min-height: 100vh;
+    padding-top: var(--nav-h);
 }
 
-.main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.page-content {
-    flex: 1;
-    padding: 1rem;
-}
-
-.nav-menu {
-    background-color: var(--nav-bg, #2c3e50);
-    padding: 0.5rem;
-}
-
-    .nav-menu ul {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        gap: 1rem;
-    }
-
-    .nav-menu a {
-        color: #fff;
-        text-decoration: none;
-    }
-
-        .nav-menu a.active {
-            font-weight: bold;
-            border-bottom: 2px solid #fff;
-        }
-/* === HEADER / NAV GLOBAL === */
+/* NAV fixed bar only (height stays small on desktop) */
 .main-nav {
-    position: fixed; /* stays stuck at the top */
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;
-    z-index: 1000; /* >> globe, map, etc. */
-    background: rgba(8, 12, 20, 0.85);
-    backdrop-filter: blur(12px);
+    z-index: 1000;
+    border-bottom: 1px solid var(--nav-border);
+    background: linear-gradient(to bottom, var(--nav-bg-top), var(--nav-bg-bottom));
+    backdrop-filter: blur(var(--nav-blur));
+    -webkit-backdrop-filter: blur(var(--nav-blur));
+    box-shadow: 0 6px 30px rgba(0,0,0,.25);
 }
 
-    /* Optional: if you want to constrain the nav's content to the center */
     .main-nav .nav-container {
         max-width: 1280px;
         margin: 0 auto;
         padding: 0 .75rem;
     }
 
-/* === Move the content so it doesn't go below the header === */
-/* You have <div class="app-container"><NavMenu /><main class="main-content">... */
-.app-container {
-    /* retains display:flex; min-height:100vh; already defined, we just ADD: */
-    padding-top: 64px; /* to be adjusted to the actual height of the NavMenu */
+.nav-bar {
+    height: var(--nav-h);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+}
+
+.nav-bar-right {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.logo {
+    color: #fff;
+    text-decoration: none;
+}
+
+/* Desktop links horizontal */
+.nav-links.desktop {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem;
+    margin: 0;
+    padding: .25rem 0 .6rem;
+    list-style: none;
+}
+
+.nav-link {
+    color: #fff;
+    text-decoration: none;
+    opacity: .92;
+    padding: .35rem .55rem;
+    border-radius: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+}
+
+    .nav-link.active {
+        font-weight: 700;
+        opacity: 1;
+        background: rgba(255,255,255,.10);
+    }
+
+/* Burger button (animated to X) */
+.nav-toggle {
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.06);
+    border-radius: 12px;
+    cursor: pointer;
+    position: relative;
+}
+
+.burger {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 18px;
+    height: 2px;
+    transform: translate(-50%,-50%);
+    background: #fff;
+    border-radius: 2px;
+    transition: transform .18s ease, background .18s ease;
+}
+
+    .burger::before,
+    .burger::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        width: 18px;
+        height: 2px;
+        background: #fff;
+        border-radius: 2px;
+        transition: transform .18s ease, top .18s ease, opacity .18s ease;
+    }
+
+    .burger::before {
+        top: -6px;
+    }
+
+    .burger::after {
+        top: 6px;
+    }
+
+/* When open => X */
+.main-nav.is-open .burger {
+    background: transparent;
+}
+
+    .main-nav.is-open .burger::before {
+        top: 0;
+        transform: rotate(45deg);
+    }
+
+    .main-nav.is-open .burger::after {
+        top: 0;
+        transform: rotate(-45deg);
+    }
+
+/* Overlay + drawer (do NOT use backdrop-filter on overlay to avoid blurring whole page) */
+.nav-overlay {
+    position: fixed;
+    inset: 0;
+    background: var(--overlay);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .18s ease;
+    z-index: 999; /* below nav, above content */
+}
+
+    .nav-overlay.show {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+.nav-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: var(--drawer-w);
+    background: rgba(10,14,24,.96);
+    border-left: 1px solid rgba(255,255,255,.10);
+    transform: translateX(100%);
+    transition: transform .20s ease;
+    z-index: 1001; /* above overlay */
+    padding-top: var(--nav-h);
+    box-shadow: -20px 0 60px rgba(0,0,0,.35);
+}
+
+    .nav-drawer.show {
+        transform: translateX(0);
+    }
+
+.nav-links.mobile {
+    margin: 0;
+    padding: .75rem .75rem 1.25rem;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+}
+
+    .nav-links.mobile .nav-link {
+        display: flex;
+        padding: .6rem .65rem;
+        background: rgba(255,255,255,.04);
+        border: 1px solid rgba(255,255,255,.06);
+    }
+
+/* Responsive behavior */
+@media (min-width: 769px) {
+    .nav-toggle {
+        display: none;
+    }
+
+    .nav-overlay, .nav-drawer {
+        display: none;
+    }
 }
 
 @media (max-width: 768px) {
-    .app-container {
-        padding-top: 72px; /* A little more if the menu is higher on mobile */
+    :root {
+        --nav-h: 72px;
+    }
+
+    .nav-links.desktop {
+        display: none;
     }
 }
+
+
+
 
 
 

@@ -120,6 +120,11 @@ builder.Services.AddScoped<IAuthService>(sp =>
     return new AuthService(http, js, provider);
 });
 
+builder.Services.AddScoped(sp =>
+{
+    var factory = sp.GetRequiredService<IHttpClientFactory>();
+    return factory.CreateClient("ApiWithAuth");
+});
 // =============================
 // Application services
 // =============================
@@ -127,6 +132,7 @@ builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.CrowdIn
 builder.Services.AddScoped<CrowdInfoService>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<GptInteractionService>();
+builder.Services.AddScoped<MessageService>();
 builder.Services.AddScoped<PlaceService>();
 builder.Services.AddScoped<SuggestionService>();
 builder.Services.AddScoped<SuggestionMapService>();

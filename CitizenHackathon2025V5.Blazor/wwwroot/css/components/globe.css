@@ -1,4 +1,10 @@
 ﻿/*/wwwroot/css/components/globe.css*/
+.earth-container {
+    width: 320px;
+    height: 320px;
+    flex: 0 0 auto;
+}
+
 .globe-wrap {
     display: flex;
     flex-direction: column;
@@ -35,8 +41,26 @@
     border-radius: 9999px;
 }
 
+.globe-in-header {
+    width: 320px;
+    height: 320px;
+    display: block;
+    position: relative;
+}
+
+.globe-fixed-corner {
+    width: 320px;
+    height: 320px;
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 20;
+}
 
 .globe-fixed { /* if you want to have it everywhere, fix it at the bottom right */
+    width: 320px;
+    height: 320px;
+    display: block;
     position: fixed;
     right: 16px;
     bottom: 16px;

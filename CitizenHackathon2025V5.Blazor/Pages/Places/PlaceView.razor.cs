@@ -223,9 +223,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
             // We derive a simple "level" from the capacity (pure visual convention)
             var level =
-                dto.Capacity >= 10000 ? 4 :
-                dto.Capacity >= 5000 ? 3 :
-                dto.Capacity >= 2000 ? 2 : 1;
+                dto.Capacity >= 3500 ? 1 :
+                dto.Capacity >= 1500 ? 2 :
+                dto.Capacity >= 150 ? 3 : 4;
 
             var desc = $"{dto.Type ?? "Unknown"}"
                        + (dto.Indoor ? " (indoor)" : " (outdoor)")

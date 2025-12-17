@@ -15,25 +15,31 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             _httpClient = httpClient;
         }
-        public async Task<IEnumerable<ClientGptInteractionDTO>> GetAllInteractions()
+        public async Task<List<ClientGptInteractionDTO>> GetAllInteractions(CancellationToken ct = default)
         {
             try
             {
-                var response = await _httpClient.GetAsync("Gpt/all");
-                if (response.StatusCode == HttpStatusCode.NotFound) 
-                    return Enumerable.Empty<ClientGptInteractionDTO>();
+                using var response = await _httpClient.GetAsync("Gpt/all", ct);
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return new List<ClientGptInteractionDTO>();
+
                 response.EnsureSuccessStatusCode();
-                
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<ClientGptInteractionDTO>>();
-                return list ?? Enumerable.Empty<ClientGptInteractionDTO>();
+
+                var list = await response.Content.ReadFromJsonAsync<List<ClientGptInteractionDTO>>(cancellationToken: ct);
+                return list ?? new List<ClientGptInteractionDTO>();
+            }
+            catch (OperationCanceledException)
+            {
+                return new List<ClientGptInteractionDTO>();
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in GetAllInteractions: {ex.Message}");
-                throw;
+                return new List<ClientGptInteractionDTO>();
             }
-            
         }
+
         public async Task<ClientGptInteractionDTO> GetByIdAsync(int id, CancellationToken ct = default)
         {
             if (id <= 0) return null;

@@ -7,40 +7,32 @@ using Microsoft.JSInterop;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Messages
 {
-
     public partial class MessageView : IAsyncDisposable
     {
 #nullable disable
-        //[Inject] public MessageService MessageService { get; set; }
+        [Inject] public MessageService MessageService { get; set; }
         [Inject] public NavigationManager Navigation { get; set; }
         [Inject] public IJSRuntime JS { get; set; }
-        [Inject] public IHubTokenService HubTokenService { get; set; }
-        [Inject] public IHttpClientFactory HttpFactory { get; set; }
         [Inject] public IConfiguration Config { get; set; }
         [Inject] public IAuthService Auth { get; set; }
 
-        private const string ApiBase = "https://localhost:7254";
-        private IJSObjectReference _message;
-        public int SelectedId { get; set; }
-        public HubConnection hubConnection { get; set; }
+        private List<ClientMessageDTO> _messages = new();
+        private string _newContent;
+        private HubConnection _hubConnection;
+        private ElementReference ScrollContainerRef;
 
         protected override async Task OnInitializedAsync()
         {
             // 1) REST initial
-            //var fetched = (await MessageService.GetAllMessagesAsync()).ToList();
-            //Messages = fetched;
-            //allMessages = fetched;
-            //visibleMessages.Clear();
-            //currentIndex = 0;
-            //LoadMoreItems();
-            // 2) SignalR (Absolute URL on API side)
+            _messages = await MessageService.GetLatestAsync(100);
+
+            // 2) SignalR
             var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
-            var hubBaseUrl = Config["SignalR:HubBase"]?.TrimEnd('/')
-                             ?? $"{apiBaseUrl}/hubs"; // fallback if no specific configuration
+            var hubBaseUrl = (Config["SignalR:HubBase"] ?? apiBaseUrl).TrimEnd('/');
+            var hubPath = HubPaths.Message.Trim('/'); // "messageHub"
+            var url = $"{hubBaseUrl}/hubs/{hubPath}";
 
-            var url = $"{hubBaseUrl}{HubPaths.Message}"; // => https://localhost:7254/hubs/messageHub
-
-            hubConnection = new HubConnectionBuilder()
+            _hubConnection = new HubConnectionBuilder()
                 .WithUrl(url, options =>
                 {
                     options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
@@ -48,99 +40,58 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Messages
                 .WithAutomaticReconnect()
                 .Build();
 
-            //// AISuggestionHub
-            //hubConnection = new HubConnectionBuilder()
-            //    .WithUrl(apiBaseUrl + TourismeHubMethods.HubPath)
-            //    .WithAutomaticReconnect()
-            //    .Build();
+            _hubConnection.On<ClientMessageDTO>("ReceiveMessageUpdate", async dto =>
+            {
+                if (dto is null) return;
 
-            //hubConnection.On<string>(TourismeHubMethods.ToClient.SuggestionsUpdated, json =>
-            //{
-            //    // parse/apply
-            //    InvokeAsync(StateHasChanged);
-            //});
+                _messages.Insert(0, dto);
+                await InvokeAsync(StateHasChanged);
+            });
 
-            //// NotificationHub
-            //notifConnection = new HubConnectionBuilder()
-            //    .WithUrl(apiBaseUrl + NotificationHubMethods.HubPath)
-            //    .WithAutomaticReconnect()
-            //    .Build();
-
-            //notifConnection.On<string>(NotificationHubMethods.ToClient.Notify, msg =>
-            //{
-            //    Console.WriteLine($"[NOTIF] {msg}");
-            //}); 
-
-            // handlers...
-            //hubConnection.On<ClientMessageDTO>("ReceiveMessageUpdate", async dto =>
-            //{
-            //    void Upsert(List<ClientMessageDTO> list)
-            //    {
-            //        var existing = list.FirstOrDefault(x => x.Id == dto.Id);
-            //        if (existing != null)
-            //        {
-            //            // Update existing
-            //            var index = list.IndexOf(existing);
-            //            list[index] = dto;
-            //        }
-            //        else
-            //        {
-            //            // Add new
-            //            list.Insert(0, dto); // Insert at the top
-            //        }
-            //    }
-            //    Upsert(Messages);
-            //    Upsert(allMessages);
-            //    await InvokeAsync(StateHasChanged);
-            //});
-            await hubConnection.StartAsync();
-            // JS init
             try
             {
-                _message = await JS.InvokeAsync<IJSObjectReference>("import", "./_content/CitizenHackathon2025V5.Blazor.Client/js/message.js");
-                if (_message is not null)
-                {
-                    await _message.InvokeVoidAsync("initializeMessage", DotNetObjectReference.Create(this), ScrollContainerRef);
-                }
+                await _hubConnection.StartAsync();
             }
-            catch { /* ignore */ }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[MessageView] Hub start failed: {ex.Message}");
+            }
         }
 
-        private static string BuildHubUrl(string baseUrl, string path)
+        private async Task SendAsync()
         {
-            var b = baseUrl.TrimEnd('/');
-            var p = path.TrimStart('/'); // ex: "hubs/crowdHub"
+            var content = _newContent?.Trim();
+            if (string.IsNullOrEmpty(content))
+                return;
 
-            // If the base already ends with "/hubs" AND the path begins with "hubs/", we avoid the duplicate
-            if (b.EndsWith("/hubs", StringComparison.OrdinalIgnoreCase) &&
-                p.StartsWith("hubs/", StringComparison.OrdinalIgnoreCase))
+            var created = await MessageService.PostAsync(content);
+            if (created is not null)
             {
-                p = p.Substring("hubs/".Length); // => "crowdHub"
+                // Optionnel : l’insert local est déjà fait par SignalR; ici on peut ne rien faire
+                _newContent = string.Empty;
             }
+        }
 
-            return $"{b}/{p}";
+        private async Task HandleScroll()
+        {
+            var scrollTop = await JS.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
+            var scrollHeight = await JS.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
+            var clientHeight = await JS.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
+
+            // Pour l’instant, pas de lazy-load (tu pourras réintroduire plus tard)
         }
 
         public async ValueTask DisposeAsync()
         {
-            try
+            if (_hubConnection is not null)
             {
-                if (_message is not null)
-                {
-                    // optional: if you have a destroy function in the module
-                    await _message.DisposeAsync();
-                }
-            }
-            catch { /* ignore */ }
-
-            if (hubConnection is not null)
-            {
-                try { await hubConnection.StopAsync(); } catch { }
-                try { await hubConnection.DisposeAsync(); } catch { }
+                try { await _hubConnection.StopAsync(); } catch { }
+                try { await _hubConnection.DisposeAsync(); } catch { }
             }
         }
     }
 }
+
 
 
 

@@ -1,35 +1,34 @@
-@using CitizenHackathon2025V5.Blazor.Client.Services
-@using CitizenHackathon2025V5.Blazor.Client.SignalR
-@using Blazored.Toast
 @inherits LayoutComponentBase
 
 <PageTitle>OutZen CitizenHackathon 2025</PageTitle>
 
+<!-- Layers FIXED : hors layout -->
 <div class="background-svg">
     <img src="/svg/animated-bg.svg" alt="Animated Background" />
 </div>
 
-<div class="dynamic-bg" style="background-image: url('@GetBackgroundImage()'); background-size: cover;">
+<div class="dynamic-bg @GetTimeClass()"
+     style="background-image: url('@GetBackgroundImage()');">
 </div>
 
+<canvas id="layoutBackgroundCanvas"></canvas>
+
+<!-- Layout NORMAL -->
 <div class="app-container">
     <NavMenu />
 
     <main class="main-content">
         <div class="page-content">
             <BlazoredToasts Position="Blazored.Toast.Configuration.ToastPosition.TopRight" />
-            @Body  
+            @Body
         </div>
     </main>
-
-    <div class="dynamic-bg @GetTimeClass()" style="background-image: url('@GetBackgroundImage()');"></div>
 
     <footer class="main-footer">
         <p>© @DateTime.Now.Year - OutZen by CitizenHackathon2025</p>
     </footer>
-
-    <canvas id="layoutBackgroundCanvas" width="800" height="400"></canvas>
 </div>
+
 
 <!-- Decorative SVGs -->
 @* <div class="svg-background">

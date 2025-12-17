@@ -37,23 +37,34 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         }
 
         // GET /api/WeatherForecast/current
-        public async Task<IEnumerable<ClientWeatherForecastDTO>> GetLatestWeatherForecastAsync()
+        public async Task<List<ClientWeatherForecastDTO>> GetLatestWeatherForecastAsync(CancellationToken ct = default)
         {
             try
             {
-                var res = await _http.GetAsync("WeatherForecast/current");
+                using var res = await _http.GetAsync("WeatherForecast/current", ct);
+
+                if (res.StatusCode == HttpStatusCode.NotFound)
+                    return new();
+
                 res.EnsureSuccessStatusCode();
-                var items = await res.Content.ReadFromJsonAsync<IEnumerable<ClientWeatherForecastDTO>>()
-                    ?? Enumerable.Empty<ClientWeatherForecastDTO>();
+
+                var items = await res.Content
+                    .ReadFromJsonAsync<List<ClientWeatherForecastDTO>>(cancellationToken: ct)
+                    ?? new();
 
                 return items.Select(WeatherForecastUiEnricher.Enrich).ToList();
             }
+            catch (OperationCanceledException)
+            {
+                return new();
+            }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Unexpected error in GetLatestWeatherForecastAsync: {ex.Message}");
-                return Enumerable.Empty<ClientWeatherForecastDTO>();
+                Console.Error.WriteLine($"GetLatestWeatherForecastAsync failed: {ex.Message}");
+                return new();
             }
         }
+
 
         // GET /api/WeatherForecast/current but filter out nulls
         public async Task<List<ClientWeatherForecastDTO>> GetLatestForecastNonNullAsync()

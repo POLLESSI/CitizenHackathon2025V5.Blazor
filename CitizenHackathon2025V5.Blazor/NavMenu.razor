@@ -1,35 +1,65 @@
 @* NavMenu.razor *@
-<nav class="main-nav nav-container">
-    <div class="nav-header">
-        <a href="/" class="logo"><b>Welcome</b></a>
-        <button class="nav-toggle" @onclick="ToggleNavMenu" aria-label="Toggle navigation">
-            <span class="hamburger"></span>
-        </button>
-        <DarkModeToggle />
-    </div>
+<nav class="main-nav @(collapseNavMenu ? "is-open" : "")" @ref="_navRef" )">
+    <div class="nav-container">
+        <div class="nav-bar">
+            <a href="/" class="logo"><b>Welcome</b></a>
 
-    <NavLink href="/crowdcalendar" Match="NavLinkMatch.Prefix">
-        <span class="oi oi-calendar" aria-hidden="true"></span> CROWD CALENDAR
-    </NavLink>
+            <div class="nav-bar-right">
+                <DarkModeToggle />
 
-    <ul class="nav-links @(collapseNavMenu ? "collapsed" : "")">
-        @if (IsHomePage)
-        {
-            @foreach (var item in MenuItems)
+                <button class="nav-toggle" type="button"
+                        @onclick="ToggleNavMenu"
+                        aria-label="Toggle navigation"
+                        aria-expanded="@(!collapseNavMenu)">
+                    <span class="hamburger"></span>
+                </button>
+            </div>
+        </div>
+
+        @* Desktop links (always visible) *@
+        <ul class="nav-links desktop">
+            @if (IsHomePage)
             {
-                <li>
-                    <NavLink href="@item.Href" @onclick="CloseMenu" class="nav-link" ActiveClass="active">
-                        @item.Icon @item.Text
-                    </NavLink>
-                </li>
+                @foreach (var item in MenuItems)
+                {
+                    <li>
+                        <NavLink href="@item.Href" class="nav-link" ActiveClass="active">
+                            @item.Icon @item.Text
+                        </NavLink>
+                    </li>
+                }
             }
-        }
-        else
-        {
-            <li><NavLink href="/" @onclick="CloseMenu">Back Home</NavLink></li>
-        }
-    </ul>
+            else
+            {
+                <li><NavLink href="/" class="nav-link">Back Home</NavLink></li>
+            }
+        </ul>
+
+        @* Mobile overlay + drawer *@
+        <div class="nav-overlay @(collapseNavMenu ? "" : "show")" @onclick="CloseMenu"></div>
+
+        <aside class="nav-drawer @(collapseNavMenu ? "" : "show")" role="dialog" aria-modal="true">
+            <ul class="nav-links mobile">
+                @if (IsHomePage)
+                {
+                    @foreach (var item in MenuItems)
+                    {
+                        <li>
+                            <NavLink href="@item.Href" @onclick="CloseMenu" class="nav-link" ActiveClass="active">
+                                @item.Icon @item.Text
+                            </NavLink>
+                        </li>
+                    }
+                }
+                else
+                {
+                    <li><NavLink href="/" @onclick="CloseMenu" class="nav-link">Back Home</NavLink></li>
+                }
+            </ul>
+        </aside>
+    </div>
 </nav>
+
 
 
 

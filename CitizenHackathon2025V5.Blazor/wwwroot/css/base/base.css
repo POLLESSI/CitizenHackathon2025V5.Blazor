@@ -1,22 +1,36 @@
-﻿/*wwwroot.css.base.base.css*/
-/* very light reset */
+﻿/* wwwroot/CSS/base/base.css */
+/* very light reset + layout safety */
 
 html, body {
     height: 100%;
 }
 
+    html.nav-lock, body.nav-lock {
+        overflow: hidden;
+    }
+
 body {
     margin: 0;
-    font-family: var(--font-main);
-    color: var(--color-fg);
-    background: var(--color-bg);
+    font-family: var(--font-main, system-ui, -apple-system, Segoe UI, Roboto, Arial);
+    color: var(--color-fg, #eee);
+    background: var(--color-bg, #0b0b10);
+}
+
+/* main app root should fill screen */
+#app, .page, .page-content {
+    min-height: 100%;
+}
+
+/* Leaflet host safety: if parent collapses, map becomes invisible */
+#homeMap, #leafletMap, .leaflet-host, .leaflet-container {
+    min-height: 280px;
 }
 
 /* general helpers */
 .container {
     width: min(1200px, 92vw);
     margin: 0 auto;
-    padding: var(--spacing-md);
+    padding: var(--spacing-md, 16px);
 }
 
 .scroll {
@@ -32,5 +46,5 @@ body {
 }
 
 .mt-md {
-    margin-top: var(--spacing-md);
+    margin-top: var(--spacing-md, 16px);
 }

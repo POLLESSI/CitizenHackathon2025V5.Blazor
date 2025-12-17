@@ -18,23 +18,31 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             _httpClient = factory.CreateClient("ApiWithAuth");
         }
-        public async Task<IEnumerable<ClientPlaceDTO>> GetLatestPlaceAsync()
+        public async Task<List<ClientPlaceDTO>> GetLatestPlaceAsync(CancellationToken ct = default)
         {
             try
             {
-                var response = await _httpClient.GetAsync("Place/Latest");
+                using var response = await _httpClient.GetAsync("Place/Latest", ct);
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return new();
+
                 response.EnsureSuccessStatusCode();
 
-                return await response.Content.ReadFromJsonAsync<IEnumerable<ClientPlaceDTO>>()
-                        ?? Enumerable.Empty<ClientPlaceDTO>();
+                return await response.Content.ReadFromJsonAsync<List<ClientPlaceDTO>>(cancellationToken: ct)
+                       ?? new();
+            }
+            catch (OperationCanceledException)
+            {
+                return new();
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Unexpected error in GetLatestPlaceAsync: {ex.Message}");
-                return Enumerable.Empty<ClientPlaceDTO>();
+                Console.Error.WriteLine($"GetLatestPlaceAsync failed: {ex.Message}");
+                return new();
             }
-            
         }
+
         public async Task<ClientPlaceDTO> GetPlaceByIdAsync(int id, CancellationToken ct)
         {
             if (id <= 0)

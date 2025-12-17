@@ -100,32 +100,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
             
         }
-        public async Task<IEnumerable<ClientSuggestionDTO>> GetLatestSuggestionAsync()
+        public async Task<List<ClientSuggestionDTO>> GetLatestSuggestionAsync(CancellationToken ct = default)
         {
             try
             {
-                //var response = await _httpClient.GetAsync("Suggestions/all");
-                //if (response.StatusCode == HttpStatusCode.NotFound)
-                //    return Enumerable.Empty<ClientSuggestionDTO>();
-
-                //response.EnsureSuccessStatusCode();
-
-                //return await response.Content.ReadFromJsonAsync<IEnumerable<ClientSuggestionDTO>>()
-                //       ?? Enumerable.Empty<ClientSuggestionDTO>();
-
-                // The call is consistent with what you're testing in Swagger.
                 var result = await _httpClient.GetFromJsonAsync<List<ClientSuggestionDTO>>(
-                    "Suggestions/all?all=true");
+                    "Suggestions/all?all=true", ct);
 
-                return result ?? Enumerable.Empty<ClientSuggestionDTO>();
+                return result ?? new();
+            }
+            catch (OperationCanceledException)
+            {
+                return new();
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Unexpected error in GetLatestSuggestionAsync: {ex.Message}");
-                return Enumerable.Empty<ClientSuggestionDTO>();
+                Console.Error.WriteLine($"GetLatestSuggestionAsync failed: {ex.Message}");
+                return new();
             }
-            
         }
+
         public async Task<ClientSuggestionDTO> SaveSuggestionAsync(ClientSuggestionDTO @suggestion)
         {
             try

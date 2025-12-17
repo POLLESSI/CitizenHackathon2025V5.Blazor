@@ -19,22 +19,31 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             _httpClient = factory.CreateClient("ApiWithAuth");
         }
-        public async Task<IEnumerable<ClientEventDTO>> GetLatestEventAsync()
+        public async Task<List<ClientEventDTO>> GetLatestEventAsync(CancellationToken ct = default)
         {
             try
             {
-                var response = await _httpClient.GetAsync("Event/latest");
+                using var response = await _httpClient.GetAsync("Event/latest", ct);
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return new();
+
                 response.EnsureSuccessStatusCode();
-                return await response.Content.ReadFromJsonAsync<IEnumerable<ClientEventDTO>>()
-                       ?? Enumerable.Empty<ClientEventDTO>();
+
+                return await response.Content.ReadFromJsonAsync<List<ClientEventDTO>>(cancellationToken: ct)
+                       ?? new();
+            }
+            catch (OperationCanceledException)
+            {
+                return new();
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Unexpected error in GetLatestEventAsync: {ex.Message}");
-                return Enumerable.Empty<ClientEventDTO>();
+                Console.Error.WriteLine($"GetLatestEventAsync failed: {ex.Message}");
+                return new();
             }
-            
         }
+
         public async Task<ClientEventDTO> SaveEventAsync(ClientEventDTO @event)
         {
             try

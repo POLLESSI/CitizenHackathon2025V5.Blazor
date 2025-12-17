@@ -9,7 +9,7 @@
     <script>window.BlazorWebAssemblyLoadAllGlobalizationData = true;</script>
 
     <base href="/" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#000000" />
     <meta http-equiv="Cache-Control" content="no-cache" />
     <meta http-equiv="Pragma" content="no-cache" />
@@ -150,22 +150,62 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js" crossorigin="anonymous"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
 
-    <!-- Interop Chart Crowd -->
-    <script src="/js/app/crowdChart.js"></script>
-
     <!-- SignalR global (only one version) -->
     <script src="https://cdn.jsdelivr.net/npm/@microsoft/signalr@8.0.5/dist/browser/signalr.min.js"></script>
 
     <!-- Helper global pour Blazor: isOutZenBooted() -->
     <script>
-        // True if the boot is done AND if the global OutZenInterop bridge is exposed.
         window.isOutZenBooted = function () {
-            try { return !!window.__outzenBootFlag && !!window.OutZenInterop; }
-            catch { return false; }
+            return !!window.__outzenBootFlag
+                || !!(window.__OutZenSingleton && window.__OutZenSingleton.initialized);
         };
     </script>
 </head>
 <body>
+    <script>
+        (function hookLeafletMapDebug() {
+            const isLocalhost =
+                location.hostname === "localhost" ||
+                location.hostname === "127.0.0.1" ||
+                location.hostname === "[::1]";
+
+            if (!isLocalhost) return;
+
+            // Optional activation via ?hook=1
+            const qs = new URLSearchParams(location.search);
+            const enabled = qs.get("hook") === "1";
+            if (!enabled) return;
+
+            // Global guard (hot reload / re-eval safe)
+            if (window.__outzenLeafletHooked) return;
+            window.__outzenLeafletHooked = true;
+
+            const L0 = window.L;
+            if (!L0 || typeof L0.map !== "function") {
+                console.warn("[HOOK] Leaflet not ready");
+                return;
+            }
+
+            // Prevent double wrapping
+            if (L0.map.__outzenWrapped) return;
+
+            const original = L0.map;
+
+            function wrappedMap(...args) {
+                console.warn("[HOOK] L.map called with:", args);
+                console.trace("[HOOK] stack");
+                return original.apply(this, args);
+            }
+
+            wrappedMap.__outzenWrapped = true;
+            wrappedMap.__outzenOriginal = original;
+
+            L0.map = wrappedMap;
+
+            console.warn("[HOOK] Leaflet L.map hooked (dev + ?hook=1)");
+        })();
+    </script>
+
     <div id="app">
         <div class="loading-screen">
             <h1>OutZen</h1>
@@ -184,6 +224,18 @@
     <img id="bgImage" alt="Background" style="display:none;" />
     <img src="/images/earth_texture.jpg" alt="Earth Texture" style="display:none;" />
 
+    <script>
+        window.__OUTZEN_ESM_ONLY__ = true;
+    </script>
+
+    <!-- Overlay for mobile nav (created once, always available) -->
+    <div id="ozNavOverlay" class="oz-nav-overlay" aria-hidden="true"></div>
+
+    <!-- Minimal global bridge -->
+    <script src="/js/outzen-interop.js" defer></script>
+    <!-- Your nav interop (optional if you already have it) -->
+    <script src="/js/navMenuInterop.js" defer></script>
+
     <!-- === Utility / Visual Modules === -->
     <script type="module" src="/js/app/timeEffects.js"></script>
     <script type="module" src="/js/app/wasmUtils.js"></script>
@@ -191,10 +243,9 @@
     <script type="module" src="/js/app/ui.effects.js"></script>
 
     <!-- OutZen Leaflet module -->
-    <script type="module" src="/js/app/leafletOutZen.module.js"></script>
-
+    <!--<script type="module" src="/js/app/leafletOutZen.module.js"></script>-->
     <!-- Interop JS non-ESM -->
-    <script src="/js/outzen-interop.js"></script>
+    <!--<script src="/js/outzen-interop.js"></script>-->
     <!-- Minimal interop bridge -->
     <script src="/js/trafficInterop.js" defer></script>
     <script src="/js/vendor/interop.js" defer></script>
@@ -233,10 +284,10 @@
             const texLink = document.createElement('link');
             texLink.rel = 'preload';
             texLink.as = 'image';
-            texLink.href = isNight
-                ? '/images/earth_texture_night.jpg'
-                : '/images/earth_texture.jpg';
+            texLink.crossOrigin = 'anonymous';
+            texLink.href = isNight ? '/images/earth_texture_night.jpg' : '/images/earth_texture.jpg';
             document.head.appendChild(texLink);
+
 
             // 4) Background image (day.jpg / night.jpg) via #bgImage
             const bg = document.getElementById('bgImage');

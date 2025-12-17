@@ -1,82 +1,141 @@
-@page "/"
-@using CitizenHackathon2025.Blazor.DTOs;
+ï»¿@page "/"
+@using CitizenHackathon2025.Blazor.DTOs
 @using CitizenHackathon2025V5.Blazor.Client.Services
 @using CitizenHackathon2025V5.Blazor.Client.Shared
-@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.JSInterop
 @inject NavigationManager Navigation
 @inject Blazored.Toast.Services.IToastService ToastService
 @inject IJSRuntime JS
 
+@inject CrowdInfoService CrowdInfoService
+@inject EventService EventService
+@inject SuggestionService SuggestionService
+@inject PlaceService PlaceService
+@inject TrafficConditionService TrafficConditionService
+@inject WeatherForecastService WeatherForecastService
+@inject GptInteractionService GptInteractionService
+@inject MessageService MessageService
+
 <PageTitle>OutZen - Home</PageTitle>
 
-<div class="page-list">
-    <h1 class="index-title">Welcome to OutZen application</h1>
-
-    <div class="earth-container scroll-fade">
-        <Globe CanvasId="homeEarth"
-               Width="450"
-               Height="450"
-               ShowControls="true"
-               CssClass="globe-fixed" />
-    </div>
-
-    <CitizenHackathon2025V5.Blazor.Client.Shared.MapSimulator />
-
-    <p class="index-subtitle">
-        Explore events with peace of mind, even when the crowds get involved.
-    </p>
-
-    <button class="index-cta" @onclick="ScrollToSuggestions">
-        Discover the suggestions
-    </button>
-
-    <div>
-        <section class="index-section scroll-fade" id="suggestions">
-            <h2>Suggestions Zen</h2>
-            <p>
-                Here are some alternatives within a 25 km radius of the selected event:
+<div class="home-page">
+    <!-- Top banner: title + globe -->
+    <div class="home-header">
+        <div class="home-header-left">
+            <h1 class="index-title">Welcome to OutZen application</h1>
+            <p class="index-subtitle">
+                Explore events with peace of mind, even when the crowds get involved.
             </p>
+        </div>
+    </div>
+    <!-- Main block: map + side panel -->
+    <div>
+        <button class="index-cta" @onclick="ScrollToSuggestions">
+            Discover the suggestions
+        </button>
+    </div>
+    <div class="home-main">
+        <!-- Summary map -->
+        <div class="homeMapCard">
+            <div id="homeMap"></div>
+            <!-- Optional: canvas for the weather chart if you want to put it back -->
+            @* <canvas id="crowdChart"></canvas> *@
+        </div>
+        
+        <!-- Side panel: GPT + message -->
+        <aside class="home-side-panel scroll-fade">
+            <section class="home-block">
+                <h2>AI Suggestions (GPT)</h2>
+                <p class="home-block-subtitle">
+                    Last generated suggestions and insights.
+                </p>
 
-            <ul>
-                <li>Upper Sambre Natural Park</li>
-                <li>Outdoor yoga classes in Gosselies</li>
-                <li>Open-air theater – La Traviata</li>
-            </ul>
-        </section>
+                <div class="gpt-table-wrapper">
+                    <table class="oz-table compact">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Title / Prompt</th>
+                                <th>Summary</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (GptInteractions is { Count: > 0 })
+                            {
+                                @foreach (var g in GptInteractions)
+                                {
+                                    <tr>
+                                        <td>@(g.SourceType ?? "GPT")</td>
+                                        <td>@(g.Prompt ?? g.Prompt ?? $"#{g.Id}")</td>
+                                        <td>@Shorten(g.Response, 120)</td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="3" class="text-muted">No AI interactions yet.</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            <section class="home-block">
+                <h2>Your message</h2>
+                <p class="home-block-subtitle">
+                    Send feedback or report what you see on the field.
+                </p>
+
+                <EditForm Model="@this" OnValidSubmit="SendMessageAsync">
+                    <InputTextArea id="userMessage"
+                                   name="userMessage"
+                                   class="oz-input your-message"
+                                   @bind-Value="NewMessage"
+                                   placeholder="Your message..."
+                                   autocomplete="off" />
+
+                    <ValidationSummary />
+
+                    <button type="submit"
+                            class="btn primary"
+                            disabled="@IsSending || string.IsNullOrWhiteSpace(NewMessage)">
+                        @(IsSending ? "Sending..." : "Send")
+                    </button>
+                </EditForm>
+            </section>
+        </aside>
     </div>
     
-    <div>
-        <footer class="index-footer">
-            &copy; 2025 OutZen – Zen in the crowd, Zen in life.
-        </footer>
+    <!-- Suggestions (for the scroll button) -->
+    <section class="index-section scroll-fade" id="suggestions">
+        <h2>Suggestions Zen</h2>
+        <p>
+            Here are some alternatives within a 25 km radius of the selected event:
+        </p>
+
+        <ul>
+            <li>Upper Sambre Natural Park</li>
+            <li>Outdoor yoga classes in Gosselies</li>
+            <li>Open-air theater â€“ La Traviata</li>
+        </ul>
+    </section>
+    <div class="earth-container scroll-fade">
+        <Globe CanvasId="homeEarth"
+               Width="320"
+               Height="320"
+               ShowControls="true"
+               CssClass="globe-in-header" />
     </div>
+    <div>
+        <button class="btn" @onclick="EnableSoundAsync">Enable sound</button>
+    </div>
+
+    <footer class="index-footer">
+        &copy; 2025 OutZen â€“ Zen in the crowd, Zen in life.
+    </footer>
 </div>
-@code {
-    #nullable disable
-    private List<ClientTrafficConditionDTO> TrafficConditionsList = new();
-    [Inject] public TrafficConditionService TrafficService { get; set; }
 
-    private async Task ScrollToSuggestions()
-        => await JS.InvokeVoidAsync("scrollIntoViewById", "suggestions", new { behavior = "smooth" });
-
-    protected override async Task OnInitializedAsync()
-    {
-        var rawTraffic = await TrafficService.GetLatestTrafficConditionAsync();
-        TrafficConditionsList = rawTraffic
-            .Where(t => t is not null)
-            .Select(t => t!)
-            .ToList();
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await JS.InvokeVoidAsync("initScrollFade");
-            await JS.InvokeVoidAsync("trafficInterop.updateTrafficMarkers", TrafficConditionsList);
-        }
-    }
-}
 
 
 
