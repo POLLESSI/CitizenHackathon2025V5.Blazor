@@ -2,305 +2,59 @@
 /* global L, Chart */
 "use strict";
 
-// Global singleton to avoid duplicates in hot reload
-if (!window.__OutZenSingleton) {
-    window.__OutZenSingleton = {
-        version: "2025.12.09",
-        bootTs: 0,
-        map: null,
-        cluster: null,
-        markers: new Map(),
-        chart: null,
-        initialized: false,
-        loggedReeval: false,
-        weatherLegend: null
-    };
-} else if (!window.__OutZenSingleton.loggedReeval) {
+window.OutZenInterop = window.OutZenInterop ?? {};
+window.OutZenInterop.enableHybridZoom = enableHybridZoom;
+
+// Single global singleton (hot reload safe)
+const S = (window.__OutZenSingleton ??= {
+    version: "2025.12.09",
+    bootTs: 0,
+    map: null,
+    cluster: null,
+    markers: new Map(),
+    chart: null,
+    initialized: false,
+    loggedReeval: false,
+    weatherLegend: null,
+
+    // bundles
+    bundleMarkers: new Map(),
+    bundleIndex: new Map(),
+    bundleRadiusMeters: 80,
+    bundleLastInput: null,
+});
+
+// Dev log only once (optional)
+if (!S.loggedReeval && S.bootTs !== 0) {
     console.info("[OutZen] module re-evaluated — reusing singleton");
-    window.__OutZenSingleton.loggedReeval = true;
+    S.loggedReeval = true;
 }
 
-const S = window.__OutZenSingleton;
-
-// ==========================================
-// BUNDLED MARKERS (Event + Place + Crowd)
-// ==========================================
-
-// Extend singleton (no breaking change)
-S.bundleMarkers = S.bundleMarkers || new Map(); // key -> Leaflet marker
-S.bundleRadiusMeters = S.bundleRadiusMeters || 80; // default, can be overridden
-S.bundleLastInput = S.bundleLastInput || null;
-
-// Small haversine in meters
-function haversineMeters(aLat, aLng, bLat, bLng) {
-    const R = 6371000;
-    const toRad = d => d * Math.PI / 180;
-    const dLat = toRad(bLat - aLat);
-    const dLng = toRad(bLng - aLng);
-    const s1 = Math.sin(dLat / 2);
-    const s2 = Math.sin(dLng / 2);
-    const aa = s1 * s1 + Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * s2 * s2;
-    return 2 * R * Math.asin(Math.sqrt(aa));
-}
-
-// Stable key for a bundle (canonical point rounded to avoid float noise)
-function bundleKey(lat, lng) {
-    return `${lat.toFixed(6)}:${lng.toFixed(6)}`;
-}
-
-function getLatestCrowd(crowds) {
-    if (!crowds || crowds.length === 0) return null;
-    return crowds
-        .slice()
-        .sort((a, b) => new Date(b.Timestamp) - new Date(a.Timestamp))[0];
-}
-
-function buildBundles(input, radiusMeters) {
-    const events = input?.events || [];
-    const places = input?.places || [];
-    const crowds = input?.crowds || [];
-
-    const bundles = [];
-
-    // 1) Seed bundles with Events (canonical point = event coords)
-    for (const ev of events) {
-        if (ev?.Latitude == null || ev?.Longitude == null) continue;
-        bundles.push({
-            lat: ev.Latitude,
-            lng: ev.Longitude,
-            event: ev,
-            place: null,
-            crowds: []
-        });
-    }
-
-    // 2) Attach Places to nearest existing bundle (else create new)
-    for (const pl of places) {
-        if (pl?.Latitude == null || pl?.Longitude == null) continue;
-
-        let bestIdx = -1;
-        let bestD = Infinity;
-        for (let i = 0; i < bundles.length; i++) {
-            const b = bundles[i];
-            const d = haversineMeters(pl.Latitude, pl.Longitude, b.lat, b.lng);
-            if (d < bestD) { bestD = d; bestIdx = i; }
-        }
-
-        if (bestIdx >= 0 && bestD <= radiusMeters) {
-            // keep the first place if already set (or replace if you prefer)
-            bundles[bestIdx].place = bundles[bestIdx].place || pl;
-        } else {
-            bundles.push({
-                lat: pl.Latitude,
-                lng: pl.Longitude,
-                event: null,
-                place: pl,
-                crowds: []
-            });
-        }
-    }
-
-    // 3) Attach Crowds to nearest bundle (else create new)
-    for (const cr of crowds) {
-        if (cr?.Latitude == null || cr?.Longitude == null) continue;
-
-        let bestIdx = -1;
-        let bestD = Infinity;
-        for (let i = 0; i < bundles.length; i++) {
-            const b = bundles[i];
-            const d = haversineMeters(cr.Latitude, cr.Longitude, b.lat, b.lng);
-            if (d < bestD) { bestD = d; bestIdx = i; }
-        }
-
-        if (bestIdx >= 0 && bestD <= radiusMeters) {
-            bundles[bestIdx].crowds.push(cr);
-        } else {
-            bundles.push({
-                lat: cr.Latitude,
-                lng: cr.Longitude,
-                event: null,
-                place: null,
-                crowds: [cr]
-            });
-        }
-    }
-
-    // 4) Compute summary fields used by icon/popup
-    for (const b of bundles) {
-        const latest = getLatestCrowd(b.crowds);
-        const crowdLevelMax = b.crowds.reduce((m, c) => Math.max(m, (c?.CrowdLevel ?? 0)), 0);
-
-        b.latestCrowd = latest;
-        b.crowdLevelMax = crowdLevelMax;
-
-        // count "types" present (E/P/C) (not count of crowd rows)
-        b.typesCount =
-            (b.event ? 1 : 0) +
-            (b.place ? 1 : 0) +
-            (b.crowds && b.crowds.length > 0 ? 1 : 0);
-
-        b.key = bundleKey(b.lat, b.lng);
-    }
-
-    return bundles;
-}
-
-// Light icon color scale (no CSS dependency required)
-function levelClass(level) {
-    // match your levels 0..3/4 etc. adapt as needed
-    if (level >= 3) return "oz-bundle--high";
-    if (level === 2) return "oz-bundle--med";
-    if (level === 1) return "oz-bundle--low";
-    return "oz-bundle--none";
-}
-
-function buildBundleIconHtml(b) {
-    const parts = [];
-    if (b.event) parts.push("E");
-    if (b.place) parts.push("P");
-    if (b.crowds && b.crowds.length) parts.push("C");
-
-    const badge = b.typesCount || 1;
-    const cls = levelClass(b.crowdLevelMax);
-
-    return `
-      <div class="oz-bundle ${cls}">
-        <div class="oz-bundle__badge">${badge}</div>
-        <div class="oz-bundle__tags">${parts.join("·")}</div>
-      </div>
-    `;
-}
-
-function makeBundleIcon(L, b) {
-    // iconSize tuned for cluster readability
-    return L.divIcon({
-        className: "oz-bundle-icon",
-        html: buildBundleIconHtml(b),
-        iconSize: [42, 42],
-        iconAnchor: [21, 21],
-        popupAnchor: [0, -18]
-    });
-}
-
-function bundlePopupHtml(b) {
-    const ev = b.event ? `
-      <div class="oz-pop__section">
-        <div class="oz-pop__title">🎟 Event</div>
-        <div><b>${escapeHtml(b.event.Name ?? "Event")}</b></div>
-        <div>Date: ${b.event.DateEvent ? new Date(b.event.DateEvent).toLocaleDateString() : "-"}</div>
-        <div>Expected: ${b.event.ExpectedCrowd ?? "-"}</div>
-        <div>Outdoor: ${b.event.IsOutdoor ? "Yes" : "No"}</div>
-      </div>
-    ` : "";
-
-    const pl = b.place ? `
-      <div class="oz-pop__section">
-        <div class="oz-pop__title">📍 Place</div>
-        <div><b>${escapeHtml(b.place.Name ?? b.place.LocationName ?? "Place")}</b></div>
-        <div>Type: ${escapeHtml(b.place.Type ?? "-")}</div>
-        <div>Capacity: ${b.place.Capacity ?? "-"}</div>
-        <div>Active: ${b.place.Active ? "Yes" : "No"}</div>
-      </div>
-    ` : "";
-
-    const cr = b.latestCrowd ? `
-      <div class="oz-pop__section">
-        <div class="oz-pop__title">👥 Crowd</div>
-        <div><b>${escapeHtml(b.latestCrowd.LocationName ?? "CrowdInfo")}</b></div>
-        <div>Level: ${b.latestCrowd.CrowdLevel ?? "-"}</div>
-        <div>At: ${b.latestCrowd.Timestamp ? new Date(b.latestCrowd.Timestamp).toLocaleString() : "-"}</div>
-        <div>Samples: ${b.crowds?.length ?? 0}</div>
-      </div>
-    ` : "";
-
-    return `
-      <div class="oz-pop">
-        ${ev}${pl}${cr}
-      </div>
-    `;
-}
-
-function escapeHtml(s) {
-    if (s == null) return "";
-    return String(s)
+// Idempotent utils namespace
+S.utils ||= {};
+S.utils.escapeHtml ||= (v) => {
+    if (v == null) return "";
+    return String(v)
         .replaceAll("&", "&amp;")
         .replaceAll("<", "&lt;")
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
-}
+};
+// Single numeric helper (prevents "Identifier 'safeNum' has already been declared")
+S.utils.safeNum ||= (x) => {
+    if (x == null) return null;
+    if (typeof x === "string") x = x.replace(",", ".");
 
-// Update or create ONE bundle marker
-function updateBundleMarker(L, b) {
-    if (!S.map) return;
-    if (!S.cluster) return;
+    const n = Number(x);
+    return Number.isFinite(n) ? n : null;
+};
 
-    const key = b.key || bundleKey(b.lat, b.lng);
-    let mk = S.bundleMarkers.get(key);
-
-    const icon = makeBundleIcon(L, b);
-    const popup = bundlePopupHtml(b);
-
-    if (!mk) {
-        mk = L.marker([b.lat, b.lng], { icon });
-
-        mk.bindPopup(popup, {
-            maxWidth: 360,
-            closeButton: true,
-            autoPan: true
-        });
-
-        // attach data for debugging / later use
-        mk.__oz_bundleKey = key;
-        mk.__oz_bundle = b;
-
-        S.cluster.addLayer(mk);
-        S.bundleMarkers.set(key, mk);
-        return;
-    }
-
-    // If canonical point moved (rare), update position
-    mk.setLatLng([b.lat, b.lng]);
-    mk.setIcon(icon);
-
-    // Keep popup updated
-    if (mk.getPopup()) mk.setPopupContent(popup);
-    else mk.bindPopup(popup);
-
-    mk.__oz_bundle = b;
-}
-
-// Main API: create/update bundles and clean removed ones
-function addOrUpdateBundleMarkers(input, radiusMeters) {
-    const Leaflet = ensureLeaflet();
-    if (!Leaflet) return;
-
-    // allow call without radius
-    const radius = Number.isFinite(radiusMeters) ? radiusMeters : (S.bundleRadiusMeters || 80);
-
-    S.bundleLastInput = input;
-
-    const bundles = buildBundles(input, radius);
-
-    // Track keys in this pass
-    const seen = new Set();
-    for (const b of bundles) {
-        seen.add(b.key);
-        updateBundleMarker(Leaflet, b);
-    }
-
-    // Remove bundle markers not present anymore
-    for (const [key, mk] of S.bundleMarkers.entries()) {
-        if (!seen.has(key)) {
-            try {
-                // remove from cluster cleanly
-                S.cluster.removeLayer(mk);
-            } catch (e) { /* ignore */ }
-            S.bundleMarkers.delete(key);
-        }
-    }
-}
-
+// NOTE:
+// All "bundle" UI helpers (bundlePopupHtml / bundle icon building / etc.)
+// must live ONLY in the "Bundle Markers" section below.
+// Keeping them here creates duplicate top-level function declarations and triggers:
+//   SyntaxError: Identifier 'bundlePopupHtml' / 'safeNum' has already been declared
 
 // ================================
 // Internal helpers
@@ -313,7 +67,6 @@ function ensureLeaflet() {
     }
     return Leaflet;
 }
-
 function ensureContainer(mapId) {
     const el = document.getElementById(mapId);
     if (!el) {
@@ -531,7 +284,17 @@ export async function bootOutZen(options) {
     // --- 3) Cluster ---
     if (L.markerClusterGroup) {
         if (!S.cluster) {
-            S.cluster = L.markerClusterGroup();
+            S.cluster = L.markerClusterGroup({
+                // At very high zoom, it shows the markers rather than continuing to cluster.
+                disableClusteringAtZoom: 18,
+                spiderfyOnMaxZoom: true,
+
+                // Avoid "disappearances" related to off-screen optimization
+                removeOutsideVisibleBounds: false,
+
+                // Optional: less aggressive clusterS
+                maxClusterRadius: 60,
+            });
         } else {
             S.cluster.clearLayers();
         }
@@ -585,8 +348,18 @@ export async function bootOutZen(options) {
     S.bootTs = Date.now();
     window.__outzenBootFlag = true;
 
+    if (!S._navListenerBound) {
+        S._navListenerBound = true;
+        window.addEventListener("outzen:nav", () => {
+            if (S.map && typeof S.map.invalidateSize === "function") {
+                setTimeout(() => { try { S.map.invalidateSize(true); } catch { } }, 50);
+            }
+        });
+    }
+
     console.log("[OutZen] ✅ bootOutZen completed.");
     return true;
+
 }
 
 // ================================
@@ -902,17 +675,535 @@ function buildPopupHtml(info) {
     const title = info?.title ?? "Unknown";
     const desc = info?.description ?? "";
     return `<div class="outzen-popup">
-        <div class="title">${escapeHtml(title)}</div>
-        <div class="desc">${escapeHtml(desc)}</div>
-    </div>`;
+      <div class="title">${S.utils.escapeHtml(title)}</div>
+      <div class="desc">${S.utils.escapeHtml(desc)}</div>
+  </div>`;
 }
 
-function escapeHtml(str) {
-    if (!str) return "";
-    return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+// =====================================================
+// Bundle Markers (ESM) — overlap/group by proximity
+// Exports: addOrUpdateBundleMarkers, updateBundleMarker
+// Requires: window.__OutZenSingleton (S), Leaflet (window.L)
+// =====================================================
+
+// Ensure bundle state exists on the singleton (do NOT break existing S)
+S.bundleMarkers = S.bundleMarkers || new Map(); // key -> Leaflet marker
+S.bundleIndex = S.bundleIndex || new Map();     // key -> bundle object
+
+// ---- Geo helpers ----
+function metersToDegLat(m) {
+    return m / 111320;
+}
+function metersToDegLng(m, lat) {
+    const cos = Math.cos((lat * Math.PI) / 180);
+    return m / (111320 * Math.max(cos, 0.1));
+}
+// Spatial hash key: grid cell sized by tolerance (in degrees), based on each point lat
+function bundleKeyFor(lat, lng, tolMeters) {
+    const dLat = metersToDegLat(tolMeters);
+    const dLng = metersToDegLng(tolMeters, lat);
+    const gy = Math.floor(lat / dLat);
+    const gx = Math.floor(lng / dLng);
+    return `${gy}:${gx}`;
+}
+
+// Belgium (geo-stable filter)
+const BELGIUM = { minLat: 49.45, maxLat: 51.60, minLng: 2.30, maxLng: 6.60 };
+
+function isInBelgium(ll) {
+    return !!ll &&
+        Number.isFinite(ll.lat) && Number.isFinite(ll.lng) &&
+        ll.lat >= BELGIUM.minLat && ll.lat <= BELGIUM.maxLat &&
+        ll.lng >= BELGIUM.minLng && ll.lng <= BELGIUM.maxLng;
+}
+
+// Parse lat/lng robuste (1 seule déclaration lat/lng, + normalisation 0..360 => -180..180)
+function pickLatLng(obj) {
+    const lat = S.utils.safeNum(
+        obj?.Latitude ?? obj?.latitude ?? obj?.lat ?? obj?.Lat ?? obj?.LAT ??
+        obj?.position?.lat ?? obj?.position?.Lat ?? obj?.Position?.Lat ??
+        obj?.location?.lat ?? obj?.location?.Lat ?? obj?.Location?.Lat ??
+        obj?.Location?.Latitude ?? obj?.location?.latitude
+    );
+
+    let lng = S.utils.safeNum(
+        obj?.Longitude ?? obj?.longitude ?? obj?.lng ?? obj?.Lng ?? obj?.LNG ??
+        obj?.Lon ?? obj?.lon ??
+        obj?.position?.lng ?? obj?.position?.Lng ?? obj?.Position?.Lng ??
+        obj?.location?.lng ?? obj?.location?.Lng ?? obj?.Location?.Lng ??
+        obj?.Location?.Longitude ?? obj?.location?.longitude
+    );
+
+    if (lat == null || lng == null) return null;
+
+    // Normalisation longitudes 0..360 => -180..180
+    if (lng > 180 && lng <= 360) lng -= 360;
+    while (lng > 180) lng -= 360;
+    while (lng < -180) lng += 360;
+
+    // Rejets
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+    if (Math.abs(Math.abs(lng) - 180) < 1e-6) return null;
+
+    return { lat, lng };
+}
+
+function ensureMapReady() {
+    const Leaflet = ensureLeaflet();
+    if (!Leaflet) return null;
+    if (!S.map) {
+        console.warn("[OutZen][Bundle] map not ready (S.map is null).");
+        return null;
+    }
+    return Leaflet;
+}
+
+function addLayerSmart(layer) {
+    // Bypass cluster for bundles
+    if (layer?.options?.__ozNoCluster) {
+        S.map.addLayer(layer);
+        return;
+    }
+    // Respect existing cluster if present
+    if (S.cluster && typeof S.cluster.addLayer === "function") S.cluster.addLayer(layer);
+    else S.map.addLayer(layer);
+}
+
+function removeLayerSmart(layer) {
+    if (!layer) return;
+    if (layer?.options?.__ozNoCluster) {
+        try { S.map.removeLayer(layer); } catch { }
+        return;
+    }
+    if (S.cluster && typeof S.cluster.removeLayer === "function") S.cluster.removeLayer(layer);
+    else if (S.map && typeof S.map.removeLayer === "function") S.map.removeLayer(layer);
+}
+
+// ---- Icon: badge count (divIcon) ----
+function makeBadgeIcon(totalCount, breakdown) {
+    const Leaflet = ensureLeaflet();
+    if (!Leaflet) return null;
+
+    // Small dots by category (optional but useful)
+    const dots = [];
+    const addDot = (n, cls, title) => {
+        if (!n) return;
+        dots.push(`<span class="oz-dot ${cls}" title="${title}"></span>`);
+    };
+
+    addDot(breakdown.events, "oz-dot-events", "Events");
+    addDot(breakdown.places, "oz-dot-places", "Places");
+    addDot(breakdown.crowds, "oz-dot-crowds", "Crowd");
+    addDot(breakdown.traffic, "oz-dot-traffic", "Traffic");
+    addDot(breakdown.gpt, "oz-dot-gpt", "GPT");
+
+    const html = `
+    <div class="oz-bundle">
+      <div class="oz-badge">${totalCount}</div>
+      <div class="oz-dots">${dots.join("")}</div>
+    </div>
+  `.trim();
+
+    return Leaflet.divIcon({
+        className: "oz-bundle-icon",
+        html,
+        iconSize: [34, 34],
+        iconAnchor: [17, 17],
+        popupAnchor: [0, -12]
+    });
+}
+
+function bundleBreakdown(b) {
+    return {
+        events: b.events?.length ?? 0,
+        places: b.places?.length ?? 0,
+        crowds: b.crowds?.length ?? 0,
+        traffic: b.traffic?.length ?? 0,
+        gpt: b.gpt?.length ?? 0
+    };
+}
+
+function bundleTotal(b) {
+    const d = bundleBreakdown(b);
+    return d.events + d.places + d.crowds + d.traffic + d.gpt;
+}
+
+function bundlePopupHtml(b) {
+    const esc = (s) => String(s ?? "")
+        .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;").replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+
+    const section = (title, items, renderer) => {
+        if (!items || items.length === 0) return "";
+        const rows = items.slice(0, 8).map(renderer).join("");
+        const more = items.length > 8 ? `<div class="oz-more">+${items.length - 8} more…</div>` : "";
+        return `
+      <div class="oz-sec">
+        <div class="oz-sec-title">${esc(title)} <span class="oz-sec-count">${items.length}</span></div>
+        <div class="oz-sec-body">${rows}${more}</div>
+      </div>
+    `;
+    };
+
+    const ev = section("Events", b.events, e => `
+    <div class="oz-row">
+      <span class="oz-k">#${esc(e.Id)}</span>
+      <span class="oz-v">${esc(e.Name)}</span>
+    </div>
+  `);
+
+    const pl = section("Places", b.places, p => `
+    <div class="oz-row">
+      <span class="oz-k">#${esc(p.Id)}</span>
+      <span class="oz-v">${esc(p.Name ?? p.LocationName)}</span>
+    </div>
+  `);
+
+    const cr = section("Crowd", b.crowds, c => `
+    <div class="oz-row">
+      <span class="oz-k">#${esc(c.Id)}</span>
+      <span class="oz-v">${esc(c.LocationName)} (L${esc(c.CrowdLevel)})</span>
+    </div>
+  `);
+
+    const tr = section("Traffic", b.traffic, t => `
+    <div class="oz-row">
+      <span class="oz-k">#${esc(t.Id)}</span>
+      <span class="oz-v">${esc(t.RoadName ?? t.Name ?? "Traffic")}</span>
+    </div>
+  `);
+
+    const gp = section("GPT", b.gpt, g => `
+    <div class="oz-row">
+      <span class="oz-k">#${esc(g.Id)}</span>
+      <span class="oz-v">${esc(g.Title ?? g.SourceType ?? "GPT")}</span>
+    </div>
+  `);
+
+    return `
+    <div class="oz-popup">
+      <div class="oz-popup-title">Bundle (${bundleTotal(b)})</div>
+      ${ev}${pl}${cr}${tr}${gp}
+    </div>
+  `.trim();
+}
+
+// ---- Bundle compute ----
+function computeBundles(payload, tolMeters) {
+    const buckets = new Map();
+
+    const push = (arr, kind) => {
+        if (!Array.isArray(arr)) return;
+
+        for (const item of arr) {
+            const ll = pickLatLng(item);
+            if (!ll) continue;
+            if (!isInBelgium(ll)) continue;
+
+            const key = bundleKeyFor(ll.lat, ll.lng, tolMeters);
+
+            let b = buckets.get(key);
+            if (!b) {
+                b = { key, lat: ll.lat, lng: ll.lng, events: [], places: [], crowds: [], traffic: [], gpt: [] };
+                buckets.set(key, b);
+            }
+            b[kind].push(item);
+        }
+    };
+
+    push(payload?.events, "events");
+    push(payload?.places, "places");
+    push(payload?.crowds, "crowds");
+    push(payload?.traffic, "traffic");
+    push(payload?.gpt, "gpt");
+
+    return buckets; // ✅ Map
+}
+
+// ---- Exported: update one bundle marker ----
+export function updateBundleMarker(b) {
+    const Leaflet = ensureMapReady();
+    if (!Leaflet) return;
+
+    const total = bundleTotal(b);
+    const breakdown = bundleBreakdown(b);
+
+    // If total==0, remove marker if exists
+    const existing = S.bundleMarkers.get(b.key);
+    if (total <= 0) {
+        if (existing) {
+            removeLayerSmart(existing);
+            S.bundleMarkers.delete(b.key);
+            S.bundleIndex.delete(b.key);
+        }
+        return;
+    }
+
+    const icon = makeBadgeIcon(total, breakdown);
+    const popup = bundlePopupHtml(b);
+
+    if (!existing) {
+        const m = Leaflet.marker([b.lat, b.lng], {
+            icon,
+            pane: "markerPane",  
+            title: `Bundle (${total})`,
+            riseOnHover: true,
+            __ozNoCluster: true
+        });
+
+        m.bindPopup(popup, { maxWidth: 360, closeButton: true, autoPan: true });
+
+        m.bindTooltip(
+            `Bundle (${total}) • E:${breakdown.events} P:${breakdown.places} C:${breakdown.crowds} T:${breakdown.traffic} G:${breakdown.gpt}`,
+            { direction: "top", sticky: true, opacity: 0.95 }
+        );
+
+        addLayerSmart(m);
+        S.bundleMarkers.set(b.key, m);
+        S.bundleIndex.set(b.key, b);
+        return;
+    }
+
+    // Update existing marker
+    existing.setLatLng([b.lat, b.lng]);
+    if (icon) existing.setIcon(icon);
+    if (existing.getPopup()) existing.setPopupContent(popup);
+    else existing.bindPopup(popup, { maxWidth: 360 });
+
+    S.bundleIndex.set(b.key, b);
+}
+
+// ---- Exported: main entry called from Blazor ----
+export function addOrUpdateBundleMarkers(payload, toleranceMeters = 80) {
+    S.bundleLastInput = payload;
+
+    const Leaflet = ensureMapReady();
+    if (!Leaflet) return false;
+
+    const tol = Number(toleranceMeters);
+    const tolMeters = Number.isFinite(tol) && tol > 0 ? tol : 80;
+
+    const newBundles = computeBundles(payload, tolMeters); // ✅ Map
+
+    // Remove bundles that no longer exist
+    for (const oldKey of Array.from(S.bundleMarkers.keys())) {
+        if (!newBundles.has(oldKey)) {
+            const marker = S.bundleMarkers.get(oldKey);
+            removeLayerSmart(marker);
+            S.bundleMarkers.delete(oldKey);
+            S.bundleIndex.delete(oldKey);
+        }
+    }
+
+    // Add / Update bundles
+    for (const b of newBundles.values()) {
+        updateBundleMarker(b);
+    }
+
+    if (S.cluster && typeof S.cluster.refreshClusters === "function") {
+        try { S.cluster.refreshClusters(); } catch { }
+    }
+
+    console.info(`[OutZen][Bundle] updated: ${newBundles.size} bundles (tol=${tolMeters}m)`);
+
+    try { fitToBundles(24); } catch { }
+    return true;
+}
+
+//window.OutZenInterop.enableHybridZoom = enableHybridZoom;
+//window.OutZenInterop.addOrUpdateDetailMarkers = addOrUpdateDetailMarkers;
+
+const EPS_180 = 1e-6;
+export function fitToBundles(padding = 24) {
+    const L = ensureMapReady();
+    if (!L) return false;
+
+    const pts = Array.from(S.bundleMarkers.values())
+        .map(m => m?.getLatLng?.())
+        .filter(ll =>
+            ll &&
+            Number.isFinite(ll.lat) && Number.isFinite(ll.lng) &&
+            Math.abs(ll.lat) <= 90 &&
+            Math.abs(ll.lng) <= 180 &&
+            Math.abs(Math.abs(ll.lng) - 180) > EPS_180 &&
+            isInBelgium(ll)               // 👈 key
+        );
+
+    if (pts.length === 0) {
+        // fallback: centre BE “safe”
+        S.map.setView([50.45, 4.6], 12);
+        return false;
+    }
+
+    const b = L.latLngBounds(pts);
+    S.map.fitBounds(b, { padding: [padding, padding], maxZoom: 16 });
+    return true;
+}
+function makeDetailKey(kind, item) {
+    return `${kind}:${item?.Id ?? item?.id ?? crypto.randomUUID()}`;
+}
+
+function addDetailMarker(kind, item) {
+    const Leaflet = ensureLeaflet();
+    const layer = ensureDetailLayer();
+    if (!Leaflet || !layer) return;
+
+    const ll = pickLatLng(item);
+    if (!ll) return;
+
+    const key = makeDetailKey(kind, item);
+    if (S.detailMarkers.has(key)) return;
+
+    const title =
+        kind === "events" ? (item?.Name ?? "Event") :
+            kind === "places" ? (item?.Name ?? item?.LocationName ?? "Place") :
+                kind === "crowds" ? (item?.LocationName ?? "Crowd") :
+                    kind === "traffic" ? (item?.RoadName ?? item?.Name ?? "Traffic") :
+                        (item?.Title ?? item?.SourceType ?? "GPT");
+
+    const m = Leaflet.circleMarker([ll.lat, ll.lng], { radius: 7 });
+    m.bindTooltip(`${kind}: ${title}`, { sticky: true, opacity: 0.95 });
+    m.bindPopup(`<div class="oz-popup"><b>${S.utils.escapeHtml(title)}</b><div class="oz-small">#${S.utils.escapeHtml(item?.Id)}</div></div>`);
+    layer.addLayer(m);
+
+    S.detailMarkers.set(key, m);
+}
+
+export function addOrUpdateDetailMarkers(payload) {
+    const Leaflet = ensureMapReady();
+    if (!Leaflet) return false;
+
+    clearDetailMarkers();
+
+    const push = (arr, kind) => Array.isArray(arr) && arr.forEach(x => addDetailMarker(kind, x));
+    push(payload?.events, "events");
+    push(payload?.places, "places");
+    push(payload?.crowds, "crowds");
+    push(payload?.traffic, "traffic");
+    push(payload?.gpt, "gpt");
+
+    return true;
+}
+
+function ensureDetailLayer() {
+    const L = ensureLeaflet();
+    if (!L || !S.map) return null;
+
+    if (!S.detailLayer) {
+        S.detailLayer = L.layerGroup();
+        S.map.addLayer(S.detailLayer);
+    }
+    return S.detailLayer;
+}
+
+function clearDetailMarkers() {
+    if (S.detailLayer) S.detailLayer.clearLayers();
+    S.detailMarkers.clear();
+}
+
+function addDetail(kind, item) {
+    const L = ensureLeaflet();
+    const layer = ensureDetailLayer();
+    if (!L || !layer) return;
+
+    const lat = item.lat ?? item.latitude ?? item.Latitude;
+    const lng = item.lng ?? item.longitude ?? item.Longitude;
+
+    const latNum = Number(String(lat).replace(",", "."));
+    const lngNum = Number(String(lng).replace(",", "."));
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return;
+
+    const id = `${kind}:${item.id ?? item.Id ?? crypto.randomUUID()}`;
+    if (S.detailMarkers.has(id)) return;
+
+    const title =
+        item.title ??
+        item.Name ??
+        item.LocationName ??
+        item.Prompt ??
+        kind;
+
+    const m = L.circleMarker([latNum, lngNum], {
+        radius: 7,
+        className: "oz-detail-marker"
+    });
+
+    m.bindTooltip(`${kind} • ${S.utils.escapeHtml(title)}`, { sticky: true });
+    m.bindPopup(buildPopupHtml({ title, description: item.description ?? item.Response }));
+
+    layer.addLayer(m);
+    S.detailMarkers.set(id, m);
+}
+
+export function renderDetailMarkers(payload) {
+    clearDetailMarkers();
+
+    payload?.events?.forEach(x => addDetail("Event", x));
+    payload?.places?.forEach(x => addDetail("Place", x));
+    payload?.crowds?.forEach(x => addDetail("Crowd", x));
+    payload?.traffic?.forEach(x => addDetail("Traffic", x));
+    payload?.gpt?.forEach(x => addDetail("GPT", x));
+}
+
+export function enableAutoDetailMode(thresholdZoom = 15) {
+    const Leaflet = ensureMapReady();
+    if (!Leaflet) return false;
+
+    const apply = () => {
+        const z = S.map.getZoom();
+        const showDetail = z >= thresholdZoom;
+
+        // Bundles are only visible when you are far away.
+        for (const m of S.bundleMarkers.values()) {
+            if (!m) continue;
+            if (showDetail) S.map.removeLayer(m);
+            else S.map.addLayer(m);
+        }
+
+        // details visible only when you are close
+        if (showDetail) {
+            if (S.bundleLastInput) addOrUpdateDetailMarkers(S.bundleLastInput);
+        } else {
+            clearDetailMarkers();
+        }
+    };
+
+    S.map.off("zoomend", apply);
+    S.map.on("zoomend", apply);
+    apply();
+    return true;
+}
+
+function enableHybridZoom({ threshold = 13 } = {}) {
+    const L = ensureLeaflet();
+    if (!L || !S.map) {
+        console.warn("[OutZen][Hybrid] map not ready");
+        return;
+    }
+
+    const apply = () => {
+        const z = S.map.getZoom();
+
+        if (z >= threshold) {
+            // 👉 détails
+            for (const m of S.bundleMarkers.values()) {
+                if (S.map.hasLayer(m)) S.map.removeLayer(m);
+            }
+            if (S.cluster) S.map.addLayer(S.cluster);
+        } else {
+            // 👉 bundles
+            if (S.cluster) S.map.removeLayer(S.cluster);
+            for (const m of S.bundleMarkers.values()) {
+                if (!S.map.hasLayer(m)) S.map.addLayer(m);
+            }
+        }
+    };
+
+    S.map.off("zoomend", apply);
+    S.map.on("zoomend", apply);
+
+    apply(); // initial
 }
 
 if (!window.OutZenInterop) {
@@ -936,15 +1227,29 @@ export function disposeOutZen() {
     if (S.bundleMarkers) S.bundleMarkers.clear();
     S.initialized = false;
 }
+
+S.detailLayer ??= null;
+S.detailMarkers ??= new Map();
+
+// ================================
+// Public API bridge (single source of truth)
+// ================================
+window.OutZenInterop ||= {};
+window.OutZenInterop.bootOutZen = bootOutZen;
+window.OutZenInterop.addOrUpdateBundleMarkers = addOrUpdateBundleMarkers;
+window.OutZenInterop.enableHybridZoom = enableHybridZoom;
+window.OutZenInterop.isOutZenReady = isOutZenReady;
 window.OutZenInterop.disposeOutZen = disposeOutZen;
 
-window.OutZen = window.OutZen || {};
-window.OutZen.addOrUpdateBundleMarkers = addOrUpdateBundleMarkers;
-window.OutZen.updateBundleMarker = function (bundle) {
-    const Leaflet = ensureLeaflet();
-    if (!Leaflet) return;
-    updateBundleMarker(Leaflet, bundle);
-};
+/*window.OutZenInterop.disposeOutZen = disposeOutZen;*/
+
+//window.OutZen = window.OutZen || {};
+//window.OutZen.addOrUpdateBundleMarkers = addOrUpdateBundleMarkers;
+//window.OutZen.updateBundleMarker = function (bundle) {
+//    const Leaflet = ensureLeaflet();
+//    if (!Leaflet) return;
+//    updateBundleMarker(Leaflet, bundle);
+//};
 
 
 

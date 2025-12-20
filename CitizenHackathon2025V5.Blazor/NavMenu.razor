@@ -1,64 +1,45 @@
 @* NavMenu.razor *@
-<nav class="main-nav @(collapseNavMenu ? "is-open" : "")" @ref="_navRef" )">
+<nav class="main-nav @(isMenuOpen ? "is-open" : "")" @ref="_navRef">
     <div class="nav-container">
-        <div class="nav-bar">
-            <a href="/" class="logo"><b>Welcome</b></a>
+        <a href="/" class="logo"><b>Welcome</b></a>
 
-            <div class="nav-bar-right">
-                <DarkModeToggle />
-
-                <button class="nav-toggle" type="button"
-                        @onclick="ToggleNavMenu"
-                        aria-label="Toggle navigation"
-                        aria-expanded="@(!collapseNavMenu)">
-                    <span class="hamburger"></span>
-                </button>
-            </div>
-        </div>
-
-        @* Desktop links (always visible) *@
         <ul class="nav-links desktop">
-            @if (IsHomePage)
+            @foreach (var item in MenuItems)
             {
-                @foreach (var item in MenuItems)
-                {
-                    <li>
-                        <NavLink href="@item.Href" class="nav-link" ActiveClass="active">
-                            @item.Icon @item.Text
-                        </NavLink>
-                    </li>
-                }
-            }
-            else
-            {
-                <li><NavLink href="/" class="nav-link">Back Home</NavLink></li>
+                <li>
+                    <NavLink href="@item.Href" class="nav-link" ActiveClass="active">
+                        @item.Icon @item.Text
+                    </NavLink>
+                </li>
             }
         </ul>
 
-        @* Mobile overlay + drawer *@
-        <div class="nav-overlay @(collapseNavMenu ? "" : "show")" @onclick="CloseMenu"></div>
-
-        <aside class="nav-drawer @(collapseNavMenu ? "" : "show")" role="dialog" aria-modal="true">
-            <ul class="nav-links mobile">
-                @if (IsHomePage)
-                {
-                    @foreach (var item in MenuItems)
-                    {
-                        <li>
-                            <NavLink href="@item.Href" @onclick="CloseMenu" class="nav-link" ActiveClass="active">
-                                @item.Icon @item.Text
-                            </NavLink>
-                        </li>
-                    }
-                }
-                else
-                {
-                    <li><NavLink href="/" @onclick="CloseMenu" class="nav-link">Back Home</NavLink></li>
-                }
-            </ul>
-        </aside>
+        <button class="nav-toggle" type="button"
+                @onclick="ToggleNavMenu"
+                aria-label="Toggle navigation"
+                aria-expanded="@isMenuOpen">
+            <span class="burger"></span>
+        </button>
     </div>
+
+    <div class="nav-overlay @(isMenuOpen ? "show" : "")" @onclick="CloseMenu"></div>
+
+    <aside class="nav-drawer @(isMenuOpen ? "show" : "")" role="dialog" aria-modal="true">
+        <ul class="nav-links mobile">
+            @foreach (var item in MenuItems)
+            {
+                <li>
+                    <NavLink href="@item.Href" class="nav-link" ActiveClass="active"
+                             @onclick="CloseMenu">
+                        @item.Icon @item.Text
+                    </NavLink>
+                </li>
+            }
+        </ul>
+    </aside>
 </nav>
+
+
 
 
 

@@ -5,7 +5,6 @@
 @using Microsoft.JSInterop
 @inject NavigationManager Navigation
 @inject Blazored.Toast.Services.IToastService ToastService
-@inject IJSRuntime JS
 
 @inject CrowdInfoService CrowdInfoService
 @inject EventService EventService
@@ -14,7 +13,6 @@
 @inject TrafficConditionService TrafficConditionService
 @inject WeatherForecastService WeatherForecastService
 @inject GptInteractionService GptInteractionService
-@inject MessageService MessageService
 
 <PageTitle>OutZen - Home</PageTitle>
 
@@ -49,7 +47,6 @@
                 <p class="home-block-subtitle">
                     Last generated suggestions and insights.
                 </p>
-
                 <div class="gpt-table-wrapper">
                     <table class="oz-table compact">
                         <thead>
@@ -66,16 +63,14 @@
                                 {
                                     <tr>
                                         <td>@(g.SourceType ?? "GPT")</td>
-                                        <td>@(g.Prompt ?? g.Prompt ?? $"#{g.Id}")</td>
+                                        <td>@(g.Prompt ?? $"#{g.Id}")</td>
                                         <td>@Shorten(g.Response, 120)</td>
                                     </tr>
                                 }
                             }
                             else
                             {
-                                <tr>
-                                    <td colspan="3" class="text-muted">No AI interactions yet.</td>
-                                </tr>
+                                <tr><td colspan="3" class="text-muted">No AI interactions yet.</td></tr>
                             }
                         </tbody>
                     </table>
@@ -83,27 +78,22 @@
             </section>
             <section class="home-block">
                 <h2>Your message</h2>
-                <p class="home-block-subtitle">
-                    Send feedback or report what you see on the field.
-                </p>
-
-                <EditForm Model="@this" OnValidSubmit="SendMessageAsync">
-                    <InputTextArea id="userMessage"
-                                   name="userMessage"
-                                   class="oz-input your-message"
-                                   @bind-Value="NewMessage"
-                                   placeholder="Your message..."
-                                   autocomplete="off" />
-
+                <EditForm Model="@Model" OnValidSubmit="SendMessageAsync">
+                    <DataAnnotationsValidator />
                     <ValidationSummary />
+                    <input class="input"
+                           placeholder="Message…"
+                           @bind="NewMessage"
+                           @bind:event="oninput" />
 
-                    <button type="submit"
-                            class="btn primary"
-                            disabled="@IsSending || string.IsNullOrWhiteSpace(NewMessage)">
-                        @(IsSending ? "Sending..." : "Send")
+                    <button class="btn"
+                            disabled="@IsSending"
+                            @onclick="SendMessageAsync">
+                        Send
                     </button>
                 </EditForm>
             </section>
+            <button class="btn" @onclick="EnableSoundAsync">Enable sound</button>
         </aside>
     </div>
     

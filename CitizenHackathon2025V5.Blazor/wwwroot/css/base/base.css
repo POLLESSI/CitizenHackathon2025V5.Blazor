@@ -26,6 +26,22 @@ body {
     min-height: 280px;
 }
 
+/* --- Leaflet: containers must have a real height --- */
+#homeMap,
+#leafletMap,
+.leaflet-host {
+    height: clamp(320px, 55vh, 720px);
+    width: 100%;
+}
+
+/* If a parent is in flex mode, avoid crushing it. */
+.homeMapCard,
+.map-card,
+.page-content,
+.home-main {
+    min-height: 0;
+}
+
 /* general helpers */
 .container {
     width: min(1200px, 92vw);

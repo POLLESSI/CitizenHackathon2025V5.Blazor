@@ -1,30 +1,34 @@
 ﻿/*wwwroot.css.themes.outzen.css*/
 /* === OutZen NAV (desktop + mobile) === */
-
 :root {
-    --nav-h: 72px; /* tu avais ~72px mesuré */
-    --nav-z: 1000;
-    --nav-bg: rgba(10, 10, 14, 0.72);
-    --nav-border: rgba(255,255,255,0.08);
-    --overlay: rgba(0,0,0,0.55);
-    --panel-bg: rgba(16,16,22,0.92);
-    --panel-blur: 12px;
+    --nav-h: 72px;
+    --nav-z: 2000;
+    --nav-bg: rgba(8,12,20,.92);
+    --nav-border: rgba(255,255,255,.08);
+    --overlay: rgba(0,0,0,.55);
+    --drawer-w: min(360px, 86vw);
 }
 
-/* The fixed bar */
+/* Décale le contenu sous le nav */
+.page-content,
+.app-container,
+.home-page {
+    padding-top: var(--nav-h);
+}
+
+/* NAV fixé au viewport */
 nav.main-nav {
-    position: sticky;
+    position: fixed;
     top: 0;
-    z-index: var(--nav-z);
+    left: 0;
+    right: 0;
     height: var(--nav-h);
-    display: block;
+    z-index: var(--nav-z);
     background: var(--nav-bg);
-    backdrop-filter: blur(var(--panel-blur));
-    -webkit-backdrop-filter: blur(var(--panel-blur));
     border-bottom: 1px solid var(--nav-border);
 }
 
-    /* container */
+    /* Barre interne */
     nav.main-nav .nav-container {
         height: 100%;
         width: min(1200px, 92vw);
@@ -32,108 +36,72 @@ nav.main-nav {
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: .75rem;
     }
 
-    /* header row */
-    nav.main-nav .nav-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
+/* Desktop */
+.nav-links.desktop {
+    display: flex;
+    gap: .6rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+/* Burger */
+.nav-toggle {
+    width: 44px;
+    height: 44px;
+    border: 1px solid rgba(255,255,255,.14);
+    border-radius: 12px;
+    background: rgba(255,255,255,.06);
+    cursor: pointer;
+    display: none;
+}
+
+.burger,
+.burger::before,
+.burger::after {
+    content: "";
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: #fff;
+    border-radius: 2px;
+    position: relative;
+    transition: transform .18s ease, opacity .18s ease, top .18s ease;
+}
+
+    .burger::before {
+        position: absolute;
+        left: 0;
+        top: -6px;
     }
 
-    nav.main-nav .logo {
-        color: #fff;
-        text-decoration: none;
-        font-weight: 700;
-        letter-spacing: .2px;
+    .burger::after {
+        position: absolute;
+        left: 0;
+        top: 6px;
     }
 
-    /* desktop links */
-    nav.main-nav .nav-links {
-        list-style: none;
-        display: flex;
-        gap: 10px;
-        padding: 0;
-        margin: 0;
-        align-items: center;
+nav.main-nav.is-open .burger {
+    background: transparent;
+}
+
+    nav.main-nav.is-open .burger::before {
+        top: 0;
+        transform: rotate(45deg);
     }
 
-    nav.main-nav .nav-link {
-        display: inline-flex;
-        gap: 8px;
-        align-items: center;
-        padding: 10px 10px;
-        border-radius: 10px;
-        text-decoration: none;
-        color: rgba(255,255,255,0.9);
-        white-space: nowrap;
+    nav.main-nav.is-open .burger::after {
+        top: 0;
+        transform: rotate(-45deg);
     }
 
-        nav.main-nav .nav-link:hover {
-            background: rgba(255,255,255,0.08);
-        }
-
-        nav.main-nav .nav-link.active {
-            background: rgba(0, 229, 238, 0.12);
-            outline: 1px solid rgba(0, 229, 238, 0.18);
-        }
-
-    /* burger button */
-    nav.main-nav .nav-toggle {
-        width: 44px;
-        height: 44px;
-        border: 1px solid rgba(255,255,255,0.14);
-        border-radius: 12px;
-        background: rgba(255,255,255,0.06);
-        cursor: pointer;
-        display: none; /* desktop hidden */
-        align-items: center;
-        justify-content: center;
-        position: relative;
-    }
-
-    nav.main-nav .hamburger,
-    nav.main-nav .hamburger::before,
-    nav.main-nav .hamburger::after {
-        content: "";
-        display: block;
-        width: 18px;
-        height: 2px;
-        background: #fff;
-        border-radius: 2px;
-        transition: transform .18s ease, opacity .18s ease, top .18s ease;
-        position: relative;
-    }
-
-        nav.main-nav .hamburger::before {
-            position: absolute;
-            top: -6px;
-            left: 0;
-        }
-
-        nav.main-nav .hamburger::after {
-            position: absolute;
-            top: 6px;
-            left: 0;
-        }
-
-    /* Mobile state class (set by Blazor) */
-    nav.main-nav.is-open .hamburger {
-        background: transparent;
-    }
-
-        nav.main-nav.is-open .hamburger::before {
-            top: 0;
-            transform: rotate(45deg);
-        }
-
-        nav.main-nav.is-open .hamburger::after {
-            top: 0;
-            transform: rotate(-45deg);
-        }
-
-/* overlay behind the drawer */
-.oz-nav-overlay {
+/* Overlay */
+.nav-overlay {
     position: fixed;
     inset: 0;
     background: var(--overlay);
@@ -143,45 +111,101 @@ nav.main-nav {
     transition: opacity .18s ease;
 }
 
-    .oz-nav-overlay.is-open {
+    .nav-overlay.show {
         opacity: 1;
         pointer-events: auto;
     }
 
-/* mobile */
-@media (max-width: 920px) {
-    nav.main-nav .nav-toggle {
-        display: inline-flex;
+/* Drawer */
+.nav-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: var(--drawer-w);
+    background: rgba(10,14,24,.96);
+    border-left: 1px solid rgba(255,255,255,.10);
+    transform: translateX(100%);
+    transition: transform .20s ease;
+    z-index: calc(var(--nav-z) + 1);
+    padding-top: var(--nav-h);
+}
+
+    .nav-drawer.show {
+        transform: translateX(0);
     }
 
-    nav.main-nav .nav-links {
-        position: fixed;
-        top: var(--nav-h);
-        left: 0;
-        right: 0;
+.nav-links.mobile {
+    list-style: none;
+    margin: 0;
+    padding: .75rem;
+    display: flex;
+    flex-direction: column;
+    gap: .25rem;
+}
+
+/* Home */
+.homeMapCard {
+    height: 520px; /* or clamp(320px, 60vh, 720px) */
+    min-height: 320px;
+}
+
+#homeMap {
+    height: 100%;
+    min-height: 320px;
+}
+
+/* Pages (if you have a generic #leafletMap) */
+#leafletMap, .leaflet-host {
+    height: 520px;
+    min-height: 320px;
+}
+
+/* Safety: avoids overbearing parents */
+.home-main, .page-content {
+    min-height: 0;
+}
+
+/* Ensures that the divIcon bundle is visible */
+.oz-bundle-icon {
+    pointer-events: auto !important;
+    z-index: 9999 !important;
+}
+
+    /* Provides a visible size/shape even if your inner classes don't load */
+    .oz-bundle-icon .oz-bundle {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
         display: grid;
-        gap: 8px;
-        padding: 14px;
-        background: var(--panel-bg);
-        border-top: 1px solid var(--nav-border);
-        transform: translateY(-8px);
-        opacity: 0;
-        pointer-events: none;
-        transition: transform .18s ease, opacity .18s ease;
-        backdrop-filter: blur(var(--panel-blur));
-        -webkit-backdrop-filter: blur(var(--panel-blur));
+        place-items: center;
+        font-weight: 700;
+        color: #fff;
+        background: rgba(30, 144, 255, .95);
+        border: 2px solid rgba(255,255,255,.65);
+        box-shadow: 0 8px 22px rgba(0,0,0,.35);
     }
 
-    nav.main-nav.is-open .nav-links {
-        transform: translateY(0);
-        opacity: 1;
-        pointer-events: auto;
+/* Responsive */
+@media (max-width: 768px) {
+    .nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    nav.main-nav .nav-link {
-        padding: 12px 12px;
+    .nav-links.desktop {
+        display: none;
     }
 }
+
+@media (min-width: 769px) {
+    .nav-overlay, .nav-drawer {
+        display: none;
+    }
+}
+
+
 
 
 
