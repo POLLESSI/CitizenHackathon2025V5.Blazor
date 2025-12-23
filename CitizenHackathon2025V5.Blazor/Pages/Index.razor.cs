@@ -33,7 +33,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private bool _mapBooted;
         private bool _bundlePushed;
 
-        private const string LeafletModulePath = "/js/app/leafletOutZen.module.js";
+        //private const string LeafletModulePath = "/js/app/leafletOutZen.module.js";
 
         private async Task ScrollToSuggestions()
             => await JS.InvokeVoidAsync("OutZen.scrollIntoViewById", "suggestions",
@@ -82,52 +82,43 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             {
                 _leafletModule = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
 
-                var ok = await _leafletModule.InvokeAsync<bool>("bootOutZen", new
+                _mapBooted = await _leafletModule.InvokeAsync<bool>("bootOutZen", new
                 {
                     mapId = "homeMap",
-                    center = new[] { 50.85, 4.35 },
-                    zoom = 8,
+                    center = new double[] { 50.45, 4.6 },
+                    zoom = 12,
                     enableChart = false,
                     force = true,
                     enableWeatherLegend = true
                 });
 
-                _mapBooted = ok;
+                if (!_mapBooted) return;
+                if (_mapBooted)
+                {
+                    await TryPushBundleAsync();
+                }
 
-                await TryPushBundleAsync(); // relance après boot
-            }
-            catch (JSException jse)
-            {
-                Console.Error.WriteLine("[Index] JS init failed: " + jse.Message);
-            }
-
-            if (firstRender)
-            {
-                //await JS.InvokeVoidAsync("OutZenInterop.bootOutZen", new
-                //{
-                //    mapId = "homeMap",
-                //    center = new[] { 50.45, 4.6 },
-                //    zoom = 12,
-                //    enableChart = false,
-                //    force = true
-                //});
-
-                // construire ton payload multi-types (events/places/crowds/traffic/gpt)
                 var payload = new
                 {
                     events = Events,
                     places = Places,
                     crowds = CrowdInfos,
+                    suggestions = Suggestions,
                     traffic = TrafficConditionsList,
-                    gpt = GptInteractions
+                    weather = WeatherPoints,
+                    // gpt = GptInteractions // if you want to add it later
                 };
 
-                //await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateBundleMarkers", payload, new { radiusMeters = 80 });
-
-                // activates the hybrid after injecting the bundles
-                //await JS.InvokeVoidAsync("OutZenInterop.enableHybridZoom", new { threshold = 13 });
+                await _leafletModule.InvokeVoidAsync("addOrUpdateBundleMarkers", payload, 80);
+                await _leafletModule.InvokeVoidAsync("enableHybridZoom", new { threshold = 13 });
+            }
+            catch (JSException jse)
+            {
+                Console.Error.WriteLine("[Index] JS init failed: " + jse.Message);
             }
         }
+
+
         private async Task TryPushBundleAsync()
         {
             if (!_dataLoaded || !_mapBooted || _bundlePushed || _leafletModule is null)
@@ -149,8 +140,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
                 _bundlePushed = true;
 
-                await _leafletModule.InvokeVoidAsync("enableHybridZoom", 15);
-
+                await _leafletModule.InvokeVoidAsync("enableHybridZoom", new { threshold = 15 });
             }
             catch (JSException jse)
             {
@@ -206,3 +196,154 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.

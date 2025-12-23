@@ -27,7 +27,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         private const string ApiBase = "https://localhost:7254";
         private IJSObjectReference _outZen;
 
-        public List<ClientWeatherForecastDTO> WeatherForecasts { get; set; } = new();
+        public List<ClientWeatherForecastDTO> WeatherForecastLists { get; set; } = new();
         private List<ClientWeatherForecastDTO> allWeatherForecasts = new();
         private List<ClientWeatherForecastDTO> visibleWeatherForecasts = new();
         private int currentIndex = 0;
@@ -52,7 +52,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
                 Console.WriteLine($"[WF-Client] First = Id={first.Id}, Lat={first.Latitude}, Lon={first.Longitude}");
             }
 
-            WeatherForecasts = fetched;
+            WeatherForecastLists = fetched;
             allWeatherForecasts = fetched;
             visibleWeatherForecasts.Clear();
             currentIndex = 0;
@@ -89,7 +89,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
                     else list.Add(dto);
                 }
 
-                Upsert(WeatherForecasts);
+                Upsert(WeatherForecastLists);
                 Upsert(allWeatherForecasts);
 
                 var j = visibleWeatherForecasts.FindIndex(c => c.Id == dto.Id);
@@ -124,7 +124,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
                 WeatherForecastHubMethods.ToClient.EventArchived,
                 async id =>
                 {
-                    WeatherForecasts.RemoveAll(c => c.Id == id);
+                    WeatherForecastLists.RemoveAll(c => c.Id == id);
                     allWeatherForecasts.RemoveAll(c => c.Id == id);
                     visibleWeatherForecasts.RemoveAll(c => c.Id == id);
 
@@ -394,7 +394,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             {
                 allWeatherForecasts.Insert(0, dto);
                 visibleWeatherForecasts.Insert(0, dto);
-                WeatherForecasts.Insert(0, dto);
+                WeatherForecastLists.Insert(0, dto);
 
                 if (_outZen is not null)
                 {

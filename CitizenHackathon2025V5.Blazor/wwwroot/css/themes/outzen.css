@@ -1,6 +1,7 @@
 ﻿/*wwwroot.css.themes.outzen.css*/
 /* === OutZen NAV (desktop + mobile) === */
 :root {
+    --home-lift: 70px;
     --nav-h: 72px;
     --nav-z: 2000;
     --nav-bg: rgba(8,12,20,.92);
@@ -8,15 +9,23 @@
     --overlay: rgba(0,0,0,.55);
     --drawer-w: min(360px, 86vw);
 }
-
-/* Décale le contenu sous le nav */
+/* Shift the content below the nav */
 .page-content,
-.app-container,
-.home-page {
+.app-container {
     padding-top: var(--nav-h);
 }
 
-/* NAV fixé au viewport */
+/* Home: remonter le header + la map d'environ 70px */
+.home-page {
+    padding-top: var(--nav-h); /* normal, stable */
+}S
+
+/* Often the header has its own margin/padding; tighten it */
+.home-header,
+.home-main {
+    transform: translateY(calc(-1 * var(--home-lift)));
+}
+/* NAV fixed to the viewport */
 nav.main-nav {
     position: fixed;
     top: 0;
@@ -161,6 +170,21 @@ nav.main-nav.is-open .burger {
     min-height: 320px;
 }
 
+.leaflet-popup-content .oz-bundle-popup {
+    font-family: system-ui, Segoe UI, Arial;
+    font-size: 13px;
+}
+
+.leaflet-popup-content .oz-sec-title {
+    font-weight: 700;
+    margin: 8px 0 4px;
+}
+
+/* Tooltip readability */
+.leaflet-tooltip {
+    font-weight: 600;
+}
+
 /* Safety: avoids overbearing parents */
 .home-main, .page-content {
     min-height: 0;
@@ -170,21 +194,257 @@ nav.main-nav.is-open .burger {
 .oz-bundle-icon {
     pointer-events: auto !important;
     z-index: 9999 !important;
+    filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));
 }
 
-    /* Provides a visible size/shape even if your inner classes don't load */
+    /* Bundle icon: green with black border */
     .oz-bundle-icon .oz-bundle {
         width: 34px;
         height: 34px;
         border-radius: 999px;
         display: grid;
         place-items: center;
-        font-weight: 700;
         color: #fff;
-        background: rgba(30, 144, 255, .95);
-        border: 2px solid rgba(255,255,255,.65);
+        font-weight: 900;
+        border: 2px solid rgba(0,0,0,.65);
         box-shadow: 0 8px 22px rgba(0,0,0,.35);
     }
+
+    /* Optional: improve the readability of the number */
+    .oz-bundle-icon .oz-bundle .oz-count {
+        filter: drop-shadow(0 2px 2px rgba(0,0,0,.35));
+    }
+
+/* Dots categories (if you use them) — to be adapted */
+.oz-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,.55);
+}
+
+.oz-dot-events {
+    background: #ffcc00;
+}
+
+.oz-dot-places {
+    background: #00c2ff;
+}
+
+.oz-dot-crowds {
+    background: #ff5aa5;
+}
+
+.oz-dot-traffic {
+    background: #ff3b30;
+}
+
+.oz-dot-gpt {
+    background: #9b59ff;
+}
+
+.oz-bundle-popup {
+    min-width: 240px;
+}
+
+.leaflet-popup-content-wrapper {
+    background: rgba(10,14,24,.96);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.10);
+}
+
+.oz-bundle-popup .oz-sec-title {
+    font-weight: 800;
+}
+
+.oz-bundle-popup .oz-row {
+    display: flex;
+    gap: .6rem;
+}
+
+.oz-bundle-popup .oz-k {
+    opacity: .75;
+    min-width: 80px;
+}
+
+.oz-bundle-popup .oz-v {
+    font-weight: 600;
+}
+
+
+.oz-bundle-head {
+    margin-bottom: .5rem;
+}
+
+.oz-bundle-title {
+    font-weight: 800;
+    font-size: 14px;
+}
+
+.oz-bundle-sub {
+    opacity: .85;
+    font-size: 12px;
+    margin-top: 2px;
+}
+
+.oz-bundle-coords {
+    opacity: .7;
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.oz-bundle-sec {
+    margin-top: .55rem;
+    padding-top: .45rem;
+    border-top: 1px solid rgba(255,255,255,.10);
+}
+
+.oz-bundle-sec-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.oz-badge {
+    font-size: 11px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.10);
+}
+
+.oz-bundle-list {
+    margin: .25rem 0 0;
+    padding-left: 1.1rem;
+}
+
+    .oz-bundle-list li {
+        margin: .15rem 0;
+    }
+
+/* ===== Marker (divIcon) color levels ===== */
+.oz-marker {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    border: 2px solid rgba(0,0,0,.75);
+    box-shadow: 0 8px 22px rgba(0,0,0,.35);
+}
+
+/* Markers individuels (divIcon) */
+.oz-marker .oz-marker-inner {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-weight: 800;
+    border: 2px solid rgba(0,0,0,.55);
+    box-shadow: 0 10px 18px rgba(0,0,0,.25);
+}
+
+/* Unknown */
+.oz-marker-lvl0 {
+    background: rgba(120,120,120,.90);
+}
+
+/* Low (1) -> green */
+.oz-marker-lvl1 {
+    background: rgba(46, 204, 113, .95);
+}
+
+/* Medium (2) -> orange */
+.oz-marker-lvl2 {
+    background: rgba(243, 156, 18, .95);
+}
+
+/* High (3) -> red */
+.oz-marker-lvl3 {
+    background: rgba(231, 76, 60, .95);
+}
+
+/* Critical (4) -> dark red */
+.oz-marker-lvl4 {
+    background: rgba(183, 28, 28, .95);
+}
+
+/* Low = vert */
+.oz-marker-lvl1 .oz-marker-inner {
+    background: rgba(76,175,80,.95);
+}
+/* Medium = orange */
+.oz-marker-lvl2 .oz-marker-inner {
+    background: rgba(255,152,0,.95);
+}
+/* High = rouge */
+.oz-marker-lvl3 .oz-marker-inner {
+    background: rgba(244,67,54,.95);
+}
+/* Critical = rouge foncé */
+.oz-marker-lvl4 .oz-marker-inner {
+    background: rgba(183,28,28,.98);
+}
+/* Default */
+.oz-marker-lvl0 .oz-marker-inner {
+    background: rgba(120,120,120,.85);
+}
+
+/* Optional: “traffic” adds an outline or distinctive style */
+.oz-marker-traffic {
+    outline: 2px solid rgba(255,255,255,.35);
+}
+
+/* Low (1) green */
+.oz-bundle.oz-sev-1 {
+    background: rgba(46, 204, 113, .95);
+}
+
+/* Medium (2) orange */
+.oz-bundle.oz-sev-2 {
+    background: rgba(243, 156, 18, .95);
+}
+
+/* High (3) red */
+.oz-bundle.oz-sev-3 {
+    background: rgba(231, 76, 60, .95);
+}
+
+/* Critical (4) dark red */
+.oz-bundle.oz-sev-4 {
+    background: rgba(183, 28, 28, .95);
+}
+
+/* Low */
+.oz-bundle-icon .oz-bundle.oz-bundle-lvl1 {
+    background: rgba(76,175,80,.95);
+}
+/* Medium */
+.oz-bundle-icon .oz-bundle.oz-bundle-lvl2 {
+    background: rgba(255,152,0,.95);
+}
+/* High */
+.oz-bundle-icon .oz-bundle.oz-bundle-lvl3 {
+    background: rgba(244,67,54,.95);
+}
+/* Critical */
+.oz-bundle-icon .oz-bundle.oz-bundle-lvl4 {
+    background: rgba(183,28,28,.98);
+}
+/* Default */
+.oz-bundle-icon .oz-bundle.oz-bundle-lvl0 {
+    background: rgba(120,120,120,.85);
+}
+
+.oz-more {
+    opacity: .8;
+    font-size: 11px;
+    margin-top: .2rem;
+}
 
 /* Responsive */
 @media (max-width: 768px) {
@@ -202,6 +462,12 @@ nav.main-nav.is-open .burger {
 @media (min-width: 769px) {
     .nav-overlay, .nav-drawer {
         display: none;
+    }
+}
+/* Avoid negative padding issues: if calc goes negative, clamp with a min */
+@supports (padding-top: max(0px, 1px)) {
+    .home-page {
+        padding-top: max(0px, calc(var(--nav-h) - var(--home-lift)));
     }
 }
 

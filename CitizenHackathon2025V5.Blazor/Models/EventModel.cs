@@ -5,6 +5,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Models
     #nullable disable
         public int Id { get; set; }
         public string Name { get; set; }
+        public int? PlaceId { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
         public DateTime DateEvent { get; set; }
