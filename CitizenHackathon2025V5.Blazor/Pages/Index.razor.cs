@@ -60,7 +60,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             GptInteractions = (gptTask.Result ?? Enumerable.Empty<ClientGptInteractionDTO>()).ToList();
 
             _dataLoaded = true;
-            await TryPushBundleAsync();
+            await PushBundlesOnceAsync();
 
             try
             {
@@ -78,75 +78,46 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         {
             if (!firstRender) return;
 
-            try
+            _leafletModule = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
+
+            _mapBooted = await _leafletModule.InvokeAsync<bool>("bootOutZen", new
             {
-                _leafletModule = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
+                mapId = "leafletMap",
+                center = new[] { 50.45, 4.6 },
+                zoom = 12,
+                enableChart = false,
+                force = true,
+                enableWeatherLegend = true
+            });
 
-                _mapBooted = await _leafletModule.InvokeAsync<bool>("bootOutZen", new
-                {
-                    mapId = "homeMap",
-                    center = new double[] { 50.45, 4.6 },
-                    zoom = 12,
-                    enableChart = false,
-                    force = true,
-                    enableWeatherLegend = true
-                });
+            if (!_mapBooted) return;
 
-                if (!_mapBooted) return;
-                if (_mapBooted)
-                {
-                    await TryPushBundleAsync();
-                }
-
-                var payload = new
-                {
-                    events = Events,
-                    places = Places,
-                    crowds = CrowdInfos,
-                    suggestions = Suggestions,
-                    traffic = TrafficConditionsList,
-                    weather = WeatherPoints,
-                    // gpt = GptInteractions // if you want to add it later
-                };
-
-                await _leafletModule.InvokeVoidAsync("addOrUpdateBundleMarkers", payload, 80);
-                await _leafletModule.InvokeVoidAsync("enableHybridZoom", new { threshold = 13 });
-            }
-            catch (JSException jse)
-            {
-                Console.Error.WriteLine("[Index] JS init failed: " + jse.Message);
-            }
+            // push when everything is ready
+            await PushBundlesOnceAsync();
         }
 
-
-        private async Task TryPushBundleAsync()
+        private async Task PushBundlesOnceAsync()
         {
-            if (!_dataLoaded || !_mapBooted || _bundlePushed || _leafletModule is null)
-                return;
+            if (!_dataLoaded || _bundlePushed || _leafletModule is null) return;
 
-            try
+            var payload = new
             {
-                await _leafletModule.InvokeVoidAsync("addOrUpdateBundleMarkers", new
-                {
-                    events = Events,
-                    places = Places,
-                    crowds = CrowdInfos,
-                    traffic = TrafficConditionsList,
-                    gpt = GptInteractions,
-                    // suggestions / weather if you add them to computeBundles
-                }, 80);
+                events = Events,
+                places = Places,
+                crowds = CrowdInfos,
+                suggestions = Suggestions,
+                traffic = TrafficConditionsList,
+                weather = WeatherPoints,
+                gpt = GptInteractions
+            };
 
-                await _leafletModule.InvokeVoidAsync("fitToBundles", 30);
+            await _leafletModule.InvokeVoidAsync("addOrUpdateBundleMarkers", payload, 80);
+            await _leafletModule.InvokeVoidAsync("enableHybridZoom", new { threshold = 13 });
+            await _leafletModule.InvokeVoidAsync("fitToBundles", 30);
 
-                _bundlePushed = true;
-
-                await _leafletModule.InvokeVoidAsync("enableHybridZoom", new { threshold = 15 });
-            }
-            catch (JSException jse)
-            {
-                Console.Error.WriteLine("[Index] addOrUpdateBundleMarkers failed: " + jse.Message);
-            }
+            _bundlePushed = true;
         }
+
 
 
         // ---- Actions ----

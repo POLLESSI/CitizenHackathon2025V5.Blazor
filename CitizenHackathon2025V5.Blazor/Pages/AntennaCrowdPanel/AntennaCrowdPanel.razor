@@ -1,0 +1,54 @@
+﻿@using CitizenHackathon2025.Blazor.DTOs
+@inject CitizenHackathon2025V5.Blazor.Client.Services.AntennaCrowdService AntennaCrowdService
+
+<div class="oz-card">
+    <div class="oz-card-header">
+        <div class="oz-title">Antenne la plus proche</div>
+        <div class="oz-subtitle">Affluence estimée sur @WindowMinutes min</div>
+    </div>
+
+    @if (SelectedEventId is null)
+    {
+        <div class="oz-muted">Sélectionne un événement pour afficher l’antenne et l’affluence.</div>
+    }
+    else if (_loading)
+    {
+        <div class="oz-muted">Chargement…</div>
+    }
+    else if (_data is null)
+    {
+        <div class="oz-warn">Aucune antenne trouvée dans le rayon (@MaxRadiusMeters m).</div>
+    }
+    else
+    {
+        <div class="oz-row">
+            <div class="oz-kv">
+                <div class="oz-k">AntenneId</div>
+                <div class="oz-v">@_data.AntennaId</div>
+            </div>
+            <div class="oz-kv">
+                <div class="oz-k">Distance</div>
+                <div class="oz-v">@($"{_data.DistanceMeters:0} m")</div>
+            </div>
+        </div>
+
+        <div class="oz-row">
+            <div class="oz-metric">
+                <div class="oz-metric-label">Connexions actives</div>
+                <div class="oz-metric-value">@_data.Counts.ActiveConnections</div>
+            </div>
+            <div class="oz-metric">
+                <div class="oz-metric-label">Devices uniques</div>
+                <div class="oz-metric-value">@_data.Counts.UniqueDevices</div>
+            </div>
+        </div>
+
+        <div class="oz-muted">
+            Fenêtre UTC : @_data.Counts.WindowStartUtc.ToString("u") → @_data.Counts.WindowEndUtc.ToString("u")
+        </div>
+    }
+</div>
+
+@code {
+    
+}

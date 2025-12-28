@@ -162,7 +162,9 @@ function resetLeafletDomId(mapId) {
     const Leaflet = ensureLeaflet();
     if (!Leaflet) return;
     const dom = Leaflet.DomUtil.get(mapId);
-    if (dom && dom._leaflet_id) dom._leaflet_id = null;
+    if (dom && dom._leaflet_id) {
+        try { delete dom._leaflet_id; } catch { dom._leaflet_id = undefined; }
+    }
 }
 
 function addLayerSmart(layer) {
@@ -251,6 +253,18 @@ export async function bootOutZen(options) {
         return false;
     }
 
+    if (S.map && !force) {
+        try {
+            // container might have resized after render
+            setTimeout(() => { try { S.map.invalidateSize(true); } catch { } }, 0);
+            // optional: keep user zoom if you want, or setView if you need to
+            // S.map.setView(center, zoom, { animate: false });
+        } catch { }
+        console.info("[OutZen] bootOutZen reused existing map.");
+        S.initialized = true;
+        return true;
+    }
+
     console.log("[OutZen] bootOutZen init…", { mapId, center, zoom, force });
 
     // clean old map
@@ -259,6 +273,8 @@ export async function bootOutZen(options) {
         S.map = null;
     }
     resetLeafletDomId(mapId);
+
+    disposeOutZen({ mapId });
 
     // create
     S.map = Leaflet.map(mapId).setView(center, zoom);
@@ -324,6 +340,7 @@ export async function bootOutZen(options) {
                 setTimeout(() => { try { S.map.invalidateSize(true); } catch { } }, 50);
             }
         });
+        window.dispatchEvent(new Event("outzen:nav"));
     }
 
     S.initialized = true;
@@ -334,22 +351,60 @@ export async function bootOutZen(options) {
     return true;
 }
 
-export function disposeOutZen() {
+export function disposeOutZen({ mapId = "leafletMap" } = {}) {
+    const L = ensureLeaflet();
+
+    // 1) Detach hybrid listener safely
     try {
-        if (S.map) { try { S.map.remove(); } catch { } }
+        if (S.map && S._hybridBound) {
+            S.map.off("zoomend", refreshHybridVisibility);
+        }
+    } catch { }
+
+    S._hybridBound = false;
+    if (S.hybrid) S.hybrid.showing = null;
+
+    // 2) Remove layers (detail layer + clusters) before removing map
+    try {
+        if (S.detailLayer && S.map) S.map.removeLayer(S.detailLayer);
+    } catch { }
+    S.detailLayer = null;
+    S.detailMarkers?.clear?.();
+
+    try {
+        if (S.cluster) {
+            try { S.cluster.clearLayers(); } catch { }
+            if (S.map) { try { S.map.removeLayer(S.cluster); } catch { } }
+        }
+    } catch { }
+    S.cluster = null;
+
+    // 3) Stop animations + remove map
+    try {
+        if (S.map) {
+            try { S.map.stop(); } catch { }
+            try { S.map.off(); } catch { }
+            try { S.map.remove(); } catch { }
+        }
     } finally {
         S.map = null;
     }
-    if (S.cluster) {
-        try { S.cluster.clearLayers(); } catch { }
-        S.cluster = null;
-    }
+
+    // 4) Reset container leaflet id (important for re-create)
+    try {
+        const el = document.getElementById(mapId);
+        if (el && el._leaflet_id) {
+            try { delete el._leaflet_id; } catch { el._leaflet_id = undefined; }
+        }
+    } catch { }
+
+    // 5) Clear caches
     destroyChartIfAny();
     S.markers?.clear?.();
     S.bundleMarkers?.clear?.();
     S.bundleIndex?.clear?.();
-    S.detailMarkers?.clear?.();
-    S.detailLayer = null;
+    S.bundleLastInput = null;
+
     S.initialized = false;
 }
 
@@ -701,9 +756,9 @@ function makeBadgeIcon(totalCount, breakdown, severity = 0) {
 
     const lvlClass =
         severity === 1 ? "oz-bundle-lvl1" :
-            severity === 2 ? "oz-bundle-lvl2" :
-                severity === 3 ? "oz-bundle-lvl3" :
-                    severity === 4 ? "oz-bundle-lvl4" : "oz-bundle-lvl0";
+        severity === 2 ? "oz-bundle-lvl2" :
+        severity === 3 ? "oz-bundle-lvl3" :
+        severity === 4 ? "oz-bundle-lvl4" : "oz-bundle-lvl0";
 
     const html = `
     <div class="oz-bundle ${lvlClass}">
@@ -747,8 +802,8 @@ function bundlePopupHtml(b) {
     return `
     <div class="oz-bundle-popup">
       <div class="oz-bundle-head">
-        <div class="oz-bundle-title">Résumé zone</div>
-        <div class="oz-bundle-sub">${total} élément(s) •
+        <div class="oz-bundle-title">Summary area</div>
+        <div class="oz-bundle-sub">${total} element(s) •
           E:${totals.events} P:${totals.places} C:${totals.crowds}
           T:${totals.traffic} W:${totals.weather} S:${totals.suggestions} G:${totals.gpt}
         </div>
@@ -788,10 +843,10 @@ function computeBundles(payload, tolMeters) {
 
             const ll = pickLatLng(place ?? item);
             if (!ll) continue;
-            if (!isInBelgium(ll)) {
-                console.warn("[OZ] out of Belgium", kind, S.utils.titleOf(kind, item), ll, item);
-                continue;
-            }
+            if (!isInBelgium(ll)) continue;
+            // possibly:
+            if (Math.abs(ll.lng) === 180) continue;
+
 
             console.log("event sample", payload?.events?.[0]);
 
@@ -847,13 +902,13 @@ export function updateBundleMarker(b) {
         const m = L.marker([b.lat, b.lng], {
             icon,
             pane: "markerPane",
-            title: `Zone (${total})`,
+            title: `Area (${total})`,
             riseOnHover: true,
             __ozNoCluster: true, // bundles bypass cluster
         });
 
         m.bindPopup(popup, { maxWidth: 420, closeButton: true, autoPan: true });
-        m.bindTooltip(`Zone • ${total} éléments`, { direction: "top", sticky: true, opacity: 0.95 });
+        m.bindTooltip(`Area • ${total} elements`, { direction: "top", sticky: true, opacity: 0.95 });
 
         // show only if not in details mode
         if (!detailsMode) addLayerSmart(m);
@@ -937,7 +992,7 @@ export function fitToBundles(padding = 24) {
     }
 
     const b = Leaflet.latLngBounds(pts);
-    S.map.fitBounds(b, { padding: [padding, padding], maxZoom: 16 });
+    S.map.fitBounds(b, { padding: [padding, padding], maxZoom: 16, animate: false });
     return true;
 }
 

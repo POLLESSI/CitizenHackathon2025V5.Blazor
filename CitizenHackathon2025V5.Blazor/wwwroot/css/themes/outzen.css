@@ -1,7 +1,8 @@
 ﻿/*wwwroot.css.themes.outzen.css*/
 /* === OutZen NAV (desktop + mobile) === */
 :root {
-    --home-lift: 70px;
+    --home-lift: 0px;
+    --map-lift: 50px;
     --nav-h: 72px;
     --nav-z: 2000;
     --nav-bg: rgba(8,12,20,.92);
@@ -10,21 +11,37 @@
     --drawer-w: min(360px, 86vw);
 }
 /* Shift the content below the nav */
-.page-content,
+.page-content {
+    padding-top: 0;
+}
 .app-container {
     padding-top: var(--nav-h);
 }
 
 /* Home: remonter le header + la map d'environ 70px */
-.home-page {
-    padding-top: var(--nav-h); /* normal, stable */
-}S
+/*.home-page {
+    padding-top: var(--nav-h);*/ /* normal, stable */
+/*}*/
 
 /* Often the header has its own margin/padding; tighten it */
 .home-header,
 .home-main {
-    transform: translateY(calc(-1 * var(--home-lift)));
+    transform: none;
 }
+.home-main {
+    margin-top: 0 !important;
+}
+/* controlled space under nav (e.g., 8px) */
+.home-header {
+    margin-top: 8px;
+}
+.index-title {
+    margin: 0;
+}
+.index-subtitle {
+    margin: 6px 0 0;
+}
+
 /* NAV fixed to the viewport */
 nav.main-nav {
     position: fixed;
@@ -157,17 +174,27 @@ nav.main-nav.is-open .burger {
 .homeMapCard {
     height: 520px; /* or clamp(320px, 60vh, 720px) */
     min-height: 320px;
+    margin-top: 8px;
+    transform: translateY(calc(-1 * var(--map-lift)));
+    will-change: transform;
+    overflow: visible;
 }
 
-#homeMap {
-    height: 100%;
-    min-height: 320px;
+.homeMapCard {
+    margin-top: calc(8px - var(--map-lift)); /* goes back */
 }
+
+/*#homeMap {
+    height: 520px;
+    min-height: 320px;
+    scroll-margin-top: var(--nav-h);
+}*/
 
 /* Pages (if you have a generic #leafletMap) */
 #leafletMap, .leaflet-host {
     height: 520px;
     min-height: 320px;
+    scroll-margin-top: var(--nav-h);
 }
 
 .leaflet-popup-content .oz-bundle-popup {
@@ -373,7 +400,7 @@ nav.main-nav.is-open .burger {
     background: rgba(183, 28, 28, .95);
 }
 
-/* Low = vert */
+/* Low = green */
 .oz-marker-lvl1 .oz-marker-inner {
     background: rgba(76,175,80,.95);
 }
@@ -381,11 +408,11 @@ nav.main-nav.is-open .burger {
 .oz-marker-lvl2 .oz-marker-inner {
     background: rgba(255,152,0,.95);
 }
-/* High = rouge */
+/* High = red */
 .oz-marker-lvl3 .oz-marker-inner {
     background: rgba(244,67,54,.95);
 }
-/* Critical = rouge foncé */
+/* Critical = dark red */
 .oz-marker-lvl4 .oz-marker-inner {
     background: rgba(183,28,28,.98);
 }
@@ -440,6 +467,74 @@ nav.main-nav.is-open .burger {
     background: rgba(120,120,120,.85);
 }
 
+.oz-card {
+    padding: 14px;
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 14px;
+    background: rgba(10,14,22,.72);
+}
+
+.oz-card-header {
+    margin-bottom: 10px;
+}
+
+.oz-title {
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.oz-subtitle {
+    font-size: 12px;
+    opacity: .75;
+}
+
+.oz-row {
+    display: flex;
+    gap: 14px;
+    margin: 10px 0;
+}
+
+.oz-kv {
+    flex: 1;
+}
+
+.oz-k {
+    font-size: 12px;
+    opacity: .7;
+}
+
+.oz-v {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.oz-metric {
+    flex: 1;
+    padding: 10px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.04);
+}
+
+.oz-metric-label {
+    font-size: 12px;
+    opacity: .7;
+}
+
+.oz-metric-value {
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.oz-muted {
+    font-size: 12px;
+    opacity: .75;
+}
+
+.oz-warn {
+    font-size: 12px;
+    color: #ffcc66;
+}
+
 .oz-more {
     opacity: .8;
     font-size: 11px;
@@ -467,7 +562,7 @@ nav.main-nav.is-open .burger {
 /* Avoid negative padding issues: if calc goes negative, clamp with a min */
 @supports (padding-top: max(0px, 1px)) {
     .home-page {
-        padding-top: max(0px, calc(var(--nav-h) - var(--home-lift)));
+        padding-top: 0 !important;
     }
 }
 

@@ -43,10 +43,8 @@ else
                     <th>Id</th>
                     <th>DateUtc</th>
                     <th>Region</th>
-                    <th>PlaceId</th>
                     <th>Event</th>
                     <th>Level</th>
-                    <th>Active</th>
                     <th></th>
                 </tr>
             </thead>
@@ -57,12 +55,12 @@ else
                         <td>@e.Id</td>
                         <td>@e.DateUtc.ToString("yyyy-MM-dd")</td>
                         <td>@e.RegionCode</td>
-                        <td>@(e.PlaceId?.ToString() ?? "-")</td>
+                        @* <td>@(e.PlaceId?.ToString() ?? "-")</td> *@
                         <td>@(string.IsNullOrWhiteSpace(e.EventName) ? "-" : e.EventName)</td>
                         <td>
                             <CrowdLevelBadge Level="e.ExpectedLevel" /> @* ✅ component accepte int? *@
                         </td>
-                        <td>@e.Active</td>
+                        @* <td>@e.Active</td> *@
                         <td>
                             <button class="btn btn-link p-0" @onclick="() => GoDetail(e.Id)">Details</button>
                         </td>

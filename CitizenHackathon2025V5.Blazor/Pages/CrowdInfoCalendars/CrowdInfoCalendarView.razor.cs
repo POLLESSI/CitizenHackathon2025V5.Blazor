@@ -47,7 +47,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
         private async Task LoadAll()
         {
             // ✅ Safe-null + empty list
-            items = (await Svc.GetAllAsync())?.ToList() ?? new List<ClientCrowdInfoCalendarDTO>();
+            //items = (await Svc.GetAllAsync())?.ToList() ?? new List<ClientCrowdInfoCalendarDTO>();
+            try
+            {
+                items = await Svc.GetAllSafeAsync();
+            }
+            catch (Exception ex)
+            {
+                items = new List<ClientCrowdInfoCalendarDTO>();
+                Console.Error.WriteLine(ex);
+                // ToastService?.ShowError(ex.Message); si tu injectes Blazored.Toast
+            }
         }
         //public async ValueTask DisposeAsync()
         //{

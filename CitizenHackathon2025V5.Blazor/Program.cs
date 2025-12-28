@@ -128,6 +128,7 @@ builder.Services.AddScoped(sp =>
 // =============================
 // Application services
 // =============================
+builder.Services.AddScoped<AntennaCrowdService>();
 builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService>();
 builder.Services.AddScoped<CrowdInfoService>();
 builder.Services.AddScoped<EventService>();

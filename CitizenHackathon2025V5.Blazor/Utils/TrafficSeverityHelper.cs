@@ -10,6 +10,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Utils
             1 => "text-green-500",
             2 => "text-yellow-500",
             3 => "text-red-500",
+            4 => "text-darkred-800",
             _ => "text-gray-400"
         };
 
@@ -18,6 +19,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Utils
             1 => "??", // or <i class="bi bi-circle-fill text-success"></i>
             2 => "??",
             3 => "??",
+            4 => "??",
             _ => "?"
         };
 
@@ -25,7 +27,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Utils
         {
             1 => "Smooth traffic",
             2 => "Slow traffic",
-            3 => "Blockage / Incident",
+            3 => "Blocking / Incident",
+            4 => "Severe congestion",
             _ => "Unknown"
         };
     }

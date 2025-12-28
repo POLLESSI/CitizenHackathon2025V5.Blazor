@@ -14,8 +14,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         private readonly JsonSerializerOptions _json;
 
         // Adapt if your API has a different prefix
-        private const string BaseRoute = "api/crowd/calendar";
-        private const string AdvisoriesRoute = "api/crowd/advisories";
+        private const string BaseRoute = "crowd/calendar";
+        private const string AdvisoriesRoute = "crowd/advisories";
 
         public CrowdInfoCalendarService(HttpClient http)
         {
@@ -30,6 +30,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         /// <summary>GET api/crowd/calendar/all (returns everything, even inactive ones if the server allows it)</summary>
         public Task<List<ClientCrowdInfoCalendarDTO>?> GetAllAsync(CancellationToken ct = default) =>
             _http.GetFromJsonAsync<List<ClientCrowdInfoCalendarDTO>>($"{BaseRoute}/all", _json, ct);
+
+        public async Task<List<ClientCrowdInfoCalendarDTO>> GetAllSafeAsync(CancellationToken ct = default)
+        {
+            var url = $"{BaseRoute}/all";
+            using var res = await _http.GetAsync(url, ct);
+            var body = await res.Content.ReadAsStringAsync(ct);
+
+            if (!res.IsSuccessStatusCode)
+                throw new HttpRequestException($"GET {url} failed: {(int)res.StatusCode} {res.ReasonPhrase}. Body: {body}");
+
+            return JsonSerializer.Deserialize<List<ClientCrowdInfoCalendarDTO>>(body, _json) ?? [];
+        }
 
         /// <summary>GET api/crowd/calendar?from=..&to=..&region=..&placeId=..&active=..</summary>
         public async Task<List<ClientCrowdInfoCalendarDTO>?> ListAsync(

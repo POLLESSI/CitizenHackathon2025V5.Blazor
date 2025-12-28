@@ -107,7 +107,8 @@
         {
             "low" or "1" or "freeflow" => "level--low",
             "medium" or "2" or "moderate" => "level--medium",
-            "high" or "3" or "heavy" or "jammed" => "level--high",
+            "high" or "3" or "heavy" => "level--high",
+            "jammed" or "4" or "jammed" => "level--jammed",
             _ => "level--unknown"
         };
     }
@@ -119,6 +120,7 @@
             1 => "level--low",
             2 => "level--medium",
             3 => "level--high",
+            4 => "level--jammed",
             _ => "level--unknown"
         };
     }
