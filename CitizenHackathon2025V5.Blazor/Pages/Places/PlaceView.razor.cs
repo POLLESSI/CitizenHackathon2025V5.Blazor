@@ -24,6 +24,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
         private IJSObjectReference _outzen;
         private bool _booted;
+        private bool _mapBooted;
         private bool _initialDataApplied;
 
         public HubConnection hubConnection { get; set; }
@@ -38,9 +39,24 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
         // UI state
         private ElementReference ScrollContainerRef;
-        private string _q;
-        private bool _onlyRecent; // placeholder si tu filtres un jour par date
+        private string _qBacking;
 
+        private string _q
+        {
+            get => _qBacking;
+            set
+            {
+                if (_qBacking == value) return;
+                _qBacking = value;
+
+                // fire-and-forget contrôlé (debounced)
+                _ = DebouncedHighlightAsync();
+            }
+        }
+        private bool _onlyRecent; // placeholder if you filter by date
+        private CancellationTokenSource _searchCts;
+
+        private int? BestMatchId { get; set; }
         private string _speedId = $"speedRange-{Guid.NewGuid():N}";
         private int SelectedId;
 
@@ -84,7 +100,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
             else
                 hubRoot = hubBaseConfig + "/hubs";        // we add /hubs
 
-            var url = $"{hubRoot}{HubPaths.Place}";       // => https://localhost:7254/hubs/placeHub
+            var url = $"{hubRoot}/{HubPaths.Place.TrimStart('/')}";// => https://localhost:7254/hubs/placeHub
 
             hubConnection = new HubConnectionBuilder()
                 .WithUrl(url, options =>
@@ -155,10 +171,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         }
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            if (_booted || !_dataLoaded)
-                return;
+            if (_mapBooted || !_dataLoaded) return;
+           
+            _mapBooted = true;
 
-            // 0) Wait until the #placeMap container exists
+            // 0) Wait container exists + small delay for layout
             for (var i = 0; i < 10; i++)
             {
                 var ok = await JS.InvokeAsync<bool>("checkElementExists", "placeMap");
@@ -170,48 +187,36 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
                     return;
                 }
             }
+            await Task.Delay(50);
 
-            // 1) Importer ESM OutZen
+            // 1) Import ESM
             _outzen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
 
+            // 2) Boot map ONCE (no force)
             var booted = await _outzen.InvokeAsync<bool>("bootOutZen", new
             {
                 mapId = "placeMap",
                 center = new[] { 50.89, 4.34 },
                 zoom = 13,
-                enableChart = false,
-                force = true
+                force = true // pendant debug
             });
 
-            if (!booted)
-            {
-                Console.WriteLine("❌ [PlaceView] OutZen boot failed.");
-                return;
-            }
+            if (!booted) { _mapBooted = false; return; }
 
-            // 2) Initial seed markers
+            // 3) Add markers (no fit while adding)
             foreach (var place in Places)
-            {
                 await AddOrUpdatePlaceMarkerAsync(place, fit: false);
-            }
 
-            // 3) Refresh + initial sync
-            try { await _outzen.InvokeVoidAsync("refreshMapSize"); } catch { }
-            await SyncMapMarkersAsync(fit: true);
-
-            // 4) Flush pending updates
             while (_pendingHubUpdates.TryDequeue(out var dto))
-            {
                 await AddOrUpdatePlaceMarkerAsync(dto, fit: false);
-            }
 
-            try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
+            // 4) One resize + one fit at the end
+            try { await _outzen.InvokeVoidAsync("refreshMapSize"); } catch { }
+            try { await _outzen.InvokeVoidAsync("fitToPlaceMarkers"); } catch { }
 
             _initialDataApplied = true;
             _booted = true;
-
         }
-
 
         private async Task AddOrUpdatePlaceMarkerAsync(ClientPlaceDTO dto, bool fit = false)
         {
@@ -232,17 +237,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
                        + $" • Cap: {dto.Capacity}"
                        + (string.IsNullOrWhiteSpace(dto.Tag) ? "" : $" • Tag: {dto.Tag}");
 
-            await _outzen.InvokeVoidAsync(
-                "addOrUpdateCrowdMarker",
-                dto.Id.ToString(),
-                dto.Latitude,
-                dto.Longitude,
-                level,
-                new
-                {
-                    title = dto.Name ?? $"Place #{dto.Id}",
-                    description = desc
-                });
+            await _outzen.InvokeVoidAsync("upsertPlaceMarker", new
+            {
+                id = dto.Id,
+                name = dto.Name,
+                latitude = dto.Latitude,
+                longitude = dto.Longitude
+            });
 
             if (fit)
             {
@@ -284,11 +285,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
             {
                 Console.Error.WriteLine($"❌ [PlaceView] JSInterop failed in SyncMapMarkersAsync: {jsex.Message}");
             }
-            var snapshot = FilterPlace(allPlaces).ToList();
-            foreach (var pl in snapshot)
-            {
-                await AddOrUpdatePlaceMarkerAsync(pl, fit: false);
-            }
+            //var snapshot = FilterPlace(allPlaces).ToList();
+            //foreach (var pl in snapshot)
+            //{
+            //    await AddOrUpdatePlaceMarkerAsync(pl, fit: false);
+            //}
 
             if (fit)
             {
@@ -296,7 +297,22 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
             }
         }
 
+        private async Task DebouncedHighlightAsync()
+        {
+            if (!_dataLoaded) return;
 
+            _searchCts?.Cancel();
+            _searchCts = new CancellationTokenSource();
+            var ct = _searchCts.Token;
+
+            try
+            {
+                await Task.Delay(200, ct);
+                await HighlightBestMatchAsync(ct);
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (TaskCanceledException) { }
+        }
         private void LoadMoreItems()
         {
             var next = allPlaces.Skip(currentIndex).Take(PageSize).ToList();
@@ -333,6 +349,95 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
                 || (x.Name ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
                 || (x.Type ?? "").Contains(q, StringComparison.OrdinalIgnoreCase));
         }
+        private async Task OnSearchChanged(ChangeEventArgs e)
+        {
+            _q = e.Value?.ToString();
+
+            _searchCts?.Cancel();
+            _searchCts = new CancellationTokenSource();
+            var ct = _searchCts.Token;
+
+            try
+            {
+                await Task.Delay(200, ct); // debounce
+                await HighlightBestMatchAsync(ct);
+                await InvokeAsync(StateHasChanged); // si tu veux MAJ le badge “_q”
+            }
+            catch (TaskCanceledException) { }
+        }
+
+
+        private async Task HighlightBestMatchAsync(CancellationToken ct)
+        {
+            if (ct.IsCancellationRequested) return;
+
+            var q = _q?.Trim();
+            if (string.IsNullOrWhiteSpace(q))
+            {
+                BestMatchId = null;
+                await InvokeAsync(StateHasChanged);
+
+                if (_outzen is not null)
+                    await _outzen.InvokeVoidAsync("clearPlaceHighlight");
+
+                return;
+            }
+
+            // best match on all seats (or visiblePlaces if you prefer)
+            var best = allPlaces
+                .Select(p => new
+                {
+                    p.Id,
+                    p.Name,
+                    Score = ScoreMatch(q, p.Name, p.Type, p.Tag)
+                })
+                .Where(x => x.Score > 0)
+                .OrderByDescending(x => x.Score)
+                .FirstOrDefault();
+
+            if (best is null)
+            {
+                BestMatchId = null;
+                await InvokeAsync(StateHasChanged);
+
+                if (_outzen is not null)
+                    await _outzen.InvokeVoidAsync("clearPlaceHighlight");
+
+                return;
+            }
+
+            // ✅ table highlighting
+            BestMatchId = best.Id;
+            await InvokeAsync(StateHasChanged);
+
+            // ✅ highlight marker (if map ready)
+            if (_outzen is not null)
+            {
+                await _outzen.InvokeAsync<bool>("highlightPlaceMarker", best.Id, new
+                {
+                    openPopup = true,
+                    panTo = true,
+                    dimOthers = false
+                });
+            }
+        }
+
+        private static int ScoreMatch(string q, params string[] fields)
+        {
+            q = q.ToLowerInvariant();
+            var score = 0;
+
+            foreach (var f in fields)
+            {
+                var s = (f ?? "").ToLowerInvariant();
+                if (string.IsNullOrWhiteSpace(s)) continue;
+
+                if (s == q) score += 1000;
+                else if (s.StartsWith(q)) score += 500;
+                else if (s.Contains(q)) score += 200;
+            }
+            return score;
+        }
 
         private void ToggleRecent() => _onlyRecent = !_onlyRecent;
 
@@ -351,10 +456,29 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
         public async ValueTask DisposeAsync()
         {
-            if (_outzen != null)
+            if (_outzen is null)
+                return;
+
+            try
             {
-                try { await _outzen.DisposeAsync(); } catch { }
+                await _outzen.InvokeVoidAsync("disposeOutZen", new { mapId = "placeMap" });
             }
+            catch { }
+
+            try
+            {
+                await _outzen.DisposeAsync();
+            }
+            catch { }
+
+            _outzen = null;
+
+            // Bonus: Stop Hub properly
+            try { if (hubConnection is not null) await hubConnection.DisposeAsync(); } catch { }
+        }
+        private Task AfterSearchBind()
+        {
+            throw new NotImplementedException();
         }
     }
 }

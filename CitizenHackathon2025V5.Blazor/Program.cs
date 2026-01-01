@@ -1,6 +1,7 @@
 ﻿using System.Net.Http;
 using Blazored.Toast;
 using CitizenHackathon2025V5.Blazor.Client;
+using CitizenHackathon2025V5.Blazor.Client.SignalR;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
@@ -133,6 +134,20 @@ builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.CrowdIn
 builder.Services.AddScoped<CrowdInfoService>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<GptInteractionService>();
+builder.Services.AddScoped<IMultiHubSignalRClient>(sp =>
+{
+    var config = sp.GetRequiredService<IConfiguration>();
+    var auth = sp.GetRequiredService<IAuthService>();
+
+    var apiBaseUrl = (config["ApiBaseUrl"] ?? "https://localhost:7254").TrimEnd('/');
+    var hubBaseUrl = (config["SignalR:HubBase"] ?? apiBaseUrl).TrimEnd('/');
+
+    return new MultiHubSignalRClient(
+        baseUrl: hubBaseUrl,
+        tokenProvider: () => auth.GetAccessTokenAsync()
+    );
+});
+builder.Services.AddScoped<IOutZenSignalRFactory, OutZenSignalRFactory>();
 builder.Services.AddScoped<MessageService>();
 builder.Services.AddScoped<PlaceService>();
 builder.Services.AddScoped<SuggestionService>();

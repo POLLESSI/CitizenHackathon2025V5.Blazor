@@ -33,7 +33,6 @@
             </NavLink>
         </div>
     </div>
-    <div id="leafletMap" class="map"></div>
     <div class="table-wrapper draggable-container"
          @ref="ScrollContainerRef"
          @onscroll="HandleScroll"
@@ -60,12 +59,13 @@
                 {
                     @foreach (var pl in FilterPlace(visiblePlaces))
                     {
-                        <tr>
+                        var isBest = (pl.Id == BestMatchId);
+
+                        <tr class="@(isBest ? "oz-best-row" : null)">
                             <td class="text-ellipsis" title="@pl.Name">@pl.Name</td>
                             <td class="text-ellipsis" title="@pl.Indoor">@((pl.Indoor) ? "Yes" : "No")</td>
                             <td class="text-ellipsis" title="@pl.Type">@pl.Type</td>
                             <td class="col-actions">
-                                <!-- ✅ in-page detail panel -->
                                 <button class="btn btn-sm btn-glow ev-chip" @onclick="() => Select(pl.Id)">Info</button>
                             </td>
                         </tr>

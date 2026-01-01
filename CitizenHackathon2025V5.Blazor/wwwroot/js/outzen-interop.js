@@ -31,6 +31,14 @@
 
     globalThis.OutZen.ensure = ensureLeafletModule;
     ensureLeafletModule().catch(err => console.warn("[OutZen] preload failed:", err));
+
+    globalThis.OutZen ??= {};
+    globalThis.OutZen.scrollRowIntoView = (rowId) => {
+        const el = document.getElementById(rowId);
+        if (!el) return;
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    };
+
 })();
 
 

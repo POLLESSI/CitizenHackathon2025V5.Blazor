@@ -1,8 +1,12 @@
+using CitizenHackathon2025.Contracts.Hubs;
+
 namespace CitizenHackathon2025V5.Blazor.Client.SignalR
 {
     public enum HubName
     {
         OutZen,
+        AntennaConnection,
+        Message,
         Crowd,
         Event,
         Notifications,
@@ -17,22 +21,25 @@ namespace CitizenHackathon2025V5.Blazor.Client.SignalR
     {
         public static string GetPath(HubName hub) => hub switch
         {
-            HubName.OutZen => "/hub/outzen",
-            HubName.Crowd => "/hubs/crowdHub",
-            HubName.Event => "/hubs/eventHub",
-            HubName.Notifications => "/hubs/notifications",
-            HubName.Place => "/hubs/placeHub",
-            HubName.Suggestions => "/hubs/suggestionHub",
-            HubName.Traffic => "/hubs/trafficHub",
-            HubName.Update => "/hubs/updateHub",
-            HubName.Weather => "/hubs/weatherforecastHub",
-            _ => throw new ArgumentOutOfRangeException(nameof(hub), hub, null)
+            HubName.OutZen => OutZenHubMethods.HubPath,                         // ex: "/hubs/outzenHub"
+            HubName.AntennaConnection => CrowdInfoAntennaConnectionHubMethods.HubPath,     // ex: "/hubs/antenna-connection"
+            HubName.Message => MessageHubMethods.HubPath,                        // ex: "/hubs/messageHub"
+            HubName.Crowd => CrowdHubMethods.HubPath,                          // ex: "/hubs/crowdHub"
+            HubName.Event => EventHubMethods.HubPath,                          // ex: "/hubs/eventHub"
+            HubName.Notifications => NotificationHubMethods.HubPath,                   // ex: "/hubs/notificationHub"
+            HubName.Place => PlaceHubMethods.HubPath,                          // ex: "/hubs/placeHub"
+            HubName.Suggestions => SuggestionHubMethods.HubPath,                     // ex: "/hubs/suggestionHub"
+            HubName.Traffic => TrafficConditionHubMethods.HubPath,               // ex: "/hubs/trafficHub"
+            HubName.Update => UpdateHubMethods.HubPath,                         // ex: "/hubs/updateHub"
+            HubName.Weather => WeatherForecastHubMethods.HubPath,                // ex: "/hubs/weatherforecastHub"
+            _ => throw new ArgumentOutOfRangeException(nameof(hub), hub, "Unknown hub")
         };
 
         public static string BuildUrl(string hubBase, HubName hub)
             => $"{hubBase.TrimEnd('/')}{GetPath(hub)}";
     }
 }
+
 
 
 

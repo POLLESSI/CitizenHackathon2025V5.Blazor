@@ -1,4 +1,4 @@
-@page "/eventview"
+Ôªø@page "/eventview"
 @* @page "/eventdetail/{DetailId:int}" *@
 @using CitizenHackathon2025.Blazor.DTOs;
 @using CitizenHackathon2025V5.Blazor.Client.Constants
@@ -18,10 +18,11 @@
     <div class="list-toolbar">
         <div class="left">
             <input class="input-compact" placeholder="Search..."
-                   @bind="_q" @bind:event="oninput" />
+                   value="@_q"
+                   @oninput="OnSearchInput" />
             @if (!string.IsNullOrWhiteSpace(_q))
             {
-                <span class="badge badge-info">ì@_qî</span>
+                <span class="badge badge-info">‚Äú@_q‚Äù</span>
             }
         </div>
 
@@ -60,18 +61,17 @@
                 {
                     @foreach (var ev in FilterEvent(visibleEvents))
                     {
-                        <tr>
-                            <td class="text-ellipsis" title="@ev.Name">@ev.Name</td>
-                            <td class="text-ellipsis" title="@ev.DateEvent">@ev.DateEvent</td>
+                        var isHot = BestMatchId == ev.Id;
+                        <tr id="@($"event-row-{ev.Id}")" class="@(isHot ? "oz-row-hot" : null)">
+                            <td class="text-ellipsis">
+                                <button type="button" class="link-like"
+                                        @onclick="() => FocusEventAsync(ev.Id)">
+                                    @ev.Name
+                                </button>
+                            </td>
+                            <td class="text-ellipsis">@ev.DateEvent</td>
                             <td class="col-actions">
-                                <NavLink class="btn btn-sm btn-glow ev-chip" href=@($"/eventview?detailId={ev.Id}")>
-                                    Info
-                                </NavLink>
-                                <!-- Optional: Fullscreen link -->
-                                <NavLink class="chip" href=@($"/eventdetail/{ev.Id}")>
-                                    Open
-                                </NavLink>
-                                <button class="chip" @onclick="CloseDetail">Close</button>
+                                <NavLink class="btn btn-sm btn-glow ev-chip" href=@($"/eventview?detailId={ev.Id}")>Info</NavLink>
                             </td>
                         </tr>
                     }

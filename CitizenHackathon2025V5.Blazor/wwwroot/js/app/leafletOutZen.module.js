@@ -17,14 +17,17 @@
 function getS() {
     globalThis.__OutZenSingleton ??= {
         version: "2025.12.23-clean",
-        initialized: false,
+        initialized: false, 
         bootTs: 0,
 
         map: null,
+        mapContainerId: null,
+        mapContainerEl: null,
         cluster: null,
         chart: null,
 
         markers: new Map(),       // id -> leaflet marker (crowd/gpt/traffic/weather)
+        placeMarkers: null,
         bundleMarkers: new Map(), // key -> leaflet marker (bundle)
         bundleIndex: new Map(),   // key -> bundle object
 
@@ -223,6 +226,128 @@ function pickLatLng(obj) {
     return { lat, lng };
 }
 
+function clearDomHighlight() {
+    if (!S.placeMarkers) return;
+    for (const m of S.placeMarkers.values()) {
+        const el = m?.getElement?.();
+        if (!el) continue;
+        el.classList.remove("oz-marker-highlight");
+        el.classList.remove("oz-marker-dim");
+        try { m.setZIndexOffset(0); } catch { }
+    }
+    S._placeHighlightedId = null;
+}
+
+export function clearPlaceHighlight() {
+    clearDomHighlight();
+}
+
+export function highlightPlaceMarker(placeId, { openPopup = true, panTo = true, dimOthers = false } = {}) {
+    const L = ensureMapReady();
+    if (!L) return false;
+
+    S.placeMarkers ??= new Map();
+    const key = String(placeId ?? "");
+    const m = S.placeMarkers.get(key);
+    if (!m) return false;
+
+    // clear previous
+    clearDomHighlight();
+
+    // dim others (optional)
+    if (dimOthers) {
+        for (const other of S.placeMarkers.values()) {
+            const el = other?.getElement?.();
+            if (el) el.classList.add("oz-marker-dim");
+        }
+    }
+
+    // highlight this
+    // NOTE: getElement() exists after Leaflet has rendered the marker
+    const apply = () => {
+        const el = m.getElement?.();
+        if (el) {
+            el.classList.remove("oz-marker-dim");
+            el.classList.add("oz-marker-highlight");
+            try { m.setZIndexOffset(1000); } catch { }
+        }
+    };
+
+    apply();
+    // If you haven't returned it yet, try again quickly.
+    setTimeout(apply, 0);
+    setTimeout(apply, 50);
+
+    if (panTo) {
+        try { S.map.setView(m.getLatLng(), Math.max(S.map.getZoom(), 14), { animate: true }); } catch { }
+    }
+    if (openPopup) {
+        try { m.openPopup(); } catch { }
+    }
+
+    S._placeHighlightedId = key;
+    return true;
+}
+
+export function highlightEventMarker(id, opts = {}) {
+    const L = ensureMapReady();
+    if (!L) return false;
+
+    const key = String(id);
+    const m = S.markers.get(key);
+    if (!m) return false;
+
+    const {
+        openPopup = true,
+        panTo = true,
+        zoom = null,
+        dimOthers = false
+    } = opts || {};
+
+    // (optionnel) dim others
+    if (dimOthers) {
+        for (const [k, mk] of S.markers.entries()) {
+            try {
+                const el = mk.getElement?.();
+                if (el) el.style.opacity = (k === key) ? "1" : "0.25";
+            } catch { }
+        }
+    }
+
+    // pulse class on the marker DOM element
+    try {
+        const el = m.getElement?.();
+        if (el) {
+            el.classList.remove("oz-pulse");
+            // reflow to restart anim
+            void el.offsetWidth;
+            el.classList.add("oz-pulse");
+            clearTimeout(S._pulseT);
+            S._pulseT = setTimeout(() => el.classList.remove("oz-pulse"), 1200);
+        }
+    } catch { }
+
+    // focus map
+    try {
+        const ll = m.getLatLng?.();
+        if (ll && panTo) {
+            if (zoom != null) S.map.setView(ll, Number(zoom), { animate: true });
+            else S.map.panTo(ll, { animate: true });
+        }
+    } catch { }
+
+    // open popup
+    if (openPopup) {
+        try { m.openPopup?.(); } catch { }
+    }
+
+    return true;
+}
+
+// Bridge legacy si tu veux
+globalThis.OutZenInterop.highlightEventMarker = highlightEventMarker;
+
+
 // ------------------------------
 // Public API
 // ------------------------------
@@ -240,44 +365,45 @@ export async function bootOutZen(options) {
         center = [50.45, 4.6],
         zoom = 12,
         enableChart = false,
-        force = true,
+        force = false,
         enableWeatherLegend = false,
     } = options || {};
 
     const Leaflet = ensureLeaflet();
     if (!Leaflet) return false;
 
+    // ✅ 1) container DOM
     const host = ensureContainer(mapId);
-    if (!host) {
-        console.info("[OutZen] bootOutZen skipped: container missing:", mapId);
-        return false;
-    }
+    if (!host) return false;
 
-    if (S.map && !force) {
-        try {
-            // container might have resized after render
-            setTimeout(() => { try { S.map.invalidateSize(true); } catch { } }, 0);
-            // optional: keep user zoom if you want, or setView if you need to
-            // S.map.setView(center, zoom, { animate: false });
-        } catch { }
-        console.info("[OutZen] bootOutZen reused existing map.");
+    // ✅ 2) same-map detection uses host safely
+    const same = !!S.map && S.mapContainerId === mapId && S.mapContainerEl === host;
+
+    // ✅ 3) reuse only if same id + same DOM
+    if (same && !force) {
+        try { S.map.invalidateSize(true); } catch { }
         S.initialized = true;
         return true;
     }
 
-    console.log("[OutZen] bootOutZen init…", { mapId, center, zoom, force });
-
-    // clean old map
-    if (S.map && force) {
-        try { S.map.remove(); } catch (e) { console.warn("[OutZen] map.remove failed:", e); }
-        S.map = null;
+    // ✅ 4) rebuild if needed
+    if (S.map) {
+        try { disposeOutZen({ mapId: S.mapContainerId ?? mapId }); } catch { }
     }
+
     resetLeafletDomId(mapId);
 
-    disposeOutZen({ mapId });
+    console.log("[OutZen] bootOutZen init…", { mapId, center, zoom, force });
 
-    // create
-    S.map = Leaflet.map(mapId).setView(center, zoom);
+    S.map = Leaflet.map(mapId, {
+        zoomAnimation: false,
+        fadeAnimation: false,
+        markerZoomAnimation: false
+    }).setView(center, zoom);
+
+    // ✅ 5) store container identity
+    S.mapContainerId = mapId;
+    S.mapContainerEl = host;
 
     Leaflet.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap contributors",
@@ -404,6 +530,8 @@ export function disposeOutZen({ mapId = "leafletMap" } = {}) {
     S.bundleMarkers?.clear?.();
     S.bundleIndex?.clear?.();
     S.bundleLastInput = null;
+    S.mapContainerEl = null;
+    S.mapContainerId = null;
 
     S.initialized = false;
 }
@@ -614,7 +742,7 @@ export function fitToMarkers() {
     if (latlngs.length === 0) return;
 
     if (latlngs.length === 1) {
-        S.map.setView(latlngs[0], 15, { animate: true });
+        S.map.setView(latlngs[0], 15, { animate: false });
         return;
     }
 
@@ -652,6 +780,68 @@ export function notifyHeavyRain(alert) {
 
     const z = S.map.getZoom?.() ?? 10;
     S.map.setView([ll.lat, ll.lng], Math.max(z, 11), { animate: true });
+}
+export function upsertPlaceMarker(dto) {
+    const L = ensureMapReady();
+    if (!L || !dto) return;
+
+    S.placeMarkers ??= new Map();
+    S.placeIndex ??= new Map(); // id -> { name, type, tag, marker }
+
+    const id = dto.id ?? dto.Id ?? dto.placeId ?? dto.PlaceId;
+    const ll = pickLatLng(dto);
+    if (id == null || !ll) return;
+
+    const key = String(id);
+
+    const name = String(dto.name ?? dto.Name ?? `Place #${key}`);
+    const type = String(dto.type ?? dto.Type ?? "");
+    const tag = String(dto.tag ?? dto.Tag ?? "");
+
+    const existing = S.placeMarkers.get(key);
+    if (existing) {
+        existing.setLatLng([ll.lat, ll.lng]);
+        existing.setTooltipContent?.(name);
+        S.placeIndex.set(key, { name, type, tag, marker: existing });
+        return;
+    }
+
+    const m = L.marker([ll.lat, ll.lng], { title: name, riseOnHover: true });
+    m.bindTooltip(name, { direction: "top", sticky: true, opacity: 0.9 });
+
+    // Optional popup
+    m.bindPopup(`
+    <div class="outzen-popup">
+      <div class="title">${S.utils.escapeHtml(name)}</div>
+      <div class="desc">${S.utils.escapeHtml(type)} ${tag ? "• " + S.utils.escapeHtml(tag) : ""}</div>
+    </div>
+  `);
+
+    m.addTo(S.map);
+
+    S.placeMarkers.set(key, m);
+    S.placeIndex.set(key, { name, type, tag, marker: m });
+}
+export function fitToPlaceMarkers() {
+    const Leaflet = ensureMapReady();
+    if (!Leaflet) return;
+
+    const reg = S.placeMarkers;
+    if (!reg || reg.size === 0) return;
+
+    const latlngs = [];
+    for (const m of reg.values()) {
+        try { latlngs.push(m.getLatLng()); } catch { }
+    }
+    if (latlngs.length === 0) return;
+
+    if (latlngs.length === 1) {
+        S.map.setView(latlngs[0], 15, { animate: false });
+        return;
+    }
+
+    const b = Leaflet.latLngBounds(latlngs).pad(0.1);
+    S.map.fitBounds(b, { padding: [32, 32], maxZoom: 17, animate: false });
 }
 
 // ------------------------------
@@ -1011,8 +1201,8 @@ function ensureDetailLayer() {
 }
 
 function clearDetailMarkers() {
-    if (S.detailLayer) S.detailLayer.clearLayers();
-    S.detailMarkers.clear();
+    try { S.detailLayer?.clearLayers?.(); } catch { }
+    try { S.detailMarkers?.clear?.(); } catch { }
 }
 
 function makeDetailKey(kind, item) {
@@ -1037,23 +1227,13 @@ function addDetailMarker(kind, item) {
 
     const m = Leaflet.circleMarker([ll.lat, ll.lng], { radius: 7, className: "oz-detail-marker" });
     m.bindTooltip(`${kind}: ${title}`, { sticky: true, opacity: 0.95 });
-    m.bindPopup(`<div class="oz-popup"><b>${S.utils.escapeHtml(kind)}</b><br>${S.utils.escapeHtml(title)}</div>`);
-    layer.addLayer(m);
+    m.bindPopup(
+        `<div class="oz-popup"><b>${S.utils.escapeHtml(kind)}</b><br>${S.utils.escapeHtml(title)}</div>`
+    );
 
+    layer.addLayer(m);
     S.detailMarkers.set(key, m);
 }
-
-function haversineMeters(a, b) {
-    const R = 6371000;
-    const toRad = d => d * Math.PI / 180;
-    const dLat = toRad(b.lat - a.lat);
-    const dLng = toRad(b.lng - a.lng);
-    const sa = Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) *
-        Math.sin(dLng / 2) ** 2;
-    return 2 * R * Math.asin(Math.sqrt(sa));
-}
-
 
 export function addOrUpdateDetailMarkers(payload) {
     const Leaflet = ensureMapReady();
@@ -1072,7 +1252,6 @@ export function addOrUpdateDetailMarkers(payload) {
 
     return true;
 }
-
 export function enableHybridZoom({ threshold = 13 } = {}) {
     const Leaflet = ensureMapReady();
     if (!Leaflet) return false;

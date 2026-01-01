@@ -342,6 +342,19 @@ nav.main-nav.is-open .burger {
     background: rgba(255,255,255,.10);
 }
 
+/* Highlighting the best match line */
+.oz-best-row {
+    outline: 2px solid rgba(255, 215, 0, 0.55);
+    box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.15) inset;
+    background: rgba(255, 215, 0, 0.08) !important;
+}
+
+    /* A small "glow" on the first cell to guide the eye */
+    .oz-best-row td:first-child {
+        font-weight: 700;
+    }
+
+
 .oz-bundle-list {
     margin: .25rem 0 0;
     padding-left: 1.1rem;
@@ -535,6 +548,37 @@ nav.main-nav.is-open .burger {
     color: #ffcc66;
 }
 
+/* Highlight marker: a class is applied to the marker's DOM icon */
+.oz-marker-highlight {
+    filter: drop-shadow(0 0 10px rgba(255, 215, 0, .95));
+    transform: scale(1.25);
+}
+
+.oz-marker-dim {
+    opacity: .35;
+}
+
+/* marker focus animation */
+.oz-pulse {
+    animation: ozPulse 1.2s ease-out 1;
+    transform-origin: bottom center;
+}
+
+.link-like {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+tr.oz-row-hot {
+    outline: 2px solid rgba(255,255,255,.25);
+    box-shadow: 0 0 0 2px rgba(0,0,0,.2) inset;
+}
+
+
 .oz-more {
     opacity: .8;
     font-size: 11px;
@@ -563,6 +607,23 @@ nav.main-nav.is-open .burger {
 @supports (padding-top: max(0px, 1px)) {
     .home-page {
         padding-top: 0 !important;
+    }
+}
+
+@keyframes ozPulse {
+    0% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 0 rgba(255,215,0,0));
+    }
+
+    30% {
+        transform: scale(1.15);
+        filter: drop-shadow(0 0 10px rgba(255,215,0,0.9));
+    }
+
+    100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 0 rgba(255,215,0,0));
     }
 }
 
