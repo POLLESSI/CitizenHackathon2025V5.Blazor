@@ -1,5 +1,4 @@
 ﻿/*wwwroot / js / app / wasmUtils.js*/
-
 export async function checkWasmAvailable(path = "_framework/blazor.webassembly.js") {
     try {
         const response = await fetch(path, { method: "HEAD" });
@@ -56,37 +55,18 @@ window.setTheme = (themeName) => {
 /*+++++++++++++++++++++++scrollInterop.js++++++++++++++++++++++*/
 /*+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++*/
 window.scrollInterop = {
-    // 📦 Blazor-compatible functions via ElementReference
-    getScrollTop: function (element) {
-        return element?.scrollTop || 0;
-    },
-    getScrollHeight: function (element) {
-        return element?.scrollHeight || 0;
-    },
-    getClientHeight: function (element) {
-        return element?.clientHeight || 0;
-    },
-
-    // 🧰 Alternative functions by ID (if other components still use them)
-    getScrollTopById: function (elementId) {
-        const el = document.getElementById(elementId);
-        return el ? el.scrollTop : 0;
-    },
-    getScrollHeightById: function (elementId) {
-        const el = document.getElementById(elementId);
-        return el ? el.scrollHeight : 0;
-    },
-    getClientHeightById: function (elementId) {
-        const el = document.getElementById(elementId);
-        return el ? el.clientHeight : 0;
-    }
+    getScrollTop: (el) => Math.trunc(el?.scrollTop ?? 0),
+    getScrollHeight: (el) => Math.trunc(el?.scrollHeight ?? 0),
+    getClientHeight: (el) => Math.trunc(el?.clientHeight ?? 0),
 };
+
 window.init = () => {
     console.log("init() called – alias for compatibility");
     ThemeManager.init(); 
 };
 
-window.getScrollTop = () => window.scrollY || document.documentElement.scrollTop || 0;
+window.getWindowScrollTop = () => window.scrollY || document.documentElement.scrollTop || 0;
+
 
 
 

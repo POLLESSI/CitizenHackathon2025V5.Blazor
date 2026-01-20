@@ -32,8 +32,9 @@
             </NavLink>
         </div>
     </div>
-    <div id="leafletMap" class="map"></div>
-
+    <div class="map-shell">
+        <div id="leafletMap-weatherforecastview"></div>
+    </div>
     <div class="chart-toolbar">
         <button class="chip @(_selectedMetric == WeatherMetric.Temperature ? "active" : null)"
                 @onclick="() => ChangeMetric(WeatherMetric.Temperature)">
@@ -97,10 +98,10 @@
     </div>
 </div>
 
-<Globe />
-
 <button class="btn btn-primary" @onclick="GenerateOne">Generate a forecast</button>
-           
+
+<Globe />
+          
 @if (SelectedId > 0)
 {
     <div class="detail-wrapper">
@@ -117,18 +118,11 @@
 {
     <div class="oz-empty">No items for these filters.</div>
 }
-
-@code
+@if (_currentRainAlert is not null)
 {
-    private RainAlertDTO? _currentRainAlert;
-
-    // called by the SignalR handler
-    private void ShowRainAlert(RainAlertDTO alert)
-    {
-        _currentRainAlert = alert;
-        InvokeAsync(StateHasChanged);
-    }
+    <RainAlertToast Alert="_currentRainAlert" OnDismiss="OnAlertDismissed" />
 }
+
 
 
 

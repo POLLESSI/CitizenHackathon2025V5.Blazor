@@ -13,7 +13,8 @@ namespace CitizenHackathon2025V5.Blazor.Client
         [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
         [Inject] private IToastService ToastService { get; set; } = default!;
         [Inject] public IOutZenSignalRFactory SignalRFactory { get; set; } = default!;
-        [Inject] public MultiHubSignalRClient Hubs { get; set; } = default!; 
+        [Inject] public MultiHubSignalRClient Hubs { get; set; } = default!;
+        [Inject] NavigationManager Nav { get; set; } = default!;
 
         private OutZenSignalRService? SignalRService;
         private IJSObjectReference? _layoutModule;
@@ -130,23 +131,18 @@ namespace CitizenHackathon2025V5.Blazor.Client
         {
             if (!firstRender || _disposed) return;
 
-            try
-            {
-                _layoutModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                    "import", "/js/app/leafletOutZen.module.js");
+            //var uri = Nav.ToBaseRelativePath(Nav.Uri);
+            //if (!string.Equals(uri, "", StringComparison.OrdinalIgnoreCase)) return;
+            //_layoutModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+            //    "import", "/js/app/leafletOutZen.module.js");
 
-                await _layoutModule.InvokeVoidAsync("bootOutZen", new
-                {
-                    mapId = "leafletMap",
-                    center = new[] { 50.89, 4.34 },
-                    zoom = 13,
-                    enableChart = true
-                });
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"JS init error: { ex.Message}");
-            }
+            //await _layoutModule.InvokeVoidAsync("bootOutZen", new
+            //{
+            //    mapId = "leafletMap",
+            //    center = new[] { 50.89, 4.34 },
+            //    zoom = 13,
+            //    enableChart = true
+            //});
         }
 
         private void ShowTestToast()

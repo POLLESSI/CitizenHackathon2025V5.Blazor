@@ -38,7 +38,10 @@
         if (!el) return;
         el.scrollIntoView({ behavior: "smooth", block: "nearest" });
     };
-
+    globalThis.checkElementExists = (id) => {
+        const el = document.getElementById(id);
+        return !!el;
+    };
 })();
 
 

@@ -1,9 +1,11 @@
 ﻿// Pages/Index.razor.cs
 using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.Pages.OutZens;
 using CitizenHackathon2025V5.Blazor.Client.Services;
-using System.ComponentModel.DataAnnotations;
+using CitizenHackathon2025V5.Blazor.Client.Utils.OutZen;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using System.ComponentModel.DataAnnotations;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages
 {
@@ -12,6 +14,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 #nullable disable
         [Inject] public MessageService MessageService { get; set; } = default!;
         [Inject] public IJSRuntime JS { get; set; } = default!;
+        [Inject] public TrafficConditionService TrafficConditionService { get; set; } = default!;
+        [Inject] public CrowdInfoService CrowdInfoService { get; set; } = default!;
+        [Inject] public EventService EventService { get; set; } = default!;
+        [Inject] public SuggestionService SuggestionService { get; set; } = default!;
+        [Inject] public PlaceService PlaceService { get; set; } = default!;
+        [Inject] public WeatherForecastService WeatherForecastService { get; set; } = default!;
+        [Inject] public GptInteractionService GptInteractionService { get; set; } = default!;
+        [Inject] public NavigationManager Navigation { get; set; } = default!;
+
 
         // Data
         private List<ClientTrafficConditionDTO> TrafficConditionsList = new();
@@ -22,7 +33,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private List<ClientWeatherForecastDTO> WeatherPoints = new();
         protected List<ClientGptInteractionDTO> GptInteractions { get; set; } = new();
         public MessageFormModel Model { get; } = new();
-
+        private const string _homeMapId = "leafletMap-home";
         protected string NewMessage { get; set; } = string.Empty;
         protected bool IsSending { get; set; }
 
@@ -60,8 +71,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             GptInteractions = (gptTask.Result ?? Enumerable.Empty<ClientGptInteractionDTO>()).ToList();
 
             _dataLoaded = true;
-            await PushBundlesOnceAsync();
-
+            
             try
             {
                 var data = await GptInteractionService.GetAllInteractions(); // Adapt if your service exposes a different name
@@ -72,53 +82,92 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 // You can log in/toast if you want, but avoid breaking the page.
                 GptInteractions = new();
             }
+
+            await InvokeAsync(StateHasChanged);
         }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            if (!firstRender) return;
+            var uri = Navigation.ToBaseRelativePath(Navigation.Uri);
+            if (!string.IsNullOrWhiteSpace(uri)) return;
 
-            _leafletModule = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
+            Console.WriteLine($"[Index] baseRel='{uri}' full='{Navigation.Uri}' path='{new Uri(Navigation.Uri).AbsolutePath}'");
 
-            _mapBooted = await _leafletModule.InvokeAsync<bool>("bootOutZen", new
+            // 1) Boot map only once
+            if (!_mapBooted)
             {
-                mapId = "leafletMap",
-                center = new[] { 50.45, 4.6 },
-                zoom = 12,
-                enableChart = false,
-                force = true,
-                enableWeatherLegend = true
-            });
+                await JS.InvokeVoidAsync("OutZen.ensure");
+
+                _mapBooted = await JS.InvokeAsync<bool>("OutZenInterop.bootOutZen", new
+                {
+                    mapId = _homeMapId,
+                    center = new[] { 50.45, 4.6 },
+                    zoom = 13,
+                    force = true,
+                    enableChart = false,
+                    enableWeatherLegend = true,
+                    resetMarkers = true
+                });
+
+                Console.WriteLine($"[Index] bootOutZen ok={_mapBooted}");
+            }
 
             if (!_mapBooted) return;
 
-            // push when everything is ready
-            await PushBundlesOnceAsync();
+            // 2) Push bundles as soon as dataLoaded becomes true (and only once).
+            if (_dataLoaded && !_bundlePushed)
+            {
+                try { await PushBundlesOnceAsync(); }
+                catch (Exception ex) { Console.Error.WriteLine($"[Index] ❌ PushBundlesOnceAsync failed: {ex}"); }
+            }
         }
+
 
         private async Task PushBundlesOnceAsync()
         {
-            if (!_dataLoaded || _bundlePushed || _leafletModule is null) return;
+            Console.WriteLine($"[Index] PushBundlesOnceAsync ENTER dataLoaded={_dataLoaded} bundlePushed={_bundlePushed}");
+            if (!_dataLoaded || _bundlePushed) return;
 
-            var payload = new
+            _bundlePushed = true; // ✅ reserve immediately
+
+            try
             {
-                events = Events,
-                places = Places,
-                crowds = CrowdInfos,
-                suggestions = Suggestions,
-                traffic = TrafficConditionsList,
-                weather = WeatherPoints,
-                gpt = GptInteractions
-            };
+                var payload = new
+                {
+                    events = Events,
+                    places = Places,
+                    crowds = CrowdInfos,
+                    suggestions = Suggestions,
+                    traffic = TrafficConditionsList,
+                    weather = WeatherPoints,
+                    gpt = GptInteractions
+                };
 
-            await _leafletModule.InvokeVoidAsync("addOrUpdateBundleMarkers", payload, 80);
-            await _leafletModule.InvokeVoidAsync("enableHybridZoom", new { threshold = 13 });
-            await _leafletModule.InvokeVoidAsync("fitToBundles", 30);
+                var ok = await JS.InvokeAsync<bool>("OutZenInterop.addOrUpdateBundleMarkers", payload, 80);
 
-            _bundlePushed = true;
+                Console.WriteLine($"[Index] addOrUpdateBundleMarkers ok={ok}");
+
+                await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateWeatherMarkers", WeatherPoints);
+
+                //if (!ok)
+                //{
+                //    _bundlePushed = false; // Rollback if you want to try again
+                //    return;
+                //}
+                if (!ok) { _bundlePushed = false; return; }
+
+                await JS.InvokeVoidAsync("OutZenInterop.enableHybridZoom", new { threshold = 13 });
+                await JS.InvokeVoidAsync("OutZenInterop.fitToBundles", 30);
+                await JS.InvokeVoidAsync("OutZenInterop.activateHybridAndZoom", 13, 13);
+                await JS.InvokeVoidAsync("OutZenInterop.refreshHybridNow");
+            }
+            catch (Exception ex)
+            {
+                _bundlePushed = false; // rollback
+                Console.Error.WriteLine($"[Index] PushBundlesOnceAsync FAIL: {ex}");
+                throw;
+            }
         }
-
-
 
         // ---- Actions ----
         public async Task SendMessageAsync()
@@ -160,11 +209,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             try
             {
                 if (_leafletModule is not null)
-                    await _leafletModule.DisposeAsync();
+                    //await _leafletModule.DisposeAsync();
+                    await JS.InvokeVoidAsync("OutZenInterop.disposeOutZen", new { mapId = _homeMapId });
             }
             catch { /* ignore */ }
         }
-
     }
 }
 

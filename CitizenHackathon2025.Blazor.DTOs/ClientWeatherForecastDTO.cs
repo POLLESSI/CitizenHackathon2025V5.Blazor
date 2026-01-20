@@ -3,13 +3,12 @@ using CitizenHackathon2025.Contracts.Enums;
 
 namespace CitizenHackathon2025.Blazor.DTOs
 {
-    public class ClientWeatherForecastDTO
+    public sealed class ClientWeatherForecastDTO
     {
-
         public int Id { get; set; }
         public DateTime DateWeather { get; set; }
-        public decimal? Latitude { get; set; }
-        public decimal? Longitude { get; set; }
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
         public int TemperatureC { get; set; }
         public string? Summary { get; set; }
         public double RainfallMm { get; set; }

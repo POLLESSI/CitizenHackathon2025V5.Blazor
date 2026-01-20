@@ -168,41 +168,49 @@
                 location.hostname === "localhost" ||
                 location.hostname === "127.0.0.1" ||
                 location.hostname === "[::1]";
-
             if (!isLocalhost) return;
 
-            // Optional activation via ?hook=1
             const qs = new URLSearchParams(location.search);
             const enabled = qs.get("hook") === "1";
             if (!enabled) return;
 
-            // Global guard (hot reload / re-eval safe)
             if (window.__outzenLeafletHooked) return;
             window.__outzenLeafletHooked = true;
 
-            const L0 = window.L;
-            if (!L0 || typeof L0.map !== "function") {
-                console.warn("[HOOK] Leaflet not ready");
-                return;
+            const maxTries = 50;
+            let tries = 0;
+
+            function tryHook() {
+                const L0 = window.L;
+                if (!L0 || typeof L0.map !== "function") {
+                    tries++;
+                    if (tries < maxTries) return setTimeout(tryHook, 50);
+                    console.warn("[HOOK] Leaflet still not ready after retries");
+                    return;
+                }
+
+                if (L0.map.__outzenWrapped) {
+                    console.warn("[HOOK] already wrapped");
+                    return;
+                }
+
+                const original = L0.map;
+                function wrappedMap(...args) {
+                    const a0 = args?.[0];
+                    const id = (typeof a0 === "string") ? a0 : (a0?.id ?? "(no-id)");
+                    console.warn("[HOOK] L.map called. containerId =", id, "rawArg0=", a0);
+                    console.trace("[HOOK] stack");
+                    return original.apply(this, args);
+                }
+                wrappedMap.__outzenWrapped = true;
+                wrappedMap.__outzenOriginal = original;
+                L0.map = wrappedMap;
+
+                console.warn("[HOOK] Leaflet L.map hooked (dev + ?hook=1)");
             }
 
-            // Prevent double wrapping
-            if (L0.map.__outzenWrapped) return;
-
-            const original = L0.map;
-
-            function wrappedMap(...args) {
-                console.warn("[HOOK] L.map called with:", args);
-                console.trace("[HOOK] stack");
-                return original.apply(this, args);
-            }
-
-            wrappedMap.__outzenWrapped = true;
-            wrappedMap.__outzenOriginal = original;
-
-            L0.map = wrappedMap;
-
-            console.warn("[HOOK] Leaflet L.map hooked (dev + ?hook=1)");
+            // hook after window load to stabilize ordering
+            setTimeout(tryHook, 0);
         })();
     </script>
 
@@ -297,11 +305,17 @@
 
     <!-- Small helpers for Blazor -->
     <script>
-        window.getScrollTop = (el) => Math.trunc((el?.scrollTop ?? window.scrollY ?? 0) || 0);
-        window.getScrollHeight = (el) => Math.trunc(el?.scrollHeight ?? document.scrollingElement?.scrollHeight ?? 0);
-        window.getClientHeight = (el) => Math.trunc(el?.clientHeight ?? document.documentElement?.clientHeight ?? 0);
-        window.checkElementExists = (id) => !!document.getElementById(id);
+        window.scrollInterop = window.scrollInterop || {};
+        window.scrollInterop.getScrollTop = (el) => Math.trunc((el?.scrollTop ?? window.scrollY ?? 0) || 0);
+        window.scrollInterop.getScrollHeight = (el) => Math.trunc(el?.scrollHeight ?? document.scrollingElement?.scrollHeight ?? 0);
+        window.scrollInterop.getClientHeight = (el) => Math.trunc(el?.clientHeight ?? document.documentElement?.clientHeight ?? 0);
+
+        // possible compat
+        window.getScrollTop = window.scrollInterop.getScrollTop;
+        window.getScrollHeight = window.scrollInterop.getScrollHeight;
+        window.getClientHeight = window.scrollInterop.getClientHeight;
     </script>
+
 
     <!-- === OutZen Core Modules (stable import, no cache-bust) === -->
     <script>

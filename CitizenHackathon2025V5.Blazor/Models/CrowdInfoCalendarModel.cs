@@ -30,6 +30,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Models
 
         [Range(0, 100, ErrorMessage = "Confidence must be between 0 and 100.")]
         public byte? Confidence { get; set; }
+        [Display(Name = "Latitude")]
+        public double Latitude { get; set; }
+        [Display(Name = "Latitude")]
+        public double Longitude { get; set; }
 
         [Display(Name = "Start (local)")]
         public TimeSpan? StartLocalTime { get; set; }

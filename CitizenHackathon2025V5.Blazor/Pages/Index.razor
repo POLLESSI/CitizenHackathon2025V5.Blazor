@@ -3,16 +3,7 @@
 @using CitizenHackathon2025V5.Blazor.Client.Services
 @using CitizenHackathon2025V5.Blazor.Client.Shared
 @using Microsoft.JSInterop
-@inject NavigationManager Navigation
 @inject Blazored.Toast.Services.IToastService ToastService
-
-@inject CrowdInfoService CrowdInfoService
-@inject EventService EventService
-@inject SuggestionService SuggestionService
-@inject PlaceService PlaceService
-@inject TrafficConditionService TrafficConditionService
-@inject WeatherForecastService WeatherForecastService
-@inject GptInteractionService GptInteractionService
 
 <PageTitle>OutZen - Home</PageTitle>
 
@@ -35,7 +26,7 @@
     <div class="home-main">
         <!-- Summary map -->
         <div class="homeMapCard">
-            <div id="leafletMap"></div>
+            <div id="leafletMap-home" class="leaflet-host"></div>
             <!-- Optional: canvas for the weather chart if you want to put it back -->
             @* <canvas id="crowdChart"></canvas> *@
         </div>
@@ -93,7 +84,6 @@
                     </button>
                 </EditForm>
             </section>
-            <button class="btn" @onclick="EnableSoundAsync">Enable sound</button>
         </aside>
     </div>
     

@@ -157,6 +157,7 @@ builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.UserSer
 builder.Services.AddScoped<TrafficStateService>();
 builder.Services.AddScoped<WeatherForecastService>();
 builder.Services.AddScoped<WeatherHubClient>();
+builder.Services.AddScoped<WeatherForecastHubClient>();
 builder.Services.AddScoped<IHubTokenService, HubTokenService>();
 builder.Services.AddScoped<CrowdCalendarHubClient>();
 

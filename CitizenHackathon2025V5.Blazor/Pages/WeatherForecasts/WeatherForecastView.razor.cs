@@ -2,13 +2,11 @@
 using CitizenHackathon2025.Contracts.DTOs;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
-using CitizenHackathon2025V5.Blazor.Client.Utils;
+using CitizenHackathon2025V5.Blazor.Client.Utils.OutZen;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.JSInterop;
-using System.Net;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 {
@@ -25,20 +23,34 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         [Inject] public IAuthService Auth { get; set; }
 
         private const string ApiBase = "https://localhost:7254";
+        private const string _mapId = $"leafletMap-weatherforecastview";
+
         private IJSObjectReference _outZen;
 
         public List<ClientWeatherForecastDTO> WeatherForecastLists { get; set; } = new();
+
         private List<ClientWeatherForecastDTO> allWeatherForecasts = new();
         private List<ClientWeatherForecastDTO> visibleWeatherForecasts = new();
+        private RainAlertDTO _activeRainAlert;
+
         private int currentIndex = 0;
         private const int PageSize = 20;
-        private string _speedId = $"speedRange-{Guid.NewGuid():N}";
+
+        private readonly List<ClientWeatherForecastDTO> _pendingMapUpdates = new();
+        private bool _lastFirstRender;
+        private bool _dataLoaded;
+        private bool _mapBooted;
+        private bool _initialMarkersSynced;
+
         public int SelectedId { get; set; }
         public HubConnection hubConnection { get; set; }
 
         private ElementReference ScrollContainerRef;
         private string _q;
         private bool _onlyRecent;
+
+        // optional (si tu l'utilises dans ton .razor)
+        private string _speedId = $"speedRange-{Guid.NewGuid():N}";
 
         protected override async Task OnInitializedAsync()
         {
@@ -52,93 +64,81 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
                 Console.WriteLine($"[WF-Client] First = Id={first.Id}, Lat={first.Latitude}, Lon={first.Longitude}");
             }
 
-            WeatherForecastLists = fetched;
-            allWeatherForecasts = fetched;
+            WeatherForecastLists = fetched ?? new();
+            allWeatherForecasts = fetched ?? new();
+
             visibleWeatherForecasts.Clear();
             currentIndex = 0;
             LoadMoreItems();
 
+            _dataLoaded = true;
+
             // 2) SignalR
-            //var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
             var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? ApiBase;
 
-            // URL finale : https://localhost:7254/hubs/weatherforecastHub
+            // Final URL : https://localhost:7254/hubs/weatherforecastHub
             var url = $"{apiBaseUrl}/hubs/{WeatherForecastHubMethods.HubPath}";
-            //var url = $"{apiBaseUrl}/hubs/{HubPaths.WeatherForecast.TrimStart('/')}";
-
             Console.WriteLine($"[WF-Client] Hub URL = {url}");
+
             hubConnection = new HubConnectionBuilder()
                 .WithUrl(url, options =>
                 {
                     options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
 
-                    // ✅ Bypass completely /negotiate
-                    //options.SkipNegotiation = true;
-                    //options.Transports = HttpTransportType.WebSockets;
+                    // f one day you want to force WS :
+                    // options.SkipNegotiation = true;
+                    // options.Transports = HttpTransportType.WebSockets;
                 })
                 .WithAutomaticReconnect()
                 .Build();
 
-            // === Handler: aligned with the server event "ReceiveForecast" ===
-            hubConnection.On<ClientWeatherForecastDTO>( WeatherForecastHubMethods.ToClient.ReceiveForecast, async dto =>
+            // === Handler: aligned with server event "ReceiveForecast" ===
+            hubConnection.On<ClientWeatherForecastDTO>(WeatherForecastHubMethods.ToClient.ReceiveForecast, async dto =>
             {
-                void Upsert(List<ClientWeatherForecastDTO> list)
+                if (dto is null) return;
+
+                Console.WriteLine($"[WF-Client] ✅ SignalR ReceiveForecast: Id={dto.Id}");
+
+                // 1) Upsert lists
+                UpsertById(WeatherForecastLists, dto);
+                UpsertById(allWeatherForecasts, dto);
+                UpsertVisible(dto);
+
+                // 2) Map updates (If the map isn't ready -> queue)
+                if (_outZen is null)
                 {
-                    var i = list.FindIndex(c => c.Id == dto.Id);
-                    if (i >= 0) list[i] = dto;
-                    else list.Add(dto);
+                    _pendingMapUpdates.Add(dto);
+                    await InvokeAsync(StateHasChanged);
+                    return;
                 }
 
-                Upsert(WeatherForecastLists);
-                Upsert(allWeatherForecasts);
+                await AddWeatherMarkerAsync(dto);
+                await _outZen.InvokeVoidAsync("fitToMarkers");
 
-                var j = visibleWeatherForecasts.FindIndex(c => c.Id == dto.Id);
-                if (j >= 0) visibleWeatherForecasts[j] = dto;
-                else visibleWeatherForecasts.Insert(0, dto);
+                // 3) Chart (a single source of truth)
+                await UpdateChartAsync();
+
+                await InvokeAsync(StateHasChanged);
+            });
+
+            // Archive / delete
+            hubConnection.On<int>(WeatherForecastHubMethods.ToClient.EventArchived, async id =>
+            {
+                WeatherForecastLists.RemoveAll(c => c.Id == id);
+                allWeatherForecasts.RemoveAll(c => c.Id == id);
+                visibleWeatherForecasts.RemoveAll(c => c.Id == id);
 
                 if (_outZen is not null)
                 {
-                    await AddWeatherMarkerAsync(dto);
+                    await _outZen.InvokeVoidAsync("removeCrowdMarker", WeatherMarkerId(id));
                     await _outZen.InvokeVoidAsync("fitToMarkers");
-
-                    // Minor chart update: we're only keeping the last X
-                    var recent = allWeatherForecasts
-                        .OrderByDescending(x => x.DateWeather)
-                        .Take(24)
-                        .OrderBy(x => x.DateWeather)
-                        .Select(x => new
-                        {
-                            label = x.DateWeather.ToString("HH:mm"),
-                            value = x.TemperatureC,
-                            isSevere = x.IsSevere,
-                            temperature = x.TemperatureC
-                        });
-
-                    await _outZen.InvokeVoidAsync("setWeatherChart", recent, _selectedMetric.ToString());
                 }
 
                 await InvokeAsync(StateHasChanged);
             });
 
-            hubConnection.On<int>(
-                WeatherForecastHubMethods.ToClient.EventArchived,
-                async id =>
-                {
-                    WeatherForecastLists.RemoveAll(c => c.Id == id);
-                    allWeatherForecasts.RemoveAll(c => c.Id == id);
-                    visibleWeatherForecasts.RemoveAll(c => c.Id == id);
-
-                    if (_outZen is not null)
-                    {
-                        await _outZen.InvokeVoidAsync("removeCrowdMarker", id);
-                        await _outZen.InvokeVoidAsync("fitToMarkers");
-                    }
-
-                    await InvokeAsync(StateHasChanged);
-                });
-
-                // SignalR customer event subscription
-                WeatherHub.HeavyRainReceived += OnHeavyRainReceived;
+            // SignalR custom event subscription
+            WeatherHub.HeavyRainReceived += OnHeavyRainReceived;
 
             try
             {
@@ -149,89 +149,106 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             {
                 Console.Error.WriteLine($"[WF-Client] hubConnection.StartAsync() FAILED: {ex.Message}");
             }
-
-            //try
-            //{
-            //    await WeatherHub.StartAsync();
-            //    Console.WriteLine("[WF-Client] WeatherHub.StartAsync() OK.");
-            //}
-            //catch (Exception ex)
-            //{
-            //    Console.Error.WriteLine($"[WF-Client] WeatherHub.StartAsync() FAILED: {ex.Message}");
-            //}
-
         }
+
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            if (!firstRender) return;
+            //if (!firstRender) return;
+            if (!_dataLoaded) return;
+            if (_mapBooted) return;
+
+            var exists = await JS.InvokeAsync<bool>("OutZenInterop.elementExists", _mapId);
+            if (!exists) return;
+
+            _mapBooted = true;
+            //_lastFirstRender = firstRender;
 
             _outZen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
 
-            await _outZen.InvokeVoidAsync("bootOutZen", new
+            var ok = await _outZen.InvokeAsync<bool>("bootOutZen", new
             {
-                mapId = "leafletMap",
-                center = new double[] { 50.5, 4.7 },
+                mapId = _mapId,
+                center = new[] { 50.5, 4.7 },
                 zoom = 13,
                 enableChart = true,
                 force = true,
-                enableWeatherLegend = true
+                enableWeatherLegend = true,
+                resetMarkers = true
             });
 
-            //Console.WriteLine($"[WF-Client] OnAfterRenderAsync: adding {allWeatherForecasts.Count} markers");
+            //Console.WriteLine($"[WF] bootOutZen ok={ok} mapId={_mapId}");
+            if (!ok) { _mapBooted = false; return; }
 
-            // ➜ we push all the historical forecasts onto the map
+            Console.WriteLine($"[WF] bootOutZen ok={ok} mapId={_mapId}");
+
+            // important if the container becomes visible after render/layout
+            await _outZen.InvokeVoidAsync("refreshMapSize");
+            await Task.Delay(200);
+            await _outZen.InvokeVoidAsync("refreshMapSize");
+            await Task.Delay(600);
+            await _outZen.InvokeVoidAsync("refreshMapSize");
+
+            // DEBUG: force a visible marker in Brussels
+            await _outZen.InvokeVoidAsync("addOrUpdateCrowdMarker",
+                "wf:__debug",
+                50.8503, 4.3517,
+                2,
+                new { title = "DEBUG", description = "Marker test", weatherType = "Clear" });
+
+            //_mapBooted = true;
+
+            // 2) Initial marker synchronization only once
+            if (_initialMarkersSynced) return;
+
+            _initialMarkersSynced = true;
+
             foreach (var dto in allWeatherForecasts)
                 await AddWeatherMarkerAsync(dto);
 
-            // ➜ Then we refocus on all the markers.
+            foreach (var dto in _pendingMapUpdates)
+                await AddWeatherMarkerAsync(dto);
+
+            _pendingMapUpdates.Clear();
+
             await _outZen.InvokeVoidAsync("fitToMarkers");
+            await _outZen.InvokeVoidAsync("debugDumpMarkers");
+
+            // chart init
             await UpdateChartAsync();
-
-            // === Weather chart ===
-            var chartPoints = allWeatherForecasts
-                .OrderByDescending(x => x.DateWeather)
-                .Take(24)                              // e.g., the last 24 statements
-                .OrderBy(x => x.DateWeather)           // chronological order for the X-axis
-                .Select(x => new
-                {
-                    label = x.DateWeather.ToString("HH:mm"),
-                    value = x.TemperatureC,
-                    isSevere = x.IsSevere,
-                    temperature = x.TemperatureC
-                });
-
-            await _outZen.InvokeVoidAsync("setWeatherChart", chartPoints, _selectedMetric.ToString());
         }
-
 
         /// <summary>
         /// Adds or updates a marker for a forecast.
         /// </summary>
         private async Task AddWeatherMarkerAsync(ClientWeatherForecastDTO dto)
         {
+            if (dto is null) return;
+
+            Console.WriteLine($"[WF] AfterRender firstRender={_lastFirstRender} dataLoaded={_dataLoaded} mapBooted={_mapBooted}");
+
             Console.WriteLine($"[WF-Client] AddWeatherMarkerAsync Id={dto.Id}, Lat={dto.Latitude}, Lon={dto.Longitude}");
 
             if (_outZen is null) return;
 
-            var lat = dto.Latitude.HasValue ? (double)dto.Latitude.Value : 50.85;
-            var lng = dto.Longitude.HasValue ? (double)dto.Longitude.Value : 4.35;
+            // Fallback coords (avoids 0/0)
+            var lat = dto.Latitude;
+            var lng = dto.Longitude;
 
-            //// We consider that 0 / 0 = "no valid coordinates"
-            //if (dto.Latitude.HasValue && dto.Longitude.HasValue &&
-            //    dto.Latitude.Value != 0 && dto.Longitude.Value != 0)
-            //{
-            //    lat = (double)dto.Latitude.Value;
-            //    lng = (double)dto.Longitude.Value;
-            //}
-            //else
-            //{
-            //    // Fallback: Wallonia/Brussels Centre
-            //    lat = 50.85;
-            //    lng = 4.35;
-            //}
+            // fallback if latitude/longitude are invalid
+            if (double.IsNaN(lat) || double.IsNaN(lng) ||
+                lat is < -90 or > 90 ||
+                lng is < -180 or > 180 ||
+                (lat == 0 && lng == 0))
+            {
+                lat = 50.85;
+                lng = 4.35;
+            }
+
+
+            Console.WriteLine($"[WF-Client] JS add marker => id={WeatherMarkerId(dto.Id)} lat={lat} lng={lng} severe={dto.IsSevere}");
 
             await _outZen.InvokeVoidAsync("addOrUpdateCrowdMarker",
-                dto.Id,
+                WeatherMarkerId(dto.Id),
                 lat,
                 lng,
                 dto.IsSevere ? 4 : 2,
@@ -242,31 +259,39 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
                     isTraffic = false,
                     weatherType = dto.WeatherType.ToString()
                 });
+            // DEBUG: How many layers are in the cluster?
+            await _outZen.InvokeVoidAsync("debugClusterCount");
+
+            Console.WriteLine($"[WF-Client] JS add marker DONE => {dto.Id}");
         }
 
+        // ============ Helpers (clean + no dup) ============
 
+        private static string WeatherMarkerId(int id) => $"wf:{id}";
 
-        //private async Task AddWeatherMarkerViaGptAsync(ClientWeatherForecastDTO dto)
-        //{
-        //    if (_outZen is null) return;
+        private static void UpsertById(List<ClientWeatherForecastDTO> list, ClientWeatherForecastDTO dto)
+        {
+            if (list is null || dto is null) return;
 
-        //    var lat = dto.Latitude.HasValue ? (double)dto.Latitude.Value : 50.5;
-        //    var lng = dto.Longitude.HasValue ? (double)dto.Longitude.Value : 4.7;
+            var i = list.FindIndex(x => x.Id == dto.Id);
+            if (i >= 0) list[i] = dto;
+            else list.Add(dto);
+        }
 
-        //    var payload = new
-        //    {
-        //        Id = dto.Id,
-        //        Latitude = lat,
-        //        Longitude = lng,
-        //        SourceType = "Weather",
-        //        Prompt = dto.Summary ?? "Weather forecast",
-        //        Response = $"Temp: {dto.TemperatureC}°C, Vent: {dto.WindSpeedKmh} km/h, Pluie: {dto.RainfallMm} mm",
-        //        CrowdLevel = dto.IsSevere ? 4 : 2
-        //    };
+        private void UpsertVisible(ClientWeatherForecastDTO dto)
+        {
+            if (dto is null) return;
 
-        //    await _outZen.InvokeVoidAsync("addOrUpdateGptMarker", payload);
-        //}
+            var idx = visibleWeatherForecasts.FindIndex(x => x.Id == dto.Id);
 
+            if (idx >= 0)
+                visibleWeatherForecasts[idx] = dto;
+            else
+                visibleWeatherForecasts.Insert(0, dto);
+
+            // Optional: limit to avoid a huge UI list
+            // if (visibleWeatherForecasts.Count > 400) visibleWeatherForecasts = visibleWeatherForecasts.Take(400).ToList();
+        }
 
         private void LoadMoreItems()
         {
@@ -277,9 +302,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
         private async Task HandleScroll()
         {
-            var scrollTop = await JS.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
-            var scrollHeight = await JS.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
-            var clientHeight = await JS.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
+            var scrollTop = await JS.InvokeAsync<double>("scrollInterop.getScrollTop", ScrollContainerRef);
+            var scrollHeight = await JS.InvokeAsync<double>("scrollInterop.getScrollHeight", ScrollContainerRef);
+            var clientHeight = await JS.InvokeAsync<double>("scrollInterop.getClientHeight", ScrollContainerRef);
+
+            var st = (int)Math.Truncate(scrollTop);
+            var sh = (int)Math.Truncate(scrollHeight);
+            var ch = (int)Math.Truncate(clientHeight);
 
             if (scrollTop + clientHeight >= scrollHeight - 5)
             {
@@ -334,9 +363,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
                     windSpeed = x.WindSpeedKmh
                 });
 
-            await _outZen.InvokeVoidAsync("setWeatherChart",
-                recent,
-                _selectedMetric.ToString()); // "Temperature", "Humidity", "Wind"
+            await _outZen.InvokeVoidAsync("setWeatherChart", recent, _selectedMetric.ToString());
         }
 
         private enum WeatherMetric
@@ -348,21 +375,25 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
         private WeatherMetric _selectedMetric = WeatherMetric.Temperature;
 
-
         private void ToggleRecent() => _onlyRecent = !_onlyRecent;
 
         private void ClickInfo(int id) => SelectedId = id;
 
+        private RainAlertDTO _currentRainAlert;
+
         private void OnHeavyRainReceived(RainAlertDTO alert)
         {
-            // Always go through the Blazor dispatcher.
             _ = InvokeAsync(() =>
             {
                 _currentRainAlert = alert;
                 StateHasChanged();
             });
         }
-
+        private void ShowRainAlert(RainAlertDTO alert)
+        {
+            _currentRainAlert = alert;
+            InvokeAsync(StateHasChanged);
+        }
         private Task OnAlertDismissed()
         {
             _currentRainAlert = null;
@@ -374,12 +405,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             try
             {
                 if (_outZen is not null)
-                    await _outZen.DisposeAsync();
-                WeatherHub.HeavyRainReceived -= OnHeavyRainReceived;
-                //await WeatherHub.DisposeAsync();
+                    await _outZen.InvokeVoidAsync("disposeOutZen", new { mapId = _mapId });
             }
             catch { }
 
+            try
+            {
+                if (_outZen is not null)
+                    await _outZen.DisposeAsync();
+                WeatherHub.HeavyRainReceived -= OnHeavyRainReceived;
+            }
+            catch { }
+            
             if (hubConnection is not null)
             {
                 try { await hubConnection.StopAsync(); } catch { }
@@ -390,26 +427,27 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         private async Task GenerateOne()
         {
             var dto = await WeatherForecastService.GenerateNewForecastAsync();
-            if (dto is not null)
+            if (dto is null) return;
+
+            allWeatherForecasts.Insert(0, dto);
+            visibleWeatherForecasts.Insert(0, dto);
+            WeatherForecastLists.Insert(0, dto);
+
+            if (_outZen is not null)
             {
-                allWeatherForecasts.Insert(0, dto);
-                visibleWeatherForecasts.Insert(0, dto);
-                WeatherForecastLists.Insert(0, dto);
-
-                if (_outZen is not null)
-                {
-                    await AddWeatherMarkerAsync(dto);
-                    await _outZen.InvokeVoidAsync("fitToMarkers");
-                }
-
-                StateHasChanged();
+                await AddWeatherMarkerAsync(dto);
+                await _outZen.InvokeVoidAsync("fitToMarkers");
+                await UpdateChartAsync();
             }
+
+            StateHasChanged();
         }
 
         private static string GetWeatherCss(bool isSevere)
             => isSevere ? "severe--true" : "severe--false";
     }
 }
+
 
 
 

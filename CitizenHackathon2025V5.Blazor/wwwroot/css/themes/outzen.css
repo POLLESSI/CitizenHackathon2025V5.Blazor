@@ -170,12 +170,23 @@ nav.main-nav.is-open .burger {
     gap: .25rem;
 }
 
+.map-shell {
+    height: 420px; /* or clamp(320px, 55vh, 560px) */
+    min-height: 320px;
+    width: 100%;
+    min-width: 320px; /* Important: Avoid 142px */
+    display: block;
+    outline: 2px solid red;
+    flex: 0 0 auto;
+}
+
 /* Home */
 .homeMapCard {
     height: 520px; /* or clamp(320px, 60vh, 720px) */
     min-height: 320px;
     margin-top: 8px;
-    transform: translateY(calc(-1 * var(--map-lift)));
+    /*transform: translateY(calc(-1 * var(--map-lift)));*/
+    transform: none !important;
     will-change: transform;
     overflow: visible;
 }
@@ -190,11 +201,22 @@ nav.main-nav.is-open .burger {
     scroll-margin-top: var(--nav-h);
 }*/
 
+#leafletMap-home {
+    position: relative;
+    z-index: 10;
+}
 /* Pages (if you have a generic #leafletMap) */
 #leafletMap, .leaflet-host {
     height: 520px;
     min-height: 320px;
     scroll-margin-top: var(--nav-h);
+}
+
+#leafletMap-weatherforecastview {
+    height: 100%;
+    min-height: 320px;
+    width: 100%;
+    border-radius: 12px; /* optional */
 }
 
 .leaflet-popup-content .oz-bundle-popup {
@@ -215,6 +237,11 @@ nav.main-nav.is-open .burger {
 /* Safety: avoids overbearing parents */
 .home-main, .page-content {
     min-height: 0;
+}
+
+.home-earth-canvas, canvas, .globe-overlay {
+    z-index: 1;
+    pointer-events: none;
 }
 
 /* Ensures that the divIcon bundle is visible */
@@ -241,6 +268,13 @@ nav.main-nav.is-open .burger {
     .oz-bundle-icon .oz-bundle .oz-count {
         filter: drop-shadow(0 2px 2px rgba(0,0,0,.35));
     }
+
+.oz-detail-marker {
+    stroke: #fff;
+    fill: #00c2ff;
+    fill-opacity: .9;
+    stroke-width: 2;
+}
 
 /* Dots categories (if you use them) — to be adapted */
 .oz-dot {
@@ -364,6 +398,14 @@ nav.main-nav.is-open .burger {
         margin: .15rem 0;
     }
 
+.oz-map {
+    width: 100%;
+    height: 420px;
+    min-height: 420px;
+    display: block;
+    outline: 2px solid lime;
+}
+
 /* ===== Marker (divIcon) color levels ===== */
 .oz-marker {
     width: 26px;
@@ -480,6 +522,14 @@ nav.main-nav.is-open .burger {
     background: rgba(120,120,120,.85);
 }
 
+.oz-bundle-weather .oz-bundle-tag {
+    position: absolute;
+    right: -6px;
+    top: -8px;
+    font-size: 14px;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,.6));
+}
+
 .oz-card {
     padding: 14px;
     border: 1px solid rgba(255,255,255,.10);
@@ -546,6 +596,40 @@ nav.main-nav.is-open .burger {
 .oz-warn {
     font-size: 12px;
     color: #ffcc66;
+}
+
+.oz-wx-row {
+    display: grid;
+    gap: 2px;
+}
+
+.oz-wx-head {
+    font-weight: 800;
+}
+
+.oz-wx-sub {
+    opacity: .85;
+    font-size: 12px;
+}
+
+.oz-wx-metrics {
+    opacity: .9;
+    font-size: 12px;
+}
+
+.oz-pill {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.14);
+}
+
+.oz-pill-sev {
+    background: rgba(244,67,54,.22);
+    border-color: rgba(244,67,54,.35);
 }
 
 /* Highlight marker: a class is applied to the marker's DOM icon */

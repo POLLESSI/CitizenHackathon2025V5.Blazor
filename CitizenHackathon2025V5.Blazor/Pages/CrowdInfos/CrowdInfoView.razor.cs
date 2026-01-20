@@ -239,7 +239,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
             {
                 var lvl = Math.Clamp(dto.CrowdLevel, 1, SharedConstants.MaxCrowdLevel);
                 await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
-                    dto.Id.ToString(), dto.Latitude, dto.Longitude, lvl,
+                    $"cr:{dto.Id}", dto.Latitude, dto.Longitude, lvl,
                     new { title = dto.LocationName, description = $"Maj {dto.Timestamp:HH:mm:ss}" });
             }
 

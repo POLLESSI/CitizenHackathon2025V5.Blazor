@@ -21,9 +21,6 @@
             <span class="burger"></span>
         </button>
     </div>
-
-    <div class="nav-overlay @(isMenuOpen ? "show" : "")" @onclick="CloseMenu"></div>
-
     <aside class="nav-drawer @(isMenuOpen ? "show" : "")" role="dialog" aria-modal="true">
         <ul class="nav-links mobile">
             @foreach (var item in MenuItems)
@@ -37,6 +34,7 @@
             }
         </ul>
     </aside>
+    <div class="nav-overlay @(isMenuOpen ? "show" : "")" @onclick="CloseMenu"></div>
 </nav>
 
 

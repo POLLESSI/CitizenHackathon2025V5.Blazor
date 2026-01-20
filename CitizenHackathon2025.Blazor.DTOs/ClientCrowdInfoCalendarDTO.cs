@@ -11,6 +11,8 @@ namespace CitizenHackathon2025.Blazor.DTOs
         public string? EventName { get; set; }
         public int? ExpectedLevel { get; set; }       // 1..4
         public byte? Confidence { get; set; }         // 0..100
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
         public TimeSpan? StartLocalTime { get; set; } // HH:mm:ss
         public TimeSpan? EndLocalTime { get; set; }   // HH:mm:ss
         public int LeadHours { get; set; } = 3;
