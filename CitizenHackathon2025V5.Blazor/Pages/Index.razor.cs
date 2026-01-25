@@ -144,21 +144,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 };
 
                 var ok = await JS.InvokeAsync<bool>("OutZenInterop.addOrUpdateBundleMarkers", payload, 80);
-
                 Console.WriteLine($"[Index] addOrUpdateBundleMarkers ok={ok}");
 
+                if (!ok)
+                {
+                    _bundlePushed = false;
+                    return;
+                }
+
+                // ✅ Add weather markers individually (not only via bundles)
                 await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateWeatherMarkers", WeatherPoints);
-
-                //if (!ok)
-                //{
-                //    _bundlePushed = false; // Rollback if you want to try again
-                //    return;
-                //}
-                if (!ok) { _bundlePushed = false; return; }
-
+                // Hybrid: enable threshold, but keep HOME in "bundles" view by default
                 await JS.InvokeVoidAsync("OutZenInterop.enableHybridZoom", new { threshold = 13 });
+
+                // ✅ IMPORTANT: stay below threshold so the map doesn't flip to "details"
+                await JS.InvokeVoidAsync("OutZenInterop.activateHybridAndZoom", 13, 12);
+
+                // Fit on bundle markers (they are the visible thing in bundles mode)
                 await JS.InvokeVoidAsync("OutZenInterop.fitToBundles", 30);
-                await JS.InvokeVoidAsync("OutZenInterop.activateHybridAndZoom", 13, 13);
+
+                // Apply visibility rules (should remain bundles)
                 await JS.InvokeVoidAsync("OutZenInterop.refreshHybridNow");
             }
             catch (Exception ex)

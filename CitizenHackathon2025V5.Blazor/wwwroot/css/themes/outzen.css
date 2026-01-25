@@ -315,6 +315,36 @@ nav.main-nav.is-open .burger {
     border: 1px solid rgba(255,255,255,.10);
 }
 
+.oz-ant-icon {
+    background: transparent;
+    border: 0;
+}
+
+.oz-ant-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    border: 2px solid rgba(255,255,255,.85);
+    box-shadow: 0 0 0 2px rgba(0,0,0,.25);
+}
+
+.oz-ant-lvl1 .oz-ant-dot {
+    background: #2ecc71;
+}
+/* green */
+.oz-ant-lvl2 .oz-ant-dot {
+    background: #f39c12;
+}
+/* orange */
+.oz-ant-lvl3 .oz-ant-dot {
+    background: #e74c3c;
+}
+/* red */
+.oz-ant-lvl4 .oz-ant-dot {
+    background: #ff0044;
+}
+/* bright red */
+
 .oz-bundle-popup .oz-sec-title {
     font-weight: 800;
 }
@@ -634,8 +664,9 @@ nav.main-nav.is-open .burger {
 
 /* Highlight marker: a class is applied to the marker's DOM icon */
 .oz-marker-highlight {
-    filter: drop-shadow(0 0 10px rgba(255, 215, 0, .95));
+    filter: drop-shadow(0 0 8px rgba(255,255,255,.9));
     transform: scale(1.25);
+    transition: transform 120ms ease, filter 120ms ease;
 }
 
 .oz-marker-dim {

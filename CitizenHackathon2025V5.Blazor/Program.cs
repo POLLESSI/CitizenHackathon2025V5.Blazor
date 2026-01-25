@@ -147,6 +147,7 @@ builder.Services.AddScoped<IMultiHubSignalRClient>(sp =>
         tokenProvider: () => auth.GetAccessTokenAsync()
     );
 });
+builder.Services.AddScoped<IHubUrlBuilder, HubUrlBuilder>();
 builder.Services.AddScoped<IOutZenSignalRFactory, OutZenSignalRFactory>();
 builder.Services.AddScoped<MessageService>();
 builder.Services.AddScoped<PlaceService>();

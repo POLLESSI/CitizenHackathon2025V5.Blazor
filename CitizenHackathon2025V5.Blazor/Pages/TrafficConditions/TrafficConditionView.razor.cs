@@ -19,6 +19,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         [Inject] public IHttpClientFactory HttpFactory { get; set; }
         [Inject] public IConfiguration Config { get; set; }
         [Inject] public IAuthService Auth { get; set; }
+        [Inject] public IHubUrlBuilder HubUrls { get; set; }
 
         private const string ApiBase = "https://localhost:7254";
 
@@ -43,6 +44,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         // Fields used by the .razor
         private ElementReference ScrollContainerRef;
         private string _q;
+        private int _refreshing = 0;
         private bool _onlyRecent;
 
         // State map / markers
@@ -63,15 +65,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             currentIndex = 0;
             LoadMoreItems();
 
-            // 2) SignalR – same logic as WeatherForecastView
-            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? ApiBase;
-
-            // If ApiBaseUrl ends with "/api", we remove it to return to the root directory (https://localhost:7254)
-            if (apiBaseUrl.EndsWith("/api", StringComparison.OrdinalIgnoreCase))
-                apiBaseUrl = apiBaseUrl[..^4];
-
             // Final URL : https://localhost:7254/hubs/trafficHub
-            var url = $"{apiBaseUrl}/hubs/{TrafficConditionHubMethods.HubPath}";
+            var url = HubUrls.Build(TrafficConditionHubMethods.HubPath);
 
             Console.WriteLine($"[Traffic-Client] Hub URL = {url}");
 
@@ -84,41 +79,43 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                 .Build();
 
             // === Event: a traffic condition is added/updated ===
-            hubConnection.On<ClientTrafficConditionDTO>(
-                TrafficConditionHubMethods.ToClient.TrafficUpdated,
-                async dto =>
+            hubConnection.On(TrafficConditionHubMethods.ToClient.NotifyNewTraffic, async () =>
+            {
+                try
                 {
-                    if (dto is null) return;
+                    // 1) Re-fetch from the API (source of truth)
+                    var latest = (await TrafficConditionService.GetLatestTrafficConditionAsync())?.ToList() ?? new();
 
-                    void Upsert(List<ClientTrafficConditionDTO> list)
+                    // 2) Simple upsert: here we replace everything (more reliable and faster to implement)
+                    TrafficConditions = latest;
+
+                    allTrafficConditions.Clear();
+                    allTrafficConditions.AddRange(latest);
+
+                    visibleTrafficConditions.Clear();
+                    currentIndex = 0;
+                    LoadMoreItems();
+
+                    // 3) Map: If ready, resync markers
+                    if (_booted && _outZen is not null)
                     {
-                        var i = list.FindIndex(g => g.Id == dto.Id);
-                        if (i >= 0)
-                            list[i] = dto;
-                        else
-                            list.Add(dto);
+                        // Cleanse and reseed
+                        try { await _outZen.InvokeVoidAsync("clearCrowdMarkers"); } catch { }
+
+                        foreach (var tc in TrafficConditions)
+                            await AddOrUpdateTrafficMarkerAsync(tc, fit: false);
+
+                        try { await _outZen.InvokeVoidAsync("refreshMapSize"); } catch { }
+                        try { await _outZen.InvokeVoidAsync("fitToMarkers"); } catch { }
                     }
 
-                    Upsert(TrafficConditions);
-                    Upsert(allTrafficConditions);
-
-                    var j = visibleTrafficConditions.FindIndex(c => c.Id == dto.Id);
-                    if (j >= 0)
-                        visibleTrafficConditions[j] = dto;
-                    else
-                        visibleTrafficConditions.Insert(0, dto);
-
-                    if (!_booted || _outZen is null)
-                    {
-                        _pendingHubUpdates.Enqueue(dto);
-                        await InvokeAsync(StateHasChanged);
-                        return;
-                    }
-
-                    await AddOrUpdateTrafficMarkerAsync(dto, fit: true);
                     await InvokeAsync(StateHasChanged);
-                });
-
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[TrafficConditionView] Refresh after notify failed: {ex.Message}");
+                }
+            });
             // === Event: a condition is archived / deleted ===
             hubConnection.On<int>(
                 TrafficConditionHubMethods.ToClient.TrafficCleared,
@@ -301,6 +298,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                 try { await _outZen.InvokeVoidAsync("fitToMarkers"); } catch { }
 
                 _markersSeeded = true;
+            }
+            if (Interlocked.Exchange(ref _refreshing, 1) == 1) return;
+            try
+            {
+                await HandleScroll();
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _refreshing, 0);
             }
         }
 

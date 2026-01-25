@@ -16,6 +16,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         [Inject] public IJSRuntime JS { get; set; }
         [Inject] public IConfiguration Config { get; set; }
         [Inject] public IAuthService Auth { get; set; }
+        [Inject] public IHubUrlBuilder HubUrls { get; set; }
 
         public List<ClientGptInteractionDTO> GptInteractions { get; set; } = new();
         private List<ClientGptInteractionDTO> allGptInteractions = new();
@@ -48,8 +49,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
             var hubBaseUrl = (Config["SignalR:HubBase"] ?? apiBaseUrl).TrimEnd('/');
 
-            var hubPath = HubPaths.GptInteraction.Trim('/'); // "gptHub"
-            var url = $"{hubBaseUrl}/hubs/{hubPath}";
+            var url = HubUrls.Build(HubPaths.GptInteraction);
 
             hubConnection = new HubConnectionBuilder()
                 .WithUrl(url, options =>
@@ -61,7 +61,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 .Build();
 
             // Handlers
-            hubConnection.On<ClientGptInteractionDTO>("RefreshGPT", async dto =>
+            hubConnection.On<ClientGptInteractionDTO>(GptInteractionHubMethods.ToClient.NotifyNewGpt, async dto =>
             {
                 if (dto is null) return;
 

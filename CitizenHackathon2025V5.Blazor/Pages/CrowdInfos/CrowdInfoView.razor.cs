@@ -1,4 +1,5 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using CitizenHackathon2025V5.Blazor.Client.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Utils;
@@ -18,6 +19,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
         [Inject] public IJSRuntime JS { get; set; }
         [Inject] public IConfiguration Config { get; set; }
         [Inject] public IAuthService Auth { get; set; }
+        [Inject] public IHubUrlBuilder HubUrls { get; set; }
 
         private const string ApiBase = "https://localhost:7254";
 
@@ -58,6 +60,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
                 allCrowdInfos = fetched;
                 visibleCrowdInfos.Clear();
                 currentIndex = 0;
+                Console.WriteLine($"[CrowdInfoView] fetched={fetched.Count}");
+                Console.WriteLine($"[CrowdInfoView] visible={visibleCrowdInfos.Count} all={allCrowdInfos.Count}");
                 LoadMoreItems();
 
                 foreach (var co in fetched)
@@ -66,8 +70,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
                 await InvokeAsync(StateHasChanged);
 
                 // Hub SignalR
-                var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? ApiBase;
-                var hubUrl = $"{apiBaseUrl}/hubs/crowdHub";
+                var hubUrl = HubUrls.Build(HubPaths.CrowdInfo);
 
                 hubConnection = new HubConnectionBuilder()
                     .WithUrl(hubUrl, options =>
@@ -98,7 +101,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
         {
             if (hubConnection is null) return;
 
-            hubConnection.On<ClientCrowdInfoDTO>("ReceiveCrowdUpdate", async dto =>
+            hubConnection.On<ClientCrowdInfoDTO>(CitizenHackathon2025.Contracts.Hubs.CrowdHubMethods.ToClient.ReceiveCrowdUpdate, async dto =>
             {
                 UpsertLocal(dto);
 
@@ -128,7 +131,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
                 await InvokeAsync(StateHasChanged);
             });
 
-            hubConnection.On<int>("CrowdInfoArchived", async id =>
+            hubConnection.On<int>(CitizenHackathon2025.Contracts.Hubs.CrowdHubMethods.ToClient.CrowdInfoArchived, async id =>
             {
                 CrowdInfos.RemoveAll(c => c.Id == id);
                 allCrowdInfos.RemoveAll(c => c.Id == id);
@@ -161,86 +164,64 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            // Prevents any second passage
-            if (!firstRender || _booted || _mapInitStarted)
-                return;
-
+            if (!firstRender || _booted || _mapInitStarted) return;
             _mapInitStarted = true;
 
-            // 0) Wait for the container to exist
+            // 0) Wait container exists
             for (var i = 0; i < 10; i++)
             {
-                var ok = await JS.InvokeAsync<bool>("checkElementExists", "leafletMap");
-                if (ok) break;
+                if (await JS.InvokeAsync<bool>("checkElementExists", "leafletMap")) break;
                 await Task.Delay(150);
-                if (i == 9)
-                {
-                    Console.WriteLine("❌ [CrowdInfoView] Map container #leafletMap not found.");
-                    return;
-                }
+                if (i == 9) { Console.WriteLine("❌ leafletMap not found."); return; }
             }
 
             _outzen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
 
-            try
+            var ok = await _outzen.InvokeAsync<bool>("bootOutZen", new
             {
-                await _outzen.InvokeVoidAsync("bootOutZen", new
-                {
-                    mapId = "leafletMap",
-                    center = new[] { 50.89, 4.34 },
-                    zoom = 13,
-                    enableChart = true,
-                    force = true
-                });
-            }
-            catch (JSException jsEx)
-            {
-                Console.Error.WriteLine($"❌ [CrowdInfoView] bootOutZen JS error: {jsEx.Message}");
-                return;
-            }
+                mapId = "leafletMap",
+                center = new[] { 50.89, 4.34 },
+                zoom = 13,
+                enableChart = true,
+                force = true
+            });
 
-            // Polling readiness…
-            var ready = false;
-            for (var i = 0; i < 40; i++)
+            if (!ok) return;
+
+            // Readiness check (no custom isOutZenReady required)
+            bool ready = false;
+            for (var i = 0; i < 25; i++)
             {
-                try
-                {
-                    ready = await _outzen.InvokeAsync<bool>("isOutZenReady");
-                    if (ready) break;
-                }
-                catch { }
+                try { ready = await _outzen.InvokeAsync<bool>("isOutZenReady"); } catch { }
+                if (ready) break;
+                await Task.Delay(120);
+            }
+            if (!ready) return;
+
+            string current = null;
+            for (var i = 0; i < 20; i++)
+            {
+                try { current = await _outzen.InvokeAsync<string>("getCurrentMapId"); } catch { }
+                if (!string.IsNullOrWhiteSpace(current)) break;
                 await Task.Delay(150);
             }
-
-            if (!ready)
-            {
-                Console.WriteLine("❌ [CrowdInfoView] OutZen not ready after boot / polling.");
-                return;
-            }
-
-            Console.WriteLine("✅ [CrowdInfoView] OutZen ready, initializing map markers...");
+            if (string.IsNullOrWhiteSpace(current)) { Console.WriteLine("❌ map not ready"); return; }
 
             try { await _outzen.InvokeVoidAsync("refreshMapSize"); } catch { }
 
-            // 4) Initial seed — But if the data isn't there, it's not a problem.
-            // The catch-up in OnInitializedAsync will take care of it later.
-            if (visibleCrowdInfos.Any())
-            {
-                Console.WriteLine($"[CrowdInfoView] Initial SyncMapMarkersAsync with {FilterCrowd(visibleCrowdInfos).Count()} markers.");
-                await SyncMapMarkersAsync(fit: true);
-            }
-            else
-            {
-                Console.WriteLine("[CrowdInfoView] No visibleCrowdInfos yet at first boot.");
-            }
+            // Seed from current visible data
+            await SyncMapMarkersAsync(fit: true);
 
-            // 5) Flush SignalR updates that arrived before the map
+            // Flush buffered hub updates
             while (_pendingHubUpdates.TryDequeue(out var dto))
             {
+                if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude)) continue;
+                if (dto.Latitude == 0 && dto.Longitude == 0) continue;
+
                 var lvl = Math.Clamp(dto.CrowdLevel, 1, SharedConstants.MaxCrowdLevel);
                 await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
                     $"cr:{dto.Id}", dto.Latitude, dto.Longitude, lvl,
-                    new { title = dto.LocationName, description = $"Maj {dto.Timestamp:HH:mm:ss}" });
+                    new { title = dto.LocationName, description = $"Maj {dto.Timestamp:HH:mm:ss}", icon = "👥" });
             }
 
             try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
@@ -260,11 +241,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
                 foreach (var co in items)
                 {
+                    if (!double.IsFinite(co.Latitude) || !double.IsFinite(co.Longitude)) continue;
+                    if (co.Latitude == 0 && co.Longitude == 0) continue;
+
                     var lvl = Math.Clamp(co.CrowdLevel, 1, SharedConstants.MaxCrowdLevel);
+
                     await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
-                        co.Id.ToString(), co.Latitude, co.Longitude, lvl,
-                        new { title = co.LocationName, description = $"Maj {co.Timestamp:HH:mm:ss}" });
-                    Console.WriteLine($"[CrowdInfoView] Marker: {co.Id} -> {co.Latitude},{co.Longitude}");
+                        $"cr:{co.Id}", co.Latitude, co.Longitude, lvl,
+                        new { title = co.LocationName, description = $"Maj {co.Timestamp:HH:mm:ss}", icon = "👥" });
                 }
 
                 if (fit && items.Any())
@@ -342,7 +326,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
             {
                 if (_outzen is not null)
                 {
-                    try { await _outzen.InvokeVoidAsync("disposeOutZen"); } catch { }
+                    try { await _outzen.InvokeVoidAsync("disposeOutZen", new { mapId = "leafletMap" }); } catch { }
                     await _outzen.DisposeAsync();
                 }
             }

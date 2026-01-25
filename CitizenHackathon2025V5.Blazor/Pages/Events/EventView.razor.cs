@@ -21,6 +21,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
         [Inject] public IHttpClientFactory HttpFactory { get; set; }
         [Inject] public IConfiguration Config { get; set; }
         [Inject] public IAuthService Auth { get; set; }
+        [Inject] public IHubUrlBuilder HubUrls { get; set; }
         [Parameter, SupplyParameterFromQuery(Name = "detailId")]
         public int? DetailId { get; set; }
 
@@ -72,11 +73,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
             // 2) SignalR
             var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
             var hubBaseUrl = (Config["SignalR:HubBase"] ?? apiBaseUrl).TrimEnd('/');
-
             // EventHubMethods.HubPath = "events"
-            var hubPath = EventHubMethods.HubPath.TrimStart('/'); // "events"
-
-            var url = $"{hubBaseUrl}/hubs/{hubPath}";
+            
+            var url = HubUrls.Build(EventHubMethods.HubPath);
             // => https://localhost:7254/hubs/events
 
             hubConnection = new HubConnectionBuilder()

@@ -1,11 +1,12 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.Services;
+﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Contracts.Hubs;
+using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
-using System.Globalization;
-using Newtonsoft.Json;
 using Microsoft.JSInterop;
-using CitizenHackathon2025.Blazor.DTOs;
+using Newtonsoft.Json;
+using System.Globalization;
+using System.Reflection;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
 {
@@ -22,6 +23,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
         [Inject] public IHttpClientFactory HttpFactory { get; set; }
         [Inject] public IConfiguration Config { get; set; }
         [Inject] public IAuthService Auth { get; set; }
+        [Inject] public IHubUrlBuilder HubUrls { get; set; }
 
         private const string ApiBase = "https://localhost:7254";
         private IJSObjectReference _outZen;
@@ -57,11 +59,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
 
             _grouped = await SuggestionMapService.GetSuggestionMapAsync(days: 7);
 
-            // 2) SignalR: dedicated hub Suggestion
-            var apiBase = (Config["ApiBaseUrl"] ?? "https://localhost:7254").TrimEnd('/');
-
             // SuggestionHubMethods.HubPath = "/hubs/suggestionHub"
-            var url = $"{apiBase}{SuggestionHubMethods.HubPath}";
+            var url = HubUrls.Build(SuggestionHubMethods.HubPath);
             // => https://localhost:7254/hubs/suggestionHub
 
             hubConnection = new HubConnectionBuilder()
@@ -182,18 +181,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
                 var level = MapSuggestionCountToLevel(g.SuggestionCount);
                 var desc = $"{g.SuggestionCount} suggestion(s) – Dernière : {g.LastSuggestedAt:yyyy-MM-dd HH:mm}";
 
-                await _outZen.InvokeVoidAsync(
-                    "addOrUpdateGptMarker",
-                    new
-                    {
-                        Id = g.PlaceName,
-                        lat = (double)g.Latitude,
-                        lng = (double)g.Longitude,
-                        CrowdLevel = level,
-                        Title = g.PlaceName,
-                        Description = desc,
-                        SourceType = "Suggestion"
-                    });
+                await _outZen.InvokeVoidAsync("addOrUpdateCrowdMarker",
+                    $"sgp:{g.PlaceName}",   // ou un id stable (placeId / placeName hash)
+                    (double)g.Latitude,
+                    (double)g.Longitude,
+                    level,
+                    new { title = g.PlaceName, description = desc, icon = "✨" });
+
             }
 
             // Debug : dump markers on the JS side

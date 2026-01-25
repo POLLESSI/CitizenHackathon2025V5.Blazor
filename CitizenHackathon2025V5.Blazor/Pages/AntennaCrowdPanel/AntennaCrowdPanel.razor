@@ -1,53 +1,77 @@
-﻿@using CitizenHackathon2025.Blazor.DTOs
-@inject CitizenHackathon2025V5.Blazor.Client.Services.AntennaCrowdService AntennaCrowdService
+﻿@page "/antennacrowdpanel"
+@using CitizenHackathon2025.Blazor.DTOs
+@using CitizenHackathon2025.Blazor.DTOs.Security
 
-<div class="oz-card">
-    <div class="oz-card-header">
-        <div class="oz-title">Antenne la plus proche</div>
-        <div class="oz-subtitle">Affluence estimée sur @WindowMinutes min</div>
+<h3>Antenna Crowd Panel</h3>
+
+<div class="antennaCrowd-page">
+    <div class="map-host" id="leafletMap" style="height:480px; min-height:480px;"></div>
+
+    <div class="antenna-list"
+         @ref="ScrollContainerRef"
+         @onscroll="HandleScrollAsync"
+         style="max-height:420px; overflow:auto;">
+
+        @foreach (var a in _visibleAntennas)
+        {
+            <div class="oz-row">
+                <div class="oz-kv">
+                    <div class="oz-k">#{@a.Id}</div>
+                    <div class="oz-v">@a.Name</div>
+                </div>
+            </div>
+        }
     </div>
 
-    @if (SelectedEventId is null)
-    {
-        <div class="oz-muted">Sélectionne un événement pour afficher l’antenne et l’affluence.</div>
-    }
-    else if (_loading)
-    {
-        <div class="oz-muted">Chargement…</div>
-    }
-    else if (_data is null)
-    {
-        <div class="oz-warn">Aucune antenne trouvée dans le rayon (@MaxRadiusMeters m).</div>
-    }
-    else
-    {
-        <div class="oz-row">
-            <div class="oz-kv">
-                <div class="oz-k">AntenneId</div>
-                <div class="oz-v">@_data.AntennaId</div>
-            </div>
-            <div class="oz-kv">
-                <div class="oz-k">Distance</div>
-                <div class="oz-v">@($"{_data.DistanceMeters:0} m")</div>
-            </div>
+    <div class="oz-card">
+        <div class="oz-card-header">
+            <div class="oz-title">Antenne la plus proche (via Event)</div>
+            <div class="oz-subtitle">Fenêtre : @WindowMinutes min — Rayon : @MaxRadiusMeters m</div>
         </div>
 
-        <div class="oz-row">
-            <div class="oz-metric">
-                <div class="oz-metric-label">Connexions actives</div>
-                <div class="oz-metric-value">@_data.Counts.ActiveConnections</div>
+        @if (SelectedEventId is null)
+        {
+            <div class="oz-muted">Sélectionne un événement pour afficher l’antenne la plus proche et l’affluence.</div>
+        }
+        else if (_loading)
+        {
+            <div class="oz-muted">Chargement…</div>
+        }
+        else if (_eventCrowd is null)
+        {
+            <div class="oz-warn">Aucune antenne trouvée dans le rayon (@MaxRadiusMeters m).</div>
+        }
+        else
+        {
+            <div class="oz-row">
+                <div class="oz-kv">
+                    <div class="oz-k">AntenneId</div>
+                    <div class="oz-v">@_eventCrowd.AntennaId</div>
+                </div>
+                <div class="oz-kv">
+                    <div class="oz-k">Distance</div>
+                    <div class="oz-v">@($"{_eventCrowd.DistanceMeters:0} m")</div>
+                </div>
             </div>
-            <div class="oz-metric">
-                <div class="oz-metric-label">Devices uniques</div>
-                <div class="oz-metric-value">@_data.Counts.UniqueDevices</div>
-            </div>
-        </div>
 
-        <div class="oz-muted">
-            Fenêtre UTC : @_data.Counts.WindowStartUtc.ToString("u") → @_data.Counts.WindowEndUtc.ToString("u")
-        </div>
-    }
+            <div class="oz-row">
+                <div class="oz-metric">
+                    <div class="oz-metric-label">Connexions actives</div>
+                    <div class="oz-metric-value">@_eventCrowd.Counts.ActiveConnections</div>
+                </div>
+                <div class="oz-metric">
+                    <div class="oz-metric-label">Devices uniques</div>
+                    <div class="oz-metric-value">@_eventCrowd.Counts.UniqueDevices</div>
+                </div>
+            </div>
+
+            <div class="oz-muted">
+                Fenêtre UTC : @_eventCrowd.Counts.WindowStartUtc.ToString("u") → @_eventCrowd.Counts.WindowEndUtc.ToString("u")
+            </div>
+        }
+    </div>
 </div>
+
 
 
 

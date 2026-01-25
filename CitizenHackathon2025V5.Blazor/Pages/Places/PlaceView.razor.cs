@@ -1,10 +1,11 @@
-﻿using CitizenHackathon2025V5.Blazor.Client.Services;
+﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Contracts.Hubs;
+using CitizenHackathon2025V5.Blazor.Client.Services;
 using Microsoft.AspNetCore.Components;
-using System.Collections.Concurrent;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
-using CitizenHackathon2025.Blazor.DTOs;
+using System.Collections.Concurrent;
+using System.Reflection;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 {
@@ -19,6 +20,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         [Inject] public IHttpClientFactory HttpFactory { get; set; }
         [Inject] public IConfiguration Config { get; set; }
         [Inject] public IAuthService Auth { get; set; }
+        [Inject] public IHubUrlBuilder HubUrls { get; set; }
 
         private const string ApiBase = "https://localhost:7254";
 
@@ -88,19 +90,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
             }
 
             // 2) SignalR
-            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
 
-            // SignalR:HubBase is considered to be the root (https://localhost:7254)
-            var hubBaseConfig = (Config["SignalR:HubBase"] ?? apiBaseUrl).TrimEnd('/');
-
-            // We guarantee that we have /hubs as the suffix, without doubling it.
-            string hubRoot;
-            if (hubBaseConfig.EndsWith("/hubs", StringComparison.OrdinalIgnoreCase))
-                hubRoot = hubBaseConfig;                  // already OK
-            else
-                hubRoot = hubBaseConfig + "/hubs";        // we add /hubs
-
-            var url = $"{hubRoot}/{HubPaths.Place.TrimStart('/')}";// => https://localhost:7254/hubs/placeHub
+            var url = HubUrls.Build(HubPaths.Place);// => https://localhost:7254/hubs/placeHub
 
             hubConnection = new HubConnectionBuilder()
                 .WithUrl(url, options =>
@@ -126,7 +117,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         private void RegisterHubHandlers()
         {
             if (hubConnection is null) return;
-            hubConnection.On<ClientPlaceDTO>("ReceivePlaceUpdate", async dto =>
+            hubConnection.On<ClientPlaceDTO>(PlaceHubMethods.ToClient.NewPlace, async dto =>
             {
                 // Map DTO API -> Client DTO
                 var client = new ClientPlaceDTO
@@ -212,7 +203,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
             // 4) One resize + one fit at the end
             try { await _outzen.InvokeVoidAsync("refreshMapSize"); } catch { }
-            try { await _outzen.InvokeVoidAsync("fitToPlaceMarkers"); } catch { }
+            try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
 
             _initialDataApplied = true;
             _booted = true;
@@ -237,13 +228,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
                        + $" • Cap: {dto.Capacity}"
                        + (string.IsNullOrWhiteSpace(dto.Tag) ? "" : $" • Tag: {dto.Tag}");
 
-            await _outzen.InvokeVoidAsync("upsertPlaceMarker", new
-            {
-                id = dto.Id,
-                name = dto.Name,
-                latitude = dto.Latitude,
-                longitude = dto.Longitude
-            });
+            await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
+                $"pl:{dto.Id}", dto.Latitude, dto.Longitude,
+                level,
+                new { title = dto.Name, description = desc, icon = "📍" });
 
             if (fit)
             {

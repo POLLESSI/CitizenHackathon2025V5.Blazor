@@ -120,9 +120,9 @@
 
         var testData = new[]
         {
-        new { Id=1, Lat=50.89, Lng=4.34, Level=2, Name="Parck" },
-        new { Id=2, Lat=50.88, Lng=4.35, Level=3, Name="Station" },
-        new { Id=3, Lat=50.90, Lng=4.33, Level=4, Name="Center" }
+        new { Id=1, Lat=50.89, Lng=4.34, Level=2, Name="Medium" },
+        new { Id=2, Lat=50.88, Lng=4.35, Level=3, Name="Hight" },
+        new { Id=3, Lat=50.90, Lng=4.33, Level=4, Name="Critic" }
     };
 
         foreach (var t in testData)
@@ -144,7 +144,6 @@
             new { title = "TEST", description = "debug" });
         try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
     }
-
 }
 
 

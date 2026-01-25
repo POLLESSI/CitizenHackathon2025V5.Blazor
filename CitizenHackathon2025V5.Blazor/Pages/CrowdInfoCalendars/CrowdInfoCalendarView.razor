@@ -4,9 +4,17 @@
 @using CitizenHackathon2025V5.Blazor.Client.Components
 @inject CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService Svc
 @inject NavigationManager Nav
-@inject IJSRuntime JS
 
 <h3>Crowd Calendar</h3>
+
+<div class="crowd-page">
+    <div class="map-host" id="leafletMap" style="height:480px; min-height:480px;"></div>
+
+    <div class="chart-panel">
+        <canvas id="crowdChart"></canvas>
+    </div>
+
+</div>
 
 <div class="mb-3 grid" style="grid-template-columns: repeat(6, minmax(180px, 1fr)); gap: 8px;">
     <InputDate @bind-Value="from" class="form-control" />
@@ -26,11 +34,11 @@
     <button class="btn btn-secondary ms-2" @onclick="LoadAll">Load All</button>
 </div>
 
-@if (items is null)
+@if (allCrowdInfoCalendars is null)
 {
     <p>Loading…</p>
 }
-else if (items.Count == 0)
+else if (allCrowdInfoCalendars.Count == 0)
 {
     <p>No entries.</p>
 }
@@ -49,7 +57,7 @@ else
                 </tr>
             </thead>
             <tbody>
-                @foreach (var e in items)
+                @foreach (var e in allCrowdInfoCalendars)
                 {
                     <tr>
                         <td>@e.Id</td>

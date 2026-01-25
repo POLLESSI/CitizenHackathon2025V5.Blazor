@@ -21,6 +21,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         [Inject] public IHttpClientFactory HttpFactory { get; set; }
         [Inject] public IConfiguration Config { get; set; }
         [Inject] public IAuthService Auth { get; set; }
+        [Inject] public IHubUrlBuilder HubUrls { get; set; }
 
         private const string ApiBase = "https://localhost:7254";
         private const string _mapId = $"leafletMap-weatherforecastview";
@@ -77,7 +78,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? ApiBase;
 
             // Final URL : https://localhost:7254/hubs/weatherforecastHub
-            var url = $"{apiBaseUrl}/hubs/{WeatherForecastHubMethods.HubPath}";
+            var url = HubUrls.Build(WeatherForecastHubMethods.HubPath);
             Console.WriteLine($"[WF-Client] Hub URL = {url}");
 
             hubConnection = new HubConnectionBuilder()
