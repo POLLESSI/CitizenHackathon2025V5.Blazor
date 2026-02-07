@@ -107,6 +107,17 @@
         return wrapperFn;
     }
 
+    function throttle(fn, ms) {
+        let t = 0;
+        return (...args) => {
+            const now = Date.now();
+            if (now - t < ms) return;
+            t = now;
+            fn(...args);
+        };
+    }
+
+
     // @function wrapNum(num: Number, range: Number[], includeMax?: Boolean): Number
     // Returns the number `num` modulo `range` in such a way so it lies within
     // `range[0]` and `range[1]`. The returned value will be always smaller than

@@ -8,6 +8,11 @@
 // Default textures (in case Blazor doesn't apply them)
 const DEFAULT_DAY_URL = "/images/earth_texture.jpg?v=1";
 const DEFAULT_NIGHT_URL = "/images/earth_texture_night.jpg?v=1";
+/*const nowMs = () => (globalThis.performance?.now?.() ?? Date.now());*/
+function nowMs() {
+    return (globalThis.performance?.now?.() ?? Date.now());
+}
+
 
 const _instances = {}; // key = canvasId
 
@@ -53,7 +58,7 @@ export async function initEarth(opts) {
             });
             applyDayNightNowInstance(state, l);
         }, opts?.dayNightIntervalMs ?? 10 * 60 * 1000);
-
+        
         console.log(`initEarth: initialized instance ${canvasId}`);
     } catch (err) {
         console.error("initEarth: failed to initialize", err);
@@ -206,7 +211,7 @@ function _createState(canvasId, canvas, opts) {
         glow: null,
 
         // Animation timing
-        lastTime: performance.now()
+        lastTime: nowMs()
     };
 }
 
@@ -253,7 +258,7 @@ async function _loadAndCreatePlanet(state, opts = {}) {
 
 function _startAnimation(state) {
     function animate() {
-        const now = performance.now();
+        const now = (globalThis.performance?.now?.() ?? Date.now());
         const dt = (now - state.lastTime) / 1000;
         state.lastTime = now;
 
@@ -489,23 +494,23 @@ function loadTex(loader, url) {
 }
 
 // ----------------------------- Geolocation & sun times -----------------------------
-function resolveLocation(cfg) {
+function resolveLocation(cfg, state) {
     return new Promise((resolve) => {
         if (!navigator.geolocation) {
+            if (state) state.geoDenied = true;
             resolve({ lat: cfg.fallbackLat, lon: cfg.fallbackLon });
             return;
         }
         navigator.geolocation.getCurrentPosition(
-            pos => resolve({
-                lat: pos.coords.latitude,
-                lon: pos.coords.longitude
-            }),
-            () => resolve({ lat: cfg.fallbackLat, lon: cfg.fallbackLon }),
+            pos => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+            err => {
+                if (state && err && err.code === err.PERMISSION_DENIED) state.geoDenied = true;
+                resolve({ lat: cfg.fallbackLat, lon: cfg.fallbackLon });
+            },
             { maximumAge: 3600_000, timeout: 6000, enableHighAccuracy: false }
         );
     });
 }
-
 function sunTimes(dateLocal, latDeg, lonDeg) {
     const tzOffsetMin = dateLocal.getTimezoneOffset();
     const dateUTC = new Date(dateLocal.getTime() + tzOffsetMin * 60_000);
@@ -619,13 +624,15 @@ const toDeg = r => r * 180 / Math.PI;
 const fixAngle = a => ((a % 360) + 360) % 360;
 
 // ----------------------------- Compatibility wrappers on window -----------------------------
-window.initEarth = (opts) => initEarth(opts || {});
-window.disposeEarth = (canvasId) => disposeEarth(canvasId || "rotatingEarth");
-window.setLightsIntensity = (v, canvasId) => setLightsIntensity(v, canvasId || "rotatingEarth");
-window.setHaloStrength = (v, canvasId) => setHaloStrength(v, canvasId || "rotatingEarth");
-window.switchNightMode = (on, immediate, canvasId) =>
-    switchNightMode(on, immediate, canvasId || "rotatingEarth");
-window.setRotationSpeed = (v, canvasId) => setRotationSpeed(v, canvasId || "rotatingEarth");
+if (typeof window !== "undefined") {
+    window.initEarth = (opts) => initEarth(opts || {});
+    window.disposeEarth = (canvasId) => disposeEarth(canvasId || "rotatingEarth");
+    window.setLightsIntensity = (v, canvasId) => setLightsIntensity(v, canvasId || "rotatingEarth");
+    window.setHaloStrength = (v, canvasId) => setHaloStrength(v, canvasId || "rotatingEarth");
+    window.switchNightMode = (on, immediate, canvasId) =>
+        switchNightMode(on, immediate, canvasId || "rotatingEarth");
+    window.setRotationSpeed = (v, canvasId) => setRotationSpeed(v, canvasId || "rotatingEarth");
+}
 
 // ----------------------------- End of file -----------------------------
 

@@ -2,13 +2,14 @@
 @using CitizenHackathon2025V5.Blazor.Client.Models;
 @using CitizenHackathon2025.Blazor.DTOs
 @using CitizenHackathon2025V5.Blazor.Client.Constants
-@using CitizenHackathon2025.Blazor.DTOs;
 @implements IAsyncDisposable
 @inject IJSRuntime js
 
 <span class="fas fa-certificate me-2"></span> Traffic Conditions
 
-<div class="map-host" id="trafficMap" style="height:480px;min-height:480px;width:100%;"></div>
+<div class="oz-map-shell">
+    <div id="@MapId" @key="MapId"></div>
+</div>
 
 <div class="page-list">
     <div class="list-toolbar">

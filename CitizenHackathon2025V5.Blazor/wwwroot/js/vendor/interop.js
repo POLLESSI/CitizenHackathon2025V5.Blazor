@@ -1,10 +1,15 @@
 ﻿/*wwwroot / js / interop.js*/
 
+function safeLocalStorage() {
+    try { return window.localStorage; } catch { return null; }
+}
+
 window.jsInterop = {
-    setLocalStorage: (key, value) => localStorage.setItem(key, value),
-    getLocalStorage: (key) => localStorage.getItem(key),
-    removeLocalStorage: (key) => localStorage.removeItem(key)
+    setLocalStorage: (k, v) => { const ls = safeLocalStorage(); if (ls) ls.setItem(k, v); },
+    getLocalStorage: (k) => { const ls = safeLocalStorage(); return ls ? ls.getItem(k) : null; },
+    removeLocalStorage: (k) => { const ls = safeLocalStorage(); if (ls) ls.removeItem(k); }
 };
+
 // Smooth scroll by id for Blazor JSInterop
     window.scrollIntoViewById = (id, opts) => {
         const el = document.getElementById(id);

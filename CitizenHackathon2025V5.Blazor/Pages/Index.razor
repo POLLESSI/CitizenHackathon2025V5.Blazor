@@ -3,11 +3,21 @@
 @using CitizenHackathon2025V5.Blazor.Client.Services
 @using CitizenHackathon2025V5.Blazor.Client.Shared
 @using Microsoft.JSInterop
+@inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
 @inject Blazored.Toast.Services.IToastService ToastService
 
 <PageTitle>OutZen - Home</PageTitle>
 
 <div class="home-page">
+    @* <div id="@MapId" style="height: 72vh;"></div> *@
+    <!-- Summary map -->
+    <div class="oz-page oz-page--home">
+        <div class="homeMapCard">
+            <div id="leafletMap-home" class="leaflet-host"></div>
+            <!-- Optional: canvas for the weather chart if you want to put it back -->
+            @* <canvas id="crowdChart"></canvas> *@
+        </div>
+    </div>
     <!-- Top banner: title + globe -->
     <div class="home-header">
         <div class="home-header-left">
@@ -24,13 +34,6 @@
         </button>
     </div>
     <div class="home-main">
-        <!-- Summary map -->
-        <div class="homeMapCard">
-            <div id="leafletMap-home" class="leaflet-host"></div>
-            <!-- Optional: canvas for the weather chart if you want to put it back -->
-            @* <canvas id="crowdChart"></canvas> *@
-        </div>
-        
         <!-- Side panel: GPT + message -->
         <aside class="home-side-panel scroll-fade">
             <section class="home-block">
@@ -88,18 +91,20 @@
     </div>
     
     <!-- Suggestions (for the scroll button) -->
-    <section class="index-section scroll-fade" id="suggestions">
-        <h2>Suggestions Zen</h2>
-        <p>
-            Here are some alternatives within a 25 km radius of the selected event:
-        </p>
+    <div>
+        <section class="index-section scroll-fade" id="suggestions">
+            <h2>Suggestions Zen</h2>
+            <p>
+                Here are some alternatives within a 25 km radius of the selected event:
+            </p>
 
-        <ul>
-            <li>Upper Sambre Natural Park</li>
-            <li>Outdoor yoga classes in Gosselies</li>
-            <li>Open-air theater – La Traviata</li>
-        </ul>
-    </section>
+            <ul>
+                <li>Upper Sambre Natural Park</li>
+                <li>Outdoor yoga classes in Gosselies</li>
+                <li>Open-air theater – La Traviata</li>
+            </ul>
+        </section>
+    </div>
     <div class="earth-container scroll-fade">
         <Globe CanvasId="homeEarth"
                Width="320"

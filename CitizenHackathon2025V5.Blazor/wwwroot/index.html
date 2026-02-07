@@ -64,6 +64,7 @@
 
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
+    <link rel="preload" href="/images/earth_texture_night.jpg" as="image" crossorigin="anonymous">
 
     <style>
         .outzen-crowd-marker {
@@ -243,8 +244,7 @@
     <!--<script src="/js/navMenuInterop.js" defer></script>-->
     <script src="/js/outzen-nav.js"></script>
     <!-- Minimal global bridge -->
-    <script src="/js/outzen-interop.js" defer></script>
-
+    <!--<script src="/js/outzen-interop.js" defer></script>-->
     <!-- === Utility / Visual Modules === -->
     <script type="module" src="/js/app/timeEffects.js"></script>
     <script type="module" src="/js/app/wasmUtils.js"></script>
@@ -254,6 +254,8 @@
     <!-- Minimal interop bridge -->
     <script src="/js/trafficInterop.js" defer></script>
     <script src="/js/vendor/interop.js" defer></script>
+    <script src="/js/outzen-interop.js?v=20260206-1"></script>
+    <!--<script src="/js/app/earthRotation-bridge.js"></script>-->
     <script src="/js/crowdbar.js" defer></script>
 
     <!-- Service Worker -->
@@ -324,8 +326,7 @@
     </script>
 
     <!--<script>globalThis.__OZ_ENV = "dev";</script>-->
-    <!--
-    <script type="module">
+    <!--<script type="module">
         (async () => {
             if (window.__importLoopDisabled) { console.info("[OutZen] import loop disabled (index.html)"); return; }
             try {
@@ -339,8 +340,8 @@
                 console.error('[OutZen] import failed (index):', e);
             }
         })();
-    </script>
-    -->
+    </script>-->
+    <script src="/js/outzen-interop.js?v=20260130"></script>
     <!-- === Blazor Boot === -->
     <script src="_framework/blazor.webassembly.js"></script>
 </body>

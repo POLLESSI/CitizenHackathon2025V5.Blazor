@@ -1,14 +1,17 @@
-﻿using System.Net.Http;
-using Blazored.Toast;
+﻿using Blazored.Toast;
 using CitizenHackathon2025V5.Blazor.Client;
-using CitizenHackathon2025V5.Blazor.Client.SignalR;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interop;
+using CitizenHackathon2025V5.Blazor.Client.SignalR;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.JSInterop;
 using Polly;
 using Polly.Extensions.Http;
+using System.Net.Http;
+
 
 // -----------------------------
 // Polly Policies
@@ -106,9 +109,7 @@ builder.Services.AddHttpClient("ApiRootAuth", c =>
 .AddPolicyHandler(GetTimeoutPolicy())
 .AddPolicyHandler(GetCircuitBreakerPolicy());
 
-// HttpClient is injected by default when you simply request "HttpClient".
-builder.Services.AddScoped(sp =>
-    sp.GetRequiredService<IHttpClientFactory>().CreateClient("Default"));
+
 
 // =============================
 // Authentication Services
@@ -120,16 +121,17 @@ builder.Services.AddScoped<IAuthService>(sp =>
     var provider = sp.GetRequiredService<AuthenticationStateProvider>();
     return new AuthService(http, js, provider);
 });
+// HttpClient is injected by default when you simply request "HttpClient".
 
 builder.Services.AddScoped(sp =>
-{
-    var factory = sp.GetRequiredService<IHttpClientFactory>();
-    return factory.CreateClient("ApiWithAuth");
-});
+    sp.GetRequiredService<IHttpClientFactory>().CreateClient("ApiWithAuth"));
+
 // =============================
 // Application services
 // =============================
+builder.Services.AddScoped<AntennaService>();
 builder.Services.AddScoped<AntennaCrowdService>();
+builder.Services.AddScoped<ICrowdInfoAntennaService, CrowdInfoAntennaService>();
 builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService>();
 builder.Services.AddScoped<CrowdInfoService>();
 builder.Services.AddScoped<EventService>();
@@ -149,6 +151,7 @@ builder.Services.AddScoped<IMultiHubSignalRClient>(sp =>
 });
 builder.Services.AddScoped<IHubUrlBuilder, HubUrlBuilder>();
 builder.Services.AddScoped<IOutZenSignalRFactory, OutZenSignalRFactory>();
+builder.Services.AddScoped<OutZenMapInterop>();
 builder.Services.AddScoped<MessageService>();
 builder.Services.AddScoped<PlaceService>();
 builder.Services.AddScoped<SuggestionService>();
@@ -178,6 +181,8 @@ builder.Services.AddScoped(sp =>
     Func<Task<string?>> tokenProvider = async () => await auth.GetAccessTokenAsync();
     return new MultiHubSignalRClient(hubBaseUrl, tokenProvider);
 });
+
+Console.WriteLine("✅ PROGRAM CLIENT V5 - AntennaService REGISTERED");
 
 // =============================
 // Run

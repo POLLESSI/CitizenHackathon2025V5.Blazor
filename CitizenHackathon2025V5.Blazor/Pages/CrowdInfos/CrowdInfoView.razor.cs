@@ -1,6 +1,7 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using CitizenHackathon2025V5.Blazor.Client.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Utils;
 using Microsoft.AspNetCore.Components;
@@ -8,6 +9,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using System.Collections.Concurrent;
 using System.Text.Json;
+//CrowdInfoView: scopeKey = "crowd"(or event:{ id})
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 {
@@ -27,20 +29,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
         // === Data ===
         public List<ClientCrowdInfoDTO> CrowdInfos { get; set; } = new();
-        private List<ClientCrowdInfoDTO> allCrowdInfos = new();
         private List<ClientCrowdInfoDTO> visibleCrowdInfos = new();
+        private List<ClientCrowdInfoDTO> allCrowdInfos = new();
+        private CancellationTokenSource _cts = new();
+        private IJSObjectReference _leafletModule;
         private IJSObjectReference _outzen;
-        private int currentIndex = 0;
-        private const int PageSize = 25;
         private const int MaxBootRetries = 25;
+        private const int PageSize = 25;
+        private int currentIndex = 0;
 
         // === UI & Scroll ===
         private ElementReference ScrollContainerRef;
         private ElementReference TableScrollRef;
         private string _q = string.Empty;
         private bool _onlyRecent;
+        private bool _disposed;
         private bool _booted;
-
+        
         // === Earth canvas ids (if used elsewhere) ===
         private readonly string _speedId = $"speedRange-{Guid.NewGuid():N}";
         private readonly Dictionary<int, int> _lastLevels = new();
@@ -95,6 +100,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
             {
                 Console.Error.WriteLine($"❌ Init error: {ex.Message}");
             }
+            if (_disposed) return;
         }
 
         private void RegisterHubHandlers()
@@ -145,6 +151,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
                 await InvokeAsync(StateHasChanged);
             });
+            if (_disposed) return;
         }
         private void UpsertLocal(ClientCrowdInfoDTO dto)
         {
@@ -158,6 +165,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
             var j = visibleCrowdInfos.FindIndex(c => c.Id == dto.Id);
             if (j >= 0) visibleCrowdInfos[j] = dto;
+            if (_disposed) return;
         }
 
         private bool _mapInitStarted = false;
@@ -228,6 +236,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
             _initialDataApplied = true;
             _booted = true;
+            if (_disposed) return;
         }
 
         private async Task SyncMapMarkersAsync(bool fit = true)
@@ -260,12 +269,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
             {
                 Console.Error.WriteLine($"❌ JSInterop failed: {jsex.Message}");
             }
+            if (_disposed) return;
         }
         private void LoadMoreItems()
         {
             var next = allCrowdInfos.Skip(currentIndex).Take(PageSize).ToList();
             visibleCrowdInfos.AddRange(next);
             currentIndex += next.Count;
+            if (_disposed) return;
         }
 
         private IEnumerable<ClientCrowdInfoDTO> FilterCrowd(IEnumerable<ClientCrowdInfoDTO> source)
@@ -280,6 +291,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
                     x.Latitude.ToString().Contains(q, StringComparison.OrdinalIgnoreCase) ||
                     x.Longitude.ToString().Contains(q, StringComparison.OrdinalIgnoreCase))
                 .Where(x => !_onlyRecent || x.Timestamp >= cutoff);
+            //if (_disposed) return;
         }
 
         private async Task HandleScroll()
@@ -294,23 +306,25 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
                 await SyncMapMarkersAsync(fit: false);
                 StateHasChanged();
             }
+            if (_disposed) return;
         }
 
         private void ToggleRecent()
         {
             _onlyRecent = !_onlyRecent;
             _ = SyncMapMarkersAsync(fit: true);
+            if (_disposed) return;
         }
 
         private string Q
         {
             get => _q;
             set { _q = value; _ = SyncMapMarkersAsync(fit: true); }
+
         }
 
         private static string InfoDesc(ClientCrowdInfoDTO co)
-            => CrowdInfoSeverityHelpers.GetDescription(
-                CrowdInfoSeverityHelpers.GetSeverity(co));
+            => CrowdInfoSeverityHelpers.GetDescription(CrowdInfoSeverityHelpers.GetSeverity(co));
 
         private static string GetLevelCss(int level)
         {
@@ -320,8 +334,29 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
         private void ClickInfo(int id) => SelectedId = id;
 
+        private async Task<IJSObjectReference> GetLeafletModuleAsync()
+        {
+            _leafletModule ??= await JS.InvokeAsync<IJSObjectReference>(
+                "import", "./js/app/leafletOutZen.module.js");
+            return _leafletModule;
+            //if (_disposed) return;
+        }
+
+        public async Task ClearCalendarAsync()
+        {
+            var mod = await GetLeafletModuleAsync();
+            await mod.InvokeVoidAsync("clearCrowdCalendarMarkers");
+            if (_disposed) return;
+        }
+
         public async ValueTask DisposeAsync()
         {
+            _disposed = true;
+            try { _cts.Cancel(); } catch { }
+
+            // stop hubs/timers here (IMPORTANT)
+            // await hub.StopAsync(); await hub.DisposeAsync(); etc.
+
             try
             {
                 if (_outzen is not null)
@@ -332,13 +367,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
             }
             catch { }
 
-            if (hubConnection is not null)
-            {
-                try { await hubConnection.StopAsync(); } catch { }
-                try { await hubConnection.DisposeAsync(); } catch { }
-            }
+            _cts.Dispose();
         }
-
     }
 }
 

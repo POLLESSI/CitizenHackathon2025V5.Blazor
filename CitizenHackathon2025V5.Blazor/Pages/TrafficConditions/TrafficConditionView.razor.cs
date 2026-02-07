@@ -2,9 +2,11 @@
 using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
+//TrafficConditionView: scopeKey = "traffic", mapId = "outzenMap_traffic"
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 {
@@ -24,7 +26,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         private const string ApiBase = "https://localhost:7254";
 
         // ID unique pour la carte TrafficCondition
-        private const string MapId = "trafficMap";
+        private const string MapId = "outzenMap_traffic"; /*"trafficMap"*/
 
         private IJSObjectReference _outZen;
 
@@ -99,14 +101,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                     // 3) Map: If ready, resync markers
                     if (_booted && _outZen is not null)
                     {
-                        // Cleanse and reseed
-                        try { await _outZen.InvokeVoidAsync("clearCrowdMarkers"); } catch { }
+                        try { await _outZen.InvokeVoidAsync("clearCrowdMarkers", "traffic"); } catch { }
 
                         foreach (var tc in TrafficConditions)
                             await AddOrUpdateTrafficMarkerAsync(tc, fit: false);
 
-                        try { await _outZen.InvokeVoidAsync("refreshMapSize"); } catch { }
-                        try { await _outZen.InvokeVoidAsync("fitToMarkers"); } catch { }
+                        try { await _outZen.InvokeVoidAsync("refreshMapSize", "traffic"); } catch { }
+                        try { await _outZen.InvokeVoidAsync("fitToMarkers", "traffic"); } catch { }
                     }
 
                     await InvokeAsync(StateHasChanged);
@@ -127,8 +128,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 
                     if (_booted && _outZen is not null)
                     {
-                        try { await _outZen.InvokeVoidAsync("removeCrowdMarker", id.ToString()); } catch { }
-                        try { await _outZen.InvokeVoidAsync("fitToMarkers"); } catch { }
+                        try { await _outZen.InvokeVoidAsync("removeCrowdMarker", $"tr:{id}", "traffic"); } catch { }
+                        try { await _outZen.InvokeVoidAsync("fitToMarkers", "traffic"); } catch { }
                     }
 
                     await InvokeAsync(StateHasChanged);
@@ -195,7 +196,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                        + (string.IsNullOrWhiteSpace(dto.IncidentType) ? "" : $" • {dto.IncidentType}")
                        + (string.IsNullOrWhiteSpace(dto.Message) ? "" : $" • {dto.Message}")
                        + $" • {dto.DateCondition:yyyy-MM-dd HH:mm}";
-
+            
             await _outZen.InvokeVoidAsync(
                 "addOrUpdateCrowdMarker",
                 $"tr:{dto.Id}",
@@ -206,13 +207,19 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                 {
                     title = dto.IncidentType ?? "Traffic",
                     description = desc,
-                    isTraffic = true
-                    // icon = "🚦"
-                });
-
+                    isTraffic = true,
+                    icon = "⚠️"
+                },
+                "traffic"
+            );
             if (fit)
             {
-                try { await _outZen.InvokeVoidAsync("fitToMarkers"); } catch { }
+                try { 
+                    await _outZen.InvokeVoidAsync("refreshMapSize", "traffic");
+                    await Task.Delay(50);
+                    await _outZen.InvokeVoidAsync("refreshMapSize", "traffic");
+                } catch { }
+                try { await _outZen.InvokeVoidAsync("fitToMarkers", "traffic"); } catch { }
             }
         }
 
@@ -228,86 +235,58 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            // 1) Boot the map at the first render
-            if (firstRender && !_booted)
+            // boot initial
+            if (firstRender)
             {
-                // 0) Wait until the container with the correct ID is present in the DOM
-                for (var i = 0; i < 10; i++)
+                var exists = await JS.InvokeAsync<bool>("eval", $"!!document.getElementById('{MapId}')");
+                if (!exists) return;
+
+                _outZen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
+
+                var ok = await _outZen.InvokeAsync<bool>("bootOutZen", new
                 {
-                    var ok = await JS.InvokeAsync<bool>("checkElementExists", MapId);
-                    if (ok) break;
+                    mapId = MapId,
+                    scopeKey = "traffic",
+                    zoom = 8,
+                    enableChart = false,
+                    force = true,
+                    resetMarkers = true,
+                    enableHybrid = false
+                });
 
-                    await Task.Delay(150);
-
-                    if (i == 9)
-                    {
-                        Console.WriteLine($"❌ [TrafficConditionView] Map container not found ({MapId}).");
-                        return;
-                    }
-                }
-
-                // 1) Importing the LeafletOutZen ESM module
-                _outZen = await JS.InvokeAsync<IJSObjectReference>(
-                    "import",
-                    "/js/app/leafletOutZen.module.js");
-
-                var booted = await _outZen.InvokeAsync<bool>(
-                    "bootOutZen",
-                    new
-                    {
-                        mapId = MapId,
-                        center = new[] { 50.89, 4.34 },
-                        zoom = 13,
-                        enableChart = false,
-                        force = true
-                    });
-
-                if (!booted)
-                {
-                    Console.WriteLine("❌ [TrafficConditionView] OutZen boot failed.");
-                    return;
-                }
+                Console.WriteLine($"[TrafficConditionView] bootOutZen traffic ok={ok}");
+                if (!ok) return;
 
                 _booted = true;
-                Console.WriteLine("[TrafficConditionView] OutZen boot OK.");
             }
 
-            // 2) Marker seeds: as soon as the map boots and data is available, only once.
+            // ✅ IMPORTANT: On EACH render, if booted, the size is invalidated (debounced on the JS side).
+            if (_booted && _outZen is not null)
+            {
+                try { await _outZen.InvokeVoidAsync("refreshMapSize", "traffic"); } catch { }
+            }
+
+            // seed markers only once
             if (_booted && !_markersSeeded && TrafficConditions.Count > 0 && _outZen is not null)
             {
-                Console.WriteLine($"[TrafficConditionView] Seeding {TrafficConditions.Count} traffic markers…");
+                foreach (var tc in TrafficConditions)
+                    await AddOrUpdateTrafficMarkerAsync(tc, fit: false);
 
-                foreach (var traffic in TrafficConditions)
-                {
-                    await AddOrUpdateTrafficMarkerAsync(traffic, fit: false);
-                }
-
-                try { await _outZen.InvokeVoidAsync("refreshMapSize"); } catch { }
-                await Task.Delay(100);
-                try { await _outZen.InvokeVoidAsync("fitToMarkers"); } catch { }
-
-                // 🔍 DEBUG JS
-                try { await _outZen.InvokeVoidAsync("debugDumpMarkers"); } catch { }
-
-                // 3) Replay the updates received via SignalR before booting
-                while (_pendingHubUpdates.TryDequeue(out var dto))
-                {
-                    await AddOrUpdateTrafficMarkerAsync(dto, fit: false);
-                }
-
-                try { await _outZen.InvokeVoidAsync("fitToMarkers"); } catch { }
-
+                try { await _outZen.InvokeVoidAsync("fitToMarkers", "traffic"); } catch { }
                 _markersSeeded = true;
             }
-            if (Interlocked.Exchange(ref _refreshing, 1) == 1) return;
-            try
-            {
-                await HandleScroll();
-            }
-            finally
-            {
-                Interlocked.Exchange(ref _refreshing, 0);
-            }
+        }
+
+        private async Task ReseedTrafficMarkersAsync(bool fit = true)
+        {
+            if (_outZen is null) return;
+            try { await _outZen.InvokeVoidAsync("clearCrowdMarkers", "traffic"); } catch { }
+
+            foreach (var tc in TrafficConditions)
+                await AddOrUpdateTrafficMarkerAsync(tc, fit: false);
+
+            try { await _outZen.InvokeVoidAsync("refreshMapSize", "traffic"); } catch { }
+            if (fit) { try { await _outZen.InvokeVoidAsync("fitToMarkers", "traffic"); } catch { } }
         }
 
         private void ClickInfo(int id)
@@ -337,7 +316,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                 }
             }
         }
-
         private IEnumerable<ClientTrafficConditionDTO> FilterTraffic(IEnumerable<ClientTrafficConditionDTO> source)
             => FilterTrafficCondition(source);
 
@@ -362,14 +340,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             try
             {
                 if (_outZen is not null)
-                {
-                    await _outZen.DisposeAsync();
-                }
+                    await _outZen.InvokeVoidAsync("disposeOutZen", new { mapId = MapId, scopeKey = "traffic" });
             }
-            catch
+            catch { }
+
+            try
             {
-                // ignore
+                if (_outZen is not null)
+                    await _outZen.DisposeAsync();
             }
+            catch { }
 
             if (hubConnection is not null)
             {

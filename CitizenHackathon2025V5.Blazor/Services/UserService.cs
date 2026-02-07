@@ -1,5 +1,6 @@
 using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Auths;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.JSInterop;
 using System.Net;
 using System.Net.Http.Headers;

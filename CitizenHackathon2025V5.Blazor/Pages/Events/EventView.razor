@@ -1,18 +1,18 @@
 ﻿@page "/eventview"
-@* @page "/eventdetail/{DetailId:int}" *@
-@using CitizenHackathon2025.Blazor.DTOs;
+@using CitizenHackathon2025.Blazor.DTOs
 @using CitizenHackathon2025V5.Blazor.Client.Constants
 @using Microsoft.AspNetCore.Components
-@implements IAsyncDisposable
-
+@inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
 
 <span class="fas fa-certificate me-2"></span> Events
 
 <!-- === MAP PANEL === -->
-<div class="map-host" style="margin-top:12px;">
-    <div id="leafletMap" style="height:420px; min-height:300px;"></div>
+<div class="oz-page oz-page--event">
+    <div class="map-host" style="margin-top:12px;">
+        <div id="leafletMap-event" style="height:420px; min-height:300px;"></div>
+        @* <div id="@MapId" style="height: 60vh;"></div> *@
+    </div>
 </div>
-
 <div class="page-list">
     @* <h3>Events List</h3> *@
     <div class="list-toolbar">

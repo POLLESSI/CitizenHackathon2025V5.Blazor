@@ -1,4 +1,5 @@
 using Blazored.Toast.Services;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using CitizenHackathon2025V5.Blazor.Client.SignalR;
 using Microsoft.AspNetCore.Components;

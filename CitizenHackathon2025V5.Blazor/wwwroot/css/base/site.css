@@ -22,7 +22,7 @@ body {
         border-radius: 4px;
     }
     body.night-mode {
-        background-image: url('/images/icons/night.png');
+        background-image: url('/images/night.jpg');
     }
 
 [data-theme="outzen"] body {

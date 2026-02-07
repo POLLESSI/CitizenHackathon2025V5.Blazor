@@ -2,17 +2,20 @@
 using CitizenHackathon2025.Blazor.DTOs.Security;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
+using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.JSInterop;
 using System.Collections.Concurrent;
+//AntennaCrowdPanelView: if no map -> scope useless; if mini-map ->scopeKey="antenna" + dedicated mapId
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
 {
-    public partial class AntennaCrowdPanel : IAsyncDisposable
+    public partial class AntennaCrowdPanel 
     {
-#nullable disable
+    #nullable disable
         // --- Inject ---
         [Inject] public NavigationManager Navigation { get; set; }
         [Inject] public IJSRuntime JS { get; set; }
@@ -72,6 +75,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
         // ----------------------------
         // Lifecycle
         // ----------------------------
+        protected override bool MapEnabled => false;
+
+        // Required (contract), but unused if MapEnabled=false
+        protected override string ScopeKey => "antenna";
+        protected override string MapId => "outzenMap_antenna";
         protected override async Task OnInitializedAsync()
         {
             await LoadAntennasAsync();
@@ -443,16 +451,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
                 var counts = _countsByAntenna.TryGetValue(a.Id, out var c) ? c : null;
                 var level = ComputeLevelByCapacity(a, counts?.ActiveConnections ?? 0);
 
-                await _outzen.InvokeVoidAsync("addOrUpdateAntennaMarker",
-                    $"ant:{a.Id}",
+                var markerId = $"ant:{a.Id}";
+                var title = a.Name ?? $"Antenne {a.Id}";
+                var desc = counts is null
+                    ? "Aucune donnée récente"
+                    : $"{counts.ActiveConnections} connexions • {counts.UniqueDevices} devices";
+
+                await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateAntennaMarker",
+                    markerId,
                     a.Latitude,
                     a.Longitude,
                     level,
-                    new
-                    {
-                        title = string.IsNullOrWhiteSpace(a.Name) ? $"Antenne {a.Id}" : a.Name,
-                        description = $"{counts?.ActiveConnections ?? 0} connexions"
-                    });
+                    new { title, description = desc });
             }
 
             if (fit && _visibleAntennas.Count > 0)
@@ -560,37 +570,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
             _cts?.Cancel();
             _cts?.Dispose();
             _timer?.Dispose();
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            try
-            {
-                _cts?.Cancel();
-                _cts?.Dispose();
-                _timer?.Dispose();
-            }
-            catch { }
-
-            try
-            {
-                if (_outzen is not null)
-                {
-                    try { await _outzen.InvokeVoidAsync("disposeOutZen", new { mapId = "leafletMap" }); } catch { }
-                    await _outzen.DisposeAsync();
-                }
-            }
-            catch { }
-
-            try
-            {
-                if (_hub is not null)
-                {
-                    try { await _hub.StopAsync(); } catch { }
-                    try { await _hub.DisposeAsync(); } catch { }
-                }
-            }
-            catch { }
         }
     }
 }

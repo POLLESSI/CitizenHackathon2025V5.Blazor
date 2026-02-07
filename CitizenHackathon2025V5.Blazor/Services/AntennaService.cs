@@ -9,7 +9,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         public AntennaService(HttpClient http) => _http = http;
 
         public Task<List<ClientCrowdInfoAntennaDTO>?> GetAllAsync(CancellationToken ct = default)
-            => _http.GetFromJsonAsync<List<ClientCrowdInfoAntennaDTO>>("api/crowdinfoantenna", ct);
+            => _http.GetFromJsonAsync<List<ClientCrowdInfoAntennaDTO>>("crowdinfoantenna", ct);
     }
 }
 

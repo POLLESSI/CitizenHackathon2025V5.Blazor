@@ -1,11 +1,17 @@
-﻿namespace CitizenHackathon2025V5.Blazor.Client.Services
+﻿namespace CitizenHackathon2025V5.Blazor.Client.Services.Interfaces
 {
-    public interface IHubTokenService
+    public interface IAuthService
     {
-        Task<string?> GetHubTokenAsync(CancellationToken ct = default);
-        Task<string?> GetHubAccessTokenAsync();
+        Task<string?> GetAccessTokenAsync();
+        Task<string?> GetRefreshTokenAsync();
     }
 }
+
+
+
+
+
+
 
 
 

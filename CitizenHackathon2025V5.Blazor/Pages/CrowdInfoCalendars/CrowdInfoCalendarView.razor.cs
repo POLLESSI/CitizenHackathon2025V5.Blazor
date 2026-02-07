@@ -1,6 +1,8 @@
 ﻿//CrowdInfoCalendarView.razor.cs
 using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using CitizenHackathon2025V5.Blazor.Client.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Utils;
 using Microsoft.AspNetCore.Components;
@@ -8,6 +10,7 @@ using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using System.Collections.Concurrent;
 using static CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService;
+//CrowdInfoCalendarView: scopeKey = "calendar"
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 {
@@ -56,7 +59,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
         protected override async Task OnInitializedAsync()
         {
-            var exists = await JS.InvokeAsync<bool>("checkElementExists", "leafletMap");
+            //var exists = await JS.InvokeAsync<bool>("checkElementExists", "leafletMap");
             try
             {
                 var fetched = (await CrowdInfoCalendarService.GetAllSafeAsync()).ToList();
@@ -69,11 +72,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
                 foreach (var co in fetched)
                     _lastLevels[co.Id] = co.ExpectedLevel.GetValueOrDefault();
 
-                await InvokeAsync(StateHasChanged);
+                //await InvokeAsync(StateHasChanged);
 
                 // Hub SignalR
                 var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? ApiBase;
-                var hubUrl = $"{apiBaseUrl}/hubs/crowdCalendarHub";
+                var hubUrl = $"{apiBaseUrl}/hubs/{CrowdCalendarHubMethods.HubPath}";
 
                 hubConnection = new HubConnectionBuilder()
                     .WithUrl(hubUrl, options =>
@@ -99,7 +102,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
                 Console.Error.WriteLine($"❌ Init error: {ex.Message}");
             }
-            await LoadAll();
+            await InvokeAsync(StateHasChanged);
         }
         private void RegisterHubHandlers()
         {
@@ -130,7 +133,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
                 await _outzen.InvokeVoidAsync("addOrUpdateCrowdCalendarMarker",
                     $"cc:{dto.Id}", dto.Latitude, dto.Longitude, lvl,
-                    new { title = dto.EventName, description = $"Maj {dto.DateUtc:HH:mm:ss}", icon = "📅" });
+                    new { title = dto.EventName, description = $"Maj {dto.DateUtc:HH:mm:ss}", icon = "🥁🎉" });
 
                 await InvokeAsync(StateHasChanged);
             });
@@ -143,7 +146,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
                 if (_booted && _outzen is not null)
                 {
-                    await _outzen.InvokeVoidAsync("removeCrowdMarker", id.ToString());
+                    await _outzen.InvokeVoidAsync("removeCrowdCalendarMarker", $"cc:{id}");
                     await SyncMapMarkersAsync(fit: false);
                 }
 
@@ -191,6 +194,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
             if (!ok) { Console.WriteLine("❌ bootOutZen failed"); return; }
 
+            try { await _outzen.InvokeVoidAsync("enableHybridZoom", false, 13); } catch { }
             // Readiness check (no custom isOutZenReady required)
             string? current = null;
             for (var i = 0; i < 20; i++)
@@ -203,6 +207,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
             try { await _outzen.InvokeVoidAsync("refreshMapSize"); } catch { }
 
+            if (!VisibleCrowdInfoCalendars.Any())
+            {
+                Console.WriteLine("[CrowdInfoCalendarView] Visible is empty, rebuilding from all...");
+                VisibleCrowdInfoCalendars.Clear();
+                currentIndex = 0;
+                LoadMoreItems();
+            }
             // Seed from current visible data
             await SyncMapMarkersAsync(fit: true);
 
@@ -214,12 +225,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
                 int lvlInt = Math.Clamp(dto.ExpectedLevel.GetValueOrDefault(), 1, SharedConstants.MaxCrowdLevel);
                 byte lvlByte = (byte)lvlInt;
-                await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
-                    $"cr:{dto.Id}", dto.Latitude, dto.Longitude, lvlInt,
-                    new { title = dto.EventName, description = $"Maj {dto.DateUtc:HH:mm:ss}", icon = "👥" });
+                await _outzen.InvokeVoidAsync("addOrUpdateCrowdCalendarMarker",
+                    $"cc:{dto.Id}", dto.Latitude, dto.Longitude, lvlInt,
+                    new { title = dto.EventName, description = $"Maj {dto.DateUtc:HH:mm:ss}", icon = "🥁🎉" });
             }
 
-            try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
+            try { await _outzen.InvokeVoidAsync("fitToCalendarMarkers"); } catch { }
 
             _initialDataApplied = true;
             _booted = true;
@@ -231,26 +242,30 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             try
             {
                 var items = FilterCrowdCalendar(VisibleCrowdInfoCalendars).ToList();
-                Console.WriteLine($"[CrowdInfoView] SyncMapMarkersAsync: {items.Count} markers.");
+                Console.WriteLine($"[CrowdInfoCalendarView] SyncMapMarkersAsync: {items.Count} markers.");
 
+                Console.WriteLine("[Calendar] calling clearCrowdCalendarMarkers");
                 await _outzen.InvokeVoidAsync("clearCrowdCalendarMarkers");
 
                 foreach (var co in items)
                 {
-                    var lvl = Math.Clamp(co.ExpectedLevel.GetValueOrDefault(), 1, SharedConstants.MaxCrowdLevel);
-                    await _outzen.InvokeVoidAsync("addOrUpdateCrowdCalendarMarker",
-                        $"cr:{co.Id}", co.Latitude, co.Longitude, lvl,
-                        new { title = co.EventName, description = $"Maj {co.DateUtc:HH:mm:ss}", icon = "👥" });
-                    Console.WriteLine($"[CrowdInfoView] Marker: {co.Id} -> {co.Latitude},{co.Longitude}");
-
                     if (!double.IsFinite(co.Latitude) || !double.IsFinite(co.Longitude)) continue;
                     if (co.Latitude == 0 && co.Longitude == 0) continue;
+
+                    var lvl = Math.Clamp(co.ExpectedLevel.GetValueOrDefault(), 1, SharedConstants.MaxCrowdLevel);
+
+                    await _outzen.InvokeVoidAsync("addOrUpdateCrowdCalendarMarker",
+                        $"cc:{co.Id}", co.Latitude, co.Longitude, lvl,
+                        new { title = co.EventName, description = $"Maj {co.DateUtc:HH:mm:ss}", icon = "🥁🎉" });
+
+                    Console.WriteLine($"[CrowdInfoCalendarView] Marker: {co.Id} -> {co.Latitude},{co.Longitude}");
                 }
 
                 if (fit && items.Any())
                 {
-                    try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
+                    try { await _outzen.InvokeVoidAsync("fitToCalendarMarkers"); } catch { }
                 }
+                Console.WriteLine($"[Calendar] after filter -> {items.Count} (onlyRecent={_onlyRecent}, q='{_q}')");
             }
             catch (JSException jsex)
             {
@@ -284,6 +299,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             var next = allCrowdInfoCalendars.Skip(currentIndex).Take(PageSize).ToList();
             VisibleCrowdInfoCalendars.AddRange(next);
             currentIndex += next.Count;
+            Console.WriteLine($"[Calendar] LoadMoreItems -> added {next.Count}, visible={VisibleCrowdInfoCalendars.Count}, all={allCrowdInfoCalendars.Count}");
         }
 
         private IEnumerable<ClientCrowdInfoCalendarDTO> FilterCrowdCalendar(IEnumerable<ClientCrowdInfoCalendarDTO> source)
@@ -291,6 +307,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             var q = _q?.Trim();
             var cutoff = DateTime.UtcNow.AddHours(-6);
 
+            Console.WriteLine($"[Filter] q='{_q}', onlyRecent={_onlyRecent}, totalVisible={source.Count()}");
             return source
                 .Where(x =>
                     string.IsNullOrEmpty(q) ||

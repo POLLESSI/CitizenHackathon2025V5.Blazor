@@ -1,11 +1,13 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using System.Collections.Concurrent;
 using System.Reflection;
+//PlaceView: scopeKey = $"place:{PlaceId}", mapId = $"outzenMap_place_{PlaceId}"
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 {
@@ -24,10 +26,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
         private const string ApiBase = "https://localhost:7254";
 
-        private IJSObjectReference _outzen;
+        //private IJSObjectReference _outzen;
         private bool _booted;
         private bool _mapBooted;
         private bool _initialDataApplied;
+        private bool _interopReady;
 
         public HubConnection hubConnection { get; set; }
 
@@ -37,6 +40,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         private List<ClientPlaceDTO> visiblePlaces = new();
         private int currentIndex = 0;
         private const int PageSize = 20;
+        private const string ScopeKey = "places"; // Stable scope for this page
         private bool _dataLoaded;
 
         // UI state
@@ -134,7 +138,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
                 UpsertLocal(client);
 
-                if (!_booted || _outzen is null)
+                if (!_booted)
                 {
                     _pendingHubUpdates.Enqueue(client);
                     await InvokeAsync(StateHasChanged);
@@ -163,61 +167,55 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (_mapBooted || !_dataLoaded) return;
-           
             _mapBooted = true;
 
-            // 0) Wait container exists + small delay for layout
-            for (var i = 0; i < 10; i++)
+            await EnsureOutZenAsync();
+
+            // (0) security measures are in place (if you return to the page).
+            await JS.InvokeVoidAsync("OutZenInterop.disposeOutZen", new { mapId = "placeMap", scopeKey = ScopeKey });
+
+            // (1) wait container exists
+            for (var i = 0; i < 20; i++)
             {
                 var ok = await JS.InvokeAsync<bool>("checkElementExists", "placeMap");
                 if (ok) break;
-                await Task.Delay(150);
-                if (i == 9)
-                {
-                    Console.WriteLine("❌ [PlaceView] Map container not found (placeMap).");
-                    return;
-                }
+                await Task.Delay(50);
+                if (i == 19) return;
             }
-            await Task.Delay(50);
 
-            // 1) Import ESM
-            _outzen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
-
-            // 2) Boot map ONCE (no force)
-            var booted = await _outzen.InvokeAsync<bool>("bootOutZen", new
+            // (2) boot
+            var booted = await JS.InvokeAsync<bool>("OutZenInterop.bootOutZen", new
             {
                 mapId = "placeMap",
+                scopeKey = ScopeKey,
                 center = new[] { 50.89, 4.34 },
                 zoom = 13,
-                force = true // pendant debug
+                force = true
             });
 
             if (!booted) { _mapBooted = false; return; }
 
-            // 3) Add markers (no fit while adding)
+            // (3) add markers
             foreach (var place in Places)
                 await AddOrUpdatePlaceMarkerAsync(place, fit: false);
 
             while (_pendingHubUpdates.TryDequeue(out var dto))
                 await AddOrUpdatePlaceMarkerAsync(dto, fit: false);
 
-            // 4) One resize + one fit at the end
-            try { await _outzen.InvokeVoidAsync("refreshMapSize"); } catch { }
-            try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
+            // (4) resize + fit
+            await JS.InvokeAsync<bool>("OutZenInterop.refreshMapSize", ScopeKey); // if you expose refreshMapSize in OutZenInterop
+            await JS.InvokeAsync<bool>("OutZenInterop.fitToMarkers", ScopeKey);   // idem
 
             _initialDataApplied = true;
             _booted = true;
         }
 
+
         private async Task AddOrUpdatePlaceMarkerAsync(ClientPlaceDTO dto, bool fit = false)
         {
-            if (_outzen is null)
-                return;
-
             if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude))
                 return;
 
-            // We derive a simple "level" from the capacity (pure visual convention)
             var level =
                 dto.Capacity >= 3500 ? 1 :
                 dto.Capacity >= 1500 ? 2 :
@@ -228,63 +226,53 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
                        + $" • Cap: {dto.Capacity}"
                        + (string.IsNullOrWhiteSpace(dto.Tag) ? "" : $" • Tag: {dto.Tag}");
 
-            await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
-                $"pl:{dto.Id}", dto.Latitude, dto.Longitude,
+            await EnsureOutZenAsync();
+
+            await JS.InvokeAsync<bool>(
+                "OutZenInterop.addOrUpdateCrowdMarker",
+                $"pl:{dto.Id}",
+                dto.Latitude,
+                dto.Longitude,
                 level,
-                new { title = dto.Name, description = desc, icon = "📍" });
+                new { title = dto.Name, description = desc, icon = "🏰" },
+                ScopeKey
+            );
 
             if (fit)
             {
-                try { await _outzen.InvokeVoidAsync("fitToMarkers"); }
-                catch (JSException ex)
-                {
-                    Console.Error.WriteLine($"[PlaceView] fitToMarkers error: {ex.Message}");
-                }
+                await JS.InvokeAsync<bool>("OutZenInterop.fitToMarkers", ScopeKey);
             }
 
             Console.WriteLine($"[PlaceView] Send place marker #{dto.Id}: {dto.Latitude},{dto.Longitude}");
         }
-
-
         private async Task SyncMapMarkersAsync(bool fit = true)
         {
-            if (_outzen is null)
-                return;
             Console.WriteLine($"[PlaceView] SyncMapMarkersAsync: visiblePlaces={visiblePlaces.Count}, allPlaces={allPlaces.Count}");
 
             try
             {
-                await _outzen.InvokeVoidAsync("clearCrowdMarkers");
-
+                await EnsureOutZenAsync();
+                await JS.InvokeAsync<bool>("OutZenInterop.clearCrowdMarkers", ScopeKey); // ⚠️ Wrapper needs to be exposed too
                 foreach (var pl in FilterPlace(visiblePlaces))
-                {
                     await AddOrUpdatePlaceMarkerAsync(pl, fit: false);
-                }
 
                 if (visiblePlaces.Any() && fit)
                 {
-                    await _outzen.InvokeVoidAsync("refreshMapSize");
-                    await _outzen.InvokeVoidAsync("fitToMarkers");
-                    await Task.Delay(150);
-                    await _outzen.InvokeVoidAsync("fitToMarkers");
+                    await JS.InvokeAsync<bool>("OutZenInterop.refreshMapSize", ScopeKey);
+                    await JS.InvokeAsync<bool>("OutZenInterop.fitToMarkers", ScopeKey);
                 }
             }
             catch (JSException jsex)
             {
                 Console.Error.WriteLine($"❌ [PlaceView] JSInterop failed in SyncMapMarkersAsync: {jsex.Message}");
             }
-            //var snapshot = FilterPlace(allPlaces).ToList();
-            //foreach (var pl in snapshot)
-            //{
-            //    await AddOrUpdatePlaceMarkerAsync(pl, fit: false);
-            //}
-
-            if (fit)
-            {
-                try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
-            }
         }
-
+        private async Task EnsureOutZenAsync()
+        {
+            if (_interopReady) return;
+            await JS.InvokeVoidAsync("OutZen.ensure"); // load the module via outzen-interop.js
+            _interopReady = true;
+        }
         private async Task DebouncedHighlightAsync()
         {
             if (!_dataLoaded) return;
@@ -349,7 +337,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
             {
                 await Task.Delay(200, ct); // debounce
                 await HighlightBestMatchAsync(ct);
-                await InvokeAsync(StateHasChanged); // si tu veux MAJ le badge “_q”
+                await InvokeAsync(StateHasChanged); // if you want to update the “_q” badge
             }
             catch (TaskCanceledException) { }
         }
@@ -365,8 +353,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
                 BestMatchId = null;
                 await InvokeAsync(StateHasChanged);
 
-                if (_outzen is not null)
-                    await _outzen.InvokeVoidAsync("clearPlaceHighlight");
+                await JS.InvokeVoidAsync("clearPlaceHighlight");
 
                 return;
             }
@@ -388,8 +375,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
                 BestMatchId = null;
                 await InvokeAsync(StateHasChanged);
 
-                if (_outzen is not null)
-                    await _outzen.InvokeVoidAsync("clearPlaceHighlight");
+                
+                await JS.InvokeVoidAsync("clearPlaceHighlight");
 
                 return;
             }
@@ -399,15 +386,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
             await InvokeAsync(StateHasChanged);
 
             // ✅ highlight marker (if map ready)
-            if (_outzen is not null)
+            await JS.InvokeAsync<bool>("OutZenInterop.highlightPlaceMarker", best.Id, new
             {
-                await _outzen.InvokeAsync<bool>("highlightPlaceMarker", best.Id, new
-                {
-                    openPopup = true,
-                    panTo = true,
-                    dimOthers = false
-                });
-            }
+                openPopup = true,
+                panTo = true,
+                dimOthers = false
+            }, ScopeKey);
         }
 
         private static int ScoreMatch(string q, params string[] fields)
@@ -444,22 +428,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
         public async ValueTask DisposeAsync()
         {
-            if (_outzen is null)
-                return;
+            //if (_outzen is null)
+            //    return;
 
             try
             {
-                await _outzen.InvokeVoidAsync("disposeOutZen", new { mapId = "placeMap" });
+                await EnsureOutZenAsync();
+                await JS.InvokeVoidAsync("OutZenInterop.disposeOutZen", new { mapId = "placeMap", scopeKey = ScopeKey });
             }
             catch { }
 
-            try
-            {
-                await _outzen.DisposeAsync();
-            }
-            catch { }
-
-            _outzen = null;
+            try { if (hubConnection is not null) await hubConnection.DisposeAsync(); } catch { }
 
             // Bonus: Stop Hub properly
             try { if (hubConnection is not null) await hubConnection.DisposeAsync(); } catch { }

@@ -1,8 +1,9 @@
 ﻿@page "/antennacrowdpanel"
 @using CitizenHackathon2025.Blazor.DTOs
 @using CitizenHackathon2025.Blazor.DTOs.Security
+@inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
 
-<h3>Antenna Crowd Panel</h3>
+<h1>Antenna Crowd Panel</h1>
 
 <div class="antennaCrowd-page">
     <div class="map-host" id="leafletMap" style="height:480px; min-height:480px;"></div>
@@ -25,21 +26,21 @@
 
     <div class="oz-card">
         <div class="oz-card-header">
-            <div class="oz-title">Antenne la plus proche (via Event)</div>
-            <div class="oz-subtitle">Fenêtre : @WindowMinutes min — Rayon : @MaxRadiusMeters m</div>
+            <div class="oz-title">Nearest antenna</div>
+            <div class="oz-subtitle">Window: @WindowMinutes min — Radius: @MaxRadiusMeters m</div>
         </div>
 
         @if (SelectedEventId is null)
         {
-            <div class="oz-muted">Sélectionne un événement pour afficher l’antenne la plus proche et l’affluence.</div>
+            <div class="oz-muted">Select an event to display the nearest antenna and the crowd size.</div>
         }
         else if (_loading)
         {
-            <div class="oz-muted">Chargement…</div>
+            <div class="oz-muted">Loading…</div>
         }
         else if (_eventCrowd is null)
         {
-            <div class="oz-warn">Aucune antenne trouvée dans le rayon (@MaxRadiusMeters m).</div>
+            <div class="oz-warn">No antennas found within range (@MaxRadiusMeters m).</div>
         }
         else
         {
@@ -66,7 +67,7 @@
             </div>
 
             <div class="oz-muted">
-                Fenêtre UTC : @_eventCrowd.Counts.WindowStartUtc.ToString("u") → @_eventCrowd.Counts.WindowEndUtc.ToString("u")
+                UTC window : @_eventCrowd.Counts.WindowStartUtc.ToString("u") → @_eventCrowd.Counts.WindowEndUtc.ToString("u")
             </div>
         }
     </div>

@@ -1,4 +1,6 @@
-﻿namespace CitizenHackathon2025V5.Blazor.Client.Services
+﻿using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
+
+namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
     public sealed class HubUrlBuilder : IHubUrlBuilder
     {

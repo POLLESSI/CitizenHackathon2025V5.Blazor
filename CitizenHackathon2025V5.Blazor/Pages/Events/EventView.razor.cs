@@ -1,16 +1,19 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.Pages.OutZens;
+using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Services;
-using Microsoft.AspNetCore.Http.Connections;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using System.Collections.Concurrent;
+//EventView: scopeKey = $"event:{EventId}", mapId = $"outzenMap_event_{EventId}"
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
 {
-    public partial class EventView : IAsyncDisposable
+    public partial class EventView 
     {
     #nullable disable
         [Inject] public HttpClient Client { get; set; }
@@ -23,6 +26,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
         [Inject] public IAuthService Auth { get; set; }
         [Inject] public IHubUrlBuilder HubUrls { get; set; }
         [Parameter, SupplyParameterFromQuery(Name = "detailId")]
+        public int EventId { get; set; }
         public int? DetailId { get; set; }
 
         private IJSObjectReference _outzen;
@@ -49,6 +53,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
         private bool _initialDataApplied;
 
         private readonly ConcurrentQueue<ClientEventDTO> _pendingHubUpdates = new();
+        protected override string ScopeKey => $"event:{EventId}";
+        protected override string MapId => $"outzenMap_event_{EventId}";
+
+        protected override int DefaultZoom => 13;
+
+        protected override async Task OnMapReadyAsync()
+        {
+            // var payload = await BuildEventPayloadAsync(EventId);
+            // await MapInterop.UpsertBundlesAsync(payload, 80, ScopeKey);
+            // await MapInterop.FitToBundlesAsync(ScopeKey);
+        }
         protected override async Task OnInitializedAsync()
         {
             // 1) Initial REST
@@ -174,7 +189,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
 
                 await _outzen.InvokeVoidAsync("bootOutZen", new
                 {
-                    mapId = "leafletMap",
+                    mapId = "leafletMap",   /*$"outzenMap_event_{EventId}"*/
                     center = new[] { 50.89, 4.34 },
                     zoom = 13,
                     enableChart = false,

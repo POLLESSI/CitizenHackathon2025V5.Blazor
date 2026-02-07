@@ -1,6 +1,6 @@
 using CitizenHackathon2025.Blazor.DTOs;
 
-namespace CitizenHackathon2025V5.Blazor.Client.Services
+namespace CitizenHackathon2025V5.Blazor.Client.Services.Interfaces
 {
     public interface ISignalRService
     {

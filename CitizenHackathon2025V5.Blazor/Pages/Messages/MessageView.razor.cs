@@ -4,6 +4,7 @@ using CitizenHackathon2025.Contracts.Hubs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Messages
 {

@@ -2,11 +2,13 @@
 using CitizenHackathon2025.Contracts.DTOs;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using CitizenHackathon2025V5.Blazor.Client.Utils.OutZen;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.JSInterop;
+//WeatherForecastView: scopeKey = "weather", mapId = "outzenMap_weather"
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 {
@@ -24,7 +26,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         [Inject] public IHubUrlBuilder HubUrls { get; set; }
 
         private const string ApiBase = "https://localhost:7254";
-        private const string _mapId = $"leafletMap-weatherforecastview";
+        private const string _mapId = $"outzenMap_weather"; /*"leafletMap-weatherforecastview"*/
 
         private IJSObjectReference _outZen;
 
@@ -50,7 +52,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         private string _q;
         private bool _onlyRecent;
 
-        // optional (si tu l'utilises dans ton .razor)
+        // optional (if you use it in your .razor file)
         private string _speedId = $"speedRange-{Guid.NewGuid():N}";
 
         protected override async Task OnInitializedAsync()
@@ -154,21 +156,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            //if (!firstRender) return;
             if (!_dataLoaded) return;
             if (_mapBooted) return;
 
-            var exists = await JS.InvokeAsync<bool>("OutZenInterop.elementExists", _mapId);
-            if (!exists) return;
+            const string scopeKey = "weather";
 
-            _mapBooted = true;
-            //_lastFirstRender = firstRender;
+            // Import module first (ESM)
+            _outZen ??= await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
 
-            _outZen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
+            // Check container via export module
+            var exists = await _outZen.InvokeAsync<bool>("elementExists", _mapId);
+            if (!exists)
+            {
+                Console.WriteLine($"[WF] map container not found: {_mapId}");
+                return;
+            }
 
             var ok = await _outZen.InvokeAsync<bool>("bootOutZen", new
             {
                 mapId = _mapId,
+                scopeKey,
                 center = new[] { 50.5, 4.7 },
                 zoom = 13,
                 enableChart = true,
@@ -177,46 +184,41 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
                 resetMarkers = true
             });
 
-            //Console.WriteLine($"[WF] bootOutZen ok={ok} mapId={_mapId}");
-            if (!ok) { _mapBooted = false; return; }
+            Console.WriteLine($"[WF] bootOutZen ok={ok} mapId={_mapId} scope={scopeKey}");
+            if (!ok) return;
 
-            Console.WriteLine($"[WF] bootOutZen ok={ok} mapId={_mapId}");
+            _mapBooted = true;
 
-            // important if the container becomes visible after render/layout
-            await _outZen.InvokeVoidAsync("refreshMapSize");
+            // refresh size
+            await _outZen.InvokeVoidAsync("refreshMapSize", scopeKey);
             await Task.Delay(200);
-            await _outZen.InvokeVoidAsync("refreshMapSize");
-            await Task.Delay(600);
-            await _outZen.InvokeVoidAsync("refreshMapSize");
+            await _outZen.InvokeVoidAsync("refreshMapSize", scopeKey);
 
-            // DEBUG: force a visible marker in Brussels
+            // debug marker
             await _outZen.InvokeVoidAsync("addOrUpdateCrowdMarker",
                 "wf:__debug",
                 50.8503, 4.3517,
                 2,
-                new { title = "DEBUG", description = "Marker test", weatherType = "Clear" });
+                new { title = "DEBUG", description = "Marker test", weatherType = "Clear" },
+                scopeKey);
 
-            //_mapBooted = true;
-
-            // 2) Initial marker synchronization only once
             if (_initialMarkersSynced) return;
-
             _initialMarkersSynced = true;
 
             foreach (var dto in allWeatherForecasts)
-                await AddWeatherMarkerAsync(dto);
+                await AddWeatherMarkerAsync(dto); // adapts AddWeatherMarkerAsync to pass scopeKey
 
             foreach (var dto in _pendingMapUpdates)
                 await AddWeatherMarkerAsync(dto);
 
             _pendingMapUpdates.Clear();
 
-            await _outZen.InvokeVoidAsync("fitToMarkers");
-            await _outZen.InvokeVoidAsync("debugDumpMarkers");
+            await _outZen.InvokeVoidAsync("fitToMarkers", scopeKey);
+            await _outZen.InvokeVoidAsync("debugDumpMarkers", scopeKey);
 
-            // chart init
             await UpdateChartAsync();
         }
+
 
         /// <summary>
         /// Adds or updates a marker for a forecast.
@@ -259,9 +261,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
                     description = $"Temp: {dto.TemperatureC}°C, Vent: {dto.WindSpeedKmh} km/h (Maj {dto.DateWeather:HH:mm:ss})",
                     isTraffic = false,
                     weatherType = dto.WeatherType.ToString()
-                });
+                },
+                "weather");
             // DEBUG: How many layers are in the cluster?
-            await _outZen.InvokeVoidAsync("debugClusterCount");
+            await _outZen.InvokeVoidAsync("fitToMarkers", "weather");
+            await _outZen.InvokeVoidAsync("debugClusterCount", "weather");
+            await _outZen.InvokeVoidAsync("refreshMapSize", "weather");
 
             Console.WriteLine($"[WF-Client] JS add marker DONE => {dto.Id}");
         }
@@ -406,7 +411,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             try
             {
                 if (_outZen is not null)
-                    await _outZen.InvokeVoidAsync("disposeOutZen", new { mapId = _mapId });
+                    await _outZen.InvokeVoidAsync("disposeOutZen", new { mapId = _mapId, scopeKey = "weather" });
             }
             catch { }
 

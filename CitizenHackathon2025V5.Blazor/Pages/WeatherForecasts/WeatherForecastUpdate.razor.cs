@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.SignalR.Client;

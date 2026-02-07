@@ -1,4 +1,5 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using System;

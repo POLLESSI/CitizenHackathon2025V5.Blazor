@@ -1,12 +1,15 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
+using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using Newtonsoft.Json;
 using System.Globalization;
 using System.Reflection;
+//SuggestionView: scopeKey = "suggestions" (or event:{ id} if contextualized)
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
 {
@@ -26,16 +29,22 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
         [Inject] public IHubUrlBuilder HubUrls { get; set; }
 
         private const string ApiBase = "https://localhost:7254";
-        private IJSObjectReference _outZen;
         private bool _mapBooted;
         private bool _markersSeeded;
+        private bool _bootRequested;
+        private bool _testMarkerAdded;
         public List<ClientSuggestionDTO> Suggestions { get; set; }
         private List<ClientSuggestionDTO> allSuggestions = new();
         private List<ClientSuggestionDTO> visibleSuggestions = new();
         private List<SuggestionGroupedByPlaceDTO> _grouped = new();
         private int currentIndex = 0;
         private const int PageSize = 100;
+        private readonly string _instanceId = Guid.NewGuid().ToString("N");
+        private readonly HashSet<string> _bundleSeededScopes = new();
+        private string _bootToken;
+        private string ScopeKey => $"suggestions:{_instanceId}";
         private string _speedId = $"speedRange-{Guid.NewGuid():N}";
+        private string _mapId => $"leafletMap-suggestions-{_instanceId}";
 
         public int SelectedId { get; set; }
         public HubConnection hubConnection { get; set; }
@@ -44,6 +53,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
         private ElementReference ScrollContainerRef;
         private string _q;
         private bool _onlyRecent;
+        private bool IsSeeded(string scopeKey) => _bundleSeededScopes.Contains(scopeKey);
+        private void MarkSeeded(string scopeKey) => _bundleSeededScopes.Add(scopeKey);
+        private void ResetSeeded(string scopeKey) => _bundleSeededScopes.Remove(scopeKey);
 
         protected override async Task OnInitializedAsync()
         {
@@ -89,10 +101,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
                     var j = visibleSuggestions.FindIndex(c => c.Id == dto.Id);
                     if (j >= 0) visibleSuggestions[j] = dto;
 
-                    if (_mapBooted && _outZen is not null)
+                    if (_mapBooted)
                     {
                         _grouped = await SuggestionMapService.GetSuggestionMapAsync(days: 7);
-                        await SeedSuggestionMarkersAsync(fit: false);
+                        await SeedSuggestionBundlesAsync(fit: false);
                     }
 
                     await InvokeAsync(StateHasChanged);
@@ -117,88 +129,111 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
             visibleSuggestions.AddRange(next);
             currentIndex += next.Count;
         }
-
-        //private static string BuildHubUrl(string baseUrl, string path)
-        //{
-        //    var b = baseUrl.TrimEnd('/');
-        //    var p = path.TrimStart('/');
-        //    if (b.EndsWith("/hubs", StringComparison.OrdinalIgnoreCase) &&
-        //        p.StartsWith("hubs/", StringComparison.OrdinalIgnoreCase))
-        //    {
-        //        p = p.Substring("hubs/".Length);
-        //    }
-        //    return $"{b}/{p}";
-        //}
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            // 1) Boot the card only once
-            if (firstRender)
+            if (firstRender && !_bootRequested)
             {
-                _outZen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
+                _bootRequested = true;
 
-                var ok = await _outZen.InvokeAsync<bool>("bootOutZen", new
+                await JS.InvokeAsync<bool>("OutZen.ensure");
+
+                var boot = await JS.InvokeAsync<BootResult>("OutZenInterop.bootOutZen", new
                 {
-                    mapId = "leafletMap",
-                    center = new double[] { 50.89, 4.34 },
+                    mapId = _mapId,
+                    scopeKey = ScopeKey,
+                    center = new[] { 50.89, 4.34 },
                     zoom = 8,
                     enableChart = false,
-                    force = true
+                    force = false,
+                    resetMarkers = true,
+                    enableHybrid = false,
+                    hybridThreshold = 13
                 });
 
-                if (!ok)
-                {
-                    Console.WriteLine("[SuggestionView] bootOutZen failed.");
-                    return;
-                }
+                Console.WriteLine("[SuggestionView] boot done, pushing markers...");
+                Console.WriteLine($"[SuggestionView] RENDER scope={ScopeKey} mapId={_mapId} booted={_mapBooted}");
 
+
+                if (boot is null || !boot.Ok) return;
+
+                _bootToken = boot.Token;
                 _mapBooted = true;
+
+                Console.WriteLine($"[Boot] ok={boot?.Ok} mapId={boot?.MapId} scope={boot?.ScopeKey} token={boot?.Token}");
+                Console.WriteLine($"[SuggestionView] RENDER scope={ScopeKey} mapId={_mapId} booted={_mapBooted}");
+
+                await Task.Delay(1);
+                await JS.InvokeAsync<bool>("OutZenInterop.refreshMapSize", ScopeKey);
+                await Task.Delay(50);
+                await JS.InvokeAsync<bool>("OutZenInterop.refreshMapSize", ScopeKey);
             }
 
-            // 2) AT EACH Render: if the map is ready, if we have data
-            //    and that we haven't seeded yet → we seed.
             if (_mapBooted && !_markersSeeded && _grouped.Count > 0)
             {
                 _markersSeeded = true;
-                await SeedSuggestionMarkersAsync(fit: true);
+                await SeedSuggestionBundlesAsync(fit: true);
             }
+
+            var debug = Navigation.Uri.Contains("debug=1", StringComparison.OrdinalIgnoreCase);
+
+            if (_mapBooted && !_testMarkerAdded && debug)
+            {
+                _testMarkerAdded = true;
+                await JS.InvokeAsync<bool>("OutZenInterop.addOrUpdateCrowdMarker",
+                    "test:1", 50.85, 4.35, 4,
+                    new { title = "TEST", description = "Marker direct" },
+                    ScopeKey);
+            }
+            Console.WriteLine($"[SuggestionView] RENDER scope={ScopeKey} mapId={_mapId} booted={_mapBooted}");
+
         }
-
-
-        private async Task SeedSuggestionMarkersAsync(bool fit)
+        private async Task SeedSuggestionBundlesAsync(bool fit)
         {
-            if (_outZen is null || !_mapBooted) return;
+            if (!_mapBooted) return;
 
-            // cleans existing markers (crowd/gpt)
-            try { await _outZen.InvokeVoidAsync("clearCrowdMarkers"); } catch { }
-
-            Console.WriteLine($"[SuggestionView] _grouped.Count = {_grouped.Count}");
-
-            foreach (var g in _grouped)
+            var places = _grouped.Select((g, idx) => new
             {
-                var lat = g.Latitude;  
-                var lon = g.Longitude;
+                Id = idx + 1,
+                Name = g.PlaceName,
+                Latitude = (double)g.Latitude,
+                Longitude = (double)g.Longitude
+            }).ToList();
 
-                var level = MapSuggestionCountToLevel(g.SuggestionCount);
-                var desc = $"{g.SuggestionCount} suggestion(s) – Dernière : {g.LastSuggestedAt:yyyy-MM-dd HH:mm}";
+            var suggestions = _grouped.Select((g, idx) => new
+            {
+                Id = idx + 1,
+                PlaceId = idx + 1,
+                Summary = $"{g.SuggestionCount} suggestion(s)",
+                Description = $"Last : {g.LastSuggestedAt:yyyy-MM-dd HH:mm}"
+            }).ToList();
 
-                await _outZen.InvokeVoidAsync("addOrUpdateCrowdMarker",
-                    $"sgp:{g.PlaceName}",   // ou un id stable (placeId / placeName hash)
-                    (double)g.Latitude,
-                    (double)g.Longitude,
-                    level,
-                    new { title = g.PlaceName, description = desc, icon = "✨" });
+            var payload = new
+            {
+                places,
+                suggestions,
+                events = Array.Empty<object>(),
+                crowds = Array.Empty<object>(),
+                traffic = Array.Empty<object>(),
+                weather = Array.Empty<object>(),
+                gpt = Array.Empty<object>()
+            };
 
-            }
+            var ok = await JS.InvokeAsync<bool>(
+                "OutZenInterop.addOrUpdateBundleMarkers",
+                payload, 80, ScopeKey);
 
-            // Debug : dump markers on the JS side
-            try { await _outZen.InvokeVoidAsync("debugDumpMarkers"); } catch { }
+            Console.WriteLine($"[SuggestionView] addOrUpdateBundleMarkers ok={ok}");
 
-            try { await _outZen.InvokeVoidAsync("refreshMapSize"); } catch { }
+            // Debug
+            await JS.InvokeVoidAsync("OutZenInterop.debugDumpMarkers", ScopeKey);
+            await JS.InvokeVoidAsync("OutZenInterop.debugClusterCount", ScopeKey);
+
             if (fit)
-            {
-                await Task.Delay(80);
-                try { await _outZen.InvokeVoidAsync("fitToMarkers"); } catch { }
-            }
+                await JS.InvokeAsync<bool>("OutZenInterop.fitToBundles", 30, ScopeKey);
+
+            await JS.InvokeAsync<bool>("OutZenInterop.refreshMapSize", ScopeKey);
+
+            await JS.InvokeAsync<bool>("OutZenInterop.addOrUpdateSuggestionMarkers", Suggestions, ScopeKey);
         }
 
         private static int MapSuggestionCountToLevel(int count)
@@ -248,14 +283,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
 
         public async ValueTask DisposeAsync()
         {
+            var mapId = _mapId; // local copy
             try
             {
-                if (_outZen is not null)
-                {
-                    await _outZen.DisposeAsync();
-                }
+                await JS.InvokeAsync<bool>("OutZenInterop.disposeOutZen", new { mapId, scopeKey = ScopeKey, token = _bootToken });
+                Console.WriteLine($"[SuggestionView] dispose mapId={_mapId} scope={ScopeKey} token={_bootToken}");
             }
-            catch { /* ignore */ }
+            catch { }
 
             if (hubConnection is not null)
             {
@@ -263,6 +297,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
                 try { await hubConnection.DisposeAsync(); } catch { }
             }
         }
+
     }
 }
 

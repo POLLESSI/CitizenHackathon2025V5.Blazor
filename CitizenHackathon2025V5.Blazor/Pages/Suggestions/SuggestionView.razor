@@ -27,7 +27,10 @@
             </NavLink>
         </div>
     </div>
-    <div id="leafletMap" class="map"></div>
+    <div class="oz-map-shell">
+        @* <div id="@_mapId" class="leaflet-host"></div> *@
+        <div id="@_mapId" class="leaflet-host" data-oz-scope="@ScopeKey"></div>
+    </div>
     <div class="table-wrapper draggable-container"
             @ref="ScrollContainerRef"
             @onscroll="HandleScroll"
