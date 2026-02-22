@@ -1,6 +1,7 @@
 @page "/suggestionview"
 @using CitizenHackathon2025V5.Blazor.Client.Constants
 @using CitizenHackathon2025.Blazor.DTOs;
+@inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
 @implements IAsyncDisposable
 @inject IJSRuntime js
 
@@ -28,8 +29,7 @@
         </div>
     </div>
     <div class="oz-map-shell">
-        @* <div id="@_mapId" class="leaflet-host"></div> *@
-        <div id="@_mapId" class="leaflet-host" data-oz-scope="@ScopeKey"></div>
+        <div id="@MapId" class="leaflet-host"></div>
     </div>
     <div class="table-wrapper draggable-container"
             @ref="ScrollContainerRef"

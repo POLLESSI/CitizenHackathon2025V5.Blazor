@@ -1,117 +1,184 @@
-﻿using CitizenHackathon2025.Blazor.DTOs;
+﻿// CrowdInfoView.razor.cs
+using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Contracts.Hubs;
+using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
+using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interop;
 using CitizenHackathon2025V5.Blazor.Client.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Utils;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using System.Collections.Concurrent;
-using System.Text.Json;
-//CrowdInfoView: scopeKey = "crowd"(or event:{ id})
+using CrowdHub = CitizenHackathon2025.Contracts.Hubs.CrowdHubMethods;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 {
-    public partial class CrowdInfoView : IAsyncDisposable
+    public partial class CrowdInfoView : OutZenMapPageBase
     {
 #nullable disable
-        [Inject] public CrowdInfoService CrowdInfoService { get; set; }
-        [Inject] public NavigationManager Navigation { get; set; }
-        [Inject] public IJSRuntime JS { get; set; }
-        [Inject] public IConfiguration Config { get; set; }
-        [Inject] public IAuthService Auth { get; set; }
-        [Inject] public IHubUrlBuilder HubUrls { get; set; }
+        // ===== Inject =====
+        [Inject] public CrowdInfoService CrowdInfoService { get; set; } = default!;
+        [Inject] public NavigationManager Navigation { get; set; } = default!;
+        [Inject] public IJSRuntime JS { get; set; } = default!;
+        [Inject] public IConfiguration Config { get; set; } = default!;
+        [Inject] public IAuthService Auth { get; set; } = default!;
+        [Inject] public IHubUrlBuilder HubUrls { get; set; } = default!;
 
-        private const string ApiBase = "https://localhost:7254";
+        private HubConnection _hub;
 
-        private HubConnection hubConnection;
-
-        // === Data ===
+        // ===== Data =====
         public List<ClientCrowdInfoDTO> CrowdInfos { get; set; } = new();
-        private List<ClientCrowdInfoDTO> visibleCrowdInfos = new();
-        private List<ClientCrowdInfoDTO> allCrowdInfos = new();
-        private CancellationTokenSource _cts = new();
-        private IJSObjectReference _leafletModule;
-        private IJSObjectReference _outzen;
-        private const int MaxBootRetries = 25;
-        private const int PageSize = 25;
-        private int currentIndex = 0;
+        private readonly List<ClientCrowdInfoDTO> _visible = new();
+        private List<ClientCrowdInfoDTO> _all = new();
 
-        // === UI & Scroll ===
+        private const int PageSize = 25;
+        private int _currentIndex = 0;
+        private long _lastFitTicks;
+
+        // ===== UI & Scroll =====
         private ElementReference ScrollContainerRef;
         private ElementReference TableScrollRef;
         private string _q = string.Empty;
         private bool _onlyRecent;
+
+        // ===== Map contract =====
+        protected override string ScopeKey => "crowdinfoview";
+        protected override string MapId => "leafletMap-crowdinfoview";
+        // boot options
+        protected override (double lat, double lng) DefaultCenter => (50.89, 4.34);
+        protected override int DefaultZoom => 14;
+
+        // Optional
+        protected override bool ForceBootOnFirstRender => true;
+        protected override bool ResetMarkersOnBoot => true;
+        private static string CIMarkerId(int id) => $"crowd:{id}";
+        private string _token;
+
+        // ===== State =====
         private bool _disposed;
         private bool _booted;
-        
-        // === Earth canvas ids (if used elsewhere) ===
-        private readonly string _speedId = $"speedRange-{Guid.NewGuid():N}";
-        private readonly Dictionary<int, int> _lastLevels = new();
-        private bool _initialDataApplied = false;
+        private bool _mapInitStarted;
+        private bool _initialDataApplied;
 
-        // === SignalR buffering until map ready ===
+        // ===== Hub buffering until map ready =====
         private readonly ConcurrentQueue<ClientCrowdInfoDTO> _pendingHubUpdates = new();
+        private readonly Dictionary<int, int> _lastLevels = new();
 
         public int SelectedId { get; set; }
 
+        // ----------------------------
+        // Lifecycle
+        // ----------------------------
         protected override async Task OnInitializedAsync()
         {
             try
             {
-                var fetched = (await CrowdInfoService.GetAllCrowdInfoAsync()).ToList();
+                var fetched = (await CrowdInfoService.GetAllCrowdInfoAsync())?.ToList() ?? new List<ClientCrowdInfoDTO>();
+
                 CrowdInfos = fetched;
-                allCrowdInfos = fetched;
-                visibleCrowdInfos.Clear();
-                currentIndex = 0;
-                Console.WriteLine($"[CrowdInfoView] fetched={fetched.Count}");
-                Console.WriteLine($"[CrowdInfoView] visible={visibleCrowdInfos.Count} all={allCrowdInfos.Count}");
+                _all = fetched;
+
+                _visible.Clear();
+                _currentIndex = 0;
                 LoadMoreItems();
 
+                _lastLevels.Clear();
                 foreach (var co in fetched)
                     _lastLevels[co.Id] = co.CrowdLevel;
 
-                await InvokeAsync(StateHasChanged);
-
-                // Hub SignalR
-                var hubUrl = HubUrls.Build(HubPaths.CrowdInfo);
-
-                hubConnection = new HubConnectionBuilder()
-                    .WithUrl(hubUrl, options =>
-                    {
-                        options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
-                    })
-                    .WithAutomaticReconnect()
-                    .Build();
-
-                RegisterHubHandlers();
-                await hubConnection.StartAsync();
-                Console.WriteLine($"✅ Connected to {hubUrl}");
-
-                // 🔁 Catch-up: if the map is already ready, we push the markers now
-                if (_booted && _outzen is not null && visibleCrowdInfos.Any())
-                {
-                    Console.WriteLine($"[CrowdInfoView] Data loaded after map. Syncing {FilterCrowd(visibleCrowdInfos).Count()} markers.");
-                    await SyncMapMarkersAsync(fit: true);
-                }
+                // SignalR
+                await StartSignalRAsync();
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"❌ Init error: {ex.Message}");
+                Console.Error.WriteLine($"❌ CrowdInfoView init error: {ex.Message}");
             }
-            if (_disposed) return;
+        }
+        protected override async Task OnMapReadyAsync()
+        {
+            // At this stage: map booted + container OK
+            await FitThrottledAsync();
+            await Task.Delay(50);
+            await FitThrottledAsync();
+
+            await ReseedCrowdInfoMarkersAsync(fit: true);
+            //await UpdateChartAsync();
         }
 
-        private void RegisterHubHandlers()
+        private async Task ReseedCrowdInfoMarkersAsync(bool fit)
         {
-            if (hubConnection is null) return;
+            if (_disposed) return;
+            if (!IsMapBooted) return;
 
-            hubConnection.On<ClientCrowdInfoDTO>(CitizenHackathon2025.Contracts.Hubs.CrowdHubMethods.ToClient.ReceiveCrowdUpdate, async dto =>
+            try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
+
+            foreach (var dto in _all)
+                await ApplySingleCrowdInfoMarkerAsync(dto);
+
+            await FitThrottledAsync();
+            if (fit)
             {
+                await FitThrottledAsync();
+            }
+        }
+
+        private async Task ApplySingleCrowdInfoMarkerAsync(ClientCrowdInfoDTO dto)
+        {
+            if (_disposed) return;
+            if (!IsMapBooted) return;
+            if (dto is null) return;
+
+            var lat = dto.Latitude;
+            var lng = dto.Longitude;
+
+            if (!double.IsFinite(lat) || !double.IsFinite(lng) || (lat == 0 && lng == 0) ||
+                lat is < -90 or > 90 || lng is < -180 or > 180)
+            {
+                lat = 50.85;
+                lng = 4.35;
+            }
+
+            await JS.InvokeVoidAsync(
+                "OutZenInterop.addOrUpdateCrowdMarker",
+                CIMarkerId(dto.Id),
+                lat,
+                lng,
+                new
+                {
+                    locationname = dto.LocationName ?? "Crowd Info",
+                    timestamp = dto.Timestamp,
+                    crowdlevel = dto.CrowdLevel,
+                    icon = "👥"
+                },
+                ScopeKey
+            );
+        }
+
+        // ----------------------------
+        // SignalR
+        // ----------------------------
+        private async Task StartSignalRAsync()
+        {
+            var hubUrl = HubUrls.Build(HubPaths.CrowdInfo);
+
+            _hub = new HubConnectionBuilder()
+                .WithUrl(hubUrl, options =>
+                {
+                    options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
+                })
+                .WithAutomaticReconnect()
+                .Build();
+
+            _hub.On<ClientCrowdInfoDTO>(CrowdHub.ToClient.ReceiveCrowdUpdate, async dto =>
+            {
+                if (_disposed) return;
+
                 UpsertLocal(dto);
 
-                int prev = _lastLevels.TryGetValue(dto.Id, out var p) ? p : 0;
+                var prev = _lastLevels.TryGetValue(dto.Id, out var p) ? p : 0;
                 _lastLevels[dto.Id] = dto.CrowdLevel;
 
                 if (_initialDataApplied && prev < 4 && dto.CrowdLevel == 4)
@@ -119,164 +186,128 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
                     try { await JS.InvokeVoidAsync("OutZenInterop.beepCritical", dto.Id); } catch { }
                 }
 
-                if (!_booted || _outzen is null)
+                if (!_booted)
                 {
                     _pendingHubUpdates.Enqueue(dto);
                     await InvokeAsync(StateHasChanged);
                     return;
                 }
 
-                var lvl = Math.Clamp(dto.CrowdLevel, 1, SharedConstants.MaxCrowdLevel);
+                await ApplySingleMarkerUpdateAsync(dto);
 
-                await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
-                    dto.Id.ToString(), dto.Latitude, dto.Longitude, lvl,
-                    new { title = dto.LocationName, description = $"Maj {dto.Timestamp:HH:mm:ss}" });
-
-                try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
+                // ⚠️ avoids systematic fitting with each update (it shakes up the map)
+                // Keep it optional:
+                // try { await JS.InvokeVoidAsync("OutZenInterop.fitToMarkers", ScopeKey); } catch { }
 
                 await InvokeAsync(StateHasChanged);
             });
 
-            hubConnection.On<int>(CitizenHackathon2025.Contracts.Hubs.CrowdHubMethods.ToClient.CrowdInfoArchived, async id =>
+            _hub.On<int>(CrowdHub.ToClient.CrowdInfoArchived, async id =>
             {
-                CrowdInfos.RemoveAll(c => c.Id == id);
-                allCrowdInfos.RemoveAll(c => c.Id == id);
-                visibleCrowdInfos.RemoveAll(c => c.Id == id);
+                if (_disposed) return;
 
-                if (_booted && _outzen is not null)
+                CrowdInfos.RemoveAll(c => c.Id == id);
+                _all.RemoveAll(c => c.Id == id);
+                _visible.RemoveAll(c => c.Id == id);
+
+                if (_booted)
                 {
-                    await _outzen.InvokeVoidAsync("removeCrowdMarker", id.ToString());
+                    try { await JS.InvokeVoidAsync("OutZenInterop.removeCrowdMarker", $"cr:{id}", ScopeKey); } catch { }
                     await SyncMapMarkersAsync(fit: false);
                 }
 
                 await InvokeAsync(StateHasChanged);
             });
-            if (_disposed) return;
+
+            await _hub.StartAsync();
+            Console.WriteLine($"✅ Connected to {hubUrl}");
+
+            // Catch-up: if map already booted
+            if (_booted && _visible.Count > 0)
+                await SyncMapMarkersAsync(fit: true);
+        }
+
+        private async Task FitThrottledAsync(int ms = 250)
+        {
+            var now = Environment.TickCount64;
+            if (now - _lastFitTicks < ms) return;
+            _lastFitTicks = now;
+
+            try
+            {
+                await MapInterop.RefreshSizeAsync(ScopeKey);
+                await MapInterop.FitToDetailsAsync(ScopeKey);
+            }
+            catch { }
         }
         private void UpsertLocal(ClientCrowdInfoDTO dto)
         {
-            void Upsert(List<ClientCrowdInfoDTO> list)
+            static void Upsert(List<ClientCrowdInfoDTO> list, ClientCrowdInfoDTO item)
             {
-                var i = list.FindIndex(c => c.Id == dto.Id);
-                if (i >= 0) list[i] = dto; else list.Add(dto);
+                var i = list.FindIndex(c => c.Id == item.Id);
+                if (i >= 0) list[i] = item; else list.Add(item);
             }
-            Upsert(CrowdInfos);
-            Upsert(allCrowdInfos);
 
-            var j = visibleCrowdInfos.FindIndex(c => c.Id == dto.Id);
-            if (j >= 0) visibleCrowdInfos[j] = dto;
-            if (_disposed) return;
+            Upsert(CrowdInfos, dto);
+            Upsert(_all, dto);
+
+            var j = _visible.FindIndex(c => c.Id == dto.Id);
+            if (j >= 0) _visible[j] = dto;
         }
 
-        private bool _mapInitStarted = false;
-
-        protected override async Task OnAfterRenderAsync(bool firstRender)
+        // ----------------------------
+        // Map markers
+        // ----------------------------
+        private async Task SyncMapMarkersAsync(bool fit)
         {
-            if (!firstRender || _booted || _mapInitStarted) return;
-            _mapInitStarted = true;
-
-            // 0) Wait container exists
-            for (var i = 0; i < 10; i++)
-            {
-                if (await JS.InvokeAsync<bool>("checkElementExists", "leafletMap")) break;
-                await Task.Delay(150);
-                if (i == 9) { Console.WriteLine("❌ leafletMap not found."); return; }
-            }
-
-            _outzen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
-
-            var ok = await _outzen.InvokeAsync<bool>("bootOutZen", new
-            {
-                mapId = "leafletMap",
-                center = new[] { 50.89, 4.34 },
-                zoom = 13,
-                enableChart = true,
-                force = true
-            });
-
-            if (!ok) return;
-
-            // Readiness check (no custom isOutZenReady required)
-            bool ready = false;
-            for (var i = 0; i < 25; i++)
-            {
-                try { ready = await _outzen.InvokeAsync<bool>("isOutZenReady"); } catch { }
-                if (ready) break;
-                await Task.Delay(120);
-            }
-            if (!ready) return;
-
-            string current = null;
-            for (var i = 0; i < 20; i++)
-            {
-                try { current = await _outzen.InvokeAsync<string>("getCurrentMapId"); } catch { }
-                if (!string.IsNullOrWhiteSpace(current)) break;
-                await Task.Delay(150);
-            }
-            if (string.IsNullOrWhiteSpace(current)) { Console.WriteLine("❌ map not ready"); return; }
-
-            try { await _outzen.InvokeVoidAsync("refreshMapSize"); } catch { }
-
-            // Seed from current visible data
-            await SyncMapMarkersAsync(fit: true);
-
-            // Flush buffered hub updates
-            while (_pendingHubUpdates.TryDequeue(out var dto))
-            {
-                if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude)) continue;
-                if (dto.Latitude == 0 && dto.Longitude == 0) continue;
-
-                var lvl = Math.Clamp(dto.CrowdLevel, 1, SharedConstants.MaxCrowdLevel);
-                await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
-                    $"cr:{dto.Id}", dto.Latitude, dto.Longitude, lvl,
-                    new { title = dto.LocationName, description = $"Maj {dto.Timestamp:HH:mm:ss}", icon = "👥" });
-            }
-
-            try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
-
-            _initialDataApplied = true;
-            _booted = true;
             if (_disposed) return;
+            if (!_booted) return;
+
+            var items = FilterCrowd(_visible).ToList();
+
+            try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
+
+            foreach (var co in items)
+                await ApplySingleMarkerUpdateAsync(co, alreadyBooted: true);
+
+            if (fit && items.Any())
+            {
+                await FitThrottledAsync();
+            }
         }
 
-        private async Task SyncMapMarkersAsync(bool fit = true)
+        private async Task ApplySingleMarkerUpdateAsync(ClientCrowdInfoDTO dto, bool alreadyBooted = false)
         {
-            try
-            {
-                var items = FilterCrowd(visibleCrowdInfos).ToList();
-                Console.WriteLine($"[CrowdInfoView] SyncMapMarkersAsync: {items.Count} markers.");
-
-                await _outzen.InvokeVoidAsync("clearCrowdMarkers");
-
-                foreach (var co in items)
-                {
-                    if (!double.IsFinite(co.Latitude) || !double.IsFinite(co.Longitude)) continue;
-                    if (co.Latitude == 0 && co.Longitude == 0) continue;
-
-                    var lvl = Math.Clamp(co.CrowdLevel, 1, SharedConstants.MaxCrowdLevel);
-
-                    await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
-                        $"cr:{co.Id}", co.Latitude, co.Longitude, lvl,
-                        new { title = co.LocationName, description = $"Maj {co.Timestamp:HH:mm:ss}", icon = "👥" });
-                }
-
-                if (fit && items.Any())
-                {
-                    try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
-                }
-            }
-            catch (JSException jsex)
-            {
-                Console.Error.WriteLine($"❌ JSInterop failed: {jsex.Message}");
-            }
             if (_disposed) return;
+            if (!alreadyBooted && !_booted) return;
+
+            if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude)) return;
+            if (dto.Latitude == 0 && dto.Longitude == 0) return;
+
+            var lvl = Math.Clamp(dto.CrowdLevel, 1, SharedConstants.MaxCrowdLevel);
+
+            await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdMarker",
+                CIMarkerId(dto.Id),
+                dto.Latitude,
+                dto.Longitude,
+                lvl,
+                new
+                {
+                    title = dto.LocationName,
+                    description = $"Maj {dto.Timestamp:HH:mm:ss}",
+                    icon = "👥"
+                },
+                ScopeKey);
         }
+
+        // ----------------------------
+        // Pagination + filtering
+        // ----------------------------
         private void LoadMoreItems()
         {
-            var next = allCrowdInfos.Skip(currentIndex).Take(PageSize).ToList();
-            visibleCrowdInfos.AddRange(next);
-            currentIndex += next.Count;
-            if (_disposed) return;
+            var next = _all.Skip(_currentIndex).Take(PageSize).ToList();
+            _visible.AddRange(next);
+            _currentIndex += next.Count;
         }
 
         private IEnumerable<ClientCrowdInfoDTO> FilterCrowd(IEnumerable<ClientCrowdInfoDTO> source)
@@ -291,38 +322,43 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
                     x.Latitude.ToString().Contains(q, StringComparison.OrdinalIgnoreCase) ||
                     x.Longitude.ToString().Contains(q, StringComparison.OrdinalIgnoreCase))
                 .Where(x => !_onlyRecent || x.Timestamp >= cutoff);
-            //if (_disposed) return;
         }
 
         private async Task HandleScroll()
         {
+            if (_disposed) return;
+
             var scrollTop = await JS.InvokeAsync<int>("getScrollTop", TableScrollRef);
             var scrollHeight = await JS.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
             var clientHeight = await JS.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
 
-            if (scrollTop + clientHeight >= scrollHeight - 5 && currentIndex < allCrowdInfos.Count)
+            if (scrollTop + clientHeight >= scrollHeight - 5 && _currentIndex < _all.Count)
             {
                 LoadMoreItems();
-                await SyncMapMarkersAsync(fit: false);
-                StateHasChanged();
+                if (_booted) await SyncMapMarkersAsync(fit: false);
+                await InvokeAsync(StateHasChanged);
             }
-            if (_disposed) return;
         }
 
         private void ToggleRecent()
         {
             _onlyRecent = !_onlyRecent;
-            _ = SyncMapMarkersAsync(fit: true);
-            if (_disposed) return;
+            if (_booted) _ = SyncMapMarkersAsync(fit: true);
         }
 
         private string Q
         {
             get => _q;
-            set { _q = value; _ = SyncMapMarkersAsync(fit: true); }
-
+            set
+            {
+                _q = value;
+                if (_booted) _ = SyncMapMarkersAsync(fit: true);
+            }
         }
 
+        // ----------------------------
+        // Misc UI helpers
+        // ----------------------------
         private static string InfoDesc(ClientCrowdInfoDTO co)
             => CrowdInfoSeverityHelpers.GetDescription(CrowdInfoSeverityHelpers.GetSeverity(co));
 
@@ -334,40 +370,62 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
         private void ClickInfo(int id) => SelectedId = id;
 
-        private async Task<IJSObjectReference> GetLeafletModuleAsync()
+        private async Task TestMarkers()
         {
-            _leafletModule ??= await JS.InvokeAsync<IJSObjectReference>(
-                "import", "./js/app/leafletOutZen.module.js");
-            return _leafletModule;
-            //if (_disposed) return;
+            if (!_booted) return;
+
+            var testData = new[]
+            {
+            new { Id = 1, Lat = 50.89, Lng = 4.34, Level = 2, Name = "Medium" },
+            new { Id = 2, Lat = 50.88, Lng = 4.35, Level = 3, Name = "High" },
+            new { Id = 3, Lat = 50.90, Lng = 4.33, Level = 4, Name = "Critical" }
+        };
+
+            // Optional: clear
+            try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
+
+            foreach (var t in testData)
+            {
+                await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdMarker",
+                    $"test:{t.Id}",
+                    t.Lat,
+                    t.Lng,
+                    t.Level,
+                    new { title = t.Name, description = "Test", icon = "🧪" },
+                    ScopeKey);
+            }
+
+            await FitThrottledAsync();
         }
 
-        public async Task ClearCalendarAsync()
+        private async Task TestBoot()
         {
-            var mod = await GetLeafletModuleAsync();
-            await mod.InvokeVoidAsync("clearCrowdCalendarMarkers");
-            if (_disposed) return;
+            // Your boot process is already complete at firstRender. Here you're just testing an insertion.
+            if (!_booted) return;
+
+            try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
+
+            await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdMarker",
+                "test:999",
+                50.89, 4.34, 5,
+                new { title = "TEST", description = "debug", icon = "🧪" },
+                ScopeKey);
+
+            await FitThrottledAsync();
         }
 
-        public async ValueTask DisposeAsync()
+        // ----------------------------
+        // Dispose
+        // ----------------------------
+        protected override async Task OnBeforeDisposeAsync()
         {
             _disposed = true;
-            try { _cts.Cancel(); } catch { }
 
-            // stop hubs/timers here (IMPORTANT)
-            // await hub.StopAsync(); await hub.DisposeAsync(); etc.
-
-            try
+            if (_hub is not null)
             {
-                if (_outzen is not null)
-                {
-                    try { await _outzen.InvokeVoidAsync("disposeOutZen", new { mapId = "leafletMap" }); } catch { }
-                    await _outzen.DisposeAsync();
-                }
+                try { await _hub.StopAsync(); } catch { }
+                try { await _hub.DisposeAsync(); } catch { }
             }
-            catch { }
-
-            _cts.Dispose();
         }
     }
 }

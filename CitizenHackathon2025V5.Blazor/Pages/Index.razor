@@ -1,10 +1,12 @@
 ﻿@page "/"
 @using CitizenHackathon2025.Blazor.DTOs
-@using CitizenHackathon2025V5.Blazor.Client.Services
+@using CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
 @using CitizenHackathon2025V5.Blazor.Client.Shared
+@using CitizenHackathon2025V5.Blazor.Client.Services
 @using Microsoft.JSInterop
 @inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
 @inject Blazored.Toast.Services.IToastService ToastService
+@inject GptInteractionService GptService
 
 <PageTitle>OutZen - Home</PageTitle>
 
@@ -13,11 +15,70 @@
     <!-- Summary map -->
     <div class="oz-page oz-page--home">
         <div class="homeMapCard">
-            <div id="leafletMap-home" class="leaflet-host"></div>
+            <div id="leafletMap-home" class="oz-map"></div>
+           @*  <div id="leafletMap-home" class="leaflet-host"></div> *@
             <!-- Optional: canvas for the weather chart if you want to put it back -->
             @* <canvas id="crowdChart"></canvas> *@
         </div>
     </div>
+    <OzFloatingWindow Id="msgDrawer"
+                      Class="oz-glass oz-drawer--fill"
+                      Title="Messages"
+                      Subtitle="Live"
+                      FabIcon="Comments"
+                      FabTitle="Open Messages"
+                      FabRight="18px"
+                      FabBottom="84px"
+                      StartLeft="24px"
+                      StartTop="420px"
+                      Width="360px"
+                      MinWidth="280px"
+                      MaxWidth="900px">
+        <MessageFloatingContent />
+    </OzFloatingWindow>
+    <OzFloatingWindow Id="gptDrawer"
+                      Class="oz-glass oz-drawer--fill"
+                      Title="OutZen GPT"
+                      Subtitle="Suggestions"
+                      FabIcon="IA Suggestions"
+                      FabTitle="Open GPT"
+                      FabRight="18px"
+                      FabBottom="18px"
+                      StartLeft="24px"
+                      StartTop="120px"
+                      Width="360px"
+                      MinWidth="280px"
+                      MaxWidth="900px">
+
+        <input class="oz-input" placeholder="To research..." @bind="_q" @bind:event="oninput" />
+
+        <div class="oz-prompt-compose">
+            <textarea class="oz-input" rows="3" placeholder="Write your prompt..." @bind="_userPrompt"></textarea>
+            <div class="oz-compose-actions">
+                <button type="button" class="oz-btn" @onclick="SendUserPromptAsync" disabled="@string.IsNullOrWhiteSpace(_userPrompt)">
+                    Send to AI
+                </button>
+            </div>
+        </div>
+
+        <div class="oz-scrollfill">
+            <div class="oz-list">
+                @foreach (var x in FilterGpt(_visible))
+                {
+                    <div class="oz-item">
+                        <div class="oz-item-title">@x.Prompt</div>
+                        <div class="oz-item-meta">@x.CreatedAt.ToLocalTime()</div>
+                        <div class="oz-actions">
+                            <button type="button" class="oz-mini" @onclick="@(() => Replay(x.Id))">Replay</button>
+                            <button type="button" class="oz-mini" @onclick="@(() => Copy(x.Prompt))">Copy</button>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    </OzFloatingWindow>
+
+
     <!-- Top banner: title + globe -->
     <div class="home-header">
         <div class="home-header-left">
@@ -89,7 +150,6 @@
             </section>
         </aside>
     </div>
-    
     <!-- Suggestions (for the scroll button) -->
     <div>
         <section class="index-section scroll-fade" id="suggestions">

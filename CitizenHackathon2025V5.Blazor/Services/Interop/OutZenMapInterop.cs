@@ -1,121 +1,216 @@
-﻿using Microsoft.JSInterop;
+﻿using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
+using CitizenHackathon2025V5.Blazor.Client.DTOs.Options;
+using Microsoft.JSInterop;
+using System.Text.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services.Interop
 {
-    public sealed class OutZenMapInterop : IAsyncDisposable
+    public class OutZenMapInterop
     {
         private readonly IJSRuntime _js;
-        private IJSObjectReference? _module; // outzen-interop.js as module OR window.OutZenInterop wrapper usage
+        private readonly Dictionary<string, string> _tokens = new();
 
         public OutZenMapInterop(IJSRuntime js) => _js = js;
 
-        /// <summary>
-        /// Ensures OutZenInterop is loaded and the underlying ESM is available.
-        /// Assumes you included /js/outzen-interop.js in index.html as a classic script.
-        /// </summary>
-        public async ValueTask EnsureAsync()
-        {
-            // OutZen.ensure() returns true/false in your JS
-            var ok = await _js.InvokeAsync<bool>("OutZen.ensure");
-            if (!ok) throw new InvalidOperationException("OutZen.ensure() failed. Check script loading order.");
-        }
+        public Task EnsureAsync() => _js.InvokeVoidAsync("OutZen.ensure").AsTask();
 
-        public async ValueTask<bool> BootAsync(string mapId, string scopeKey, double lat = 50.85, double lng = 4.35, int zoom = 12,
-            bool enableChart = false, bool force = false, bool enableWeatherLegend = false, bool resetMarkers = false)
+        public async Task<bool> BootAsync(OutZenBootOptions opt)
         {
             await EnsureAsync();
 
-            // calling global wrapper: OutZenInterop.bootOutZen({ ... })
-            var opts = new
+            var boot = await _js.InvokeAsync<BootResult>("OutZenInterop.bootOutZen", new
+            {
+                mapId = opt.MapId,
+                scopeKey = opt.ScopeKey,
+                center = new[] { opt.Lat, opt.Lng },
+                zoom = opt.Zoom,
+                enableHybrid = false,
+                enableCluster = false,
+                resetMarkers = opt.ResetMarkers,
+                force = opt.Force
+            });
+
+            if (boot?.Ok == true && !string.IsNullOrWhiteSpace(boot.Token))
+                _tokens[opt.ScopeKey] = boot.Token;
+
+            return boot?.Ok == true;
+        }
+
+        public async Task DisposeMapAsync(string scopeKey, string mapId)
+        {
+            _tokens.TryGetValue(scopeKey, out var token);
+
+            await _js.InvokeVoidAsync("OutZenInterop.disposeOutZen", new
             {
                 mapId,
                 scopeKey,
-                center = new[] { lat, lng },
-                zoom,
-                enableChart,
-                force,
-                enableWeatherLegend,
-                resetMarkers
-            };
+                token
+            });
 
-            return await _js.InvokeAsync<bool>("OutZenInterop.bootOutZen", opts);
+            _tokens.Remove(scopeKey);
         }
 
-        public async ValueTask<bool> IsReadyAsync(string scopeKey)
-        {
-            await EnsureAsync();
-            return await _js.InvokeAsync<bool>("OutZenInterop.isOutZenReady", scopeKey);
-        }
+        public Task RefreshSizeAsync(string scopeKey)
+            => _js.InvokeVoidAsync("OutZenInterop.refreshMapSize", scopeKey).AsTask();
 
-        public async ValueTask DisposeMapAsync(string scopeKey, string? mapId = null)
-        {
-            // disposeOutZen({ mapId, scopeKey })
-            await EnsureAsync();
-            await _js.InvokeVoidAsync("OutZenInterop.disposeOutZen", new { mapId, scopeKey });
-        }
+        public Task FitToDetailsAsync(string scopeKey)
+            => _js.InvokeVoidAsync("OutZenInterop.fitToDetails", scopeKey).AsTask();
 
-        public async ValueTask RefreshSizeAsync(string scopeKey)
-        {
-            await EnsureAsync();
-            await _js.InvokeVoidAsync("OutZenInterop.refreshMapSize", scopeKey);
-        }
+        public Task ClearCrowdMarkersAsync(string scopeKey)
+    => _js.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", scopeKey).AsTask();
 
-        public async ValueTask FitToBundlesAsync(string scopeKey, int padding = 30)
-        {
-            await EnsureAsync();
-            await _js.InvokeAsync<bool>("OutZenInterop.fitToBundles", padding, scopeKey);
-        }
+        public Task RemoveCrowdMarkerAsync(string markerId, string scopeKey)
+            => _js.InvokeVoidAsync("OutZenInterop.removeCrowdMarker", markerId, scopeKey).AsTask();
 
-        public async ValueTask FitToDetailsAsync(string scopeKey, int padding = 30)
-        {
-            await EnsureAsync();
-            await _js.InvokeAsync<bool>("OutZenInterop.fitToDetails", padding, scopeKey);
-        }
+        public Task UpsertCrowdMarkerAsync(
+            string id,
+            double lat,
+            double lng,
+            int level,
+            object info,
+            string scopeKey)
+            => _js.InvokeVoidAsync(
+                    "OutZenInterop.addOrUpdateCrowdMarker",
+                    id,
+                    lat,
+                    lng,
+                    level,
+                    info,
+                    scopeKey
+               ).AsTask();
 
-        public async ValueTask FitToCalendarAsync(string scopeKey)
-        {
-            await EnsureAsync();
-            await _js.InvokeAsync<bool>("OutZenInterop.fitToCalendarMarkers", scopeKey);
-        }
+        public Task ClearCrowdCalendarMarkersAsync(string scopeKey)
+    => _js.InvokeVoidAsync("OutZenInterop.clearCrowdCalendarMarkers", scopeKey).AsTask();
 
-        // Bundles payload is typically an anonymous object matching your JS expectations
-        public async ValueTask<bool> UpsertBundlesAsync(object payload, int tolMeters, string scopeKey)
-        {
-            await EnsureAsync();
-            return await _js.InvokeAsync<bool>("OutZenInterop.addOrUpdateBundleMarkers", payload, tolMeters, scopeKey);
-        }
+        public Task RemoveCrowdCalendarMarkerAsync(string markerId, string scopeKey)
+            => _js.InvokeVoidAsync("OutZenInterop.removeCrowdCalendarMarker", markerId, scopeKey).AsTask();
 
-        public async ValueTask<bool> UpsertCrowdMarkerAsync(string id, double lat, double lng, int level, object info, string scopeKey)
-        {
-            await EnsureAsync();
-            return await _js.InvokeAsync<bool>("OutZenInterop.addOrUpdateCrowdMarker", id, lat, lng, level, info, scopeKey);
-        }
+        public Task UpsertCrowdCalendarMarkerAsync(string id, double lat, double lng, int level, object info, string scopeKey)
+            => _js.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdCalendarMarker", id, lat, lng, level, info, scopeKey).AsTask();
 
-        public async ValueTask ClearCrowdMarkersAsync(string scopeKey)
+        public Task FitToMarkersAsync(string scopeKey)
+    => _js.InvokeVoidAsync("OutZenInterop.fitToMarkers", scopeKey).AsTask();
+        private sealed class BootResult
         {
-            await EnsureAsync();
-            await _js.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", scopeKey);
-        }
-
-        public async ValueTask ClearCalendarAsync()
-        {
-            await EnsureAsync();
-            // you currently expose window.clearCrowdCalendarMarkers
-            await _js.InvokeVoidAsync("clearCrowdCalendarMarkers");
-        }
-
-        public async ValueTask<bool> UpsertCalendarAsync(object items, string scopeKey)
-        {
-            await EnsureAsync();
-            // you exposed OutZenDebug.upsertCrowdCalendarMarkers; better to expose OutZenInterop.upsertCrowdCalendarMarkers later
-            return await _js.InvokeAsync<bool>("OutZenDebug.upsertCrowdCalendarMarkers", items, scopeKey);
-        }
-
-        public ValueTask DisposeAsync()
-        {
-            _module?.DisposeAsync();
-            _module = null;
-            return ValueTask.CompletedTask;
+            public bool Ok { get; set; }
+            public string? Token { get; set; }
+            public string? Reason { get; set; }
         }
     }
+
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025.API. All rights reserved.

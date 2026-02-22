@@ -1,17 +1,19 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Contracts.Hubs;
+using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
+using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using System.Collections.Concurrent;
 using System.Reflection;
-//PlaceView: scopeKey = $"place:{PlaceId}", mapId = $"outzenMap_place_{PlaceId}"
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 {
-    public partial class PlaceView : ComponentBase, IAsyncDisposable
+    public partial class PlaceView : OutZenMapPageBase
     {
 #nullable disable
         [Inject] public HttpClient Client { get; set; }
@@ -31,6 +33,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         private bool _mapBooted;
         private bool _initialDataApplied;
         private bool _interopReady;
+        private bool _mapInitStarted;
+        private bool _disposed;
 
         public HubConnection hubConnection { get; set; }
 
@@ -39,8 +43,19 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         private List<ClientPlaceDTO> allPlaces = new();
         private List<ClientPlaceDTO> visiblePlaces = new();
         private int currentIndex = 0;
+        private long _lastFitTicks;
         private const int PageSize = 20;
-        private const string ScopeKey = "places"; // Stable scope for this page
+        protected override string ScopeKey => "placeview";
+        protected override string MapId => "leafletMap-placeview";
+        protected override (double lat, double lng) DefaultCenter => (50.89, 4.34);
+        protected override int DefaultZoom => 14;
+
+        // Optionnel
+        protected override bool ForceBootOnFirstRender => true;
+        protected override bool ResetMarkersOnBoot => true;
+        private static string PlMarkerId(int id) => $"place:{id}";
+        private string _token;
+
         private bool _dataLoaded;
 
         // UI state
@@ -63,6 +78,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         private CancellationTokenSource _searchCts;
 
         private int? BestMatchId { get; set; }
+
         private string _speedId = $"speedRange-{Guid.NewGuid():N}";
         private int SelectedId;
 
@@ -164,53 +180,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
             var j = visiblePlaces.FindIndex(p => p.Id == dto.Id);
             if (j >= 0) visiblePlaces[j] = dto;
         }
-        protected override async Task OnAfterRenderAsync(bool firstRender)
-        {
-            if (_mapBooted || !_dataLoaded) return;
-            _mapBooted = true;
-
-            await EnsureOutZenAsync();
-
-            // (0) security measures are in place (if you return to the page).
-            await JS.InvokeVoidAsync("OutZenInterop.disposeOutZen", new { mapId = "placeMap", scopeKey = ScopeKey });
-
-            // (1) wait container exists
-            for (var i = 0; i < 20; i++)
-            {
-                var ok = await JS.InvokeAsync<bool>("checkElementExists", "placeMap");
-                if (ok) break;
-                await Task.Delay(50);
-                if (i == 19) return;
-            }
-
-            // (2) boot
-            var booted = await JS.InvokeAsync<bool>("OutZenInterop.bootOutZen", new
-            {
-                mapId = "placeMap",
-                scopeKey = ScopeKey,
-                center = new[] { 50.89, 4.34 },
-                zoom = 13,
-                force = true
-            });
-
-            if (!booted) { _mapBooted = false; return; }
-
-            // (3) add markers
-            foreach (var place in Places)
-                await AddOrUpdatePlaceMarkerAsync(place, fit: false);
-
-            while (_pendingHubUpdates.TryDequeue(out var dto))
-                await AddOrUpdatePlaceMarkerAsync(dto, fit: false);
-
-            // (4) resize + fit
-            await JS.InvokeAsync<bool>("OutZenInterop.refreshMapSize", ScopeKey); // if you expose refreshMapSize in OutZenInterop
-            await JS.InvokeAsync<bool>("OutZenInterop.fitToMarkers", ScopeKey);   // idem
-
-            _initialDataApplied = true;
-            _booted = true;
-        }
-
-
+        
         private async Task AddOrUpdatePlaceMarkerAsync(ClientPlaceDTO dto, bool fit = false)
         {
             if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude))
@@ -230,17 +200,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
             await JS.InvokeAsync<bool>(
                 "OutZenInterop.addOrUpdateCrowdMarker",
-                $"pl:{dto.Id}",
+                PlMarkerId(dto.Id),
                 dto.Latitude,
                 dto.Longitude,
-                level,
-                new { title = dto.Name, description = desc, icon = "🏰" },
+                dto.Type,
+                new { title = dto.Name, desc, icon = "🏰" },
                 ScopeKey
             );
 
             if (fit)
             {
-                await JS.InvokeAsync<bool>("OutZenInterop.fitToMarkers", ScopeKey);
+                await FitThrottledAsync();
             }
 
             Console.WriteLine($"[PlaceView] Send place marker #{dto.Id}: {dto.Latitude},{dto.Longitude}");
@@ -258,8 +228,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
                 if (visiblePlaces.Any() && fit)
                 {
-                    await JS.InvokeAsync<bool>("OutZenInterop.refreshMapSize", ScopeKey);
-                    await JS.InvokeAsync<bool>("OutZenInterop.fitToMarkers", ScopeKey);
+                    await FitThrottledAsync();
                 }
             }
             catch (JSException jsex)
@@ -267,12 +236,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
                 Console.Error.WriteLine($"❌ [PlaceView] JSInterop failed in SyncMapMarkersAsync: {jsex.Message}");
             }
         }
-        private async Task EnsureOutZenAsync()
+
+        private async Task FitThrottledAsync(int ms = 250)
         {
-            if (_interopReady) return;
-            await JS.InvokeVoidAsync("OutZen.ensure"); // load the module via outzen-interop.js
-            _interopReady = true;
+            var now = Environment.TickCount64;
+            if (now - _lastFitTicks < ms) return;
+            _lastFitTicks = now;
+
+            try
+            {
+                await MapInterop.RefreshSizeAsync(ScopeKey);
+                await MapInterop.FitToDetailsAsync(ScopeKey);
+            }
+            catch { }
         }
+        private Task EnsureOutZenAsync()
+            => JS.InvokeVoidAsync("OutZen.ensure").AsTask();
+
         private async Task DebouncedHighlightAsync()
         {
             if (!_dataLoaded) return;
@@ -325,23 +305,64 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
                 || (x.Name ?? "").Contains(q, StringComparison.OrdinalIgnoreCase)
                 || (x.Type ?? "").Contains(q, StringComparison.OrdinalIgnoreCase));
         }
-        private async Task OnSearchChanged(ChangeEventArgs e)
+        protected override async Task OnMapReadyAsync()
         {
-            _q = e.Value?.ToString();
+            // À ce stade : map bootée + container OK
+            await FitThrottledAsync();
+            await Task.Delay(50);
+            await FitThrottledAsync();
 
-            _searchCts?.Cancel();
-            _searchCts = new CancellationTokenSource();
-            var ct = _searchCts.Token;
-
-            try
-            {
-                await Task.Delay(200, ct); // debounce
-                await HighlightBestMatchAsync(ct);
-                await InvokeAsync(StateHasChanged); // if you want to update the “_q” badge
-            }
-            catch (TaskCanceledException) { }
+            await ReseedPlaceMarkersAsync(fit: true);
         }
+        private async Task ReseedPlaceMarkersAsync(bool fit)
+        {
+            if (_disposed) return;
+            if (!IsMapBooted) return;
 
+            try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
+
+            foreach (var dto in allPlaces)
+                await ApplySinglePlaceMarkerAsync(dto);
+
+            await FitThrottledAsync();
+            if (fit)
+            {
+                await FitThrottledAsync();
+            }
+        }
+        private async Task ApplySinglePlaceMarkerAsync(ClientPlaceDTO dto)
+        {
+            if (_disposed) return;
+            if (!IsMapBooted) return;
+            if (dto is null) return;
+
+            var lat = dto.Latitude;
+            var lng = dto.Longitude;
+
+            if (!double.IsFinite(lat) || !double.IsFinite(lng) || (lat == 0 && lng == 0) ||
+                lat is < -90 or > 90 || lng is < -180 or > 180)
+            {
+                lat = 50.85;
+                lng = 4.35;
+            }
+
+            await JS.InvokeVoidAsync(
+                "OutZenInterop.addOrUpdateCrowdMarker",
+                PlMarkerId(dto.Id),
+                lat,
+                lng,
+                new
+                {
+                    name = dto.Name ?? "Place",
+                    type = dto.Type,
+                    indoor = true,
+                    capacity = dto.Capacity,
+                    icon = "🏰",
+                    tag = dto.Tag
+                },
+                ScopeKey
+            );
+        }
 
         private async Task HighlightBestMatchAsync(CancellationToken ct)
         {
@@ -426,26 +447,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
         private void CloseDetail() => SelectedId = 0;
 
-        public async ValueTask DisposeAsync()
+        protected override async Task OnBeforeDisposeAsync()
         {
-            //if (_outzen is null)
-            //    return;
+            _disposed = true;
 
-            try
+            if (hubConnection is not null)
             {
-                await EnsureOutZenAsync();
-                await JS.InvokeVoidAsync("OutZenInterop.disposeOutZen", new { mapId = "placeMap", scopeKey = ScopeKey });
+                try { await hubConnection.StopAsync(); } catch { }
+                try { await hubConnection.DisposeAsync(); } catch { }
             }
-            catch { }
-
-            try { if (hubConnection is not null) await hubConnection.DisposeAsync(); } catch { }
-
-            // Bonus: Stop Hub properly
-            try { if (hubConnection is not null) await hubConnection.DisposeAsync(); } catch { }
-        }
-        private Task AfterSearchBind()
-        {
-            throw new NotImplementedException();
         }
     }
 }

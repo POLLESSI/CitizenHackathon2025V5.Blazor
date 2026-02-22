@@ -5,6 +5,8 @@
     --map-lift: 50px;
     --nav-h: 72px;
     --nav-z: 2000;
+    --nav-z-below: 1999;
+    --nav-z-above: 2001;
     --nav-bg: rgba(8,12,20,.92);
     --nav-border: rgba(255,255,255,.08);
     --overlay: rgba(0,0,0,.55);
@@ -47,6 +49,17 @@
     width: 100%;
     border-radius: 12px;
 }
+#leafletMap-weatherforecastview,
+#leafletMap-eventview {
+    height: 420px; /* or 100% if parent sized */
+    min-height: 320px;
+}
+#leafletMap-suggestionview {
+    height: 70vh;
+    min-height: 420px;
+    width: 100%;
+}
+
 /* NAV fixed to the viewport */
 nav.main-nav {
     position: fixed;
@@ -136,16 +149,16 @@ nav.main-nav.is-open .burger {
     position: fixed;
     inset: 0;
     background: var(--overlay);
-    z-index: calc(var(--nav-z) - 1);
+    z-index: var(--nav-z-below);
     opacity: 0;
     pointer-events: none;
     transition: opacity .18s ease;
 }
 
-    .nav-overlay.show {
-        opacity: 1;
-        pointer-events: auto;
-    }
+.nav-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
 
 /* Drawer */
 .nav-drawer {
@@ -158,7 +171,7 @@ nav.main-nav.is-open .burger {
     border-left: 1px solid rgba(255,255,255,.10);
     transform: translateX(100%);
     transition: transform .20s ease;
-    z-index: calc(var(--nav-z) + 1);
+    z-index: var(--nav-z-above);
     padding-top: var(--nav-h);
 }
 
@@ -191,7 +204,6 @@ nav.main-nav.is-open .burger {
     min-height: 320px;
     margin-top: 8px;
     /*transform: translateY(calc(-1 * var(--map-lift)));*/
-    transform: none !important;
     will-change: transform;
     overflow: visible;
 }
@@ -326,6 +338,12 @@ nav.main-nav {
         box-shadow: 0 0 0 0 rgba(255,0,0,.0);
     }
 }
+
+.oz-body {
+    padding: 10px 12px;
+    overflow: auto;
+    max-height: calc(min(70vh, 560px) - 44px);
+}
 /* Ensures that the divIcon bundle is visible */
 .oz-bundle-icon {
     pointer-events: auto !important;
@@ -426,10 +444,18 @@ nav.main-nav {
 
 
 .oz-detail-marker {
-    stroke: #fff;
-    fill: #00c2ff;
-    fill-opacity: .9;
+    stroke: rgba(255,255,255,.85);
     stroke-width: 2;
+    fill: #00c2ff;
+    fill-opacity: .95;
+}
+/* Place = violet */
+.oz-detail-marker--place {
+    fill: #3f116b; /* mauve */
+}
+/* Event = fuchsia */
+.oz-detail-marker--event {
+    fill: #a33c8f; /* fuchsia */
 }
 
 /* Dots categories (if you use them) — to be adapted */
@@ -442,11 +468,11 @@ nav.main-nav {
 }
 
 .oz-dot-events {
-    background: #ffcc00;
+    background: #a33c8f;
 }
 
 .oz-dot-places {
-    background: #00c2ff;
+    background: #3f116b;
 }
 
 .oz-dot-crowds {
@@ -461,8 +487,117 @@ nav.main-nav {
     background: #9b59ff;
 }
 
+.oz-dot-weather {
+    background: #9aa7ff;
+}
+
 .oz-bundle-popup {
     min-width: 240px;
+}
+
+/*.oz-gpt-fab {
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 9999;
+}*/
+
+/* Floating Window */
+.oz-gpt-drawer {
+    position: fixed;
+    left: 24px; /* starting point */
+    top: 120px; /* starting point */
+    width: min(420px, 92vw);
+    max-height: min(70vh, 560px);
+    z-index: 30000; /* > leaflet (and > nav 2000) */
+    background: rgba(10,14,24,.96);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    box-shadow: 0 18px 50px rgba(0,0,0,.45);
+    overflow: hidden; /* internal body scroll */
+    transform: translateY(0); /* it is no longer animated by translateY */
+    display: none; /* close */
+    pointer-events: auto !important;
+}
+
+/* Open */
+/*.oz-gpt-drawer.open {
+    display: block;
+}*/
+
+/* Barre draggable */
+/*.oz-gpt-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: 10px 12px;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    border-bottom: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.04);
+    touch-action: none;*/ /* CRITICAL for pointing events */
+    /*pointer-events: auto !important;
+}*/
+
+/*.oz-gpt-drawer.oz-dragging .oz-gpt-titlebar {
+    cursor: grabbing;
+}*/
+
+/*.oz-gpt-drawer.oz-dragging {
+    transition: none !important;
+    will-change: left, top;
+}*/
+
+/*.oz-gpt-titlebar:active {
+    cursor: grabbing;
+}*/
+
+/* Corps scrollable */
+/*.oz-gpt-body {
+    padding: 10px 12px;
+    overflow: auto;
+    max-height: calc(min(70vh, 560px) - 44px);*/ /* remove the title bar */
+/*}*/
+
+/* Pin on top = even higher z-index */
+/*.oz-gpt-drawer.pin-top {
+    z-index: 60000;
+}*/
+
+/*.oz-gpt-drawer:not(.pin-top) {
+    z-index: 30000;
+}*/
+
+/* Dock right */
+/*.oz-gpt-drawer.dock-right {
+    right: 18px;
+    left: auto !important;
+    top: 120px;
+}*/
+
+/* Minimize => keeps only the title bar */
+/*.oz-gpt-drawer.minimized .oz-gpt-body {
+    display: none;
+}*/
+
+/*.oz-gpt-drawer.minimized {
+    width: min(360px, 92vw);
+    max-height: none;
+}*/
+
+/*.oz-gpt-drawer.open {
+    transform: translateY(0);
+}*/
+
+/* IMPORTANT: during drag, avoid selection */
+.oz-dragging, .oz-dragging * {
+    user-select: none !important;
+}
+
+.oz-dragging .oz-titlebar {
+    cursor: grabbing;
 }
 
 .leaflet-popup-content-wrapper {
@@ -472,6 +607,22 @@ nav.main-nav {
 }
 .leaflet-marker-icon.oz-bundle-icon {
     filter: none !important;
+}
+
+.oz-bundle-icon .oz-dots {
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 3px;
+}
+
+.oz-bundle-icon .oz-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    border: 1px solid rgba(0,0,0,.55);
 }
 
 .oz-ant-icon {
@@ -488,11 +639,11 @@ nav.main-nav {
 }
 
 .oz-ant-lvl1 .oz-ant-dot {
-    background: #2ecc71;
+    background: #0ccc3c;
 }
 /* green */
 .oz-ant-lvl2 .oz-ant-dot {
-    background: #f39c12;
+    background: #cf6406;
 }
 /* orange */
 .oz-ant-lvl3 .oz-ant-dot {
@@ -572,10 +723,10 @@ nav.main-nav {
     background: rgba(237, 237, 228, 0.08) !important;
 }
 
-    /* A small "glow" on the first cell to guide the eye */
-    .oz-best-row td:first-child {
-        font-weight: 700;
-    }
+/* A small "glow" on the first cell to guide the eye */
+.oz-best-row td:first-child {
+    font-weight: 700;
+}
 
 
 .oz-bundle-list {
@@ -583,9 +734,9 @@ nav.main-nav {
     padding-left: 1.1rem;
 }
 
-    .oz-bundle-list li {
-        margin: .15rem 0;
-    }
+.oz-bundle-list li {
+    margin: .15rem 0;
+}
 
 .oz-map {
     width: 100%;
@@ -596,14 +747,20 @@ nav.main-nav {
 }
 .oz-map-shell {
     min-height: 420px; /* or 60vh */
-    height: 60vh; /* if you want responsive */
+    height: clamp(420px, 60vh, 720px);
     width: 100%;
     position: relative;
 }
-    .oz-map-shell > .leaflet-host {
-        height: 100%;
-        min-height: 420px;
-    }
+.oz-map-shell > .leaflet-host {
+    width: 100%;
+    height: 100%;
+    min-height: 420px;
+    display: block;
+}
+/* safety net if a parent flexes the height */
+.oz-map-shell, .leaflet-host {
+    min-height: 420px;
+}
 /* ===== Marker (divIcon) color levels ===== */
 .oz-marker {
     width: 26px;
@@ -616,18 +773,21 @@ nav.main-nav {
 }
 
 /* Markers individuels (divIcon) */
-.oz-marker .oz-marker-inner {
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    display: grid;
-    place-items: center;
-    color: #fff;
-    font-weight: 800;
-    border: 2px solid rgba(0,0,0,.55);
-    box-shadow: 0 10px 18px rgba(0,0,0,.25);
-}
-/* Place = blue */
+    .oz-marker .oz-marker-inner {
+        font-size: 16px;
+        line-height: 26px;
+        text-align: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-weight: 800;
+        border: 2px solid rgba(0,0,0,.55);
+        box-shadow: 0 10px 18px rgba(0,0,0,.25);
+    }
+/* Place = Violet */
 .oz-marker--place { /* possibly border */
 }
 
@@ -635,9 +795,9 @@ nav.main-nav {
     background: rgba(111, 0, 255,.95);
 }
 
-/* Event = yellow */
+/* Event = fuschia */
 .oz-marker--event .oz-marker-inner {
-    background: rgba(183, 0, 255,.95);
+    background: rgba(163, 60, 143,.95);
 }
 
 /* Traffic = rouge + outline distinct */
@@ -654,6 +814,11 @@ nav.main-nav {
 /* Weather = gris/bleu clair (ou basé sur severity) */
 /*.oz-marker--weather .oz-marker-inner {
     background: rgba(120,120,120,.85);*/
+/*}*/
+
+.oz-marker-inner {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 /* Unknown */
@@ -703,14 +868,14 @@ nav.main-nav {
 }
 
 .oz-marker--place .oz-marker-inner {
-    background: rgba(170, 0, 255,.95) !important;
+    background: rgba(63, 17, 107,.95) !important;
 }
 
 .oz-marker--event .oz-marker-inner {
     background: rgba(240, 7, 189,.95) !important;
 }
 /* Optional: “traffic” adds an outline or distinctive style */
-.oz-marker-traffic {
+.oz-marker--traffic .oz-marker-inner {
     outline: 2px solid rgba(255,255,255,.35);
 }
 
@@ -778,6 +943,283 @@ nav.main-nav {
     font-size: 16px;
     font-weight: 700;
 }
+/* Prevents the browser from interpreting drag as scroll/zoom on mobile */
+.oz-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    padding: 10px 12px;
+    cursor: grab;
+    user-select: none;
+    border-bottom: 1px solid rgba(255,255,255,.10);
+    background: rgba(255,255,255,.04);
+    touch-action: none; /* IMPORTANT for pointer events */
+}
+
+/* Ensures the window is above the map */
+.oz-drawer {
+    position: fixed;
+    left: 24px;
+    top: 120px;
+    width: min(420px, 92vw);
+    max-width: none;
+    max-height: min(70vh, 560px);
+    /*resize: both;*/
+    min-width: 260px;
+    min-height: 120px;
+    z-index: 30000;
+    background: rgba(10,14,24,.35);
+    /* ⬇️ glass effect */
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    box-shadow: 0 18px 50px rgba(0,0,0,.45);
+    overflow: hidden;
+    display: none; /* closed */
+    pointer-events: auto;
+}
+
+.oz-drawer.open {
+    display: block;
+}
+
+.oz-drawer.oz-front {
+    z-index: 65000;
+}
+
+.oz-drawer.oz-dragging .oz-titlebar {
+    cursor: grabbing;
+}
+
+/* states */
+.oz-drawer.pin-top {
+    z-index: 65000;
+}
+
+.oz-drawer.dock-right {
+    right: 18px;
+    left: auto !important;
+    top: 120px;
+}
+
+.oz-drawer.minimized .oz-body {
+    display: none;
+}
+
+.oz-drawer.minimized {
+    max-height: none;
+}
+
+/* bring-to-front helper class */
+.oz-drawer.oz-front {
+    z-index: 70000;
+}
+
+.oz-drawer.oz-resizing {
+    transition: none !important;
+    will-change: width, height;
+}
+/* ===== Common: drawer content fills and internal panes can scroll ===== */
+/* 1) oz-body becomes a flex column that can shrink */
+.oz-drawer.oz-drawer--fill .oz-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: 100%;
+    min-height: 0; /* CRITIQUE */
+    overflow: hidden; /* We let the children scroll, not the body */
+}
+
+/* 2) Any card inside must be able to shrink */
+.oz-drawer.oz-drawer--fill .oz-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 0; /* CRITIQUE */
+}
+
+/* 3) This is your reusable "fill remaining space and scroll" block */
+.oz-drawer.oz-drawer--fill .table-wrapper--fill,
+.oz-drawer.oz-drawer--fill .oz-scrollfill {
+    flex: 1 1 auto;
+    min-height: 0; /* CRITIQUE */
+    overflow: auto;
+}
+
+.table-wrapper--fill .oz-scrollfill {
+    overflow: auto;
+}
+/* 4) Stable table sizing */
+.oz-drawer.oz-drawer--fill table {
+    width: 100%;
+    table-layout: fixed;
+}
+
+.oz-resize-handle {
+    pointer-events: auto;
+    z-index: 5;
+}
+
+.oz-glass {
+    background: rgba(10,14,24,.35);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,.12);
+    box-shadow: 0 18px 50px rgba(0,0,0,.45);
+}
+
+.rain-toast {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 9999;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(30,30,30,.92);
+    border: 1px solid rgba(255,255,255,.12);
+    max-width: 420px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.35);
+}
+
+.rain-toast__icon {
+    font-size: 20px;
+    margin-top: 2px;
+}
+
+.rain-toast__title {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.rain-toast__msg {
+    opacity: .95;
+}
+
+.rain-toast__meta {
+    opacity: .75;
+    font-size: .9em;
+    margin-top: 6px;
+}
+
+.rain-toast__close {
+    background: transparent;
+    border: none;
+    color: rgba(255,255,255,.8);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 2px 6px;
+}
+
+#gptDrawer.oz-drawer {
+    background: rgba(10,14,24,.55);
+}
+
+#gptDrawer .oz-body {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+#gptDrawer .oz-scrollfill {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+/* === Message drawer narrower === */
+#msgDrawer.oz-drawer {
+    width: min(420px, 92vw);
+    max-width: none;
+}
+
+/* 1) The drawer body must be a flexible column */
+#msgDrawer .oz-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px; /* optional */
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Prevent tables from forcing window width */
+#msgDrawer .table-wrapper {
+    width: 100%;
+    overflow: auto;
+}
+
+#msgDrawer table {
+    width: 100%;
+    table-layout: fixed; /* Key: avoids exploding columns */
+}
+
+#msgDrawer td:nth-child(4) {
+    white-space: normal;
+}
+
+/* 2) The card and its contents must be able to shrink.*/
+#msgDrawer .oz-card {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+#msgDrawer td, #msgDrawer th {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#msgDrawer .styled-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+/* Line 1: meta */
+#msgDrawer tr.msg-head td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: .95;
+}
+
+/* Option: reduce the "false" column 4 */
+#msgDrawer td.c-spacer {
+    width: 0;
+    padding: 0;
+}
+
+/* Line 2: content */
+#msgDrawer tr.msg-body td {
+    padding-top: 6px;
+    padding-bottom: 10px;
+    border-top: none;
+}
+
+#msgDrawer .msg-content {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.25;
+    opacity: 0.98;
+}
+
+/* 3) The table-wrapper fills the remaining space and scrolls */
+#msgDrawer .table-wrapper--fill {
+    flex: 1 1 auto;
+    min-height: 220px; 
+    overflow: auto;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 12px;
+}
+
+    /* 4) Optional: more stable tableS */
+#msgDrawer .table-wrapper--fill table {
+    width: 100%;
+    table-layout: fixed;
+}
 
 .oz-subtitle {
     font-size: 12px;
@@ -788,6 +1230,22 @@ nav.main-nav {
     display: flex;
     gap: 14px;
     margin: 10px 0;
+}
+
+.oz-resize-handle {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    width: 14px;
+    height: 14px;
+    cursor: se-resize;
+    opacity: .75;
+    border-right: 2px solid rgba(255,255,255,.35);
+    border-bottom: 2px solid rgba(255,255,255,.35);
+}
+
+.oz-resize-handle:hover {
+    opacity: 1;
 }
 
 .oz-kv {
@@ -866,10 +1324,18 @@ nav.main-nav {
 }
 
 /* Highlight marker: a class is applied to the marker's DOM icon */
-.oz-marker-highlight {
-    filter: drop-shadow(0 0 8px rgba(255,255,255,.9));
+/*.oz-marker-highlight {
+    filter: drop-shadow(0 0 8px rgba(255,255,255,.35));
     transform: scale(1.25);
     transition: transform 120ms ease, filter 120ms ease;
+}*/
+
+/* highlight on inner only */
+.oz-marker-highlight .oz-marker-inner {
+    transform: scale(1.25);
+    transform-origin: center;
+    transition: transform 120ms ease, filter 120ms ease;
+    filter: drop-shadow(0 0 8px rgba(255,255,255,.9));
 }
 
 .oz-marker-dim {
@@ -953,6 +1419,307 @@ tr.oz-row-hot {
     }
 }
 
+/* =========================================================
+   OUTZEN — LEAFLET MARKERS (LEAFLET-SAFE)
+   RULE: NEVER set transform on .leaflet-marker-icon itself.
+   Animate/scale ONLY inside (.oz-marker-inner / .oz-cal-pin / etc.)
+   ========================================================= */
+
+/* ---------- Leaflet containers: sizing only (NO transform) ---------- */
+.leaflet-marker-icon.oz-marker,
+.leaflet-marker-icon.oz-bundle-icon,
+.leaflet-marker-icon.oz-cal-icon,
+.leaflet-marker-icon.oz-ant-icon {
+    width: 26px !important;
+    height: 26px !important;
+    min-width: 26px !important;
+    min-height: 26px !important;
+    max-width: 26px !important;
+    max-height: 26px !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: block !important;
+    /* DO NOT set transform here */
+}
+
+/* Bundle bigger */
+.leaflet-marker-icon.oz-bundle-icon {
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    max-width: 34px !important;
+    max-height: 34px !important;
+    z-index: 99999 !important;
+}
+
+/* Optional pane layering (safe) */
+.leaflet-marker-pane {
+    z-index: 650;
+}
+
+.leaflet-tooltip-pane {
+    z-index: 700;
+}
+
+.leaflet-popup-pane {
+    z-index: 750;
+}
+
+/* ---------- Generic marker wrapper: NO transform ---------- */
+/* IMPORTANT: .oz-marker is often on the SAME element as .leaflet-marker-icon */
+.leaflet-marker-icon.oz-marker {
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    /* DO NOT set transform */
+}
+
+    /* Inner = you own it (safe to animate/scale) */
+    .leaflet-marker-icon.oz-marker .oz-marker-inner {
+        width: 26px !important;
+        height: 26px !important;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-weight: 800;
+        font-size: 16px;
+        line-height: 1;
+        border: 2px solid rgba(0,0,0,.55);
+        box-shadow: 0 10px 18px rgba(0,0,0,.25);
+        transform-origin: center;
+        /* transform allowed here */
+    }
+
+    /* Severity background (wrapper carries lvlX, inner gets color) */
+    .leaflet-marker-icon.oz-marker.oz-marker-lvl0 .oz-marker-inner {
+        background: rgba(120,120,120,.85);
+    }
+
+    .leaflet-marker-icon.oz-marker.oz-marker-lvl1 .oz-marker-inner {
+        background: rgba(76,175,80,.95);
+    }
+
+    .leaflet-marker-icon.oz-marker.oz-marker-lvl2 .oz-marker-inner {
+        background: rgba(255,152,0,.95);
+    }
+
+    .leaflet-marker-icon.oz-marker.oz-marker-lvl3 .oz-marker-inner {
+        background: rgba(244,67,54,.95);
+    }
+
+    .leaflet-marker-icon.oz-marker.oz-marker-lvl4 .oz-marker-inner {
+        background: rgba(183,28,28,.98);
+    }
+
+    /* Category overrides (safe: affects inner only) */
+    .leaflet-marker-icon.oz-marker.oz-marker--place .oz-marker-inner {
+        background: rgba(63,17,107,.95) !important;
+    }
+
+    .leaflet-marker-icon.oz-marker.oz-marker--event .oz-marker-inner {
+        background: rgba(240,7,189,.95) !important;
+    }
+
+    .leaflet-marker-icon.oz-marker.oz-marker--suggestion .oz-marker-inner {
+        background: rgba(155,89,255,.95) !important;
+    }
+
+    .leaflet-marker-icon.oz-marker.oz-marker--traffic .oz-marker-inner {
+        outline: 2px solid rgba(255,255,255,.35);
+    }
+
+    /* Dim (safe on container, no transform) */
+    .leaflet-marker-icon.oz-marker.oz-marker-dim {
+        opacity: .35 !important;
+    }
+
+    /* ---------- Highlight (FIXED): NEVER transform the container ---------- */
+    /* You can style the container with filters, but scale only the inner. */
+    .leaflet-marker-icon.oz-marker.oz-marker-highlight {
+        filter: drop-shadow(0 0 8px rgba(255,255,255,.35));
+    }
+
+        .leaflet-marker-icon.oz-marker.oz-marker-highlight .oz-marker-inner {
+            transform: scale(1.25);
+            transition: transform 120ms ease, filter 120ms ease;
+            filter: drop-shadow(0 0 8px rgba(255,255,255,.9));
+        }
+
+/* Pulse (safe): animate inner, not container */
+@keyframes ozMarkerPulse {
+    0% {
+        transform: scale(1);
+    }
+
+    40% {
+        transform: scale(1.18);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.leaflet-marker-icon.oz-marker.oz-pulse .oz-marker-inner {
+    animation: ozMarkerPulse 1.2s ease-out 1;
+}
+
+/* ---------- Bundle (divIcon content) ---------- */
+.leaflet-marker-icon.oz-bundle-icon {
+    pointer-events: auto !important;
+    filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));
+}
+
+    .leaflet-marker-icon.oz-bundle-icon .oz-bundle {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font-weight: 900;
+        border: 2px solid rgba(0,0,0,.65);
+        box-shadow: 0 8px 22px rgba(0,0,0,.35);
+    }
+
+        .leaflet-marker-icon.oz-bundle-icon .oz-bundle .oz-count {
+            filter: drop-shadow(0 2px 2px rgba(0,0,0,.35));
+        }
+
+        /* Bundle levels */
+        .leaflet-marker-icon.oz-bundle-icon .oz-bundle.oz-bundle-lvl0 {
+            background: rgba(120,120,120,.85);
+        }
+
+        .leaflet-marker-icon.oz-bundle-icon .oz-bundle.oz-bundle-lvl1 {
+            background: rgba(76,175,80,.95);
+        }
+
+        .leaflet-marker-icon.oz-bundle-icon .oz-bundle.oz-bundle-lvl2 {
+            background: rgba(255,152,0,.95);
+        }
+
+        .leaflet-marker-icon.oz-bundle-icon .oz-bundle.oz-bundle-lvl3 {
+            background: rgba(244,67,54,.95);
+        }
+
+        .leaflet-marker-icon.oz-bundle-icon .oz-bundle.oz-bundle-lvl4 {
+            background: rgba(183,28,28,.98);
+        }
+
+    /* Bundle dots (transform inside is OK) */
+    .leaflet-marker-icon.oz-bundle-icon .oz-dots {
+        position: absolute;
+        bottom: -6px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        gap: 3px;
+    }
+
+    .leaflet-marker-icon.oz-bundle-icon .oz-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        border: 1px solid rgba(0,0,0,.55);
+    }
+
+    /* Weather tag on bundle */
+    .leaflet-marker-icon.oz-bundle-icon .oz-bundle-weather .oz-bundle-tag {
+        position: absolute;
+        right: -6px;
+        top: -8px;
+        font-size: 14px;
+        filter: drop-shadow(0 1px 2px rgba(0,0,0,.6));
+    }
+
+/* ---------- Calendar icon ---------- */
+.leaflet-marker-icon.oz-cal-icon {
+    background: transparent !important;
+    border: none !important;
+}
+    /* safe to animate pin (inner) */
+    .leaflet-marker-icon.oz-cal-icon .oz-cal-pin {
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 2px solid rgba(255,255,255,.85);
+        box-shadow: 0 6px 18px rgba(0,0,0,.35);
+        backdrop-filter: blur(2px);
+        transform-origin: center;
+    }
+
+    .leaflet-marker-icon.oz-cal-icon .oz-cal-emoji {
+        font-size: 14px;
+        line-height: 1;
+    }
+
+    .leaflet-marker-icon.oz-cal-icon.oz-cal-lvl1 .oz-cal-pin {
+        background: rgba(40,180,99,.95);
+    }
+
+    .leaflet-marker-icon.oz-cal-icon.oz-cal-lvl2 .oz-cal-pin {
+        background: rgba(241,196,15,.95);
+    }
+
+    .leaflet-marker-icon.oz-cal-icon.oz-cal-lvl3 .oz-cal-pin {
+        background: rgba(230,126,34,.95);
+    }
+
+    .leaflet-marker-icon.oz-cal-icon.oz-cal-lvl4 .oz-cal-pin {
+        background: rgba(231,76,60,.98);
+    }
+
+@keyframes ozCalBlink {
+    0%,100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+
+    50% {
+        transform: scale(1.10);
+        filter: brightness(1.35);
+    }
+}
+
+.leaflet-marker-icon.oz-cal-icon.oz-cal-critical .oz-cal-pin {
+    animation: ozCalBlink .8s infinite;
+}
+
+/* ---------- Antenna icon ---------- */
+.leaflet-marker-icon.oz-ant-icon {
+    background: transparent;
+    border: 0;
+}
+
+    .leaflet-marker-icon.oz-ant-icon .oz-ant-dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 999px;
+        border: 2px solid rgba(255,255,255,.85);
+        box-shadow: 0 0 0 2px rgba(0,0,0,.25);
+    }
+
+    .leaflet-marker-icon.oz-ant-icon.oz-ant-lvl1 .oz-ant-dot {
+        background: #0ccc3c;
+    }
+
+    .leaflet-marker-icon.oz-ant-icon.oz-ant-lvl2 .oz-ant-dot {
+        background: #cf6406;
+    }
+
+    .leaflet-marker-icon.oz-ant-icon.oz-ant-lvl3 .oz-ant-dot {
+        background: #e74c3c;
+    }
+
+    .leaflet-marker-icon.oz-ant-icon.oz-ant-lvl4 .oz-ant-dot {
+        background: #ff0044;
+    }
 
 
 

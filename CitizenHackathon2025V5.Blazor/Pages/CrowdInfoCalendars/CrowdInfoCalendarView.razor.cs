@@ -1,313 +1,163 @@
-﻿//CrowdInfoCalendarView.razor.cs
+﻿// CrowdInfoCalendarView.razor.cs
 using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Contracts.Hubs;
+using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
+using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interop;
 using CitizenHackathon2025V5.Blazor.Client.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Utils;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using System.Collections.Concurrent;
-using static CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService;
-//CrowdInfoCalendarView: scopeKey = "calendar"
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 {
-    public partial class CrowdInfoCalendarView : IAsyncDisposable
+    public partial class CrowdInfoCalendarView : OutZenMapPageBase
     {
+#nullable disable
+        // ===== Inject =====
         [Inject] public CrowdInfoCalendarService CrowdInfoCalendarService { get; set; } = default!;
         [Inject] public NavigationManager Navigation { get; set; } = default!;
         [Inject] public IJSRuntime JS { get; set; } = default!;
         [Inject] public IConfiguration Config { get; set; } = default!;
         [Inject] public IAuthService Auth { get; set; } = default!;
+        [Inject] public IHubUrlBuilder HubUrls { get; set; } = default!; // If you already have it, otherwise delete it and keep the manual build.
 
-        private const string ApiBase = "https://localhost:7254";
+        //private const string ApiBase = "https://localhost:7254";
 
-        private HubConnection? hubConnection;
+        // ===== OutZen contract =====
+        protected override string ScopeKey => "crowdinfocalendarview";
 
-        // === Data ===
+        // ⚠️ MPORTANT: correct your typo: "crowdinfocaledarview" -> "crowdinfocaledarview"
+        protected override string MapId => "leafletMap-crowdinfocalendarview";
+
+        // boot options
+        protected override (double lat, double lng) DefaultCenter => (50.89, 4.34);
+        protected override int DefaultZoom => 14;
+
+        // Optionnel
+        protected override bool ForceBootOnFirstRender => true;
+        protected override bool ResetMarkersOnBoot => true;
+        // ===== SignalR =====
+        private HubConnection _hub;
+
+        // ===== Search form fields (used by .razor) =====
+        private DateTime from = DateTime.UtcNow.Date.AddDays(-7);
+        private DateTime to = DateTime.UtcNow.Date.AddDays(+7);
+        private string region = "";
+        private int? placeId = null;
+        private long _lastFitTicks;
+        private static string CICMarkerId(int id) => $"calendar/{id:int}";
+        private string activeFilter = ""; // "", "true", "false"
+
+        // Razor expects this exact name:
+        private List<ClientCrowdInfoCalendarDTO> allCrowdInfoCalendars;
+
+        // ===== Data =====
         public List<ClientCrowdInfoCalendarDTO> CrowdInfoCalendars { get; set; } = new();
-        private List<ClientCrowdInfoCalendarDTO> allCrowdInfoCalendars = new();
-        private List<ClientCrowdInfoCalendarDTO> VisibleCrowdInfoCalendars = new();
+        private List<ClientCrowdInfoCalendarDTO> _all = new();
+        private readonly List<ClientCrowdInfoCalendarDTO> _visible = new();
 
-        private IJSObjectReference? _outzen;
-        private int currentIndex = 0;
+        private int _currentIndex = 0;
         private const int PageSize = 25;
-        private const int MaxBootRetries = 25;
 
-        // === UI & Scroll ===
+        // ===== UI / filtering =====
         private ElementReference ScrollContainerRef;
         private ElementReference TableScrollRef;
         private string _q = string.Empty;
         private bool _onlyRecent;
-        private bool _booted;
 
-        // === Earth canvas ids (if used elsewhere) ===
-        private DateTime? from;
-        private DateTime? to;
-        private string? region;
-        private int? placeId;
-        private string? activeFilter; // "", "true", "false"
-        private string _speedId = $"speedRange-{Guid.NewGuid():N}";
-        private readonly Dictionary<int, int> _lastLevels = new();
-        private bool _initialDataApplied = false;
+        // ===== Map state =====
+        private bool _disposed;
 
-        // === SignalR buffering until map ready ===
+        // ===== Hub buffering until map ready =====
         private readonly ConcurrentQueue<ClientCrowdInfoCalendarDTO> _pendingHubUpdates = new();
+        private readonly Dictionary<int, int> _lastLevels = new();
+
         public int SelectedId { get; set; }
 
+        // ----------------------------
+        // Lifecycle
+        // ----------------------------
         protected override async Task OnInitializedAsync()
         {
-            //var exists = await JS.InvokeAsync<bool>("checkElementExists", "leafletMap");
-            try
-            {
-                var fetched = (await CrowdInfoCalendarService.GetAllSafeAsync()).ToList();
-                CrowdInfoCalendars = fetched;
-                allCrowdInfoCalendars = fetched;
-                VisibleCrowdInfoCalendars.Clear();
-                currentIndex = 0;
-                LoadMoreItems();
-               
-                foreach (var co in fetched)
-                    _lastLevels[co.Id] = co.ExpectedLevel.GetValueOrDefault();
-
-                //await InvokeAsync(StateHasChanged);
-
-                // Hub SignalR
-                var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? ApiBase;
-                var hubUrl = $"{apiBaseUrl}/hubs/{CrowdCalendarHubMethods.HubPath}";
-
-                hubConnection = new HubConnectionBuilder()
-                    .WithUrl(hubUrl, options =>
-                    {
-                        options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
-                    })
-                    .WithAutomaticReconnect()
-                    .Build();
-
-                RegisterHubHandlers();
-                await hubConnection.StartAsync();
-                Console.WriteLine($"✅ Connected to {hubUrl}");
-
-                // 🔁 Catch-up: if the map is already ready, we push the markers now
-                if (_booted && _outzen is not null && VisibleCrowdInfoCalendars.Any())
-                {
-                    Console.WriteLine($"[CrowdInfoCalendarView] Data loaded after map. Syncing {FilterCrowdCalendar(VisibleCrowdInfoCalendars).Count()} markers.");
-                    await SyncMapMarkersAsync(fit: true);
-                }
-            }
-            catch (Exception ex)
-            {
-
-                Console.Error.WriteLine($"❌ Init error: {ex.Message}");
-            }
+            await LoadAllAsync();
+            allCrowdInfoCalendars = _all;
+            await StartSignalRAsync();
             await InvokeAsync(StateHasChanged);
         }
-        private void RegisterHubHandlers()
+        protected override async Task OnMapReadyAsync()
         {
-            if (hubConnection is null) return;
+            // À ce stade : map bootée + container OK
+            await FitThrottledAsync();
+            await Task.Delay(50);
+            await FitThrottledAsync();
 
-            hubConnection.On<ClientCrowdInfoCalendarDTO>("ReceiveCrowdCalendarUpdate", async dto =>
-            {
-                UpsertLocal(dto);
-
-                int prev = _lastLevels.TryGetValue(dto.Id, out var p) ? p : 0;
-                int next = dto.ExpectedLevel.GetValueOrDefault();
-                _lastLevels[dto.Id] = next;
-
-                // beep si tu veux sur ExpectedLevel (ou autre logique)
-                if (_initialDataApplied && prev < 4 && next == 4)
-                {
-                    try { await JS.InvokeVoidAsync("OutZenInterop.beepCritical", dto.Id); } catch { }
-                }
-
-                if (!_booted || _outzen is null)
-                {
-                    _pendingHubUpdates.Enqueue(dto);
-                    await InvokeAsync(StateHasChanged);
-                    return;
-                }
-
-                var lvl = Math.Clamp(next, 1, SharedConstants.MaxCrowdLevel);
-
-                await _outzen.InvokeVoidAsync("addOrUpdateCrowdCalendarMarker",
-                    $"cc:{dto.Id}", dto.Latitude, dto.Longitude, lvl,
-                    new { title = dto.EventName, description = $"Maj {dto.DateUtc:HH:mm:ss}", icon = "🥁🎉" });
-
-                await InvokeAsync(StateHasChanged);
-            });
-
-            hubConnection.On<int>("CrowdInfoArchived", async id =>
-            {
-                CrowdInfoCalendars.RemoveAll(c => c.Id == id);
-                allCrowdInfoCalendars.RemoveAll(c => c.Id == id);
-                VisibleCrowdInfoCalendars.RemoveAll(c => c.Id == id);
-
-                if (_booted && _outzen is not null)
-                {
-                    await _outzen.InvokeVoidAsync("removeCrowdCalendarMarker", $"cc:{id}");
-                    await SyncMapMarkersAsync(fit: false);
-                }
-
-                await InvokeAsync(StateHasChanged);
-            });
-        }
-        private void UpsertLocal(ClientCrowdInfoCalendarDTO dto)
-        {
-            void Upsert(List<ClientCrowdInfoCalendarDTO> list)
-            {
-                var i = list.FindIndex(c => c.Id == dto.Id);
-                if (i >= 0) list[i] = dto; else list.Add(dto);
-            }
-            Upsert(CrowdInfoCalendars);
-            Upsert(allCrowdInfoCalendars);
-
-            var j = VisibleCrowdInfoCalendars.FindIndex(c => c.Id == dto.Id);
-            if (j >= 0) VisibleCrowdInfoCalendars[j] = dto;
-        }
-
-        private bool _mapInitStarted = false;
-        protected override async Task OnAfterRenderAsync(bool firstRender)
-        {
-            if (!firstRender || _booted || _mapInitStarted) return;
-            _mapInitStarted = true;
-
-            // 0) Wait container exists
-            for (var i = 0; i < 10; i++)
-            {
-                if (await JS.InvokeAsync<bool>("checkElementExists", "leafletMap")) break;
-                await Task.Delay(150);
-                if (i == 9) { Console.WriteLine("❌ leafletMap not found."); return; }
-            }
-
-            _outzen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
-
-            var ok = await _outzen.InvokeAsync<bool>("bootOutZen", new
-            {
-                mapId = "leafletMap",
-                center = new[] { 50.89, 4.34 },
-                zoom = 13,
-                enableChart = true,
-                force = true
-            });
-
-            if (!ok) { Console.WriteLine("❌ bootOutZen failed"); return; }
-
-            try { await _outzen.InvokeVoidAsync("enableHybridZoom", false, 13); } catch { }
-            // Readiness check (no custom isOutZenReady required)
-            string? current = null;
-            for (var i = 0; i < 20; i++)
-            {
-                try { current = await _outzen.InvokeAsync<string>("getCurrentMapId"); } catch { }
-                if (!string.IsNullOrWhiteSpace(current)) break;
-                await Task.Delay(150);
-            }
-            if (string.IsNullOrWhiteSpace(current)) { Console.WriteLine("❌ map not ready"); return; }
-
-            try { await _outzen.InvokeVoidAsync("refreshMapSize"); } catch { }
-
-            if (!VisibleCrowdInfoCalendars.Any())
-            {
-                Console.WriteLine("[CrowdInfoCalendarView] Visible is empty, rebuilding from all...");
-                VisibleCrowdInfoCalendars.Clear();
-                currentIndex = 0;
-                LoadMoreItems();
-            }
-            // Seed from current visible data
-            await SyncMapMarkersAsync(fit: true);
-
-            // Flush buffered hub updates
+            await ReseedCrowdInfoCalendarMarkersAsync(fit: true);
             while (_pendingHubUpdates.TryDequeue(out var dto))
-            {
-                if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude)) continue;
-                if (dto.Latitude == 0 && dto.Longitude == 0) continue;
-
-                int lvlInt = Math.Clamp(dto.ExpectedLevel.GetValueOrDefault(), 1, SharedConstants.MaxCrowdLevel);
-                byte lvlByte = (byte)lvlInt;
-                await _outzen.InvokeVoidAsync("addOrUpdateCrowdCalendarMarker",
-                    $"cc:{dto.Id}", dto.Latitude, dto.Longitude, lvlInt,
-                    new { title = dto.EventName, description = $"Maj {dto.DateUtc:HH:mm:ss}", icon = "🥁🎉" });
-            }
-
-            try { await _outzen.InvokeVoidAsync("fitToCalendarMarkers"); } catch { }
-
-            _initialDataApplied = true;
-            _booted = true;
+                await ApplySingleMarkerUpdateAsync(dto, alreadyBooted: true);
         }
 
-        private async Task SyncMapMarkersAsync(bool fit = true)
+        private async Task ReseedCrowdInfoCalendarMarkersAsync(bool fit)
         {
-            if (_outzen is null) return;
+            if (_disposed) return;
+            if (!IsMapBooted) return;
+
+            //try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
+
+            foreach (var dto in _all)
+                await ApplySingleMarkerUpdateAsync(dto, alreadyBooted: true);
+
+            if (fit) await FitThrottledAsync();
+        }
+        private async Task FitThrottledAsync(int ms = 250)
+        {
+            var now = Environment.TickCount64;
+            if (now - _lastFitTicks < ms) return;
+            _lastFitTicks = now;
+
             try
             {
-                var items = FilterCrowdCalendar(VisibleCrowdInfoCalendars).ToList();
-                Console.WriteLine($"[CrowdInfoCalendarView] SyncMapMarkersAsync: {items.Count} markers.");
-
-                Console.WriteLine("[Calendar] calling clearCrowdCalendarMarkers");
-                await _outzen.InvokeVoidAsync("clearCrowdCalendarMarkers");
-
-                foreach (var co in items)
-                {
-                    if (!double.IsFinite(co.Latitude) || !double.IsFinite(co.Longitude)) continue;
-                    if (co.Latitude == 0 && co.Longitude == 0) continue;
-
-                    var lvl = Math.Clamp(co.ExpectedLevel.GetValueOrDefault(), 1, SharedConstants.MaxCrowdLevel);
-
-                    await _outzen.InvokeVoidAsync("addOrUpdateCrowdCalendarMarker",
-                        $"cc:{co.Id}", co.Latitude, co.Longitude, lvl,
-                        new { title = co.EventName, description = $"Maj {co.DateUtc:HH:mm:ss}", icon = "🥁🎉" });
-
-                    Console.WriteLine($"[CrowdInfoCalendarView] Marker: {co.Id} -> {co.Latitude},{co.Longitude}");
-                }
-
-                if (fit && items.Any())
-                {
-                    try { await _outzen.InvokeVoidAsync("fitToCalendarMarkers"); } catch { }
-                }
-                Console.WriteLine($"[Calendar] after filter -> {items.Count} (onlyRecent={_onlyRecent}, q='{_q}')");
+                await MapInterop.RefreshSizeAsync(ScopeKey);
+                await MapInterop.FitToDetailsAsync(ScopeKey);
             }
-            catch (JSException jsex)
-            {
-                Console.Error.WriteLine($"❌ JSInterop failed: {jsex.Message}");
-            }
+            catch { }
         }
 
-        private void GoNew() => Nav.NavigateTo("/crowdcalendar/new");
-        private void GoDetail(int id) => Nav.NavigateTo($"/crowdcalendar/{id}");
-
-        private async Task Load()
+        // ----------------------------
+        // Loading + pagination
+        // ----------------------------
+        private async Task LoadAllAsync()
         {
-            bool? active = activeFilter switch { "true" => true, "false" => false, _ => (bool?)null };
+            var fetched = (await CrowdInfoCalendarService.GetAllSafeAsync())?.ToList() ?? new List<ClientCrowdInfoCalendarDTO>();
 
-            // ✅ Safe-null + empty list
-            allCrowdInfoCalendars = (await Svc.ListAsync(from, to, region, placeId, active))?.ToList() ?? new List<ClientCrowdInfoCalendarDTO>();
-        }
-
-        private async Task LoadAll()
-        {
-            var fetched = await CrowdInfoCalendarService.GetAllSafeAsync();
             CrowdInfoCalendars = fetched;
-            allCrowdInfoCalendars = fetched;
-            VisibleCrowdInfoCalendars.Clear();
-            currentIndex = 0;
+            _all = fetched;
+
+            _visible.Clear();
+            _currentIndex = 0;
             LoadMoreItems();
+
+            _lastLevels.Clear();
+            foreach (var co in fetched)
+                _lastLevels[co.Id] = co.ExpectedLevel.GetValueOrDefault();
         }
 
         private void LoadMoreItems()
         {
-            var next = allCrowdInfoCalendars.Skip(currentIndex).Take(PageSize).ToList();
-            VisibleCrowdInfoCalendars.AddRange(next);
-            currentIndex += next.Count;
-            Console.WriteLine($"[Calendar] LoadMoreItems -> added {next.Count}, visible={VisibleCrowdInfoCalendars.Count}, all={allCrowdInfoCalendars.Count}");
+            var next = _all.Skip(_currentIndex).Take(PageSize).ToList();
+            _visible.AddRange(next);
+            _currentIndex += next.Count;
         }
 
-        private IEnumerable<ClientCrowdInfoCalendarDTO> FilterCrowdCalendar(IEnumerable<ClientCrowdInfoCalendarDTO> source)
+        private IEnumerable<ClientCrowdInfoCalendarDTO> Filter(IEnumerable<ClientCrowdInfoCalendarDTO> source)
         {
             var q = _q?.Trim();
             var cutoff = DateTime.UtcNow.AddHours(-6);
 
-            Console.WriteLine($"[Filter] q='{_q}', onlyRecent={_onlyRecent}, totalVisible={source.Count()}");
             return source
                 .Where(x =>
                     string.IsNullOrEmpty(q) ||
@@ -317,34 +167,173 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
                 .Where(x => !_onlyRecent || x.DateUtc >= cutoff);
         }
 
+        // ----------------------------
+        // SignalR
+        // ----------------------------
+        private async Task StartSignalRAsync()
+        {
+            // If you have IHubUrlBuilder, prefer:
+            // var hubUrl = HubUrls.Build(HubPaths.CrowdCalendar); // according to your project
+            // Alternatively, manual build:
+            var hubUrl = HubUrls.Build(CrowdCalendarHubMethods.HubPath);
+
+            _hub = new HubConnectionBuilder()
+                .WithUrl(hubUrl, options =>
+                {
+                    options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
+                })
+                .WithAutomaticReconnect()
+                .Build();
+
+            _hub.On<ClientCrowdInfoCalendarDTO>("ReceiveCrowdCalendarUpdate", async dto =>
+            {
+                UpsertLocal(dto);
+
+                // detect level change
+                int prev = _lastLevels.TryGetValue(dto.Id, out var p) ? p : 0;
+                int next = dto.ExpectedLevel.GetValueOrDefault();
+                _lastLevels[dto.Id] = next;
+
+                if (!IsMapBooted)
+                {
+                    _pendingHubUpdates.Enqueue(dto);
+                    await InvokeAsync(StateHasChanged);
+                    return;
+                }
+
+                await ApplySingleMarkerUpdateAsync(dto);
+                await InvokeAsync(StateHasChanged);
+            });
+
+            _hub.On<int>("CrowdInfoArchived", async id =>
+            {
+                CrowdInfoCalendars.RemoveAll(c => c.Id == id);
+                _all.RemoveAll(c => c.Id == id);
+                _visible.RemoveAll(c => c.Id == id);
+
+                if (IsMapBooted)
+                {
+                    //try { await JS.InvokeVoidAsync("OutZenInterop.removeCrowdCalendarMarker", $"calendar:{id}", ScopeKey); } catch { }
+                    await SyncMapMarkersAsync(fit: false);
+                }
+
+                await InvokeAsync(StateHasChanged);
+            });
+
+            await _hub.StartAsync();
+            Console.WriteLine($"✅ Connected to {hubUrl}");
+
+            // catch-up: if the map is already booted when hub starts
+            if (IsMapBooted && _visible.Count > 0)
+                await SyncMapMarkersAsync(fit: true);
+        }
+
+        private void UpsertLocal(ClientCrowdInfoCalendarDTO dto)
+        {
+            static void Upsert(List<ClientCrowdInfoCalendarDTO> list, ClientCrowdInfoCalendarDTO item)
+            {
+                var i = list.FindIndex(c => c.Id == item.Id);
+                if (i >= 0) list[i] = item; else list.Add(item);
+            }
+
+            Upsert(CrowdInfoCalendars, dto);
+            Upsert(_all, dto);
+
+            var j = _visible.FindIndex(c => c.Id == dto.Id);
+            if (j >= 0) _visible[j] = dto;
+        }
+
+        // ----------------------------
+        // Map markers
+        // ----------------------------
+        private async Task SyncMapMarkersAsync(bool fit)
+        {
+            if (!IsMapBooted) return;
+
+            var items = Filter(_visible).ToList();
+
+            // Clear calendar markers (global wrapper)
+            //try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdCalendarMarkers", ScopeKey); } catch { }
+
+            foreach (var co in items)
+                await ApplySingleMarkerUpdateAsync(co, alreadyBooted: true);
+
+            if (fit && items.Any())
+            {
+                await FitThrottledAsync();
+            }
+        }
+
+        private async Task ApplySingleMarkerUpdateAsync(ClientCrowdInfoCalendarDTO dto, bool alreadyBooted = false)
+        {
+            if (!alreadyBooted && !IsMapBooted) return;
+
+            if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude)) return;
+            if (dto.Latitude == 0 && dto.Longitude == 0) return;
+
+            var lvl = Math.Clamp(dto.ExpectedLevel.GetValueOrDefault(), 1, SharedConstants.MaxCrowdLevel);
+            static string FmtTs(TimeSpan? ts) => ts is null ? "—" : ts.Value.ToString(@"hh\:mm\:ss");
+
+            await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdCalendarMarker",
+                CICMarkerId(dto.Id),
+                dto.Latitude,
+                dto.Longitude,
+                lvl,
+                new
+                {
+                    eventname = dto.EventName,
+                    description =
+                        $"Start Local Time {FmtTs(dto.StartLocalTime)}, " +
+                        $"End Local Time {FmtTs(dto.EndLocalTime)}, " +
+                        $"LeadHours {dto.LeadHours}, Confidence {dto.Confidence} %",
+                    messagetemplate = dto.MessageTemplate?.ToString(),
+                    active = dto.Active,
+                    icon = "🥁🎉"
+                },
+                ScopeKey);
+        }
+
+        // ----------------------------
+        // Scroll + filters (call from razor)
+        // ----------------------------
         private async Task HandleScroll()
         {
             var scrollTop = await JS.InvokeAsync<int>("getScrollTop", TableScrollRef);
             var scrollHeight = await JS.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
             var clientHeight = await JS.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
 
-            if (scrollTop + clientHeight >= scrollHeight - 5 && currentIndex < allCrowdInfoCalendars.Count)
+            if (scrollTop + clientHeight >= scrollHeight - 5 && _currentIndex < _all.Count)
             {
                 LoadMoreItems();
-                await SyncMapMarkersAsync(fit: false);
-                StateHasChanged();
+                if (IsMapBooted) await SyncMapMarkersAsync(fit: false);
+                await InvokeAsync(StateHasChanged);
             }
         }
 
         private void ToggleRecent()
         {
             _onlyRecent = !_onlyRecent;
-            _ = SyncMapMarkersAsync(fit: true);
+            if (IsMapBooted) _ = SyncMapMarkersAsync(fit: true);
         }
 
         private string Q
         {
             get => _q;
-            set { _q = value; _ = SyncMapMarkersAsync(fit: true); }
+            set
+            {
+                _q = value;
+                if (IsMapBooted) _ = SyncMapMarkersAsync(fit: true);
+            }
         }
 
+        // ----------------------------
+        // Navigation helpers (optionnels)
+        // ----------------------------
+        private void GoNew() => Navigation.NavigateTo("/crowdcalendar/new");
+        private void GoDetail(int id) => Navigation.NavigateTo($"/calendar/{id}");
+
         private static string InfoDescCalendar(ClientCrowdInfoCalendarDTO co)
-             => CrowdInfoSeverityHelpers.GetDescription(CrowdInfoSeverityHelpers.GetSeverity(co));
+            => CrowdInfoSeverityHelpers.GetDescription(CrowdInfoSeverityHelpers.GetSeverity(co));
 
         private static string GetLevelCss(int level)
         {
@@ -353,26 +342,84 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
         }
 
         private void ClickInfo(int id) => SelectedId = id;
-        public async ValueTask DisposeAsync()
-        {
-            try
-            {
-                if (_outzen is not null)
-                {
-                    try { await _outzen.InvokeVoidAsync("disposeOutZen", new { mapId = "leafletMap" }); } catch { }
-                    await _outzen.DisposeAsync();
-                }
-            }
-            catch { }
 
-            if (hubConnection is not null)
+        private async Task Load()
+        {
+            // ⚠️ Adapt to your actual service (existing methods)
+            // Idea: you call a filtered endpoint: from/to/region/placeId/active
+            // If you don't have a filtered method, fallback -> LoadAllAsync()
+
+            if (CrowdInfoCalendarService is null)
+                return;
+
+            bool? active = activeFilter switch
             {
-                try { await hubConnection.StopAsync(); } catch { }
-                try { await hubConnection.DisposeAsync(); } catch { }
+                "true" => true,
+                "false" => false,
+                _ => null
+            };
+
+            List<ClientCrowdInfoCalendarDTO> fetched;
+
+            // ✅ If you have a filtered method, use it:
+            // fetched = (await CrowdInfoCalendarService.SearchAsync(from, to, region, placeId, active))?.ToList() ?? new();
+
+            // ✅ Alternatively: simple fallback (then client-side filtering)
+            fetched = (await CrowdInfoCalendarService.GetAllSafeAsync())?.ToList() ?? new();
+
+            // Minimal local filtering (if no SearchAsync)
+            fetched = fetched
+                .Where(x => x.DateUtc.Date >= from.Date && x.DateUtc.Date <= to.Date)
+                .Where(x => string.IsNullOrWhiteSpace(region) || string.Equals(x.RegionCode, region, StringComparison.OrdinalIgnoreCase))
+                .Where(x => !placeId.HasValue || x.PlaceId == placeId.Value)
+                .Where(x =>
+                {
+                    if (active is null) return true;
+                    return x.Active == active.Value;
+                })
+                .ToList();
+
+            allCrowdInfoCalendars = fetched;
+
+            // You can also feed your existing pipeline
+            CrowdInfoCalendars = fetched;
+            _all = fetched;
+            _visible.Clear();
+            _currentIndex = 0;
+            LoadMoreItems();
+
+            if (IsMapBooted) await SyncMapMarkersAsync(fit: true);
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task LoadAll()
+        {
+            await LoadAllAsync();
+            allCrowdInfoCalendars = _all;
+
+            if (IsMapBooted) await SyncMapMarkersAsync(fit: true);
+            await InvokeAsync(StateHasChanged);
+        }
+
+        // ----------------------------
+        // Dispose
+        // ----------------------------
+        protected override async Task OnBeforeDisposeAsync()
+        {
+            _disposed = true;
+
+            if (_hub is not null)
+            {
+                try { await _hub.StopAsync(); } catch { }
+                try { await _hub.DisposeAsync(); } catch { }
             }
+
+            //WeatherHub.HeavyRainReceived -= OnHeavyRainReceived;
         }
     }
 }
+
 
 
 

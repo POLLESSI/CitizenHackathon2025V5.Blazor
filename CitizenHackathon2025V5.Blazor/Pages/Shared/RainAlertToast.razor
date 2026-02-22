@@ -1,0 +1,37 @@
+﻿@using CitizenHackathon2025.Contracts.DTOs
+
+@if (Alert is not null)
+{
+    <div class="rain-toast">
+        <div class="rain-toast__icon">🌧️</div>
+
+        <div class="rain-toast__body">
+            <div class="rain-toast__title">Alerte pluie</div>
+            <div class="rain-toast__msg">@Alert.Message</div>
+
+            @if (Alert.IsNearSensitiveArea && !string.IsNullOrWhiteSpace(Alert.SensitiveAreaName))
+            {
+                <div class="rain-toast__sensitive">
+                    Zone sensible : @Alert.SensitiveAreaName
+                </div>
+            }
+
+            <div class="rain-toast__meta">
+                1h : @Alert.Total1h:F1 mm • 72h : @Alert.Total72h:F1 mm
+            </div>
+        </div>
+
+        <button class="rain-toast__close" @onclick="DismissAsync">✕</button>
+    </div>
+}
+
+@code {
+    [Parameter] public RainAlertDTO? Alert { get; set; }
+    [Parameter] public EventCallback OnDismiss { get; set; }
+
+    private async Task DismissAsync()
+    {
+        if (OnDismiss.HasDelegate)
+            await OnDismiss.InvokeAsync();
+    }
+}

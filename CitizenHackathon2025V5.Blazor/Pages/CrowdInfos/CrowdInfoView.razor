@@ -2,14 +2,17 @@
 @using CitizenHackathon2025.Blazor.DTOs;
 @using CitizenHackathon2025V5.Blazor.Client.Utils
 @using CitizenHackathon2025V5.Blazor.Client.Enums
+@inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
+
 @inject IJSRuntime js
 @implements IAsyncDisposable
 
 <span class="fas fa-certificate me-2"></span> Crowd Infos
 
 <div class="crowd-page">
-    <div class="map-host" id="leafletMap" style="height:480px; min-height:480px;"></div>
-
+    <div class="oz-map-shell">
+        <div id="@MapId" class="leaflet-host"></div>
+    </div>
     @* <div class="list-panel" @ref="ScrollContainerRef" @onscroll="HandleScroll">
         @foreach (var co in visibleCrowdInfos)
         {
@@ -60,13 +63,13 @@
                 </tr>
             </thead>
             <tbody>
-                @if (!FilterCrowd(visibleCrowdInfos).Any())
+                @if (!FilterCrowd(_visible).Any())
                 {
                     <tr><td colspan="3"><div class="empty-state">No Crowd Informations Available.</div></td></tr>
                 }
                 else
                 {
-                    @foreach (var co in FilterCrowd(visibleCrowdInfos))
+                    @foreach (var co in FilterCrowd(_visible))
                     {
                         <tr>
                             <td>@co.LocationName</td>
@@ -109,38 +112,6 @@
     </div>
 }
 
-@code {
-    async Task TestMarkers()
-    {
-        if (_outzen is null) return;
-
-        var testData = new[]
-        {
-        new { Id=1, Lat=50.89, Lng=4.34, Level=2, Name="Medium" },
-        new { Id=2, Lat=50.88, Lng=4.35, Level=3, Name="Hight" },
-        new { Id=3, Lat=50.90, Lng=4.33, Level=4, Name="Critic" }
-    };
-
-        foreach (var t in testData)
-        {
-            await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
-                t.Id, t.Lat, t.Lng, t.Level,
-                new { title = t.Name, description = "Test" });
-        }
-
-        try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
-    }
-
-    async Task TestBoot()
-    {
-        if (_outzen is null) return;
-
-        await _outzen.InvokeVoidAsync("clearCrowdMarkers");
-        await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker", "999", 50.89, 4.34, 5,
-            new { title = "TEST", description = "debug" });
-        try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
-    }
-}
 
 
 

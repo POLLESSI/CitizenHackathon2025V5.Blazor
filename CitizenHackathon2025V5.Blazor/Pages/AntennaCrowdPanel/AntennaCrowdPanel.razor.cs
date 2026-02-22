@@ -1,19 +1,20 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Blazor.DTOs.Security;
 using CitizenHackathon2025.Contracts.Hubs;
+using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
+using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
-using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.JSInterop;
 using System.Collections.Concurrent;
-//AntennaCrowdPanelView: if no map -> scope useless; if mini-map ->scopeKey="antenna" + dedicated mapId
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
 {
-    public partial class AntennaCrowdPanel 
+    public partial class AntennaCrowdPanel : OutZenMapPageBase
     {
     #nullable disable
         // --- Inject ---
@@ -22,7 +23,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
         [Inject] public IConfiguration Config { get; set; }
         [Inject] public IAuthService Auth { get; set; }
         [Inject] public IHubUrlBuilder HubUrls { get; set; }
-
         [Inject] public AntennaService AntennaService { get; set; }
         [Inject] public AntennaCrowdService AntennaCrowdService { get; set; }
 
@@ -31,28 +31,35 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
         [Parameter] public int WindowMinutes { get; set; } = 10;
         [Parameter] public double MaxRadiusMeters { get; set; } = 5000;
         [Parameter] public int RefreshSeconds { get; set; } = 10;
-
-        /// <summary>
-        /// If true: refresh uses SignalR Hub method RequestEventCrowd(eventId,...)
-        /// If false: refresh uses HTTP GET api/crowdinfoantenna/event/{id}/crowd...
-        /// </summary>
         [Parameter] public bool RefreshViaHub { get; set; } = true;
 
-        // --- Data: antennas list + pagination ---
+        // --- Map contract ---
+        protected override string ScopeKey => "antennacrowdpanel";
+        protected override string MapId => "leafletMap-antennacrowdpanel";
+
+        // Activate the map if your .razor file contains a <div id="leafletMap-antennacrowdpanel">
+
+        // boot options
+        protected override (double lat, double lng) DefaultCenter => (50.89, 4.34);
+        protected override int DefaultZoom => 14;
+
+        // Optional
+        protected override bool ForceBootOnFirstRender => true;
+        protected override bool ResetMarkersOnBoot => true;
+
+        // --- Data ---
         public List<ClientCrowdInfoAntennaDTO> Antennas { get; set; } = new();
+
         private List<ClientCrowdInfoAntennaDTO> _allAntennas = new();
         private readonly List<ClientCrowdInfoAntennaDTO> _visibleAntennas = new();
         private int _currentIndex = 0;
         private const int PageSize = 25;
+        private long _lastFitTicks;
+        private static string ANPMarkerId(int id) => $"{id:int}/counts";
 
-        // --- Event crowd (nearest antenna + counts) ---
         private ClientEventAntennaCrowdDTO _eventCrowd;
         private bool _loading;
-
-        // --- Leaflet module ---
-        private IJSObjectReference _outzen;
-        private bool _booted;
-        private bool _mapInitStarted;
+        private bool _disposed;
 
         // --- SignalR ---
         private HubConnection _hub;
@@ -60,28 +67,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
         private readonly Dictionary<int, ClientAntennaCountsDTO> _countsByAntenna = new();
         private readonly HashSet<int> _joinedAntennaGroups = new();
         private int? _joinedEventGroup;
+        private long _lastRefreshTicks;
 
         // --- Timer ---
         private PeriodicTimer _timer;
         private CancellationTokenSource _cts;
 
-        // --- UI refs (if you use them in razor) ---
+        // --- UI refs ---
         private ElementReference ScrollContainerRef;
         private ElementReference TableScrollRef;
 
-        // --- Filtering/search (optional, still clean) ---
         private string _q = string.Empty;
 
-        // ----------------------------
-        // Lifecycle
-        // ----------------------------
-        protected override bool MapEnabled => false;
-
-        // Required (contract), but unused if MapEnabled=false
-        protected override string ScopeKey => "antenna";
-        protected override string MapId => "outzenMap_antenna";
         protected override async Task OnInitializedAsync()
         {
+            _cts = new CancellationTokenSource();
             await LoadAntennasAsync();
             await StartSignalRAsync();
         }
@@ -93,66 +93,96 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
             await EnsureEventGroupJoinedAsync();
         }
 
-        protected override async Task OnAfterRenderAsync(bool firstRender)
+        // ✅ Called when the map is booted (by OutZenMapPageBase)
+        private async Task FitThrottledAsync(int ms = 250)
         {
-            if (!firstRender || _booted || _mapInitStarted) return;
-            _mapInitStarted = true;
+            var now = Environment.TickCount64;
+            if (now - _lastFitTicks < ms) return;
+            _lastFitTicks = now;
 
-            // Wait container exists
-            for (var i = 0; i < 10; i++)
+            try
             {
-                if (await JS.InvokeAsync<bool>("checkElementExists", "leafletMap")) break;
-                await Task.Delay(150);
-                if (i == 9) return;
+                await MapInterop.RefreshSizeAsync(ScopeKey);
+                // si tu veux "fit", utilise FitToDetailsAsync (déjà existant)
+                await MapInterop.FitToDetailsAsync(ScopeKey);
             }
+            catch { }
+        }
+        protected override async Task OnMapReadyAsync()
+        {
+            // At this stage: map booted + container OK
+            await FitThrottledAsync();
+            await Task.Delay(50);
+            await FitThrottledAsync();
 
-            _outzen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
-
-            var ok = await _outzen.InvokeAsync<bool>("bootOutZen", new
-            {
-                mapId = "leafletMap",
-                center = new[] { 50.89, 4.34 },
-                zoom = 13,
-                enableChart = false,
-                force = true
-            });
-
-            if (!ok) return;
-
-            // basic readiness (if your module has isOutZenReady)
-            bool ready = false;
-            for (var i = 0; i < 25; i++)
-            {
-                try { ready = await _outzen.InvokeAsync<bool>("isOutZenReady"); } catch { }
-                if (ready) break;
-                await Task.Delay(120);
-            }
-            if (!ready) return;
-
-            try { await _outzen.InvokeVoidAsync("refreshMapSize"); } catch { }
-
-            // Seed markers with currently visible antennas
-            await SyncVisibleAntennaMarkersAsync(fit: true);
-
-            // Flush pending counts updates received before map boot
+            await ReseedAntennaCrowdPanelMarkersAsync(fit: true);
             while (_pendingCountsUntilMap.TryDequeue(out var item))
             {
-                await UpdateAntennaMarkerLevelAsync(item.AntennaId, item.Counts);
+                try { await UpdateAntennaMarkerLevelAsync(item.AntennaId, item.Counts); } catch { }
+            }
+            //await UpdateChartAsync();
+        }
+
+        private async Task ReseedAntennaCrowdPanelMarkersAsync(bool fit)
+        {
+            if (_disposed) return;
+            if (!IsMapBooted) return;
+
+            try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
+
+            foreach (var dto in _allAntennas)
+                await ApplySingleAntennaCrowdPanelMarkerAsync(dto);
+
+            await FitThrottledAsync();
+            if (fit)
+            {
+                await FitThrottledAsync();
+            }
+        }
+
+        private async Task ApplySingleAntennaCrowdPanelMarkerAsync(ClientCrowdInfoAntennaDTO dto)
+        {
+            if (_disposed) return;
+            if (!IsMapBooted) return;
+            if (dto is null) return;
+
+            var lat = dto.Latitude;
+            var lng = dto.Longitude;
+
+            if (!double.IsFinite(lat) || !double.IsFinite(lng) || (lat == 0 && lng == 0) ||
+                lat is < -90 or > 90 || lng is < -180 or > 180)
+            {
+                lat = 50.85;
+                lng = 4.35;
             }
 
-            _booted = true;
-            await InvokeAsync(StateHasChanged);
+            await JS.InvokeVoidAsync(
+                "OutZenInterop.addOrUpdateCrowdMarker",
+                ANPMarkerId(dto.Id),
+                lat,
+                lng,
+                1, // initial (or calculated) level
+                new
+                {
+                    title = dto.Name ?? "Crowd Antenna",
+                    description = $"Created Utc: {dto.CreatedUtc:HH:mm:ss} • Max: {dto.MaxCapacity}",
+                    kind = "antenna",
+                    icon = "📡👥"
+                },
+                ScopeKey
+            );
         }
 
         // ----------------------------
         // Antennas loading + pagination
         // ----------------------------
+
         private async Task LoadAntennasAsync()
         {
             try
             {
                 var fetched = await AntennaService.GetAllAsync(_cts?.Token ?? CancellationToken.None);
-                Antennas = fetched ?? new List<ClientCrowdInfoAntennaDTO>();
+                Antennas = fetched ?? new();
 
                 _allAntennas = Antennas
                     .Where(a => a is not null)
@@ -163,9 +193,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
                 _currentIndex = 0;
                 LoadMoreItems();
 
-                // Join groups for the initial visible page
                 await JoinGroupsForVisibleAsync();
-
                 await InvokeAsync(StateHasChanged);
             }
             catch (Exception ex)
@@ -196,10 +224,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
             _currentIndex += next.Count;
         }
 
-        /// <summary>
-        /// Called by your scroll handler when user hits bottom.
-        /// Adds next page + joins antenna groups for new antennas + sync markers.
-        /// </summary>
         private async Task LoadMoreAndSyncAsync()
         {
             var before = _visibleAntennas.Select(a => a.Id).ToHashSet();
@@ -212,13 +236,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
             await InvokeAsync(StateHasChanged);
         }
 
-        // ----------------------------
-        // Join/Leave groups when scrolling
-        // ----------------------------
-
-        /// <summary>
-        /// Join groups for all antennas in _visibleAntennas (initial page).
-        /// </summary>
         private Task JoinGroupsForVisibleAsync()
             => JoinGroupsAsync(_visibleAntennas.Select(a => a.Id));
 
@@ -241,46 +258,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
             }
         }
 
-        private async Task LeaveGroupsAsync(IEnumerable<int> antennaIds)
-        {
-            if (_hub is null) return;
-
-            foreach (var id in antennaIds.Distinct())
-            {
-                if (!_joinedAntennaGroups.Contains(id)) continue;
-                try
-                {
-                    await _hub.InvokeAsync(CrowdInfoAntennaConnectionHubMethods.FromClient.LeaveAntenna, id);
-                    _joinedAntennaGroups.Remove(id);
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"❌ LeaveAntenna({id}) failed: {ex.Message}");
-                }
-            }
-        }
-
-        /// <summary>
-        /// Optional optimization: keep only groups for visible antennas.
-        /// Call this if you implement "virtualization" where visible set changes a lot.
-        /// </summary>
-        private async Task NormalizeJoinedGroupsToVisibleAsync()
-        {
-            var visibleIds = _visibleAntennas.Select(a => a.Id).ToHashSet();
-            var toLeave = _joinedAntennaGroups.Where(id => !visibleIds.Contains(id)).ToList();
-            var toJoin = visibleIds.Where(id => !_joinedAntennaGroups.Contains(id)).ToList();
-
-            await LeaveGroupsAsync(toLeave);
-            await JoinGroupsAsync(toJoin);
-        }
-
         private async Task EnsureEventGroupJoinedAsync()
         {
             if (_hub is null) return;
-
             var desired = SelectedEventId;
 
-            // leave previous
             if (_joinedEventGroup is not null && _joinedEventGroup != desired)
             {
                 try { await _hub.InvokeAsync(CrowdInfoAntennaConnectionHubMethods.FromClient.LeaveEvent, _joinedEventGroup.Value); }
@@ -288,7 +270,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
                 _joinedEventGroup = null;
             }
 
-            // join new
             if (desired is not null && _joinedEventGroup != desired)
             {
                 try
@@ -302,10 +283,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
                 }
             }
         }
-
-        // ----------------------------
-        // SignalR setup + handlers
-        // ----------------------------
         private async Task StartSignalRAsync()
         {
             var hubUrl = HubUrls.Build(HubPaths.AntennaConnection);
@@ -318,58 +295,51 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
                 .WithAutomaticReconnect()
                 .Build();
 
-            // counts per antenna updates
             _hub.On<ClientAntennaCountsUpdateDTO>(
                 CrowdInfoAntennaConnectionHubMethods.ToClient.AntennaCountsUpdated,
                 async msg =>
                 {
                     _countsByAntenna[msg.AntennaId] = msg.Counts;
 
-                    if (!_booted || _outzen is null)
-                        _pendingCountsUntilMap.Enqueue((msg.AntennaId, msg.Counts));
-                    else
-                        await UpdateAntennaMarkerLevelAsync(msg.AntennaId, msg.Counts);
+                    // If the map is not booted, it is queued (flush at OnMapReadyAsync).
+                    _pendingCountsUntilMap.Enqueue((msg.AntennaId, msg.Counts));
+
+                    // If the map is already ready, apply it directly.
+                    if (IsMapBooted)
+                    {
+                        try { await UpdateAntennaMarkerLevelAsync(msg.AntennaId, msg.Counts); } catch { }
+                    }
 
                     await InvokeAsync(StateHasChanged);
                 });
 
-            // event crowd updates (event -> nearest antenna -> counts)
             _hub.On<ClientEventAntennaCrowdDTO>(
                 CrowdInfoAntennaConnectionHubMethods.ToClient.EventCrowdUpdated,
                 async dto =>
                 {
                     _eventCrowd = dto;
-
-                    // reflect marker change for the nearest antenna
                     if (dto is not null)
                     {
                         _countsByAntenna[dto.AntennaId] = dto.Counts;
-
-                        if (!_booted || _outzen is null)
-                            _pendingCountsUntilMap.Enqueue((dto.AntennaId, dto.Counts));
-                        else
-                            await UpdateAntennaMarkerLevelAsync(dto.AntennaId, dto.Counts);
+                        _pendingCountsUntilMap.Enqueue((dto.AntennaId, dto.Counts));
+                        if (IsMapBooted)
+                        {
+                            try { await UpdateAntennaMarkerLevelAsync(dto.AntennaId, dto.Counts); } catch { }
+                        }
                     }
-
                     await InvokeAsync(StateHasChanged);
                 });
 
             await _hub.StartAsync();
             Console.WriteLine($"✅ Connected to {hubUrl}");
 
-            // join initial visible antenna groups + current event group
             await JoinGroupsForVisibleAsync();
             await EnsureEventGroupJoinedAsync();
         }
 
-        // ----------------------------
-        // Refresh strategy: Hub push vs HTTP pull
-        // ----------------------------
         private async Task ResetTimerAsync()
         {
-            _cts?.Cancel();
-            _cts?.Dispose();
-            _cts = new CancellationTokenSource();
+            _cts ??= new CancellationTokenSource();
 
             _timer?.Dispose();
             _timer = new PeriodicTimer(TimeSpan.FromSeconds(Math.Max(5, RefreshSeconds)));
@@ -379,11 +349,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
                 try
                 {
                     while (_timer is not null && await _timer.WaitForNextTickAsync(_cts.Token))
-                    {
                         await InvokeAsync(() => RefreshEventCrowdAsync(force: false));
-                    }
                 }
-                catch { /* ignore */ }
+                catch { }
             }, _cts.Token);
         }
 
@@ -391,16 +359,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
         {
             if (SelectedEventId is null) { _eventCrowd = null; return; }
 
-            // If using hub: call RequestEventCrowd -> server replies via EventCrowdUpdated
             if (RefreshViaHub && _hub is not null && _hub.State == HubConnectionState.Connected)
             {
                 try
                 {
-                    // Avoid spamming if not forced and no event group joined
                     await EnsureEventGroupJoinedAsync();
 
                     await _hub.InvokeAsync(
-                        CrowdInfoAntennaConnectionHubMethods.FromClient.RequestEventCrowd, // <-- see note below
+                        CrowdInfoAntennaConnectionHubMethods.FromClient.RequestEventCrowd,
                         SelectedEventId.Value,
                         WindowMinutes,
                         MaxRadiusMeters);
@@ -409,12 +375,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
                 }
                 catch (Exception ex)
                 {
-                    // fallback to HTTP if hub fails
                     Console.Error.WriteLine($"⚠️ Hub refresh failed, fallback HTTP: {ex.Message}");
                 }
             }
 
-            // HTTP fallback/pull
             _loading = true;
             try
             {
@@ -431,17 +395,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
             }
         }
 
-        // NOTE:
-        // Your Contracts class CrowdInfoAntennaConnectionHubMethods currently does NOT include "RequestEventCrowd".
-        // Add it there (FromClient) with const string RequestEventCrowd = "RequestEventCrowd";
-        // otherwise replace the InvokeAsync string with the raw method name.
-
-        // ----------------------------
-        // Leaflet markers sync + color by capacity
-        // ----------------------------
         private async Task SyncVisibleAntennaMarkersAsync(bool fit)
         {
-            if (_outzen is null) return;
+            if (!IsMapBooted) return;
 
             foreach (var a in _visibleAntennas)
             {
@@ -451,48 +407,73 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
                 var counts = _countsByAntenna.TryGetValue(a.Id, out var c) ? c : null;
                 var level = ComputeLevelByCapacity(a, counts?.ActiveConnections ?? 0);
 
-                var markerId = $"ant:{a.Id}";
-                var title = a.Name ?? $"Antenne {a.Id}";
-                var desc = counts is null
-                    ? "Aucune donnée récente"
-                    : $"{counts.ActiveConnections} connexions • {counts.UniqueDevices} devices";
-
-                await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateAntennaMarker",
-                    markerId,
-                    a.Latitude,
-                    a.Longitude,
-                    level,
-                    new { title, description = desc });
+                // ⚠️ IMPORTANT: Call the actual JS API you have: addOrUpdateAntennaMarker(antenna, scopeKey)
+                // -> So send the antenna object and your scopeKey, not (id,lat,lng,level,...)
+                await MapInterop.EnsureAsync();
+                await JS.InvokeAsync<bool>("OutZenInterop.addOrUpdateAntennaMarker", new
+                {
+                    Id = a.Id,
+                    Name = a.Name,
+                    Description = a.Description,
+                    Latitude = a.Latitude,
+                    Longitude = a.Longitude,
+                    Level = level
+                }, ScopeKey);
             }
-
-            if (fit && _visibleAntennas.Count > 0)
+            if (fit)
             {
-                try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
+                try { await MapInterop.FitToMarkersAsync(ScopeKey); } catch { }
             }
         }
-
         private async Task UpdateAntennaMarkerLevelAsync(int antennaId, ClientAntennaCountsDTO counts)
         {
-            if (_outzen is null) return;
+            if (_disposed) return;
+            if (!IsMapBooted) return;
 
             var antenna = _allAntennas.FirstOrDefault(a => a.Id == antennaId);
-            var level = ComputeLevelByCapacity(antenna, counts.ActiveConnections);
+            if (antenna is null) return;
 
-            await _outzen.InvokeVoidAsync("setAntennaMarkerLevel",
-                $"ant:{antennaId}",
-                level,
-                new { title = antenna?.Name ?? $"Antenne {antennaId}", description = $"{counts.ActiveConnections} connexions" });
+            var lat = antenna.Latitude;
+            var lng = antenna.Longitude;
+            if (!double.IsFinite(lat) || !double.IsFinite(lng) || (lat == 0 && lng == 0) ||
+                lat is < -90 or > 90 || lng is < -180 or > 180)
+            {
+                return; // or fallback Brussels if you prefer
+            }
+
+            var active = Math.Max(0, counts?.ActiveConnections ?? 0);
+            var cap = antenna.MaxCapacity.GetValueOrDefault(0);
+
+            var level = ComputeLevelByCapacity(antenna, active);
+
+            // warning condition : capacity reached (cap > 0)
+            var isAtCapacity = cap > 0 && active >= cap;
+            var isNearCapacity = cap > 0 && active >= (int)(cap * 0.9);
+
+            var icon = isAtCapacity ? "📡🔴" : (isNearCapacity ? "📡🟠" : "📡🟢");
+            level = isAtCapacity ? 4 : (isNearCapacity ? Math.Max(level, 3) : level);
+
+            var desc = cap > 0
+                ? $"{active}/{cap} connections • {counts?.UniqueDevices ?? 0} devices"
+                : $"{active} connections • {counts?.UniqueDevices ?? 0} devices";
+
+            await MapInterop.UpsertCrowdMarkerAsync(
+                id: ANPMarkerId(antenna.Id),
+                lat: lat,
+                lng: lng,
+                level: isAtCapacity ? 4 : level,
+                info: new
+                {
+                    title = antenna.Name ?? $"Antenna #{antenna.Id}",
+                    description = (isAtCapacity ? "⚠️ CAPACITY ACHIEVED • " : "") + desc,
+                    kind = "antenna",
+                    isWarning = isAtCapacity,
+                    icon = isAtCapacity ? "📡⚠️" : "📡👥"
+                },
+                scopeKey: ScopeKey
+            );
         }
 
-        /// <summary>
-        /// Computes the severity 1..4 based on antenna capacity.
-        /// - Green: <= 30% capacity
-        /// - Orange: <= 60%
-        /// - Red: <= 90%
-        /// - Bright red: > 90%
-        /// 
-        /// If no capacity known, fallback to config thresholds Normal/High/NearCapacity.
-        /// </summary>
         private int ComputeLevelByCapacity(ClientCrowdInfoAntennaDTO antenna, int activeConnections)
         {
             var cap = ResolveCapacity(antenna);
@@ -506,7 +487,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
                 return 4;
             }
 
-            // Fallback: thresholds from config or defaults
             var normalMax = GetIntCfg("OutZen:Antenna:NormalMax", 50);
             var highMax = GetIntCfg("OutZen:Antenna:HighMax", 120);
             var nearMax = GetIntCfg("OutZen:Antenna:NearCapacityMax", 200);
@@ -519,11 +499,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
 
         private int ResolveCapacity(ClientCrowdInfoAntennaDTO antenna)
         {
-            // MaxCapacity est typiquement int? (nullable)
             if (antenna?.MaxCapacity is > 0)
                 return antenna.MaxCapacity!.Value;
 
             return GetIntCfg("OutZen:Antenna:DefaultCapacity", 0);
+        }
+
+        private async Task HandleScrollAsync()
+        {
+            // If you're not using these JS helpers, replace it with a DOM calculation via JS interop.
+            var scrollTop = await JS.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
+            var scrollHeight = await JS.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
+            var clientHeight = await JS.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
+
+            if (scrollTop + clientHeight >= scrollHeight - 5)
+            {
+                if (_currentIndex < ApplyFilter(_allAntennas).Count())
+                {
+                    await LoadMoreAndSyncAsync();
+                }
+            }
         }
 
         private int GetIntCfg(string key, int fallback)
@@ -533,46 +528,22 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
                 var s = Config[key];
                 return int.TryParse(s, out var n) ? n : fallback;
             }
-            catch
-            {
-                return fallback;
-            }
-        }
-        // ----------------------------
-        // Scroll handler hook (call from razor)
-        // ----------------------------
-        private async Task HandleScrollAsync()
-        {
-            // Your JS functions must exist:
-            // getScrollTop, getScrollHeight, getClientHeight
-            var scrollTop = await JS.InvokeAsync<int>("getScrollTop", TableScrollRef);
-            var scrollHeight = await JS.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
-            var clientHeight = await JS.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
-
-            if (scrollTop + clientHeight >= scrollHeight - 5)
-            {
-                // If still more to load
-                if (_currentIndex < ApplyFilter(_allAntennas).Count())
-                {
-                    await LoadMoreAndSyncAsync();
-
-                    // Optional: normalize joined groups to visible (if you also remove items)
-                    // await NormalizeJoinedGroupsToVisibleAsync();
-                }
-            }
+            catch { return fallback; }
         }
 
-        // ----------------------------
-        // Disposal
-        // ----------------------------
-        public void Dispose()
+        protected override async Task OnBeforeDisposeAsync()
         {
-            _cts?.Cancel();
-            _cts?.Dispose();
-            _timer?.Dispose();
+            _disposed = true;
+
+            if (_hub is not null)
+            {
+                try { await _hub.StopAsync(); } catch { }
+                try { await _hub.DisposeAsync(); } catch { }
+            }
         }
     }
 }
+
 
 
 

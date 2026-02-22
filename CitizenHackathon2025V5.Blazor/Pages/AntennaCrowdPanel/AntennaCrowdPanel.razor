@@ -6,8 +6,9 @@
 <h1>Antenna Crowd Panel</h1>
 
 <div class="antennaCrowd-page">
-    <div class="map-host" id="leafletMap" style="height:480px; min-height:480px;"></div>
-
+    <div class="oz-map-shell">
+        <div id="@MapId" class="leaflet-host"></div>
+    </div>
     <div class="antenna-list"
          @ref="ScrollContainerRef"
          @onscroll="HandleScrollAsync"

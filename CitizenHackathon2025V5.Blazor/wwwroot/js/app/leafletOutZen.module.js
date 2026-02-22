@@ -3,77 +3,57 @@
 "use strict";
 
 /* =========================================================
-   OutZen Leaflet Module (ESM)
-   - Hot reload safe singleton
-   - bootOutZen(map)
-   - Markers (generic + weather)
-   - Bundles (grouped by proximity)
-   - Hybrid zoom: bundles far, details near
+   OutZen Leaflet Module (ESM) - Guarded & Hot-reload safe
+   - Singleton per scopeKey: __OutZenSingleton__{scopeKey}
+   - bootOutZen / disposeOutZen
+   - Markers (generic, weather, event, place)
+   - Calendar + Antenna markers (no cluster)
+   - Bundles + Hybrid mode (bundles far, details near)
    - Incremental weather updates: upsertWeatherIntoBundleInput + scheduleBundleRefresh
    ========================================================= */
 
+/* ---------------------------------------------------------
+   Scope helpers (SAFE)
+--------------------------------------------------------- */
 function pickScopeKey(scopeKey) {
     return scopeKey || globalThis.__OutZenActiveScope || "main";
 }
-function peekS(scopeKey = "main") {
-    const key = "__OutZenSingleton__" + String(scopeKey || "main");
-    return globalThis[key] ?? null; // ✅ does not create anything
-}
-export function dumpState(scopeKey = "main") {
-    const k = pickScopeKey(scopeKey);
-    const s =
-        getS(k) ||
-        globalThis.__OutZenGetS?.(k) ||
-        globalThis.__OutZenGetS?.() ||
-        null;
 
-    if (!s) return { loaded: false, scopeKey: k };
+function pickBestScopeKey() {
+    const a = globalThis.__OutZenActiveScope;
+    if (a) {
+        const sa = peekS(a);
+        if (sa?.map) return a;
+    }
 
-    return {
-        loaded: true,
-        scopeKey: k,
-        mapId: s.mapContainerId ?? null,
-        zoom: s.map?.getZoom?.() ?? null,
-        hasClusterLayer: !!(s.cluster && s.map?.hasLayer?.(s.cluster)),
-        initialized: !!s.initialized,
-        hasMap: !!s.map,
-        markers: s.markers?.size ?? 0,
-        bundleMarkers: s.bundleMarkers?.size ?? 0,
-        detailMarkers: s.detailMarkers?.size ?? 0,
-        hybrid: s.hybrid ?? null,
-    };
-}
-export function listScopes() {
-    const out = [];
     for (const k of Object.keys(globalThis)) {
         if (!k.startsWith("__OutZenSingleton__")) continue;
-        const scopeKey = k.replace("__OutZenSingleton__", "");
         const s = globalThis[k];
-        out.push({
-            scopeKey,
-            mapId: s?.mapContainerId ?? null,
-            hasMap: !!s?.map,
-            initialized: !!s?.initialized,
-            bootTs: s?.bootTs ?? 0,
-            markers: s?.markers?.size ?? 0,
-            bundleMarkers: s?.bundleMarkers?.size ?? 0,
-        });
+        if (s?.map) return k.replace("__OutZenSingleton__", "");
     }
-    out.sort((a, b) => (b.bootTs || 0) - (a.bootTs || 0));
-    console.table(out);
-    return out;
+
+    return "main";
 }
 
-// ------------------------------
-// Singleton (Hot Reload safe)
-// ------------------------------
+function pickScopeKeyRead(scopeKey) {
+    return scopeKey || pickBestScopeKey();
+}
+function pickScopeKeyWrite(scopeKey) {
+    return scopeKey || pickBestScopeKey();
+}
+
+/* ---------------------------------------------------------
+   Singleton state (REQUIRED SHAPE)
+--------------------------------------------------------- */
 function initState(s) {
-    // Defaults (per-scope)
     s.consts ??= {};
     s.utils ??= {};
     s.flags ??= {};
 
-    // Consts / Utils
+    s.flags.userLockedMode ??= false;
+    s.flags.showBundleStats ??= false;
+    s.flags.showWeatherPinsInBundles ??= false;
+
     s.consts.BELGIUM ??= { minLat: 49.45, maxLat: 51.6, minLng: 2.3, maxLng: 6.6 };
 
     s.utils.safeNum ??= (x) => {
@@ -114,95 +94,91 @@ function initState(s) {
 
         return id != null ? `${kind} #${id}` : kind;
     };
-
-    // Flags
-    s.flags.showBundleStats ??= false;          // prod
-    s.flags.showWeatherPinsInBundles ??= false; // optional
 }
 
 function getS(scopeKey = "main") {
     const key = "__OutZenSingleton__" + String(scopeKey || "main");
-    globalThis[key] ??= {
-        version: "2026.01.14-clean",
-        initialized: false,
-        bootTs: 0,
 
-        map: null,
-        mapContainerId: null,
-        mapContainerEl: null,
+    if (!globalThis[key]) {
+        globalThis[key] = {
+            version: "2026.02.07-clean-dev",
+            initialized: false,
+            bootTs: 0,
 
-        cluster: null,
-        chart: null,
+            map: null,
+            mapContainerId: null,
+            mapContainerEl: null,
+            _domToken: null,
 
-        markers: new Map(),
-        placeMarkers: new Map(),
-        placeIndex: new Map(),
+            cluster: null,
+            layerGroup: null,
 
-        bundleMarkers: new Map(),
-        bundleIndex: new Map(),
-        bundleLastInput: null,
+            markers: new Map(),
+            placeMarkers: new Map(),
+            placeIndex: new Map(),
 
-        detailLayer: null,
-        detailMarkers: new Map(),
-        hybrid: { enabled: true, threshold: 13, showing: null },
-        _hybridBound: false,
-        _hybridHandler: null,
-        _hybridSwitching: false,
+            bundleMarkers: new Map(),
+            bundleIndex: new Map(),
+            bundleLastInput: null,
 
-        _bundleRefreshT: 0,
-        _weatherById: new Map(),
+            detailLayer: null,
+            detailMarkers: new Map(),
 
-        consts: {},
-        utils: {},
-        flags: {},
+            calendarLayer: null,
+            calendarMarkers: new Map(),
 
-        calendarLayer: null,
-        calendarMarkers: new Map(),
+            antennaLayer: null,
+            antennaMarkers: new Map(),
 
-        _hybridFireCount: 0,
-        _mapToken: 0,
-        _invT: 0,
-        _highlightT: 0,
-    };
+            hybrid: { enabled: true, threshold: 13, showing: null },
+            _hybridBound: false,
+            _hybridHandler: null,
+            _hybridSwitching: false,
 
-    const s = globalThis[key];
-    initState(s);
-    return s;
+            _bundleRefreshT: 0,
+            _weatherById: new Map(),
+
+            chart: null,
+
+            consts: {},
+            utils: {},
+            flags: {},
+
+            _mapToken: 0,
+            _resizeQueued: false,
+            _fitLock: false,
+            _invT: 0,
+            _highlightT: 0,
+        };
+
+        initState(globalThis[key]);
+    }
+
+    return globalThis[key];
 }
 
-// By default, we work on "main"
-function S(scopeKey = globalThis.__OutZenActiveScope || "main") {
-    return getS(scopeKey);
+function peekS(scopeKey = "main") {
+    const key = "__OutZenSingleton__" + String(scopeKey || "main");
+    return globalThis[key] ?? null; // does not create anything
 }
-// Debug helper (optional)
+
 globalThis.__OutZenGetS ??= (scopeKey = "main") => getS(scopeKey);
 
-function SActive() {
-    return getS(globalThis.__OutZenActiveScope || "main");
-}
-function debounceOncePerFrame(s, key, fn) {
-    if (s[key]) return;
-    s[key] = true;
-    requestAnimationFrame(() => {
-        s[key] = false;
-        try { fn(); } catch { }
-    });
+/* ---------------------------------------------------------
+   Universal guard helper (ALWAYS define after `const s = ...`)
+--------------------------------------------------------- */
+function makeHas(s) {
+    return (layer) => !!layer && !!s.map && typeof s.map.hasLayer === "function" && s.map.hasLayer(layer);
 }
 
-
-// ------------------------------
-// Dev / toggles
-// ------------------------------
-const SHOW_BUNDLE_STATS = (globalThis.__OZ_ENV === "dev") || false; // default prod = false
-
-// ------------------------------
-// Internal helpers
-// ------------------------------
-async function waitForContainer(mapId, tries = 15) {
+/* ---------------------------------------------------------
+   DOM / Leaflet helpers
+--------------------------------------------------------- */
+async function waitForContainer(mapId, tries = 30) {
     for (let i = 0; i < tries; i++) {
         const el = document.getElementById(mapId);
         if (el) return el;
-        await new Promise((r) => requestAnimationFrame(() => r()));
+        await new Promise((r) => requestAnimationFrame(r));
     }
     return null;
 }
@@ -216,15 +192,6 @@ function ensureLeaflet() {
     return Leaflet;
 }
 
-function ensureMapReady(scopeKey = null) {
-    const k = pickScopeKey(scopeKey);
-    const s = getS(k);
-    const L = ensureLeaflet();
-    if (!L) return null;
-    if (!s?.map) return null;
-    return { s, L, map: s.map };
-}
-
 function resetLeafletDomId(mapId) {
     const L = ensureLeaflet();
     if (!L) return;
@@ -234,72 +201,347 @@ function resetLeafletDomId(mapId) {
     }
 }
 
-function isInBelgium(ll, s) {
-    const BE = s.consts.BELGIUM;
-    return !!ll &&
-        Number.isFinite(ll.lat) && Number.isFinite(ll.lng) &&
-        ll.lat >= BE.minLat && ll.lat <= BE.maxLat &&
-        ll.lng >= BE.minLng && ll.lng <= BE.maxLng;
-}
-function arr(payload, key) {
-    const v =
-        payload?.[key] ??
-        payload?.[key[0].toUpperCase() + key.slice(1)] ??    // Places
-        payload?.[key.toLowerCase()] ??                      // places
-        null;
+function ensureMapReady(scopeKey = null) {
+    const k = pickScopeKeyRead(scopeKey);
+    const s = getS(k);
+    const has = makeHas(s);
 
-    return Array.isArray(v) ? v : [];
-}
-// Parse lat/lng robustly (supports nested Location/position)
-function pickLatLng(obj, utils) {
-    if (!obj) return null;
+    const L = ensureLeaflet();
+    if (!L) return null;
 
-    const toNum = (v) => {
-        if (v == null) return null;
-        const n = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
-        return Number.isFinite(n) ? n : null;
+    if (!s?.map) return null;
+
+    // Note: we DON'T require detailLayer to exist to say the map is ready.
+    // detailLayer is created only in details mode.
+    return { k, s, has, L, map: s.map };
+}
+
+function isContainerVisible(map) {
+    const el = map?.getContainer?.();
+    if (!el) return false;
+    const r = el.getBoundingClientRect?.();
+    return !!r && r.width > 10 && r.height > 10;
+}
+
+/* ---------------------------------------------------------
+   Debug exports
+--------------------------------------------------------- */
+export function dumpState(scopeKey = "main") {
+    const k = pickScopeKeyRead(scopeKey);
+    const s = getS(k);
+    const has = makeHas(s);
+
+    const safeCount = (arr) => Array.isArray(arr) ? arr.length : 0;
+
+    return {
+        loaded: true,
+        scopeKey: k,
+        mapId: s.mapContainerId ?? null,
+        zoom: s.map?.getZoom?.() ?? null,
+        hasClusterLayer: !!s.cluster,
+        hasMap: !!s.map,
+        initialized: !!s.initialized,
+        bootTs: s.bootTs ?? 0,
+
+        markers: s.markers?.size ?? 0,
+        bundleMarkers: s.bundleMarkers?.size ?? 0,
+        detailMarkers: s.detailMarkers?.size ?? 0,
+        showing: s.hybrid?.showing ?? null,
+        hasDetailLayer: has(s.detailLayer),
+
+        bundleLastInputSizes: s.bundleLastInput ? {
+            places: safeCount(s.bundleLastInput.places),
+            events: safeCount(s.bundleLastInput.events),
+            crowds: safeCount(s.bundleLastInput.crowds),
+            traffic: safeCount(s.bundleLastInput.traffic),
+            weather: safeCount(s.bundleLastInput.weather),
+            suggestions: safeCount(s.bundleLastInput.suggestions),
+            gpt: safeCount(s.bundleLastInput.gpt),
+        } : null,
     };
-
-    const latVal =
-        obj.lat ?? obj.LAT ?? obj.Lat ??
-        obj.latitude ?? obj.Latitude ??
-        obj.Latitude ?? obj.LATITUDE ??                      // ✅ add
-        obj?.location?.lat ?? obj?.Location?.Lat ?? obj?.Location?.Latitude ??
-        obj?.Location?.latitude ?? obj?.location?.Latitude ?? // ✅ add common nesting
-        obj?.coords?.lat ?? obj?.Coords?.Latitude;
-
-    const lngVal =
-        obj.lng ?? obj.LNG ?? obj.Lng ??
-        obj.lon ?? obj.Lon ?? obj.longitude ?? obj.Longitude ??
-        obj.Longitude ?? obj.LONGITUDE ??                    // ✅ add
-        obj?.location?.lng ?? obj?.Location?.Lng ?? obj?.Location?.Longitude ??
-        obj?.Location?.longitude ?? obj?.location?.Longitude ?? // ✅ add common nesting
-        obj?.coords?.lng ?? obj?.Coords?.Longitude;
-
-    const lat = toNum(latVal);
-    const lng = toNum(lngVal);
-
-    if (lat == null || lng == null) return null;
-    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
-
-    return { lat, lng };
+}
+export function listScopes() {
+    const out = [];
+    for (const k of Object.keys(globalThis)) {
+        if (!k.startsWith("__OutZenSingleton__")) continue;
+        const scopeKey = k.replace("__OutZenSingleton__", "");
+        const s = globalThis[k];
+        const has = s ? makeHas(s) : (() => false);
+        out.push({
+            scopeKey,
+            mapId: s?.mapContainerId ?? null,
+            hasMap: !!s?.map,
+            initialized: !!s?.initialized,
+            bootTs: s?.bootTs ?? 0,
+            markers: s?.markers?.size ?? 0,
+            bundleMarkers: s?.bundleMarkers?.size ?? 0,
+            detailMarkers: s?.detailMarkers?.size ?? 0,
+            showing: s?.hybrid?.showing ?? null,
+            hasDetailLayer: !!(s && has(s.detailLayer)),
+        });
+    }
+    out.sort((a, b) => (b.bootTs || 0) - (a.bootTs || 0));
+    console.table(out);
+    return out;
 }
 
+/* ---------------------------------------------------------
+   Public API: ready
+--------------------------------------------------------- */
+export function isOutZenReady(scopeKey = "main") {
+    const s = peekS(pickScopeKeyRead(scopeKey));
+    return !!s?.initialized && !!s?.map;
+}
+
+/* ---------------------------------------------------------
+   Boot / Dispose
+--------------------------------------------------------- */
+function bootFail(mapId, scopeKey, reason = "") {
+    return { ok: false, token: null, mapId: mapId ?? null, scopeKey: scopeKey ?? null, reason };
+}
+
+function destroyChartIfAny(s) {
+    if (s?.chart && typeof s.chart.destroy === "function") {
+        try { s.chart.destroy(); } catch { }
+    }
+    if (s) s.chart = null;
+}
+
+/**
+ * Boot Leaflet map
+ * options: { mapId, scopeKey, center:[lat,lng], zoom, enableChart, force, enableWeatherLegend, resetMarkers, resetAll, enableHybrid, hybridThreshold }
+ */
+export async function bootOutZen({
+    mapId,
+    scopeKey = "main",
+    center = [50.85, 4.35],
+    zoom = 12,
+    enableChart = false,
+    force = false,
+    enableWeatherLegend = false, // kept for compat (unused here)
+    resetMarkers = false,
+    resetAll = false,
+    enableHybrid = true,
+    enableCluster = true,
+    hybridThreshold = 13,
+} = {}) {
+    globalThis.__OutZenActiveScope = scopeKey;
+    const s = getS(scopeKey);
+    const has = makeHas(s);
+
+    const host = await waitForContainer(mapId, 30);
+    if (!host) return bootFail(mapId, scopeKey, "container-not-found");
+
+    // container changed => dispose old map
+    if (s.map && s.mapContainerId && s.mapContainerId !== mapId) {
+        disposeOutZen({ mapId: s.mapContainerId, scopeKey });
+    }
+
+    resetLeafletDomId(mapId);
+
+    // already booted + not force
+    if (s.map && s.mapContainerId === mapId && !force) {
+        const tok = s._domToken ?? host?.dataset?.ozToken ?? null;
+        return { ok: true, token: tok, mapId, scopeKey };
+    }
+    if (s.map && force) disposeOutZen({ mapId: s.mapContainerId, scopeKey });
+
+    const L = ensureLeaflet();
+    if (!L) return bootFail(mapId, scopeKey, "leaflet-missing");
+
+    let map = null; // ✅ parent scope
+
+    // Always clean the host before creating the map (cluster or not).
+    try { host.replaceChildren(); } catch { host.innerHTML = ""; }
+
+    map = L.map(host, {
+        zoomAnimation: false,
+        fadeAnimation: false,
+        markerZoomAnimation: false,
+        preferCanvas: true,
+        zoomControl: true,
+        trackResize: false,
+        minZoom: 5,
+        maxZoom: 19,
+        zoomSnap: 1,
+        zoomDelta: 1
+    }).setView(center, zoom);
+
+    // Cluster: optional (but the map still exists)
+    if (enableCluster && L.markerClusterGroup) {
+        if (!s.cluster) {
+            s.cluster = L.markerClusterGroup({
+                disableClusteringAtZoom: 16,
+                spiderfyOnMaxZoom: true,
+                showCoverageOnHover: false,
+                zoomToBoundsOnClick: true
+            });
+            if (!map.hasLayer(s.cluster)) s.cluster.addTo(map);
+        }
+    } else {
+        s.cluster = null;
+    }
+
+    const token = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    host.dataset.ozToken = token;
+    s._domToken = token;
+
+    console.log("[bootOutZen] map created", { mapId, scopeKey });
+
+    s.map = map;               // ✅ map still exists
+    s.mapContainerId = mapId;
+    s.mapContainerEl = host;
+
+    // base tile
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors",
+        maxZoom: 19,
+    }).addTo(map);
+
+    try { map.doubleClickZoom.disable(); } catch { }
+
+    // invalidate async ops
+    s._mapToken = (s._mapToken || 0) + 1;
+
+    // base groups
+    s.calendarLayer ??= L.featureGroup();
+    if (!map.hasLayer(s.calendarLayer)) s.calendarLayer.addTo(map);
+
+    s.layerGroup ??= L.layerGroup();
+    if (!map.hasLayer(s.layerGroup)) s.layerGroup.addTo(map);
+
+    // Add cluster if present
+    if (s.cluster && !map.hasLayer(s.cluster)) s.cluster.addTo(map);
+
+    // reset logic
+    if (resetAll) {
+        try { s.cluster?.clearLayers?.(); } catch { }
+        try { s.calendarLayer?.clearLayers?.(); } catch { }
+        try { if (has(s.detailLayer)) s.detailLayer.clearLayers?.(); } catch { }
+
+        s.markers = new Map();
+        s.bundleMarkers = new Map();
+        s.bundleIndex = new Map();
+        s.detailMarkers = new Map();
+        s.calendarMarkers = new Map();
+        s._weatherById = new Map();
+        s.bundleLastInput = null;
+        s.hybrid.showing = null;
+    } else {
+        if (resetMarkers) s.markers = new Map();
+        else s.markers ??= new Map();
+
+        s.bundleMarkers ??= new Map();
+        s.bundleIndex ??= new Map();
+        s.detailMarkers ??= new Map();
+        s.calendarMarkers ??= new Map();
+        s._weatherById ??= new Map();
+    }
+
+    // chart (optional)
+    destroyChartIfAny(s);
+    if (enableChart && globalThis.Chart) {
+        const canvas = document.getElementById("crowdChart");
+        if (canvas) {
+            const ctx = canvas.getContext("2d");
+            s.chart = new Chart(ctx, {
+                type: "bar",
+                data: { labels: [], datasets: [{ label: "Metric", data: [] }] },
+                options: { responsive: true, animation: false },
+            });
+        }
+    }
+
+    // hybrid
+    try {
+        if (enableHybrid) enableHybridZoom(true, hybridThreshold, scopeKey);
+        else s.hybrid.enabled = false;
+    } catch (e) {
+        console.warn("[bootOutZen] hybrid init failed", e);
+    }
+
+    // restore last bundle payload
+    if (s.bundleLastInput) {
+        try { addOrUpdateBundleMarkers(s.bundleLastInput, 80, scopeKey); } catch { }
+    }
+
+    queueMicrotask(() => {
+        try { map.invalidateSize({ animate: false, debounceMoveend: true }); } catch { }
+    });
+
+    s.initialized = true;
+    s.bootTs = Date.now();
+
+    console.log("[bootOutZen] returning", { ok: true, token, mapId, scopeKey });
+    return { ok: true, token, mapId, scopeKey };
+}
+
+export function getCurrentMapId(scopeKey = null) {
+    const s = peekS(pickScopeKeyRead(scopeKey)) || getS(pickScopeKeyRead(scopeKey));
+    return s?.mapContainerId ?? null;
+}
+
+export function disposeOutZen({ mapId, scopeKey = "main", token = null } = {}) {
+    const s = getS(scopeKey);
+    if (!s) return false;
+
+    const host = s.mapContainerEl || (mapId ? document.getElementById(mapId) : null);
+
+    // ✅ If internal call (bootOutZen): allows use without token
+    // ✅ If external call: token recommended
+    const currentTok = host?.dataset?.ozToken ?? s._domToken ?? null;
+
+    const isInternal = (token == null); // <-- simple
+    const tokenOk = isInternal || (token && currentTok && token === currentTok);
+
+    if (!tokenOk) {
+        console.warn("[disposeOutZen] token mismatch -> IGNORE", { mapId, scopeKey, token, currentTok });
+        return false;
+    }
+
+    try { s.cluster?.clearLayers?.(); } catch { }
+    try { s.layerGroup?.clearLayers?.(); } catch { }
+    try { s.calendarLayer?.clearLayers?.(); } catch { }
+    try { s.detailLayer?.clearLayers?.(); } catch { }
+
+    try { s.map?.remove?.(); } catch { }
+    s.map = null;
+    s.mapContainerId = null;
+    s.mapContainerEl = null;
+
+    // reset markers maps
+    s.markers = new Map();
+    s.bundleMarkers = new Map();
+    s.bundleIndex = new Map();
+    s.detailMarkers = new Map();
+    s.calendarMarkers = new Map();
+    s._weatherById = new Map();
+    s.bundleLastInput = null;
+    s.initialized = false;
+
+    if (host) {
+        try { host.replaceChildren(); } catch { host.innerHTML = ""; }
+        try { delete host.dataset.ozToken; } catch { }
+    }
+    return true;
+}
+
+/* ---------------------------------------------------------
+   Layer add/remove (cluster-aware) - GUARDED
+--------------------------------------------------------- */
 function addLayerSmart(layer, s) {
     if (!s?.map || !layer) return;
 
-    // ✅ Robust Leaflet layer check
     const looksLikeLeafletLayer =
         typeof layer.addTo === "function" ||
         typeof layer.getLatLng === "function" ||
-        typeof layer.getLayers === "function"; // groups
+        typeof layer.getLayers === "function";
 
     if (!looksLikeLeafletLayer) {
         console.error("[addLayerSmart] NOT a Leaflet layer", layer);
         return;
     }
 
-    // no-cluster marker -> add directly to map
     if (layer?.options?.__ozNoCluster) {
         try { layer.addTo(s.map); } catch { try { s.map.addLayer(layer); } catch { } }
         return;
@@ -313,431 +555,35 @@ function addLayerSmart(layer, s) {
 
     try {
         if (clusterUsable) s.cluster.addLayer(layer);
-        else layer.addTo ? layer.addTo(s.map) : s.map.addLayer(layer);
+        else (layer.addTo ? layer.addTo(s.map) : s.map.addLayer(layer));
     } catch (e) {
         console.warn("[addLayerSmart] failed", e);
     }
 }
 
-function removeLayerSmart(marker, s) {
-    if (!s?.map || !marker) return;
+function removeLayerSmart(layer, s) {
+    if (!s?.map || !layer) return;
 
-    if (marker?.options?.__ozNoCluster) {
-        try { s.map.removeLayer(marker); } catch { }
+    if (layer?.options?.__ozNoCluster) {
+        try { s.map.removeLayer(layer); } catch { }
         return;
     }
 
     try {
-        if (s.cluster && typeof s.cluster.removeLayer === "function") s.cluster.removeLayer(marker);
-        else s.map.removeLayer(marker);
+        if (s.cluster && typeof s.cluster.removeLayer === "function") s.cluster.removeLayer(layer);
+        else s.map.removeLayer(layer);
     } catch { }
 }
 
-function destroyChartIfAny(s) {
-    if (s.chart && typeof s.chart.destroy === "function") {
-        try { s.chart.destroy(); } catch { }
-    }
-    s.chart = null;
-}
-
-function ensureChartCanvas() {
-    const canvas = document.getElementById("crowdChart");
-    return canvas ?? null;
-}
-
-function isDetailsModeNow(s) {
-    if (!s.map) return false;
-    if (!s.hybrid?.enabled) return false;
-    const z = s.map.getZoom();
-    return z >= (Number(s.hybrid.threshold) || 13);
-}
-
-// ------------------------------
-// Public API
-// ------------------------------
-export function isOutZenReady(scopeKey = "main") {
-    const s = getS(pickScopeKey(scopeKey));
-    return !!s.initialized && !!s.map;
-}
-
-/**
- * Boot Leaflet map
- * options: { mapId, center:[lat,lng], zoom, enableChart, force, enableWeatherLegend, resetMarkers }
- */
-// helper local (optionnel)
-function bootFail(mapId, scopeKey, reason = "") {
-    return { ok: false, token: null, mapId: mapId ?? null, scopeKey: scopeKey ?? null, reason };
-}
-export async function bootOutZen({
-    mapId,
-    scopeKey = "main",
-    center = [50.85, 4.35],
-    zoom = 12,
-    enableChart = false,
-    force = false,
-    enableWeatherLegend = false,
-    resetMarkers = false,
-    resetAll = false,
-
-    enableHybrid = true,      // ✅
-    hybridThreshold = 13,     // ✅
-} = {}) {
-    globalThis.__OutZenActiveScope = scopeKey;
-    const s = getS(scopeKey);
-
-    const host = await waitForContainer(mapId, 30);
-    if (!host) return bootFail(mapId, scopeKey, "container-not-found");
-
-    if (s.map && s.mapContainerId && s.mapContainerId !== mapId) {
-        disposeOutZen({ mapId: s.mapContainerId, scopeKey });
-    }
-
-    resetLeafletDomId(mapId);
-
-    // if already booted and not forced
-    if (s.map && s.mapContainerId === mapId && !force) {
-        const tok = s._domToken ?? host?.dataset?.ozToken ?? null;
-        return { ok: true, token: tok, mapId, scopeKey };
-    }
-    if (s.map && force) disposeOutZen({ mapId: s.mapContainerId, scopeKey });
-
-    const L = ensureLeaflet();
-    if (!L) return bootFail(mapId, scopeKey, "leaflet-missing");
-
-    try { host.replaceChildren(); } catch { host.innerHTML = ""; }
-
-    //host.style.outline = "4px solid magenta";
-    //host.style.minHeight = "420px";
-    //host.style.height = host.style.height || "520px";
-
-    const map = L.map(host, {
-        zoomAnimation: false,
-        fadeAnimation: false,
-        markerZoomAnimation: false,
-        preferCanvas: true,
-        zoomControl: true,
-        trackResize: false, // ✅ IMPORTANT: avoid _onResize -> invalidateSize -> crash
-
-        minZoom: 5,
-        maxZoom: 19,      // ✅ important
-        zoomSnap: 1,
-        zoomDelta: 1
-    }).setView(center, zoom);
-
-    const token = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    host.dataset.ozToken = token;
-    s._domToken = token;
-
-    console.log("[bootOutZen] map created", { mapId, scopeKey });
-
-    s.map = map;
-    s.mapContainerId = mapId;
-    s.mapContainerEl = host;
-
-    s.calendarLayer ??= L.featureGroup();
-    s.calendarLayer.addTo(map);
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors",
-        maxZoom: 19,
-    }).addTo(map);
-
-    try { map.doubleClickZoom.disable(); } catch { }
-
-    s._mapToken = (s._mapToken || 0) + 1;
-    const mapToken = s._mapToken;
-
-    queueMicrotask(() => {
-        if (s._mapToken !== mapToken || s.map !== map) return;
-        try { map.invalidateSize({ animate: false, debounceMoveend: true }); } catch { }
-    });
-
-    if (!s.layerGroup) s.layerGroup = L.layerGroup();
-    if (!s.map.hasLayer(s.layerGroup)) s.layerGroup.addTo(s.map);
-
-    if (L.markerClusterGroup) {
-        if (!s.cluster) {
-            s.cluster = L.markerClusterGroup({
-                disableClusteringAtZoom: 16,  // or 17/18 depending on your UX
-                spiderfyOnMaxZoom: true,
-                showCoverageOnHover: false,
-                zoomToBoundsOnClick: true
-            });
-        }
-        if (!s.map.hasLayer(s.cluster)) s.cluster.addTo(s.map);
-    }
-
-    if (resetMarkers) s.markers = new Map();
-    else s.markers ??= new Map();
-
-    if (enableWeatherLegend) {
-        try { createWeatherLegendControl(L).addTo(map); } catch { }
-    }
-
-    // ✅ HYBRID only once
-    try {
-        if (enableHybrid) enableHybridZoom(true, hybridThreshold, scopeKey);
-        else s.hybrid.enabled = false;
-    } catch (e) {
-        console.warn("[bootOutZen] hybrid init failed", e);
-    }
-
-    destroyChartIfAny(s);
-    if (enableChart && globalThis.Chart) {
-        const canvas = ensureChartCanvas();
-        if (canvas) {
-            const ctx = canvas.getContext("2d");
-            s.chart = new Chart(ctx, {
-                type: "bar",
-                data: { labels: [], datasets: [{ label: "Metric", data: [] }] },
-                options: { responsive: true, animation: false },
-            });
-        }
-    }
-
-    if (s.bundleLastInput) {
-        try { console.log("[bootOutZen] state", dumpState(scopeKey)); } catch { }
-    }
-    OutZenInterop.dumpStateSync("home");
-
-    if (resetAll) {
-        try { s.cluster?.clearLayers?.(); } catch { }
-        try { s.calendarLayer?.clearLayers?.(); } catch { }
-        try { s.detailLayer?.clearLayers?.(); } catch { }
-
-        s.markers = new Map();
-        s.bundleMarkers = new Map();
-        s.bundleIndex = new Map();
-        s.detailMarkers = new Map();
-        s.calendarMarkers = new Map();
-        s._weatherById = new Map();
-        s.bundleLastInput = null;
-        s.hybrid.showing = null;
-    } else {
-        if (resetMarkers) s.markers = new Map();
-        else s.markers ??= new Map();
-    }
-
-    s.initialized = true;
-    s.bootTs = Date.now();
-    // ✅ IMPORTANT: Returning an object (C# contract)
-    console.log("[bootOutZen] returning", { ok: true, token, mapId, scopeKey });
-    return { ok: true, token, mapId, scopeKey };
-    
-
-}
-export function getCurrentMapId(scopeKey = null) {
-    const s = getS(pickScopeKey(scopeKey));
-    return s.mapContainerId;
-}
-function requireScopeKey(scopeKey, fnName) {
-    if (!scopeKey && globalThis.__OZ_ENV === "dev") {
-        console.warn(`[OutZen] ${fnName} called WITHOUT scopeKey -> defaulting to 'main' (safe)`);
-    }
-    return scopeKey || "main";
-}
-export function disposeOutZen({ mapId, scopeKey = null, token = null } = {}) {
-    const k = pickScopeKeyWrite(scopeKey);
-    const s = getS(k);
-    const map = s.map;
-    if (!map) return true;
-
-    console.warn("[OutZen][disposeOutZen] called", { mapId, current: s.mapContainerId, scopeKey: k });
-
-    const realEl = map.getContainer?.();
-    const currentToken = realEl?.dataset?.ozToken;
-    const callerToken = token ?? null;
-
-    if (callerToken && currentToken && callerToken !== currentToken) {
-        console.warn("[disposeOutZen] token mismatch -> IGNORE dispose", { callerToken, currentToken });
-        return true;
-    }
-    //// ✅ HARD GUARD: never dispose if DOM token mismatch
-    //if (realEl?.dataset?.ozToken && s._domToken && realEl.dataset.ozToken !== s._domToken) {
-    //    console.warn("[disposeOutZen] token mismatch -> skip DOM cleanup");
-    //} 
-    // ✅ HARD GUARD mapId
-    if (mapId && s.mapContainerId && mapId !== s.mapContainerId) {
-        console.warn("[disposeOutZen] mapId mismatch -> IGNORE dispose", { mapId, expected: s.mapContainerId });
-        return true;
-    }
-    
-    // 0) Invalidate async ops FIRST
-    s._mapToken = (s._mapToken || 0) + 1;
-    try { clearTimeout(s._invT); } catch { }
-    try { clearTimeout(s._bundleRefreshT); } catch { }
-    try { clearTimeout(s._highlightT); } catch { }
-    s._invT = 0;
-    s._bundleRefreshT = 0;
-    s._highlightT = 0;
-
-    // 1) Stop animations (safe)
-    try { map.stop?.(); } catch { }
-
-    // 2) Remove layers/plugins cleanly (important for markercluster)
-    try {
-        if (s._hybridBound && s._hybridHandler) {
-            map.off("zoomend", s._hybridHandler);
-            map.off("moveend", s._hybridHandler);
-        }
-    } catch { }
-    s._hybridBound = false;
-    s._hybridHandler = null;
-
-    // Remove cluster BEFORE killing map events
-    try {
-        if (s.cluster) {
-            try { s.cluster.clearLayers?.(); } catch { }
-            try {
-                // remove from map in the most "official" way
-                if (typeof s.cluster.remove === "function") s.cluster.remove();
-                else if (map.hasLayer?.(s.cluster)) map.removeLayer(s.cluster);
-            } catch { }
-            try { s.cluster.off?.(); } catch { }
-            s.cluster = null;
-        }
-    } catch { }
-
-    try { if (s.calendarLayer && map.hasLayer?.(s.calendarLayer)) map.removeLayer(s.calendarLayer); } catch { }
-    try { if (s.detailLayer && map.hasLayer?.(s.detailLayer)) map.removeLayer(s.detailLayer); } catch { }
-    try { if (s.layerGroup && map.hasLayer?.(s.layerGroup)) map.removeLayer(s.layerGroup); } catch { }
-    try { s.layerGroup?.clearLayers?.(); } catch { }
-    s.layerGroup = null;
-
-    // 3) Now detach map events and remove map
-    try { map.off?.(); } catch { }
-    try { map.remove?.(); } catch { }
-
-    try {
-        const el = s.mapContainerEl || (mapId ? document.getElementById(mapId) : null);
-        if (el) { try { el.replaceChildren(); } catch { el.innerHTML = ""; } }
-    } catch { }
-
-    // 4) cleanup DOM leaflet id (Blazor navigation)
-    try {
-        const el = s.mapContainerEl || (mapId ? document.getElementById(mapId) : null);
-        if (el && el._leaflet_id) {
-            try { delete el._leaflet_id; } catch { el._leaflet_id = undefined; }
-        }
-    } catch { }
-
-    try { map.off?.(); } catch { }
-    try { map.remove?.(); } catch { }
-    // 4.5) HARD purge of layers + refs (prevents memory leaks between Blazor pages)
-    try { s.calendarLayer?.clearLayers?.(); } catch { }
-    try { s.detailLayer?.clearLayers?.(); } catch { }
-    try { s.cluster?.clearLayers?.(); } catch { }
-
-    try {
-        for (const m of s.markers?.values?.() ?? []) { try { m.off?.(); } catch { } }
-        for (const m of s.bundleMarkers?.values?.() ?? []) { try { m.off?.(); } catch { } }
-        for (const m of s.detailMarkers?.values?.() ?? []) { try { m.off?.(); } catch { } }
-        for (const m of s.calendarMarkers?.values?.() ?? []) { try { m.off?.(); } catch { } }
-    } catch { }
-
-    // ✅ only empty the actual container, not a random getElementById
-    try {
-        if (realEl && realEl.isConnected) {
-            try { realEl.replaceChildren(); } catch { realEl.innerHTML = ""; }
-            // purge leaflet id (if applicable)
-            try { if (realEl._leaflet_id) delete realEl._leaflet_id; } catch { realEl._leaflet_id = undefined; }
-        }
-    } catch { }
-
-    // Clear all state containers
-    try { s.markers?.clear?.(); } catch { }
-    try { s.placeMarkers?.clear?.(); } catch { }
-    try { s.placeIndex?.clear?.(); } catch { }
-    try { s.bundleMarkers?.clear?.(); } catch { }
-    try { s.bundleIndex?.clear?.(); } catch { }
-    try { s.detailMarkers?.clear?.(); } catch { }
-    try { s.calendarMarkers?.clear?.(); } catch { }
-    try { s._weatherById?.clear?.(); } catch { }
-
-    s.bundleLastInput = null;
-    s.hybrid.showing = null;
-
-    // 5) reset state
-    s.map = null;
-    s.cluster = null;
-    s.calendarLayer = null;
-    s.detailLayer = null;
-    s.initialized = false;
-    s.mapContainerId = null;
-    s.mapContainerEl = null;
-
-    return true;
-}
-
-// ------------------------------
-// Weather legend
-// ------------------------------
-function createWeatherLegendControl(L) {
-    const legend = L.control({ position: "bottomright" });
-    legend.onAdd = function () {
-        const div = L.DomUtil.create("div", "oz-weather-legend");
-        div.innerHTML = `
-      <div class="oz-weather-legend-title">Météo</div>
-      <div class="oz-weather-legend-row"><span class="oz-weather-emoji">☀️</span><span>Sunny</span></div>
-      <div class="oz-weather-legend-row"><span class="oz-weather-emoji">☁️</span><span>Cloudy</span></div>
-      <div class="oz-weather-legend-row"><span class="oz-weather-emoji">🌧️</span><span>Rain</span></div>
-      <div class="oz-weather-legend-row"><span class="oz-weather-emoji">⛈️</span><span>Stormy</span></div>
-      <div class="oz-weather-legend-row"><span class="oz-weather-emoji">🌫️</span><span>Foggy</span></div>
-      <div class="oz-weather-legend-row"><span class="oz-weather-emoji">💨</span><span>Windy</span></div>
-      <div class="oz-weather-legend-row"><span class="oz-weather-emoji">❄️</span><span>Snowy</span></div>
-    `;
-        return div;
-    };
-    return legend;
-}
-
-// ------------------------------
-// Chart update
-// ------------------------------
-export function setWeatherChart(points, metricType = "Temperature", scopeKey = null) {
-    const s = getS(pickScopeKey(scopeKey));
-    if (!s.chart || !Array.isArray(points)) return;
-
-    const metric = (metricType || "Temperature").toLowerCase();
-    const labels = [];
-    const values = [];
-
-    let datasetLabel = "Temperature (°C)";
-    if (metric === "humidity") datasetLabel = "Humidity (%)";
-    else if (metric === "wind") datasetLabel = "Wind (km/h)";
-
-    for (const p of points) {
-        labels.push(p.label ?? "");
-
-        const t = Number(p.temperature ?? p.value ?? 0);
-        const h = Number(p.humidity ?? 0);
-        const w = Number(p.windSpeed ?? 0);
-
-        let val = t || Number(p.value) || 0;
-        if (metric === "humidity") val = h || Number(p.value) || 0;
-        if (metric === "wind") val = w || Number(p.value) || 0;
-
-        values.push(val);
-    }
-
-    const ds = s.chart.data.datasets[0];
-    s.chart.data.labels = labels;
-    ds.label = datasetLabel;
-    ds.data = values;
-
-    try { s.chart.update(); } catch { }
-}
-
-// ------------------------------
-// Marker icons
-// ------------------------------
+/* ---------------------------------------------------------
+   Marker icons (divIcon)
+--------------------------------------------------------- */
 function normalizeLevel(level) {
     const n = Number(level) || 0;
     if (n < 0) return 0;
     if (n > 4) return 4;
     return n;
 }
-
 function getMarkerClassForLevel(level) {
     switch (normalizeLevel(level)) {
         case 1: return "oz-marker-lvl1";
@@ -747,7 +593,6 @@ function getMarkerClassForLevel(level) {
         default: return "oz-marker-lvl0";
     }
 }
-
 function getWeatherEmoji(weatherType) {
     const wt = (weatherType || "").toLowerCase();
     if (wt.includes("clear") || wt.includes("sun")) return "☀️";
@@ -758,40 +603,32 @@ function getWeatherEmoji(weatherType) {
     if (wt.includes("fog") || wt.includes("mist")) return "🌫️";
     return "🌡️";
 }
-
 function buildMarkerIcon(L, level, {
-    kind = "generic",        // ✅ place | event | traffic | crowd | calendar | antenna | weather | suggestion
-    scopeKey = null,         // ✅ "home" | "main" | etc
+    kind = "generic",
+    scopeKey = null,
     isTraffic = false,
     weatherType = null,
     iconOverride = null,
-    riseOnHover = false
 } = {}) {
     const lvlClass = getMarkerClassForLevel(level);
     const trafficClass = isTraffic ? "oz-marker--traffic" : "";
     const kindClass = `oz-marker--${String(kind).toLowerCase()}`;
     const scopeClass = scopeKey ? `oz-scope--${String(scopeKey).toLowerCase()}` : "";
     const emoji = iconOverride ? iconOverride : (weatherType ? getWeatherEmoji(weatherType) : "");
+    const content = (emoji && String(emoji).trim()) ? emoji : "•";
 
     return L.divIcon({
         className: `oz-marker ${lvlClass} ${kindClass} ${trafficClass} ${scopeClass}`.trim(),
-        html: `<div class="oz-marker-inner">${emoji}</div>`,
+        html: `<div class="oz-marker-inner">${content}</div>`,
         iconSize: [26, 26],
         iconAnchor: [13, 26],
         popupAnchor: [0, -26],
     });
 }
-function iconSuggestion(L, scopeKey) {
-    return buildMarkerIcon(L, 2, { kind: "suggestion", scopeKey, iconOverride: "💡" });
-}
 
-function iconTraffic(L, level, scopeKey) {
-    return buildMarkerIcon(L, level, { kind: "traffic", scopeKey, isTraffic: true, iconOverride: "🚗" });
-}
-
-function iconWeather(L, level, scopeKey, weatherType) {
-    return buildMarkerIcon(L, level, { kind: "weather", scopeKey, weatherType });
-}
+/* ---------------------------------------------------------
+   Generic marker API
+--------------------------------------------------------- */
 function buildPopupHtml(info, s) {
     const title = info?.title ?? "Unknown";
     const desc = info?.description ?? "";
@@ -800,22 +637,25 @@ function buildPopupHtml(info, s) {
     <div class="desc">${s.utils.escapeHtml(desc)}</div>
   </div>`;
 }
-
-// ------------------------------
-// Crowd / generic marker API
-// ------------------------------
+function toNumLoose(v) {
+    if (v == null) return null;
+    if (typeof v === "string") v = v.replace(",", ".");
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+}
 export function addOrUpdateCrowdMarker(id, lat, lng, level, info, scopeKey = null) {
-    const k = pickScopeKeyWrite(scopeKey);
-    const ready = ensureMapReady(k);
+    console.log("[OZ] addOrUpdateCrowdMarker", { scopeKey, id, lat, lng, level, kind: info?.kind });
+    const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
 
-    const { s, L } = ready;
-    const map = s.map;
-    if (!map) return false;
+    const { k, s, L } = ready;
 
-    const latNum = Number(lat);
-    const lngNum = Number(lng);
-    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return false;
+    const latNum = toNumLoose(lat);
+    const lngNum = toNumLoose(lng);
+    if (latNum == null || lngNum == null) {
+        console.warn("[addOrUpdateCrowdMarker] drop invalid coords", { id, lat, lng });
+        return false;
+    }
 
     const key = String(id);
     const existing = s.markers.get(key);
@@ -847,9 +687,42 @@ export function addOrUpdateCrowdMarker(id, lat, lng, level, info, scopeKey = nul
     return true;
 }
 
+export function addOrUpdatePlaceMarker(place, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+    const { k, s } = ready;
+
+    const ll = pickLatLng(place, s.utils);
+    if (!ll) return false;
+
+    const id = `place:${place?.Id ?? place?.id}`;
+    return addOrUpdateCrowdMarker(id, ll.lat, ll.lng, 1, {
+        kind: "place",
+        title: place?.Name ?? place?.name ?? "Place",
+        description: place?.Description ?? place?.description ?? "",
+        icon: "🏰"
+    }, k);
+}
+
+export function addOrUpdateEventMarker(ev, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+    const { k, s } = ready;
+
+    const ll = pickLatLng(ev, s.utils);
+    if (!ll) return false;
+
+    const id = `event:${ev?.Id ?? ev?.id}`;
+    return addOrUpdateCrowdMarker(id, ll.lat, ll.lng, 2, {
+        kind: "event",
+        title: ev?.Title ?? ev?.Name ?? ev?.title ?? ev?.name ?? "Event",
+        description: ev?.Description ?? ev?.description ?? "",
+        icon: "🎪"
+    }, k);
+}
+
 export function removeCrowdMarker(id, scopeKey = null) {
-    const k = pickScopeKeyWrite(scopeKey);
-    const ready = ensureMapReady(k);
+    const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
 
     const { s } = ready;
@@ -863,8 +736,10 @@ export function removeCrowdMarker(id, scopeKey = null) {
 }
 
 export function clearCrowdMarkers(scopeKey = null) {
-    const s = getS(pickScopeKeyWrite(scopeKey));
-    if (!s.map) return false;
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { s } = ready;
 
     try { s.cluster?.clearLayers?.(); } catch { }
     if (!s.cluster) {
@@ -876,120 +751,291 @@ export function clearCrowdMarkers(scopeKey = null) {
     return true;
 }
 
-export function fitToMarkers(scopeKey = null) {
-    const k = pickScopeKeyWrite(scopeKey);
-    const ready = ensureMapReady(k);
+/* ---------------------------------------------------------
+   Calendar markers (no cluster)
+--------------------------------------------------------- */
+function ensureCalendarLayer(s, L) {
+    if (!s.calendarLayer) {
+        s.calendarLayer = L.featureGroup();
+        s.map.addLayer(s.calendarLayer);
+    } else if (!s.map.hasLayer(s.calendarLayer)) {
+        s.calendarLayer.addTo(s.map);
+    }
+    return s.calendarLayer;
+}
+
+function makeCalendarKey(x) {
+    const id = x?.Id ?? x?.id;
+    if (id == null) return null;
+    return `cc:${id}`;
+}
+
+function calendarLevelFromExpected(x) {
+    const n = Number(x?.ExpectedLevel ?? x?.expectedLevel ?? 2);
+    if (!Number.isFinite(n)) return 2;
+    return Math.max(1, Math.min(4, n));
+}
+
+function calendarIconEmoji(x) {
+    const tags = String(x?.Tags ?? x?.tags ?? "").toLowerCase();
+    const name = String(x?.EventName ?? x?.eventName ?? "").toLowerCase();
+    if (tags.includes("folkl") || name.includes("carnaval")) return "🎭";
+    if (tags.includes("music") || name.includes("concert")) return "🎵";
+    if (tags.includes("sport")) return "🏟️";
+    return "📅";
+}
+
+function calendarPopupHtml(x, s) {
+    const esc = s.utils.escapeHtml;
+
+    const title = x?.EventName ?? x?.eventName ?? `Calendar #${x?.Id ?? x?.id ?? "?"}`;
+    const region = x?.RegionCode ?? x?.regionCode ?? "";
+    const msg = x?.MessageTemplate ?? x?.messageTemplate ?? x?.Message ?? x?.message ?? "";
+    const dt = x?.DateUtc ?? x?.dateUtc ?? x?.Date ?? x?.date ?? null;
+
+    const start = x?.StartLocalTime ?? x?.startLocalTime ?? null;
+    const end = x?.EndLocalTime ?? x?.endLocalTime ?? null;
+    const lead = x?.LeadHours ?? x?.leadHours ?? null;
+
+    const parts = [];
+    if (region) parts.push(`📍 ${esc(region)}`);
+    if (dt) parts.push(`🕒 ${esc(String(dt))}`);
+    if (start || end) parts.push(`⏱️ ${esc(String(start ?? "?"))} → ${esc(String(end ?? "?"))}`);
+    if (lead != null) parts.push(`⏳ lead: ${esc(String(lead))}h`);
+    if (msg) parts.push(`💬 ${esc(String(msg))}`);
+
+    return `
+    <div class="outzen-popup">
+      <div class="title">${esc(String(title))}</div>
+      <div class="desc">${parts.join("<br>")}</div>
+    </div>
+  `.trim();
+}
+
+export function upsertCrowdCalendarMarkers(items, scopeKey = "main") {
+    const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
 
-    const { s, L, map } = ready;
-    if (!s.markers || s.markers.size === 0) return false;
+    const { k, s, L } = ready;
+    if (!Array.isArray(items)) return false;
 
-    const latlngs = [];
-    for (const m of s.markers.values()) {
-        try { latlngs.push(m.getLatLng()); } catch { }
+    ensureCalendarLayer(s, L);
+    s.calendarMarkers ??= new Map();
+
+    let dropped = 0;
+
+    for (const x of items) {
+        const key = makeCalendarKey(x);
+        if (!key) { dropped++; continue; }
+
+        const ll = pickLatLng(x, s.utils);
+        if (!ll) {
+            dropped++;
+            if (dropped <= 5) {
+                console.warn("[Bundles] drop sample kind=", kind,
+                    +  "keys=", Object.keys(x || {}),
+                    +  "item=", x
+                );
+            }
+            continue;
+        }
+
+        const level = calendarLevelFromExpected(x);
+        const emoji = calendarIconEmoji(x);
+
+        const icon = buildMarkerIcon(L, level, {
+            kind: "calendar",
+            scopeKey: k,
+            iconOverride: emoji
+        });
+
+        const popup = calendarPopupHtml(x, s);
+
+        const existing = s.calendarMarkers.get(key);
+        if (existing) {
+            try { existing.setLatLng([ll.lat, ll.lng]); } catch { }
+            try { existing.setIcon(icon); } catch { }
+            try { if (existing.getPopup()) existing.setPopupContent(popup); else existing.bindPopup(popup); } catch { }
+            try { if (!s.calendarLayer.hasLayer(existing)) s.calendarLayer.addLayer(existing); } catch { }
+            continue;
+        }
+
+        const marker = L.marker([ll.lat, ll.lng], {
+            icon,
+            title: (x?.EventName ?? x?.eventName ?? key),
+            riseOnHover: true,
+            __ozNoCluster: true
+        });
+
+        try { marker.bindPopup(popup, { maxWidth: 420, closeButton: true, autoPan: true }); } catch { }
+        try { s.calendarLayer.addLayer(marker); } catch { addLayerSmart(marker, s); }
+
+        s.calendarMarkers.set(key, marker);
     }
-    if (latlngs.length === 0) return false;
 
-    if (latlngs.length === 1) {
-        try { map.setView(latlngs[0], 15, { animate: false }); } catch { }
+    if (dropped) console.warn("[Calendar] dropped =", dropped, "(missing id/coords)");
+    try { refreshHybridVisibility(k); } catch { }
+
+    return true;
+}
+
+export function pruneCrowdCalendarMarkers(activeIds, scopeKey = "main") {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { s } = ready;
+    s.calendarMarkers ??= new Map();
+    if (!Array.isArray(activeIds)) activeIds = [];
+
+    const keep = new Set(activeIds.map(String));
+    let removed = 0;
+
+    for (const [key, marker] of Array.from(s.calendarMarkers.entries())) {
+        if (keep.has(key)) continue;
+
+        try {
+            if (s.calendarLayer && s.calendarLayer.hasLayer?.(marker)) s.calendarLayer.removeLayer(marker);
+            else removeLayerSmart(marker, s);
+        } catch { }
+
+        s.calendarMarkers.delete(key);
+        removed++;
+    }
+
+    if (removed) console.info("[Calendar] pruned =", removed);
+    return true;
+}
+
+/* ---------------------------------------------------------
+   Antenna markers (no cluster)
+--------------------------------------------------------- */
+function ensureAntennaLayer(s, L) {
+    if (!s.antennaLayer) {
+        s.antennaLayer = L.featureGroup();
+        s.map.addLayer(s.antennaLayer);
+    } else if (!s.map.hasLayer(s.antennaLayer)) {
+        s.antennaLayer.addTo(s.map);
+    }
+    return s.antennaLayer;
+}
+
+function makeAntennaKey(a) {
+    const id = a?.Id ?? a?.id ?? a?.AntennaId ?? a?.antennaId;
+    if (id == null) return null;
+    return `ant:${id}`;
+}
+
+export function addOrUpdateAntennaMarker(antenna, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { k, s, L } = ready;
+    if (!antenna) return false;
+
+    const ll = pickLatLng(antenna, s.utils);
+    if (!ll) return false;
+
+    ensureAntennaLayer(s, L);
+    s.antennaMarkers ??= new Map();
+
+    const key = makeAntennaKey(antenna) ?? `ant:${ll.lat.toFixed(5)},${ll.lng.toFixed(5)}`;
+
+    const icon = buildMarkerIcon(L, 1, {
+        kind: "antenna",
+        scopeKey: k,
+        iconOverride: "📡"
+    });
+
+    const title = antenna?.Name ?? antenna?.name ?? "Antenna";
+    const desc = antenna?.Description ?? antenna?.description ?? "";
+    const popup = buildPopupHtml({ title, description: desc }, s);
+
+    const existing = s.antennaMarkers.get(key);
+    if (existing) {
+        try { existing.setLatLng([ll.lat, ll.lng]); } catch { }
+        try { existing.setIcon(icon); } catch { }
+        try { if (existing.getPopup()) existing.setPopupContent(popup); else existing.bindPopup(popup); } catch { }
+        try { if (!s.antennaLayer.hasLayer(existing)) s.antennaLayer.addLayer(existing); } catch { }
         return true;
     }
 
-    const bounds = L.latLngBounds(latlngs).pad(0.1);
-    return safeFitBounds(map, bounds, { padding: [32, 32], maxZoom: 17, animate: false });
-}
-export function refreshMapSize(scopeKey = null) {
-    const s = getS(pickScopeKeyWrite(scopeKey));
-    const map = s.map;
-    const token = s._mapToken;
-    if (!map) return false;
-
-    if (s._resizeQueued) return true;
-    s._resizeQueued = true;
-
-    requestAnimationFrame(() => {
-        s._resizeQueued = false;
-        if (!s.map || s.map !== map || s._mapToken !== token) return;
-
-        const el = map.getContainer?.();
-        if (!el || !el.isConnected) return; // ✅
-
-        const r = el.getBoundingClientRect?.();
-        if (!r || r.width < 10 || r.height < 10) return;
-
-        if (map._animatingZoom || map._zooming || map._panning) return;
-
-        try { map.invalidateSize({ animate: false, debounceMoveend: true }); } catch { }
+    const m = L.marker([ll.lat, ll.lng], {
+        icon,
+        title,
+        riseOnHover: true,
+        __ozNoCluster: true
     });
 
-    return true;
-}
-export function debugClusterCount(scopeKey = null) {
-    const s = getS(pickScopeKey(scopeKey));
-    const layers = s?.cluster?.getLayers?.();
-    console.log("[DBG] markers=", s?.markers?.size ?? 0, "clusterLayers=", layers?.length ?? 0);
-}
+    try { m.bindPopup(popup, { maxWidth: 420, closeButton: true, autoPan: true }); } catch { }
+    try { s.antennaLayer.addLayer(m); } catch { addLayerSmart(m, s); }
 
-async function safeFitBoundsAsync(map, bounds, opts, isStillValid) {
-    try {
-        // visible container ?
-        if (!isContainerVisible(map)) return false;
-
-        // wait until the layout is stable then fit
-        return await fitAfterLayout(map, bounds, opts, isStillValid);
-    } catch {
-        return false;
-    }
-}
-
-function safeFitBounds(map, bounds, opts, isStillValid = () => true) {
-    // API sync that returns a boolean immediately
-    safeFitBoundsAsync(map, bounds, opts, isStillValid)
-        .catch(() => { /* swallow */ });
-
+    s.antennaMarkers.set(key, m);
     return true;
 }
 
-async function fitAfterLayout(map, bounds, opts, stillValid) {
-    const s = SActive();              // ou getS(scopeKey) si tu passes scope
-    if (s._fitLock) return false;
-    s._fitLock = true;
-    try {
-        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-        if (stillValid && !stillValid()) return false;
-        try { map.invalidateSize(true); } catch { }
-        await new Promise(r => requestAnimationFrame(r));
-        if (stillValid && !stillValid()) return false;
-        if (!isContainerVisible(map)) return false;
-        try { map.fitBounds(bounds, opts); return true; } catch { return false; }
-    } finally {
-        s._fitLock = false;
+export function pruneAntennaMarkers(activeKeys, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { s } = ready;
+    s.antennaMarkers ??= new Map();
+    const keep = new Set((activeKeys ?? []).map(String));
+
+    for (const [key, m] of Array.from(s.antennaMarkers.entries())) {
+        if (keep.has(key)) continue;
+        try {
+            if (s.antennaLayer?.hasLayer?.(m)) s.antennaLayer.removeLayer(m);
+            else removeLayerSmart(m, s);
+        } catch { }
+        s.antennaMarkers.delete(key);
     }
-}
-function pickScopeKeyRead(scopeKey) {
-    return scopeKey || globalThis.__OutZenActiveScope || "main";
-}
-// IMPORTANT: write/destructive ops must NOT depend on active scope
-function pickScopeKeyWrite(scopeKey) {
-    return scopeKey || globalThis.__OutZenActiveScope || "main";
+    return true;
 }
 
-function isContainerVisible(map) {
-    const el = map?.getContainer?.();
-    if (!el) return false;
-    const r = el.getBoundingClientRect();
-    return r.width > 10 && r.height > 10;
+/* ---------------------------------------------------------
+   Weather markers (standalone)
+--------------------------------------------------------- */
+export function addOrUpdateWeatherMarkers(items, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { k, s } = ready;
+    if (!Array.isArray(items)) return false;
+
+    for (const w of items) {
+        const ll = pickLatLng(w, s.utils);
+        if (!ll) continue;
+
+        const wid = (w?.Id ?? w?.id);
+        if (wid == null) continue;
+
+        const id = `wf:${wid}`;
+        const level = (w?.IsSevere || w?.isSevere) ? 4 : 2;
+
+        addOrUpdateCrowdMarker(id, ll.lat, ll.lng, level, {
+            title: w?.Summary ?? w?.summary ?? "Weather",
+            description: [
+                `Temp: ${w?.TemperatureC ?? w?.temperatureC ?? "?"}°C`,
+                `Hum: ${w?.Humidity ?? w?.humidity ?? "?"}%`,
+                `Wind: ${w?.WindSpeedKmh ?? w?.windSpeedKmh ?? "?"} km/h`,
+                `Rain: ${w?.RainfallMm ?? w?.rainfallMm ?? "?"} mm`,
+                (w?.Description ?? w?.description) ? `Desc: ${w?.Description ?? w?.description}` : null
+            ].filter(Boolean).join(" • "),
+            weatherType: (w?.WeatherType ?? w?.weatherType ?? "").toString(),
+            isTraffic: false
+        }, k);
+    }
+    return true;
 }
 
-// ------------------------------
-// Bundles (group by proximity)
-// ------------------------------
+/* ---------------------------------------------------------
+   Bundles (group by proximity)
+--------------------------------------------------------- */
 function metersToDegLat(m) { return m / 111320; }
 function metersToDegLng(m, lat) {
     const cos = Math.cos((lat * Math.PI) / 180);
     return m / (111320 * Math.max(cos, 0.1));
 }
-
 function bundleKeyFor(lat, lng, tolMeters) {
     const dLat = metersToDegLat(tolMeters);
     const dLng = metersToDegLng(tolMeters, lat);
@@ -997,25 +1043,11 @@ function bundleKeyFor(lat, lng, tolMeters) {
     const gx = Math.floor(lng / dLng);
     return `${gy}:${gx}`;
 }
-
-function bundleBreakdown(b) {
-    return {
-        events: b.events?.length ?? 0,
-        places: b.places?.length ?? 0,
-        crowds: b.crowds?.length ?? 0,
-        traffic: b.traffic?.length ?? 0,
-        weather: b.weather?.length ?? 0,
-        suggestions: b.suggestions?.length ?? 0,
-        gpt: b.gpt?.length ?? 0,
-    };
-}
-
 function clampLevel14(level) {
     const n = Number(level);
     if (!Number.isFinite(n)) return 1;
     return Math.max(1, Math.min(4, n));
 }
-
 function pickCrowdLevel(item) {
     return clampLevel14(item?.CrowdLevel ?? item?.crowdLevel ?? item?.Level ?? item?.level);
 }
@@ -1024,43 +1056,94 @@ function pickTrafficLevel(item) {
 }
 function pickWeatherLevel(item) {
     const severe = !!(item?.IsSevere ?? item?.isSevere);
-    if (severe) return 4;
-    return 2;
+    return severe ? 4 : 2;
 }
-
 function bundleSeverity(b) {
     let sev = 1;
-
-    if (Array.isArray(b?.crowds)) {
-        for (const c of b.crowds) {
-            const lv = pickCrowdLevel(c);
-            if (lv != null && lv > sev) sev = lv;
-        }
-    }
-
-    if (Array.isArray(b?.traffic)) {
-        for (const t of b.traffic) {
-            const lv = pickTrafficLevel(t);
-            if (lv != null && lv > sev) sev = lv;
-        }
-    }
-
-    // ✅ NEW: weather affects severity
-    if (Array.isArray(b?.weather)) {
-        for (const w of b.weather) {
-            const lv = pickWeatherLevel(w);
-            if (lv != null && lv > sev) sev = lv;
-        }
-    }
-
+    if (Array.isArray(b?.crowds)) for (const c of b.crowds) sev = Math.max(sev, pickCrowdLevel(c));
+    if (Array.isArray(b?.traffic)) for (const t of b.traffic) sev = Math.max(sev, pickTrafficLevel(t));
+    if (Array.isArray(b?.weather)) for (const w of b.weather) sev = Math.max(sev, pickWeatherLevel(w));
     return sev;
 }
-
 function bundleTotal(b) {
-    const d = bundleBreakdown(b);
-    return d.events + d.places + d.crowds + d.traffic + d.weather + d.suggestions + d.gpt;
+    const arrs = ["events", "places", "crowds", "traffic", "weather", "suggestions", "gpt"];
+    let total = 0;
+    for (const k of arrs) total += (b?.[k]?.length ?? 0);
+    return total;
 }
 
+function toNum(v) {
+    if (v == null) return null;
+    const n = (typeof v === "string") ? Number(v.replace(",", ".")) : Number(v);
+    return Number.isFinite(n) ? n : null;
+}
+
+function pickLatLng(o, utils = null) {
+    if (!o) return null;
+
+    const latVal =
+        o.lat ?? o.Lat ?? o.LAT ??
+        o.latitude ?? o.Latitude ?? o.LATITUDE ??
+        o?.location?.lat ?? o?.Location?.Lat ?? o?.Location?.Latitude ??
+        o?.coords?.lat ?? o?.Coords?.Latitude;
+
+    const lngVal =
+        o.lng ?? o.Lng ?? o.LNG ??
+        o.lon ?? o.Lon ?? o.longitude ?? o.Longitude ?? o.LONGITUDE ??
+        o?.location?.lng ?? o?.Location?.Lng ?? o?.Location?.Longitude ??
+        o?.coords?.lng ?? o?.Coords?.Longitude;
+
+    const toNum = (v) => {
+        if (v == null) return null;
+        if (typeof v === "string") v = v.replace(",", ".");
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+    };
+
+    const lat = toNum(latVal);
+    const lng = toNum(lngVal);
+
+    if (lat == null || lng == null) return null;
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+
+    return { lat, lng };
+}
+function hasCoord(o) {
+    const p = pickLatLng(o);
+    return !!p;
+}
+function normalizePayload(payload) {
+    const p = payload || {};
+    const norm = {
+        places: p.places ?? p.Places ?? [],
+        events: p.events ?? p.Events ?? [],
+        crowds: p.crowds ?? p.Crowds ?? [],
+        traffic: p.traffic ?? p.Traffic ?? [],
+        weather: p.weather ?? p.Weather ?? [],
+        suggestions: p.suggestions ?? p.Suggestions ?? [],
+        gpt: p.gpt ?? p.Gpt ?? p.GPT ?? []
+    };
+
+    norm.places = normalizeItems(norm.places);
+    norm.events = normalizeItems(norm.events);
+    norm.crowds = normalizeItems(norm.crowds);
+    norm.traffic = normalizeItems(norm.traffic);
+    norm.weather = normalizeItems(norm.weather);
+    norm.suggestions = normalizeItems(norm.suggestions);
+    norm.gpt = normalizeItems(norm.gpt);
+
+    return norm;
+}
+function normalizeItems(arr) {
+    if (!Array.isArray(arr)) return [];
+    const out = [];
+    for (const x of arr) {
+        const ll = pickLatLng(x);
+        if (!ll) continue;
+        out.push({ ...x, lat: ll.lat, lng: ll.lng });
+    }
+    return out;
+}
 function hasOnlyWeather(b) {
     return (b.weather?.length ?? 0) > 0
         && (b.events?.length ?? 0) === 0
@@ -1070,7 +1153,6 @@ function hasOnlyWeather(b) {
         && (b.suggestions?.length ?? 0) === 0
         && (b.gpt?.length ?? 0) === 0;
 }
-
 function weatherEmojiForBundle(b) {
     const w = b.weather?.[0];
     const s = String(w?.WeatherMain ?? w?.WeatherType ?? w?.Summary ?? "").toLowerCase();
@@ -1093,15 +1175,34 @@ function makeBadgeIcon(totalCount, severity = 1, b = null) {
                     severity === 4 ? "oz-bundle-lvl4" : "oz-bundle-lvl1";
 
     const onlyWeather = b && hasOnlyWeather(b);
+
+    const nEvents = b?.events?.length ?? 0;
+    const nPlaces = b?.places?.length ?? 0;
+    const nCrowds = b?.crowds?.length ?? 0;
+    const nTraffic = b?.traffic?.length ?? 0;
+    const nWeather = b?.weather?.length ?? 0;
+    const nSugg = b?.suggestions?.length ?? 0;
+
+    const dots = `
+    <div class="oz-dots">
+      ${nEvents ? `<span class="oz-dot oz-dot-events" title="Events"></span>` : ``}
+      ${nPlaces ? `<span class="oz-dot oz-dot-places" title="Places"></span>` : ``}
+      ${nCrowds ? `<span class="oz-dot oz-dot-crowds" title="Crowd"></span>` : ``}
+      ${nTraffic ? `<span class="oz-dot oz-dot-traffic" title="Traffic"></span>` : ``}
+      ${nWeather ? `<span class="oz-dot oz-dot-weather" title="Weather"></span>` : ``}
+      ${nSugg ? `<span class="oz-dot oz-dot-gpt" title="Suggestion"></span>` : ``}
+    </div>
+  `.trim();
+
     const tag = onlyWeather ? `<div class="oz-bundle-tag">${weatherEmojiForBundle(b)}</div>` : "";
 
     const html = `
-      <div class="oz-bundle ${lvlClass} ${onlyWeather ? "oz-bundle-weather" : ""}">
-        <div class="oz-badge">${totalCount}</div>
-        ${tag}
-        <div class="oz-dots"></div>
-      </div>
-    `.trim();
+    <div class="oz-bundle ${lvlClass} ${onlyWeather ? "oz-bundle-weather" : ""}">
+      <div class="oz-badge">${totalCount}</div>
+      ${tag}
+      ${dots}
+    </div>
+  `.trim();
 
     return Leaflet.divIcon({
         className: "oz-bundle-icon",
@@ -1112,41 +1213,11 @@ function makeBadgeIcon(totalCount, severity = 1, b = null) {
     });
 }
 
-function weatherLineHtml(w, s) {
-    const esc = s.utils.escapeHtml;
-    const t = w?.TemperatureC ?? w?.temperatureC;
-    const hum = w?.Humidity ?? w?.humidity;
-    const wind = w?.WindSpeedKmh ?? w?.windSpeedKmh;
-    const rain = w?.RainfallMm ?? w?.rainfallMm;
-    const sum = w?.Summary ?? w?.summary ?? "Weather";
-    const desc = w?.Description ?? w?.description ?? "";
-    const main = w?.WeatherMain ?? w?.weatherMain ?? "";
-    const sev = !!(w?.IsSevere ?? w?.isSevere);
-
-    const parts = [];
-    if (t != null) parts.push(`${esc(t)}°C`);
-    if (hum != null) parts.push(`Hum ${esc(hum)}%`);
-    if (wind != null) parts.push(`Vent ${esc(wind)} km/h`);
-    if (rain != null) parts.push(`Pluie ${esc(rain)} mm`);
-
-    const badge = sev ? `<span class="oz-pill oz-pill-sev">Severe</span>` : "";
-    const head = `<div class="oz-wx-head">${esc(sum)} ${badge}</div>`;
-    const sub = (main || desc) ? `<div class="oz-wx-sub">${esc([main, desc].filter(Boolean).join(" • "))}</div>` : "";
-    const metrics = parts.length ? `<div class="oz-wx-metrics">${esc(parts.join(" • "))}</div>` : "";
-
-    return `
-    <div class="oz-wx-row">
-      ${head}
-      ${sub}
-      ${metrics}
-    </div>
-  `.trim();
-}
-
 function bundlePopupHtml(b, s) {
     const esc = s.utils.escapeHtml;
-    const totals = bundleBreakdown(b);
     const total = bundleTotal(b);
+
+    const breakdown = (k) => (b?.[k]?.length ?? 0);
 
     return `
     <div class="oz-bundle-popup">
@@ -1159,26 +1230,27 @@ function bundlePopupHtml(b, s) {
       <div class="oz-sec">
         <div class="oz-sec-title">Counts</div>
         <div class="oz-sec-body">
-          <div class="oz-row"><span class="oz-k">Events</span><span class="oz-v">${esc(totals.events)}</span></div>
-          <div class="oz-row"><span class="oz-k">Places</span><span class="oz-v">${esc(totals.places)}</span></div>
-          <div class="oz-row"><span class="oz-k">Crowds</span><span class="oz-v">${esc(totals.crowds)}</span></div>
-          <div class="oz-row"><span class="oz-k">Traffic</span><span class="oz-v">${esc(totals.traffic)}</span></div>
-          <div class="oz-row"><span class="oz-k">Weather</span><span class="oz-v">${esc(totals.weather)}</span></div>
-          <div class="oz-row"><span class="oz-k">Suggestions</span><span class="oz-v">${esc(totals.suggestions)}</span></div>
-          <div class="oz-row"><span class="oz-k">GPT</span><span class="oz-v">${esc(totals.gpt)}</span></div>
+          <div class="oz-row"><span class="oz-k">Events</span><span class="oz-v">${esc(breakdown("events"))}</span></div>
+          <div class="oz-row"><span class="oz-k">Places</span><span class="oz-v">${esc(breakdown("places"))}</span></div>
+          <div class="oz-row"><span class="oz-k">Crowds</span><span class="oz-v">${esc(breakdown("crowds"))}</span></div>
+          <div class="oz-row"><span class="oz-k">Traffic</span><span class="oz-v">${esc(breakdown("traffic"))}</span></div>
+          <div class="oz-row"><span class="oz-k">Weather</span><span class="oz-v">${esc(breakdown("weather"))}</span></div>
+          <div class="oz-row"><span class="oz-k">Suggestions</span><span class="oz-v">${esc(breakdown("suggestions"))}</span></div>
+          <div class="oz-row"><span class="oz-k">GPT</span><span class="oz-v">${esc(breakdown("gpt"))}</span></div>
         </div>
       </div>
     </div>
   `.trim();
 }
-function resolveLatLngForItem(kindLower, item, indexes, s) {
-    let ll = pickLatLng(item, s.utils);
+
+function resolveLatLngForItem(item, indexes, s) {
+    let ll = pickLatLng(item);
     if (ll) return ll;
 
     const placeId = item?.PlaceId ?? item?.placeId;
     if (placeId != null) {
         const p = indexes.placeById.get(placeId);
-        ll = pickLatLng(p, s.utils);
+        ll = pickLatLng(p);
         if (ll) return ll;
     }
 
@@ -1196,7 +1268,7 @@ function resolveLatLngForItem(kindLower, item, indexes, s) {
         if (ll) return ll;
     }
 
-    const wfId = item?.WeatherForecastId ?? item?.weatherForecastId;
+    const wfId = item?.WeatherForecastId ?? item?.weatherForecastId ?? item?.ForecastId ?? item?.forecastId;
     if (wfId != null) {
         const w = indexes.weatherById.get(wfId);
         ll = pickLatLng(w, s.utils);
@@ -1209,43 +1281,21 @@ function resolveLatLngForItem(kindLower, item, indexes, s) {
         ll = pickLatLng(t, s.utils);
         if (ll) return ll;
     }
+
     return null;
 }
 
-function countValidResolvable(arr, kindLower, indexes, s) {
-    if (!Array.isArray(arr) || arr.length === 0) return 0;
-
-    let ok = 0;
-    for (const it of arr) {
-        try {
-            const ll = resolveLatLngForItem(kindLower, it, indexes, s);
-            if (ll) ok++;
-        } catch { }
-    }
-    return ok;
-}
-function normalizePayload(payload) {
-    const p = payload || {};
-    return {
-        places: p.places ?? p.Places ?? [],
-        events: p.events ?? p.Events ?? [],
-        crowds: p.crowds ?? p.Crowds ?? [],
-        traffic: p.traffic ?? p.Traffic ?? [],
-        weather: p.weather ?? p.Weather ?? [],
-        suggestions: p.suggestions ?? p.Suggestions ?? [],
-        gpt: p.gpt ?? p.Gpt ?? [],
-    };
-}
 function computeBundles(payload, tolMeters, s) {
     const buckets = new Map();
+    const norm = payload;
 
-    const placesArr = arr(payload, "places");
-    const eventsArr = arr(payload, "events");
-    const crowdsArr = arr(payload, "crowds");
-    const trafficArr = arr(payload, "traffic");
-    const weatherArr = arr(payload, "weather");
-    const suggestionsArr = arr(payload, "suggestions");
-    const gptArr = arr(payload, "gpt");
+    const placesArr = norm.places;
+    const eventsArr = norm.events;
+    const crowdsArr = norm.crowds;
+    const trafficArr = norm.traffic;
+    const weatherArr = norm.weather;
+    const suggestionsArr = norm.suggestions;
+    const gptArr = norm.gpt;
 
     const indexes = {
         placeById: new Map(placesArr.map(p => [p?.Id ?? p?.id, p]).filter(([id]) => id != null)),
@@ -1255,64 +1305,27 @@ function computeBundles(payload, tolMeters, s) {
         weatherById: new Map(weatherArr.map(w => [w?.Id ?? w?.id, w]).filter(([id]) => id != null)),
     };
 
-    let missingTotal = 0;
+    let dropped = 0;
 
     const push = (arr, kind) => {
-        if (!Array.isArray(arr)) return;
-
-        const kindLower = String(kind).toLowerCase();
-        let missing = 0;
-        console.log("[DBG] push kind=", kind, "len=", arr?.length, "tol=", tolMeters);
+        if (!Array.isArray(arr) || arr.length === 0) return;
 
         for (const item of arr) {
-            try {
-                const ll = resolveLatLngForItem(kindLower, item, indexes, s);
-                if (!ll) { missing++; missingTotal++; continue; }
+            const ll = resolveLatLngForItem(item, indexes, s);
+            if (!ll) {
+                dropped++;
 
-                /*if (!isInBelgium(ll, s)) continue;*/
-
-                const key = bundleKeyFor(ll.lat, ll.lng, tolMeters);
-
-                let b = buckets.get(key);
-                if (!b) {
-                    b = { key, lat: ll.lat, lng: ll.lng, events: [], places: [], crowds: [], traffic: [], weather: [], suggestions: [], gpt: [] };
-                    buckets.set(key, b);
-                }
-
-                const target = b[kind];
-                if (!Array.isArray(target)) {
-                    if (missingTotal <= 3) console.warn("[Bundles] unknown kind", { kind, keys: Object.keys(b) });
-                    continue;
-                }
-
-                target.push(item);
-            } catch (err) {
-                if (missingTotal <= 3) {
-                    console.error("[Bundles] push failed", {
-                        kindLower,
-                        id: item?.Id ?? item?.id,
-                        placeId: item?.PlaceId ?? item?.placeId,
-                        eventId: item?.EventId ?? item?.eventId,
-                        lat: item?.Latitude ?? item?.latitude ?? item?.Lat ?? item?.lat,
-                        lng: item?.Longitude ?? item?.longitude ?? item?.Lng ?? item?.lng,
-                        err
-                    });
-                }
                 continue;
             }
-        }
 
-        if (missing && kindLower === "suggestions") {
-            console.warn(`[Bundles] ${missing} suggestion(s) without coords/PlaceId/EventId`);
+            const key = bundleKeyFor(ll.lat, ll.lng, tolMeters);
+            let b = buckets.get(key);
+            if (!b) {
+                b = { key, lat: ll.lat, lng: ll.lng, events: [], places: [], crowds: [], traffic: [], weather: [], suggestions: [], gpt: [] };
+                buckets.set(key, b);
+            }
+            b[kind].push(item);
         }
-
-        const sampleSug = suggestionsArr[0];
-        console.log("[DBG] suggestion fields", {
-            Latitude: sampleSug?.Latitude, Longitude: sampleSug?.Longitude,
-            lat: sampleSug?.lat, lng: sampleSug?.lng,
-            Lat: sampleSug?.Lat, Lng: sampleSug?.Lng,
-            PlaceId: sampleSug?.PlaceId, EventId: sampleSug?.EventId
-        });
     };
 
     push(placesArr, "places");
@@ -1321,288 +1334,52 @@ function computeBundles(payload, tolMeters, s) {
     push(trafficArr, "traffic");
     push(weatherArr, "weather");
     push(suggestionsArr, "suggestions");
-    push(gptArr, "gpt");
 
-    const stats = {
-        places: countValidResolvable(placesArr, "places", indexes, s),
-        events: countValidResolvable(eventsArr, "events", indexes, s),
-        crowds: countValidResolvable(crowdsArr, "crowds", indexes, s),
-        traffic: countValidResolvable(trafficArr, "traffic", indexes, s),
-        weather: countValidResolvable(weatherArr, "weather", indexes, s),
-        suggestions: countValidResolvable(suggestionsArr, "suggestions", indexes, s),
-        gpt: countValidResolvable(gptArr, "gpt", indexes, s),
-        missingTotal
-    };
+    if (Array.isArray(gptArr) && gptArr.length) {
+        const gptGeo = gptArr.filter(x => pickLatLng(x) || x?.PlaceId != null || x?.EventId != null);
+        push(gptGeo, "gpt");
+    }
 
-    console.log("[Bundles] valid points", stats);
-
-    const totalUseful =
-        stats.places + stats.events +
-        stats.crowds + stats.weather +
-        stats.traffic + stats.suggestions + stats.gpt;
-
-    if (totalUseful === 0) return new Map();
-
-
-    const sampleSug = suggestionsArr[0];
-    console.log("[DBG] suggestion sample", sampleSug);
-    console.log("[DBG] pickLatLng(suggestion) =", pickLatLng(sampleSug, s.utils));
-    console.log("[DBG] resolveLatLngForItem(suggestions) =", resolveLatLngForItem("suggestions", sampleSug, indexes, s));
-
-    console.log("[DBG] buckets keys =", Array.from(buckets.keys()).slice(0, 5));
-    console.log("[DBG] first bucket =", buckets.values().next().value);
-
+    if (dropped) console.warn("[Bundles] dropped items without lat/lng =", dropped);
     return buckets;
 }
 
-export function updateBundleMarker(b, scopeKey = null) {
-    console.log("[DBG] updateBundleMarker called", { key: b?.key, lat: b?.lat, lng: b?.lng });
-    const k = pickScopeKey(scopeKey);
-    const ready = ensureMapReady(k);
-    if (!ready) return;
-
-    const { s, L } = ready;
-    const total = bundleTotal(b);
-    const sev = bundleSeverity(b);
-    const existing = s.bundleMarkers.get(b.key);
-    const detailsMode = isDetailsModeNow(s);
-
-    // ✅ Correct: if nothing to show => remove existing bundle marker
-    if (total <= 0) {
-        if (existing) {
-            removeLayerSmart(existing, s);
-            s.bundleMarkers.delete(b.key);
-            s.bundleIndex.delete(b.key);
-        }
-        return;
-    }
-
-
-    /*const icon = makeBadgeIcon(total, sev, b);*/
-    const icon = undefined;
-
-    const popup = bundlePopupHtml(b, s);
-
-    if (!existing) {
-        const m = L.marker([b.lat, b.lng], {
-            icon,
-            /*pane: "tooltipPane", */ // quick test, above
-            /*pane: "markerPane",*/
-            title: `Area (${total})`,
-            riseOnHover: true,
-            __ozNoCluster: true,
-        });
-        console.log("[DBG] bundle marker created", { m, isMarker: !!m?.getLatLng, opts: m?.options });
-
-        m.bindPopup(popup, { maxWidth: 420, closeButton: true, autoPan: true });
-        /*m.bindTooltip(`Area • ${total} elements`, { direction: "top", sticky: true, opacity: 0.95 });*/
-
-        if (!m || typeof m.getLatLng !== "function") console.error("[DBG] bundle marker invalid", m);
-        if (!detailsMode) addLayerSmart(m, s);
-
-        debounceOncePerFrame(s, "_hybridTick", () => {
-            console.log("[DBG] detailsMode=", detailsMode, "hybrid=", s.hybrid);
-        });
-
-        s.bundleMarkers.set(b.key, m);
-        s.bundleIndex.set(b.key, b);
-        return;
-    }
-
-    try { existing.setLatLng([b.lat, b.lng]); } catch { }
-    try { if (icon) existing.setIcon(icon); } catch { }
-    try { if (existing.getPopup()) existing.setPopupContent(popup); } catch { }
-
-    try {
-        if (detailsMode) {
-            if (s.map.hasLayer(existing)) s.map.removeLayer(existing);
-        } else {
-            if (!s.map.hasLayer(existing)) s.map.addLayer(existing);
-        }
-    } catch { }
-
-    s.bundleIndex.set(b.key, b);
-    console.log("[DBG] updateBundleMarker", { key: b.key, total, sev, detailsMode, hasExisting: !!existing });
+/* ---------------------------------------------------------
+   Detail markers + Hybrid zoom (GUARDED)
+--------------------------------------------------------- */
+function isDetailsModeNow(s) {
+    if (!s?.map) return false;
+    if (!s.hybrid?.enabled) return false;
+    const z = s.map.getZoom?.();
+    return (Number(z) || 0) >= (Number(s.hybrid.threshold) || 13);
 }
 
-export function addOrUpdateBundleMarkers(payload, toleranceMeters = 80, scopeKey = null) {
-    const k = pickScopeKey(scopeKey);
-    const ready = ensureMapReady(k);
-    if (!ready) return false;
-
-    const { s } = ready;
-
-    // 1) tolerance (defined BEFORE use)
-    const tol = Number(toleranceMeters);
-    const tolMeters = (Number.isFinite(tol) && tol > 0) ? tol : 80;
-
-    // 2) normalize only once
-    const norm = normalizePayload(payload);
-    s.bundleLastInput = norm;
-
-    console.log("[Bundles] input keys", Object.keys(payload || {}));
-    console.log("[Bundles] counts", {
-        events: norm.events.length,
-        places: norm.places.length,
-        crowds: norm.crowds.length,
-        suggestions: norm.suggestions.length,
-        traffic: norm.traffic.length,
-        weather: norm.weather.length,
-        gpt: norm.gpt.length,
-    });
-
-    console.log("[Bundles] map has cluster?", !!s.cluster, "map?", !!s.map, "zoom", s.map?.getZoom?.());
-
-    // 3) compute bundles (a single statement)
-    const bundles = computeBundles(norm, tolMeters, s);
-    if (!bundles || bundles.size === 0) {
-        // Option: purge old bundles if nothing else is available
-        for (const oldKey of Array.from(s.bundleMarkers.keys())) {
-            const marker = s.bundleMarkers.get(oldKey);
-            removeLayerSmart(marker, s);
-            s.bundleMarkers.delete(oldKey);
-            s.bundleIndex.delete(oldKey);
-        }
-        try { refreshHybridVisibility(k); } catch { }
-        return true;
-    }
-
-    console.log("[Bundles] bundles.size =", bundles?.size ?? null);
-
-    // 4) remove old bundles
-    for (const oldKey of Array.from(s.bundleMarkers.keys())) {
-        if (!bundles.has(oldKey)) {
-            const marker = s.bundleMarkers.get(oldKey);
-            removeLayerSmart(marker, s);
-            s.bundleMarkers.delete(oldKey);
-            s.bundleIndex.delete(oldKey);
-        }
-    }
-
-    // 5) upsert bundles
-    for (const b of bundles.values()) updateBundleMarker(b, k);
-
-    // 6) hybrid refresh + cluster refresh (if available)
-    try { refreshHybridVisibility(k); } catch { }
-
-    if (s.cluster && typeof s.cluster.refreshClusters === "function") {
-        try { s.cluster.refreshClusters(); } catch { }
-    }
-
-    // 7) Optional: Weather pins in bundle mode
-    if (s.flags.showWeatherPinsInBundles && s.hybrid?.showing !== "details") {
-        addOrUpdateWeatherMarkers(norm.weather ?? [], k);
-    }
-
-    try { refreshHybridVisibility(k); } catch { }
-
-    return true;
-}
-// ------------------------------
-// Weather markers (standalone)
-// ------------------------------
-export function addOrUpdateWeatherMarkers(items, scopeKey = null) {
-    const k = pickScopeKey(scopeKey);
-    const ready = ensureMapReady(k);
-    if (!ready) return false;
-
-    const { s } = ready;
-    if (!Array.isArray(items)) return false;
-
-    for (const w of items) {
-        const ll = pickLatLng(w, s.utils);
-        if (!ll || !isInBelgium(ll, s)) continue;
-
-        const wid = (w?.Id ?? w?.id);
-        /*const id = "wf:" + String(w.Id ?? w.id ?? "");*/
-        if (wid == null) continue;
-        const id = `wf:${wid}`;
-
-        console.log("[WeatherMarkers] adding", { id, lat: ll.lat, lng: ll.lng });
-
-        const level = (w.IsSevere || w.isSevere) ? 4 : 2;
-
-        addOrUpdateCrowdMarker(id, ll.lat, ll.lng, level, {
-            title: w.Summary ?? w.summary ?? "Weather",
-            description: [
-                `Temp: ${w.TemperatureC ?? w.temperatureC ?? "?"}°C`,
-                `Hum: ${w.Humidity ?? w.humidity ?? "?"}%`,
-                `Wind: ${w.WindSpeedKmh ?? w.windSpeedKmh ?? "?"} km/h`,
-                `Rain: ${w.RainfallMm ?? w.rainfallMm ?? "?"} mm`,
-                (w.Description ?? w.description) ? `Desc: ${w.Description ?? w.description}` : null
-            ].filter(Boolean).join(" • "),
-            weatherType: (w.WeatherType ?? w.weatherType ?? "").toString(),
-            isTraffic: false
-        }, k);
-    }
-    return true;
-}
-
-export function addOrUpdateSuggestionMarkersFromPayload(payload, scopeKey = null) {
-    const k = pickScopeKey(scopeKey);
-    const ready = ensureMapReady(k);
-    if (!ready) return false;
-    const { s } = ready;
-
-    const placesArr = Array.isArray(payload?.places) ? payload.places : [];
-    const eventsArr = Array.isArray(payload?.events) ? payload.events : [];
-    const suggestionsArr = Array.isArray(payload?.suggestions) ? payload.suggestions : [];
-
-    const indexes = {
-        placeById: new Map(placesArr.map(p => [p?.Id ?? p?.id, p]).filter(([id]) => id != null)),
-        eventById: new Map(eventsArr.map(e => [e?.Id ?? e?.id, e]).filter(([id]) => id != null)),
-        crowdById: new Map(),
-        trafficById: new Map(),
-        weatherById: new Map(),
-    };
-
-    for (const it of suggestionsArr) {
-        const ll = resolveLatLngForItem("suggestions", it, indexes, s);
-        if (!ll) continue;
-
-        addOrUpdateCrowdMarker(
-            `sg:${it.Id ?? it.id}`,
-            ll.lat, ll.lng,
-            2,
-            { title: it.Title ?? it.title ?? "Suggestion", description: it.SuggestedAlternatives ?? it.suggestedAlternatives ?? "", icon: "💡", kind: "suggestion" },
-            k
-        );
-    }
-    return true;
-}
-export function scheduleBundleRefresh(delayMs = 150, tolMeters = 80, scopeKey = null) {
-    const s = getS(pickScopeKey(scopeKey));
-    clearTimeout(s._bundleRefreshT);
-    s._bundleRefreshT = setTimeout(() => {
-        try {
-            if (s.bundleLastInput) addOrUpdateBundleMarkers(s.bundleLastInput, tolMeters, pickScopeKey(scopeKey));
-        } catch { }
-    }, delayMs);
-}
-
-// ------------------------------
-// Detail markers + Hybrid zoom
-// ------------------------------
 function ensureDetailLayer(s, L) {
+    if (!s?.map) return null;
     if (!s.detailLayer) {
         s.detailLayer = L.layerGroup();
         s.map.addLayer(s.detailLayer);
+    } else if (s.map && typeof s.map.hasLayer === "function" && !s.map.hasLayer(s.detailLayer)) {
+        s.detailLayer.addTo(s.map);
     }
     return s.detailLayer;
 }
 
 function clearDetailMarkers(s) {
-    try { s.detailLayer?.clearLayers?.(); } catch { }
+    const has = makeHas(s);
+    try { if (has(s.detailLayer)) s.detailLayer.clearLayers?.(); } catch { }
     try { s.detailMarkers?.clear?.(); } catch { }
 }
 
 function makeDetailKey(kind, item, s) {
     const k = String(kind).toLowerCase();
 
-    const id =
-        item?.Id ?? item?.id ??
-        item?.ForecastId ?? item?.forecastId ??
-        item?.WeatherForecastId ?? item?.weatherForecastId;
+    if (k === "suggestion") {
+        const sid = item?.SuggestionId ?? item?.suggestionId ?? item?.Id ?? item?.id;
+        if (sid != null) return `suggestion:${sid}`;
+    }
+
+    const id = item?.Id ?? item?.id ?? item?.ForecastId ?? item?.forecastId ?? item?.WeatherForecastId ?? item?.weatherForecastId;
 
     if (id != null) return `${k}:${id}`;
 
@@ -1610,133 +1387,201 @@ function makeDetailKey(kind, item, s) {
     const dt = item?.DateWeather ?? item?.dateWeather ?? item?.DateUtc ?? item?.dateUtc;
     if (placeId != null && dt) return `${k}:p${placeId}:${String(dt)}`;
 
-    const ll = pickLatLng(item, s.utils);
+    const ll = pickLatLng(item);
     if (ll) return `${k}:${ll.lat.toFixed(5)},${ll.lng.toFixed(5)}`;
 
     return `${k}:${JSON.stringify(item).slice(0, 64)}`;
 }
 
-function addDetailMarker(kind, item, s, L) {
-    try {
-        const layer = ensureDetailLayer(s, L);
-        if (!layer) return;
+function addDetailMarker(kind, item, s, L, scopeKey = null) {
+    if (!s?.map) return;
 
-        let ll = null;
+    const layer = ensureDetailLayer(s, L);
+    if (!layer) return;
 
-        if (String(kind).toLowerCase() === "weather") {
-            const placeId = item?.PlaceId ?? item?.placeId;
-            const place = placeId != null ? (s.bundleLastInput?.places ?? []).find(p => (p?.Id ?? p?.id) == placeId) : null;
-            ll = pickLatLng(item, s.utils) ?? pickLatLng(place, s.utils);
-        } else {
-            ll = pickLatLng(item, s.utils);
-        }
+    const kindLower = String(kind).toLowerCase();
 
-        if (!ll || !isInBelgium(ll, s)) return;
+    // 1) coords
+    const ll = pickLatLng(item);
+    if (!ll) return;
 
-        const key = makeDetailKey(kind, item, s);
-        if (s.detailMarkers.has(key)) return;
+    // 2) ✅ Define key/title/sid BEFORE any log/usage (avoids TDZ)
+    const key = makeDetailKey(kindLower, item, s);
+    if (s.detailMarkers.has(key)) return;
 
-        const title = s.utils.titleOf(kind, item);
+    const title = s.utils.titleOf(kindLower, item);
 
-        // ✅ Weather with icon
-        if (String(kind).toLowerCase() === "weather") {
-            const severe = !!(item?.IsSevere ?? item?.isSevere);
-            const level = severe ? 4 : 2;
-            const icon = buildMarkerIcon(L, level, {
-                weatherType: (item?.WeatherType ?? item?.weatherType ?? "").toString(),
-                isTraffic: false
-            });
+    // Suggestion id (for click map -> Blazor)
+    const sid =
+        Number(item?.SuggestionId ?? item?.suggestionId ?? item?.Id ?? item?.id);
 
-            const m = L.marker([ll.lat, ll.lng], {
-                icon,
-                title: `Weather: ${title}`,
-                riseOnHover: true,
-                pane: "markerPane"
-            });
+    if (kindLower === "suggestion") {
+        console.log("[DETAILS] suggestion resolved ll", {
+            key,
+            sid,
+            title,
+            rawLat: item?.Latitude ?? item?.latitude ?? item?.lat,
+            rawLng: item?.Longitude ?? item?.longitude ?? item?.lng,
+            ll
+        });
+    }
 
-            /*m.bindTooltip(`Weather: ${title}`, { sticky: true, opacity: 0.95 });*/
-            m.bindPopup(buildPopupHtml({
-                title: item?.Summary ?? item?.summary ?? title,
-                description: `Temp: ${item?.TemperatureC ?? item?.temperatureC ?? "?"}°C • Vent: ${item?.WindSpeedKmh ?? item?.windSpeedKmh ?? "?"} km/h`
-            }, s));
+    // 3) icon + popup by type
+    if (kindLower === "weather") {
+        const severe = !!(item?.IsSevere ?? item?.isSevere);
+        const level = severe ? 4 : 2;
 
-            console.log("[DETAILS] add weather", key);
-            layer.addLayer(m);
-            s.detailMarkers.set(key, m);
-            return;
-        }
+        const icon = buildMarkerIcon(L, level, {
+            kind: "weather",
+            weatherType: (item?.WeatherType ?? item?.weatherType ?? "").toString(),
+            isTraffic: false
+        });
 
-        // other kinds: keep circleMarker (or convert later)
-        const m = L.circleMarker([ll.lat, ll.lng], { radius: 7, className: "oz-detail-marker" });
-        /*m.bindTooltip(`${kind}: ${title}`, { sticky: true, opacity: 0.95 });*/
-        m.bindPopup(`<div class="oz-popup"><b>${s.utils.escapeHtml(kind)}</b><br>${s.utils.escapeHtml(title)}</div>`);
+        const m = L.marker([ll.lat, ll.lng], {
+            icon,
+            title: `Weather: ${title}`,
+            riseOnHover: true,
+            pane: "markerPane"
+        });
+
+        m.bindPopup(buildPopupHtml({
+            title: item?.Summary ?? item?.summary ?? title,
+            description: `Temp: ${item?.TemperatureC ?? item?.temperatureC ?? "?"}°C • Vent: ${item?.WindSpeedKmh ?? item?.windSpeedKmh ?? "?"} km/h`
+        }, s));
 
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
-    } catch (e) {
-        console.error("[DETAILS] addDetailMarker failed", { kind, item, e });
+        return;
     }
+
+    if (kindLower === "place") {
+        const icon = buildMarkerIcon(L, 1, { kind: "place", iconOverride: "🏰" });
+        const m = L.marker([ll.lat, ll.lng], { icon, title: `Place: ${title}`, riseOnHover: true, pane: "markerPane" });
+        m.bindPopup(buildPopupHtml({ title, description: item?.Description ?? item?.description ?? "" }, s));
+        layer.addLayer(m);
+        s.detailMarkers.set(key, m);
+        return;
+    }
+
+    if (kindLower === "event") {
+        const icon = buildMarkerIcon(L, 2, { kind: "event", iconOverride: "🎪" });
+        const m = L.marker([ll.lat, ll.lng], { icon, title: `Event: ${title}`, riseOnHover: true, pane: "markerPane" });
+        m.bindPopup(buildPopupHtml({ title, description: item?.Description ?? item?.description ?? "" }, s));
+        layer.addLayer(m);
+        s.detailMarkers.set(key, m);
+        return;
+    }
+
+    if (kindLower === "suggestion") {
+        const icon = buildMarkerIcon(L, 2, { kind: "suggestion", iconOverride: "💡" });
+
+        const popupDesc = [
+            item?.Reason ? `Reason: ${item.Reason}` : null,
+            item?.OriginalPlace ? `From: ${item.OriginalPlace}` : null,
+            item?.SuggestedAlternatives ? `Alt: ${item.SuggestedAlternatives}` : null,
+            (item?.DistanceKm != null) ? `Distance: ${item.DistanceKm} km` : null,
+        ].filter(Boolean).join(" • ");
+
+        const m = L.marker([ll.lat, ll.lng], {
+            icon,
+            title: `Suggestion: ${title}`,
+            riseOnHover: true,
+            pane: "markerPane"
+        });
+
+        // ✅ Click -> Blazor (if dotnet ref is registered)
+        m.on("click", () => {
+            if (!Number.isFinite(sid)) return;
+            const dn = getDotNetRef(scopeKey); // ✅ propagated scopeKey
+            if (dn) dn.invokeMethodAsync("SelectSuggestionFromMap", sid);
+        });
+
+        m.bindPopup(buildPopupHtml({ title, description: popupDesc }, s));
+
+        layer.addLayer(m);
+        s.detailMarkers.set(key, m);
+        return;
+    }
+
+    // generic fallback
+    const icon = buildMarkerIcon(L, 1, { kind: kindLower, iconOverride: "" });
+    const m = L.marker([ll.lat, ll.lng], { icon, title: `${kindLower}: ${title}`, riseOnHover: true, pane: "markerPane" });
+    m.bindPopup(`<div class="oz-popup"><b>${s.utils.escapeHtml(kindLower)}</b><br>${s.utils.escapeHtml(title)}</div>`);
+    layer.addLayer(m);
+    s.detailMarkers.set(key, m);
+}
+
+const __ozDotNet = globalThis.__ozDotNet || (globalThis.__ozDotNet = new Map());
+
+function getDotNetRef(scopeKey) {
+    const m = globalThis.__ozDotNet;
+    if (!(m instanceof Map)) return null;
+    return m.get(String(scopeKey || "main")) || null;
+}
+
+export function registerDotNetRef(scopeKey, dotnetRef) {
+    const m = globalThis.__ozDotNet;
+    if (!(m instanceof Map)) globalThis.__ozDotNet = new Map();
+    globalThis.__ozDotNet.set(String(scopeKey || "main"), dotnetRef);
+    return true;
+}
+
+export function unregisterDotNetRef(scopeKey) {
+    const m = globalThis.__ozDotNet;
+    if (m instanceof Map) m.delete(String(scopeKey || "main"));
+    return true;
 }
 
 export function addOrUpdateDetailMarkers(payload, scopeKey = null) {
-    const k = pickScopeKey(scopeKey);
-    const ready = ensureMapReady(k);
+    const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
 
     const { s, L } = ready;
-
     clearDetailMarkers(s);
 
-    let counts = { Event: 0, Place: 0, Crowd: 0, Traffic: 0, Weather: 0, Suggestion: 0, GPT: 0 };
+    const norm = normalizePayload(payload);
+
+    console.log("[DETAILS] suggestions input (first 10):",
+        (norm.suggestions || []).slice(0, 10).map(x => ({
+            id: x.Id ?? x.id,
+            title: x.Title ?? x.title,
+            lat: x.Latitude ?? x.latitude ?? x.lat,
+            lng: x.Longitude ?? x.longitude ?? x.lng
+        }))
+    );
 
     const push = (arr, kind) => {
         if (!Array.isArray(arr)) return;
         for (const x of arr) {
-            counts[kind]++;
-            addDetailMarker(kind, x, s, L);
+            addDetailMarker(kind, x, s, L, scopeKey);
         }
     };
 
-    push(payload?.events, "Event");
-    push(payload?.places, "Place");
-    push(payload?.crowds, "Crowd");
-    push(payload?.traffic, "Traffic");
-    push(payload?.weather, "Weather");
-    push(payload?.suggestions, "Suggestion");
-    push(payload?.gpt, "GPT");
-
-    if (Array.isArray(payload?.weather)) {
-        for (const w of payload.weather) {
-            addDetailMarker("weather", w, s, L); // force lowercase
-        }
-    }
-
-    console.log("[DETAILS] counts", counts, "detailMarkers.size", s.detailMarkers.size);
-    console.log("[DETAILS] weather sample", payload?.weather?.[0]);
+    push(norm.events, "event");
+    push(norm.places, "place");
+    push(norm.crowds, "crowd");
+    push(norm.traffic, "traffic");
+    push(norm.weather, "weather");
+    push(norm.suggestions, "suggestion");
+    push(norm.gpt, "gpt");
 
     return true;
 }
 
-export function enableHybridZoom(enabled = true, threshold = 13, scopeKey = null) {
-    const k = pickScopeKey(scopeKey);
-    const s = getS(k);
-
-    s.hybrid.enabled = !!enabled;
-    s.hybrid.threshold = (threshold ?? s.hybrid.threshold ?? 13);
-
-    if (!s.map) return false;
-
-    if (!s._hybridBound) {
-        s._hybridBound = true;
-        const h = throttleOZ(() => refreshHybridVisibility(k), 150);
-        s._hybridHandler = h;
-
-        s.map.on("zoomend", h);   // ✅ keep only zoomend
-        // s.map.on("moveend", h); // ❌ remove movesend
-    }
-
-    refreshHybridVisibility(k);
-    return true;
+function runWhenMapReallyIdle(map, fn) {
+    const tick = () => {
+        if (!map) return;
+        if (map._animatingZoom || map._zooming || map._panning || map._moving) {
+            requestAnimationFrame(tick);
+            return;
+        }
+        requestAnimationFrame(() => {
+            if (!map) return;
+            if (map._animatingZoom || map._zooming || map._panning || map._moving) return;
+            fn();
+        });
+    };
+    requestAnimationFrame(tick);
 }
 
 function throttleOZ(fn, ms) {
@@ -1762,57 +1607,52 @@ function throttleOZ(fn, ms) {
     return wrapper;
 }
 
-function runWhenMapReallyIdle(map, fn) {
-    const tick = () => {
-        if (!map) return;
-        // Leaflet internal flags - be conservative
-        if (map._animatingZoom || map._zooming || map._panning || map._moving) {
-            requestAnimationFrame(tick);
-            return;
-        }
-        // wait one extra frame AFTER it looks idle
-        requestAnimationFrame(() => {
-            if (!map) return;
-            if (map._animatingZoom || map._zooming || map._panning || map._moving) return;
-            fn();
-        });
-    };
-    requestAnimationFrame(tick);
-}
-function purgeClusterWeatherMarkers(s) {
-    try {
-        const toDelete = [];
-        for (const [k, m] of s.markers.entries()) {
-            if (!String(k).startsWith("wf:")) continue;
-            try { removeLayerSmart(m, s); } catch { }
-            toDelete.push(k);
-        }
-        for (const k of toDelete) s.markers.delete(k);
-    } catch (e) {
-        console.warn("[Hybrid] purgeClusterWeatherMarkers failed", e);
-    }
-}
-function computeTotalCountFromBundles(input) {
-    if (!input || typeof input !== "object") return null;
+function switchToDetails(s, map, scopeKey) {
+    const L = ensureLeaflet();
+    if (!L || !s?.map) return;
 
-    const keys = ["places", "events", "crowds", "traffic", "weather", "suggestions", "gpt"];
-    let total = 0;
-
-    for (const k of keys) {
-        const arr = input[k];
-        if (Array.isArray(arr)) total += arr.length;
+    // ✅ If there are no payload bundles, the switchover is refused.
+    if (!s.bundleLastInput) {
+        console.warn("[Hybrid] No bundleLastInput => keep bundles/markers");
+        s.hybrid.showing = s.hybrid.showing ?? "bundles";
+        return;
     }
-    return total;
+
+    for (const m of s.bundleMarkers.values()) {
+        try { if (map.hasLayer(m)) map.removeLayer(m); } catch { }
+    }
+
+    ensureDetailLayer(s, L);
+    //if (s.bundleLastInput)
+    //    addOrUpdateDetailMarkers(s.bundleLastInput, scopeKey);
+    addOrUpdateDetailMarkers(s.bundleLastInput, scopeKey);
+
+    s.hybrid.showing = "details";
 }
+
+function switchToBundles(s, map) {
+    clearDetailMarkers(s);
+
+    for (const m of s.bundleMarkers.values()) {
+        try { if (!map.hasLayer(m)) map.addLayer(m); } catch { }
+    }
+
+    s.hybrid.showing = "bundles";
+}
+
 function refreshHybridVisibility(scopeKey = null) {
-    const k = pickScopeKey(scopeKey);
-    const s = getS(k);
-    const map = s.map;
-    const token = s._mapToken;
+    const k = pickScopeKeyRead(scopeKey);
+    const s = peekS(k) || getS(k);
+    const map = s?.map;
+    const token = s?._mapToken;
 
-    if (!map || !s.hybrid?.enabled) return;
+    if (!s || !map || !s.hybrid?.enabled) return;
+    if (s._hybridSwitching) return;
 
-    if (s._hybridSwitching) return; // ✅ block reentrancy
+    if (s.flags?.userLockedMode) {
+        if (s.hybrid.showing !== "details" && s.map) switchToDetails(s, s.map, k);
+        return;
+    }
 
     setTimeout(() => {
         if (!s.map || s.map !== map || s._mapToken !== token) return;
@@ -1823,13 +1663,13 @@ function refreshHybridVisibility(scopeKey = null) {
 
             s._hybridSwitching = true;
             try {
-                const z = map.getZoom();
-                const wantDetails = z >= s.hybrid.threshold;
+                const z = map.getZoom?.() ?? 0;
+                const wantDetails = (Number(z) || 0) >= (Number(s.hybrid.threshold) || 13);
 
                 if (wantDetails && s.hybrid.showing !== "details") {
                     switchToDetails(s, map, k);
                 } else if (!wantDetails && s.hybrid.showing !== "bundles") {
-                    switchToBundles(s, map, k);
+                    switchToBundles(s, map);
                 }
             } finally {
                 s._hybridSwitching = false;
@@ -1837,420 +1677,230 @@ function refreshHybridVisibility(scopeKey = null) {
         });
     }, 0);
 }
-function switchToDetails(s, map, scopeKey) {
-    const L = ensureLeaflet();
-    if (!L) return;
 
-    // 1) Hide the bundles (they are directly on the map)
-    for (const m of s.bundleMarkers.values()) {
-        try { if (map.hasLayer(m)) map.removeLayer(m); } catch { }
-    }
-
-    // 2) DO NOT empty the cluster: we want to keep the markers
-    //    (disableClusteringAtZoom manages the "detail" at high zoom levels)
-
-    // 3) Add an optional details layer (e.g., circles + enhanced tooltips)
-    ensureDetailLayer(s, L);
-    if (s.bundleLastInput) addOrUpdateDetailMarkers(s.bundleLastInput, scopeKey);
-
-    s.hybrid.showing = "details";
-}
-
-function switchToBundles(s, map, scopeKey) {
-    // 1) remove details (optional)
-    clearDetailMarkers(s);
-
-    // 2) show bundles
-    for (const m of s.bundleMarkers.values()) {
-        try { if (!map.hasLayer(m)) map.addLayer(m); } catch { }
-    }
-
-    s.hybrid.showing = "bundles";
-}
-export function activateHybridAndZoom(threshold = 13, zoom = 13, scopeKey = null) {
+export function enableHybridZoom(enabled = true, threshold = 13, scopeKey = "main") {
     const k = pickScopeKey(scopeKey);
-    const ready = ensureMapReady(k);
-    if (!ready) return false;
+    const s = getS(k);
 
-    const { s, map } = ready;
+    s.hybrid.enabled = !!enabled;
+    s.hybrid.threshold = (threshold ?? s.hybrid.threshold ?? 13);
 
-    try { enableHybridZoom(true, threshold, k); } catch { }
+    if (!s.map) return false;
 
-    // postpone zoom to avoid zoom transition during layer churn
-    setTimeout(() => {
-        if (s.map !== map) return;
-        try {
-            map.invalidateSize({ animate: false, debounceMoveend: true }); // ✅
-        } catch { }
-        try { map.setZoom(zoom, { animate: false }); } catch { }
-    }, 0);
+    if (!s._hybridBound) {
+        s._hybridBound = true;
+        const h = throttleOZ(() => refreshHybridVisibility(k), 150);
+        s._hybridHandler = h;
+        try { s.map.on("zoomend", h); } catch { }
+    }
 
+    refreshHybridVisibility(k);
     return true;
 }
 
 export function forceDetailsMode(scopeKey = null) {
-    const s = getS(pickScopeKey(scopeKey));
+    const k = pickScopeKeyRead(scopeKey);
+    const s = peekS(k) || getS(k);
     if (!s.map) return false;
+
+    s.flags.userLockedMode = true;
     s.hybrid.enabled = true;
 
-    // Option 1: Lower the threshold just to force details
-    // S.hybrid.threshold = 1;
-
-    // Option 2: Just zoom in above the current threshold
     const th = Number(s.hybrid.threshold) || 13;
-    if (s.map.getZoom() < th) s.map.setZoom(th);
+    try {
+        if ((s.map.getZoom?.() ?? 0) < th) s.map.setZoom(th, { animate: false });
+    } catch { }
 
-    try { refreshHybridVisibility(pickScopeKey(scopeKey)); } catch { }
+    switchToDetails(s, s.map, k);
+    try { refreshHybridVisibility(k); } catch { }
+    return true;
+}
+
+export function unlockHybrid(scopeKey = null) {
+    const k = pickScopeKeyRead(scopeKey);
+    const s = peekS(k) || getS(k);
+    s.flags.userLockedMode = false;
+    refreshHybridVisibility(k);
     return true;
 }
 
 export function refreshHybridNow(scopeKey = null) {
-    const s = getS(pickScopeKey(scopeKey));
+    const k = pickScopeKeyRead(scopeKey);
+    const s = peekS(k) || getS(k);
     if (!s.map || !s.hybrid?.enabled) return false;
-
-    const z = s.map.getZoom();
-    const next = z >= s.hybrid.threshold ? "details" : "bundles";
-
-    if (s.hybrid.showing !== next) {
-        s.hybrid.showing = next;
-        console.log("[Hybrid] showing ->", next, "zoom=", z, "threshold=", s.hybrid.threshold);
-    }
-
-    // apply visually only if necessary
-    if (next === "details") {
-        // show details / hide bundles
-        // ...
-    } else {
-        // show bundles / hide details
-        // ...
-    }
-
+    try { refreshHybridVisibility(k); } catch { }
     return true;
 }
 
-export async function fitToBundles(padding = 30, scopeKey = null) {
-    const k = pickScopeKey(scopeKey);
-    const ready = ensureMapReady(k);
-    if (!ready) return false;
+/* ---------------------------------------------------------
+   Bundle marker update (GUARDED)
+--------------------------------------------------------- */
+export function updateBundleMarker(b, scopeKey = "main") {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return;
 
     const { s, L, map } = ready;
-    const token = s._mapToken;
+    const total = bundleTotal(b);
+    const sev = bundleSeverity(b);
+    const existing = s.bundleMarkers.get(b.key);
+    const detailsMode = isDetailsModeNow(s);
 
-    if (!map || typeof map.fitBounds !== "function") return false;
-
-    const ms = Array.from(s.bundleMarkers?.values?.() ?? []);
-    const latlngs = [];
-
-    for (const m of ms) {
-        try {
-            const ll = m?.getLatLng?.();
-            if (ll) latlngs.push(ll);
-        } catch { }
+    if (total <= 0) {
+        if (existing) {
+            removeLayerSmart(existing, s);
+            s.bundleMarkers.delete(b.key);
+            s.bundleIndex.delete(b.key);
+        }
+        return;
     }
-    if (!latlngs.length) return false;
 
-    // bounds
-    const b = L.latLngBounds(latlngs).pad(0.10);
+    const icon = makeBadgeIcon(total, sev, b);
+    const popup = bundlePopupHtml(b, s);
 
-    // Race-safe recheck BEFORE fit
-    if (s._mapToken !== token || s.map !== map) return false;
+    if (!existing) {
+        const m = L.marker([b.lat, b.lng], {
+            icon,
+            title: `Area (${total})`,
+            riseOnHover: true,
+            __ozNoCluster: true,
+        });
 
-    const opts = { padding: [padding, padding], maxZoom: 16, animate: false };
+        try { m.bindPopup(popup, { maxWidth: 420, closeButton: true, autoPan: true }); } catch { }
 
-    // If container not visible yet, skip (or retry via caller)
-    if (!isContainerVisible(map)) return false;
+        addLayerSmart(m, s);
 
-    // Do fit after layout stabilization
-    return await fitAfterLayout(map, b, opts, () => (s._mapToken === token && s.map === map));
+        s.bundleMarkers.set(b.key, m);
+        s.bundleIndex.set(b.key, b);
+        return;
+    }
+
+    try { existing.setLatLng([b.lat, b.lng]); } catch { }
+    try { existing.setIcon(icon); } catch { }
+    try { if (existing.getPopup()) existing.setPopupContent(popup); } catch { }
+
+    try {
+        if (detailsMode) {
+            if (map.hasLayer(existing)) map.removeLayer(existing);
+        } else {
+            if (!map.hasLayer(existing)) map.addLayer(existing);
+        }
+    } catch { }
+
+    s.bundleIndex.set(b.key, b);
 }
 
-export function debugDumpMarkers(scopeKey = null) {
-    const s = getS(pickScopeKey(scopeKey));
-    console.log("[DBG] markers keys =", Array.from(s.markers.keys()));
-    console.log("[DBG] bundle keys =", Array.from(s.bundleMarkers.keys()));
-    console.log("[DBG] map initialized =", !!s.map, "cluster =", !!s.cluster);
-}
-
-export function fitToDetails(padding = 30, scopeKey = null) {
-    const k = pickScopeKey(scopeKey);
-    const ready = ensureMapReady(k);
+export function addOrUpdateBundleMarkers(payload, tolMeters = 80, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
 
-    const { s, L, map } = ready;
+    const { k, s } = ready;
 
-    const latlngs = [];
-    for (const m of s.detailMarkers.values()) {
-        try { latlngs.push(m.getLatLng()); } catch { }
-    }
-    if (latlngs.length === 0) return false;
+    const tol = Number(tolMeters);
+    const tolFinal = (Number.isFinite(tol) && tol > 0) ? tol : 80;
 
-    const bounds = L.latLngBounds(latlngs).pad(0.1);
-    return safeFitBounds(map, bounds, { padding: [padding, padding], maxZoom: 17, animate: false });
-}
-export function elementExists(id, scopeKey = null) {
-    // scopeKey kept for signature symmetry
-    return !!document.getElementById(id);
-}
+    const norm = normalizePayload(payload);
 
-// --- Aliases for backward compat (Blazor pages calling old names) ---
-export function checkElementExists(id) {   // C# uses checkElementExists(...)
-    return elementExists(id);
-}
+    console.log("[Bundles] payload sizes",
+        "events", (norm.events?.length ?? 0),
+        "places", (norm.places?.length ?? 0),
+        "crowds", (norm.crowds?.length ?? 0),
+        "traffic", (norm.traffic?.length ?? 0),
+        "weather", (norm.weather?.length ?? 0),
+        "suggestions", (norm.suggestions?.length ?? 0),
+        "gpt", (norm.gpt?.length ?? 0)
+    );
 
-export function upsertPlaceMarker(id, lat, lng, level, info, scopeKey = null) {
-    // Old PlaceView call: maps to the generic marker API
-    const s = getS(pickScopeKey(scopeKey));
-    if (!s.map) return false;
-    return addOrUpdateCrowdMarker(id, lat, lng, level, info, pickScopeKey(scopeKey));
-}
+    s.bundleLastInput = norm;
 
-export function fitToPlaceMarkers(scopeKey = null) {
-    // Old call: just fit to current markers
-    return fitToMarkers(pickScopeKey(scopeKey));
-}
-
-export function clearPlaceHighlight() {
-    // no-op for now
-    return true;
-}
-
-// Guard: define once (hot reload / accidental paste protection)
-function ensureHighlightImpl(s) {
-    if (s.utils.highlightPlaceMarker) return;
-
-    s.utils.highlightPlaceMarker = function highlightPlaceMarker(placeId, opts = {}) {
-        const s = SActive();
-        const L = ensureLeaflet();
-        if (!L || !s.map) return false;
-
-        const id = String(placeId ?? "");
-        if (!id) return false;
-
-        const {
-            openPopup = true,
-            panTo = true,
-            zoomTo = null,
-            dimOthers = false,
-            pulseMs = 1400,
-        } = opts || {};
-
-        let marker =
-            (s.placeMarkers && (s.placeMarkers.get(id) || s.placeMarkers.get(`pl:${id}`))) ||
-            (s.markers && (s.markers.get(`pl:${id}`) || s.markers.get(id)));
-
-        if (!marker) {
-            console.warn("[OutZen][highlightPlaceMarker] marker not found", { placeId });
-            return false;
-        }
-
-        // Optional dim
-        let restoreDim = null;
-        if (dimOthers) {
-            const changed = [];
-            const all = [];
-            try { if (s.markers) for (const m of s.markers.values()) all.push(m); } catch { }
-            try { if (s.placeMarkers) for (const m of s.placeMarkers.values()) all.push(m); } catch { }
-
-            for (const m of all) {
-                if (!m || m === marker) continue;
-                if (typeof m.setOpacity === "function") {
-                    const old = (m.options && typeof m.options.opacity === "number") ? m.options.opacity : 1;
-                    changed.push([m, old]);
-                    try { m.setOpacity(0.25); } catch { }
-                }
-            }
-            restoreDim = () => { for (const [m, old] of changed) { try { m.setOpacity(old); } catch { } } };
-        }
-
-        const iconEl = marker?._icon ?? null;
-        const cls = "oz-marker-highlight";
-        try { iconEl?.classList?.add(cls); } catch { }
-
-        // pan/zoom
-        try {
-            const ll = marker.getLatLng?.();
-            if (ll && panTo) {
-                if (typeof zoomTo === "number") s.map.setView(ll, zoomTo, { animate: true });
-                else s.map.panTo(ll, { animate: true });
-            }
-        } catch { }
-
-        // open popup, clustered-safe
-        const open = () => { try { marker.openPopup?.(); } catch { } };
-        try {
-            if (s.cluster && typeof s.cluster.zoomToShowLayer === "function") {
-                s.cluster.zoomToShowLayer(marker, open);
-            } else open();
-        } catch { open(); }
-
-        clearTimeout(s._highlightT);
-        s._highlightT = setTimeout(() => {
-            try { iconEl?.classList?.remove(cls); } catch { }
-            try { restoreDim?.(); } catch { }
-        }, Math.max(250, Number(pulseMs) || 1400));
-
-        return true;
-    };
-}
-
-// ✅ Single export that points to the guarded implementation
-export function highlightPlaceMarker(placeId, opts = {}, scopeKey = null) {
-    const s = getS(pickScopeKey(scopeKey));
-    ensureHighlightImpl(s);
-    return s.utils.highlightPlaceMarker(placeId, opts);
-}
-
-// ------------------------------
-// Calendar markers
-// ------------------------------
-function calendarDivIcon(level, meta = {}) {
-    const L = ensureLeaflet();
-    if (!L) return null;
-
-    const lv = clampLevel14(level);
-    const emoji = meta?.icon ?? "🥁🎉";
-
-    return L.divIcon({
-        className: `oz-cal-icon oz-cal-lvl${lv} ${lv === 4 ? "oz-cal-critical" : ""}`,
-        html: `<div class="oz-cal-pin"><span class="oz-cal-emoji">${emoji}</span></div>
-           <div class="oz-cal-shadow"></div>`,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14],
-        popupAnchor: [0, -12],
-    });
-}
-
-export function addOrUpdateCrowdCalendarMarker(id, lat, lng, level, meta, scopeKey = null) {
-    const k = pickScopeKey(scopeKey);
-    const ready = ensureMapReady(k);
-    if (!ready) return false;
-
-    const { s, L } = ready;
-
-    const latNum = Number(lat), lngNum = Number(lng);
-    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return false;
-
-    s.calendarLayer ??= L.featureGroup().addTo(s.map);
-    s.calendarMarkers ??= new Map();
-
-    const key = String(id);
-    let m = s.calendarMarkers.get(key);
-
-    const icon = calendarDivIcon(level, meta);
-    if (!icon) return false;
-
-    if (!m) {
-        m = L.marker([latNum, lngNum], { icon, riseOnHover: true, title: meta?.title ?? key });
-        s.calendarLayer.addLayer(m);
-        s.calendarMarkers.set(key, m);
-    } else {
-        m.setLatLng([latNum, lngNum]);
-        m.setIcon(icon);
-    }
-
-    if (meta?.title || meta?.description) {
-        const t = s.utils?.escapeHtml ? s.utils.escapeHtml(meta.title ?? "") : (meta.title ?? "");
-        const d = s.utils?.escapeHtml ? s.utils.escapeHtml(meta.description ?? "") : (meta.description ?? "");
-        m.bindPopup(`<b>${t}</b><br/>${d}`);
-    }
-
-    return true;
-}
-
-export function clearCrowdCalendarMarkers(scopeKey = null) {
-    console.log("[OutZen] clearCrowdCalendarMarkers called");
-    const s = getS(pickScopeKey(scopeKey));
     if (!s?.map) return false;
 
-    const L = ensureLeaflet();
-    if (!L) return false;
-
-    // guarantees the existence of the containers
-    s.calendarLayer ??= L.layerGroup().addTo(s.map);
-    s.calendarMarkers ??= new Map();
-
-    s.calendarLayer.clearLayers();
-    s.calendarMarkers.clear();
-
-    console.debug("[Calendar] cleared");
-    return true;
-}
-
-export function upsertCrowdCalendarMarkers(items, scopeKey = null) {
-    const s = getS(pickScopeKey(scopeKey));
-    if (!s.map) return false;
-
-    for (const it of (items ?? [])) {
-        const id = `cc:${it.id ?? it.Id}`;
-        addOrUpdateCrowdCalendarMarker(
-            id,
-            it.latitude ?? it.Latitude,
-            it.longitude ?? it.Longitude,
-            it.expectedLevel ?? it.ExpectedLevel ?? 1,
-            { title: it.eventName ?? it.EventName, description: it.regionCode ?? it.RegionCode, icon: "🥁🎉" },
-            pickScopeKey(scopeKey)
-        );
-    }
-    return true;
-}
-
-export function pruneCrowdCalendarMarkers(activeIds, scopeKey = null) {
-    const s = getS(pickScopeKey(scopeKey));
-    if (!s.map) return false;
-
-    const keep = new Set((activeIds ?? []).map(String));
-    for (const [id, m] of s.calendarMarkers.entries()) {
-        if (!keep.has(id)) {
-            try { s.calendarLayer.removeLayer(m); } catch { }
-            s.calendarMarkers.delete(id);
+    const bundles = computeBundles(norm, tolFinal, s);
+    if (!bundles || bundles.size === 0) {
+        for (const oldKey of Array.from(s.bundleMarkers.keys())) {
+            const marker = s.bundleMarkers.get(oldKey);
+            removeLayerSmart(marker, s);
+            s.bundleMarkers.delete(oldKey);
+            s.bundleIndex.delete(oldKey);
         }
-    }
-    return true;
-}
-
-export function removeCrowdCalendarMarker(id, scopeKey = null) {
-    const k = pickScopeKey(scopeKey);
-    const ready = ensureMapReady(k);
-    if (!ready) return false;
-
-    const { s, L } = ready;
-
-    s.calendarLayer ??= L.layerGroup().addTo(s.map);
-    s.calendarMarkers ??= new Map();
-
-    if (!id) return false;
-
-    const existing = s.calendarMarkers.get(id);
-    if (existing) {
-        s.calendarLayer.removeLayer(existing);
-        s.calendarMarkers.delete(id);
-        console.debug("[Calendar] removed", id);
+        try { refreshHybridVisibility(k); } catch { }
         return true;
     }
-    return false;
+
+    for (const oldKey of Array.from(s.bundleMarkers.keys())) {
+        if (!bundles.has(oldKey)) {
+            const marker = s.bundleMarkers.get(oldKey);
+            removeLayerSmart(marker, s);
+            s.bundleMarkers.delete(oldKey);
+            s.bundleIndex.delete(oldKey);
+        }
+    }
+
+    for (const b of bundles.values()) updateBundleMarker(b, k);
+
+    try { refreshHybridVisibility(k); } catch { }
+
+    if (s.cluster && typeof s.cluster.refreshClusters === "function") {
+        try { s.cluster.refreshClusters(); } catch { }
+    }
+
+    if (s.flags.showWeatherPinsInBundles && s.hybrid?.showing !== "details") {
+        addOrUpdateWeatherMarkers(norm.weather ?? [], k);
+    }
+    console.log("[Bundles] sample place", norm.places?.[0], "latlng", pickLatLng(norm.places?.[0]));
+    return true;
 }
 
-export function fitToCalendarMarkers(scopeKey = null) {
-    const k = pickScopeKey(scopeKey);
-    const ready = ensureMapReady(k);
+/* ---------------------------------------------------------
+   Fit / Resize helpers
+--------------------------------------------------------- */
+export function refreshMapSize(scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
 
     const { s, map } = ready;
-    if (!s.calendarLayer) return false;
+    const token = s._mapToken;
 
-    const bounds = s.calendarLayer.getBounds?.();
-    if (!bounds || !bounds.isValid || !bounds.isValid()) return false;
+    if (s._resizeQueued) return true;
+    s._resizeQueued = true;
 
-    return safeFitBounds(map, bounds.pad(0.15), { animate: false });
+    requestAnimationFrame(() => {
+        s._resizeQueued = false;
+        if (!s.map || s.map !== map || s._mapToken !== token) return;
+
+        const el = map.getContainer?.();
+        if (!el || !el.isConnected) return;
+
+        const r = el.getBoundingClientRect?.();
+        if (!r || r.width < 10 || r.height < 10) return;
+
+        if (map._animatingZoom || map._zooming || map._panning) return;
+
+        try { map.invalidateSize({ animate: false, debounceMoveend: true }); } catch { }
+    });
+
+    return true;
 }
 
-// ------------------------------
-// Incremental weather bundle input
-// ------------------------------
+/* ---------------------------------------------------------
+   Incremental weather bundle input
+--------------------------------------------------------- */
+export function scheduleBundleRefresh(delayMs = 150, tolMeters = 80, scopeKey = null) {
+    const k = pickScopeKeyRead(scopeKey);
+    const s = peekS(k) || getS(k);
+
+    clearTimeout(s._bundleRefreshT);
+    s._bundleRefreshT = setTimeout(() => {
+        try {
+            if (s.bundleLastInput) addOrUpdateBundleMarkers(s.bundleLastInput, tolMeters, k);
+        } catch { }
+    }, delayMs);
+}
+
 export function upsertWeatherIntoBundleInput(delta, scopeKey = null) {
-    const k = pickScopeKey(scopeKey);
-    const s = getS(k);
-    if (!s.map) return false;
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { k, s } = ready;
 
     s.bundleLastInput ??= { events: [], places: [], crowds: [], traffic: [], weather: [], suggestions: [], gpt: [] };
     s._weatherById ??= new Map();
@@ -2283,8 +1933,7 @@ export function upsertWeatherIntoBundleInput(delta, scopeKey = null) {
     if (wid == null) return false;
 
     const ll = pickLatLng(raw, s.utils);
-
-    if (!ll || !isInBelgium(ll, s)) {
+    if (!ll) {
         s._weatherById.delete(String(wid));
         s.bundleLastInput.weather = Array.from(s._weatherById.values());
         return true;
@@ -2301,26 +1950,180 @@ export function upsertWeatherIntoBundleInput(delta, scopeKey = null) {
     s.bundleLastInput.weather = Array.from(s._weatherById.values());
     return true;
 }
-function wrapScope(fn) {
-    return (...args) => {
-        // Convention: last optional argument = scopeKey
-        // If the call comes from an old page (no scope), we fallback.
-        const last = args.length ? args[args.length - 1] : null;
-        const scopeKey = (typeof last === "string" && last.length) ? last : null;
-        return fn(...args, scopeKey);
-    };
+
+/* ---------------------------------------------------------
+   Debug
+--------------------------------------------------------- */
+export function debugDumpMarkers(scopeKey = null) {
+    const k = pickScopeKeyRead(scopeKey);
+    const s = peekS(k) || getS(k);
+    const has = makeHas(s);
+
+    console.log("[DBG] markers keys =", Array.from(s.markers?.keys?.() ?? []));
+    console.log("[DBG] bundle keys =", Array.from(s.bundleMarkers?.keys?.() ?? []));
+    console.log("[DBG] detail keys =", Array.from(s.detailMarkers?.keys?.() ?? []));
+    console.log("[DBG] map initialized =", !!s.map, "cluster =", !!s.cluster, "showing=", s.hybrid?.showing, "hasDetailLayer=", has(s.detailLayer));
 }
-// Example: if you want to make “scopeKey” mandatory for certain calls, we can also log in dev.
-function wrapScopeDevWarn(fn, name) {
-    return (...args) => {
-        const last = args.length ? args[args.length - 1] : null;
-        const hasScope = (typeof last === "string" && last.length);
-        if (!hasScope && (globalThis.__OZ_ENV === "dev")) {
-            console.warn(`[OutZen][${name}] called without scopeKey -> using __OutZenActiveScope fallback`);
+
+export function debugClusterCount(scopeKey = null) {
+    const k = pickScopeKeyRead(scopeKey);
+    const s = peekS(k) || getS(k);
+    const layers = s?.cluster?.getLayers?.();
+    console.log("[DBG] markers=", s?.markers?.size ?? 0, "clusterLayers=", layers?.length ?? 0);
+}
+
+/* ---------------------------------------------------------
+   waitForMarkerElement (as requested)
+--------------------------------------------------------- */
+export function waitForMarkerElement(marker, tries = 30) {
+    return new Promise(resolve => {
+        if (!marker) return resolve(null);
+
+        const tick = () => {
+            try {
+                const el = marker.getElement?.();
+                if (el) return resolve(el);
+            } catch { }
+
+            if (--tries <= 0) return resolve(null);
+            requestAnimationFrame(tick);
+        };
+
+        try { marker.once?.("add", () => requestAnimationFrame(tick)); } catch { }
+        tick();
+    });
+}
+function _boundsFromLatLngs(L, latlngs) {
+    if (!latlngs || !latlngs.length) return null;
+    const b = L.latLngBounds(latlngs);
+    return b && b.isValid && b.isValid() ? b : null;
+}
+
+export function fitToBundles(scopeKey = null, opts = {}) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+    const { s, L, map } = ready;
+
+    const padding = opts.padding ?? [22, 22];
+    const maxZoom = opts.maxZoom ?? 16;
+
+    const latlngs = [];
+    for (const m of (s.bundleMarkers?.values?.() ?? [])) {
+        try { latlngs.push(m.getLatLng()); } catch { }
+    }
+
+    const b = _boundsFromLatLngs(L, latlngs);
+    if (!b) return false;
+
+    try { map.fitBounds(b, { padding, animate: false, maxZoom }); } catch { }
+    return true;
+}
+
+export function fitToDetails(scopeKey = null, opts = {}) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+    const { s, L, map } = ready;
+
+    const padding = opts.padding ?? [22, 22];
+    const maxZoom = opts.maxZoom ?? 17;
+
+    const latlngs = [];
+    // detail : detailMarkers
+    for (const m of (s.detailMarkers?.values?.() ?? [])) {
+        try { latlngs.push(m.getLatLng()); } catch { }
+    }
+    // fallback : “General” markers
+    if (!latlngs.length) {
+        for (const m of (s.markers?.values?.() ?? [])) {
+            try { latlngs.push(m.getLatLng()); } catch { }
         }
-        return fn(...args, hasScope ? last : null);
+    }
+
+    const b = _boundsFromLatLngs(L, latlngs);
+    if (!b) return false;
+
+    try { map.fitBounds(b, { padding, animate: false, maxZoom }); } catch { }
+    return true;
+}
+
+export function fitToMarkers(scopeKey = null, opts = {}) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+    const { s, L, map } = ready;
+
+    const padding = opts.padding ?? [22, 22];
+    const maxZoom = opts.maxZoom ?? 17;
+
+    const latlngs = [];
+    for (const m of (s.markers?.values?.() ?? [])) {
+        try { latlngs.push(m.getLatLng()); } catch { }
+    }
+
+    const b = _boundsFromLatLngs(L, latlngs);
+    if (!b) return false;
+
+    try { map.fitBounds(b, { padding, animate: false, maxZoom }); } catch { }
+    return true;
+}
+
+// Practical: “active hybrid + fit”
+export function activateHybridAndZoom(scopeKey = null, threshold = 13) {
+    const k = pickScopeKeyRead(scopeKey);
+    enableHybridZoom(true, threshold, k);
+
+    const s = peekS(k) || getS(k);
+    const z = s?.map?.getZoom?.() ?? 0;
+    const wantDetails = z >= threshold;
+
+    return wantDetails ? fitToDetails(k) : fitToBundles(k);
+}
+export function debugExplainBundles(scopeKey = null) {
+    const k = pickScopeKeyRead(scopeKey);
+    const s = peekS(k) || getS(k);
+    const li = s.bundleLastInput;
+    return {
+        hasLastInput: !!li,
+        lastCounts: li ? {
+            places: li.places?.length ?? 0,
+            events: li.events?.length ?? 0,
+            crowds: li.crowds?.length ?? 0,
+            traffic: li.traffic?.length ?? 0,
+            weather: li.weather?.length ?? 0,
+            suggestions: li.suggestions?.length ?? 0,
+            gpt: li.gpt?.length ?? 0,
+        } : null,
+        showing: s.hybrid?.showing ?? null,
+        zoom: s.map?.getZoom?.() ?? null,
+        bundleMarkers: s.bundleMarkers?.size ?? 0,
+        detailMarkers: s.detailMarkers?.size ?? 0,
     };
 }
+export function removeAntennaMarker(key, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+    const { s } = ready;
+
+    s.antennaMarkers ??= new Map();
+    const k = String(key);
+    const m = s.antennaMarkers.get(k);
+    if (!m) return true;
+
+    try {
+        if (s.antennaLayer?.hasLayer?.(m)) s.antennaLayer.removeLayer(m);
+        else removeLayerSmart(m, s);
+    } catch { }
+
+    s.antennaMarkers.delete(k);
+    return true;
+}
+
+export function addOrUpdateCrowdCalendarMarker(item, scopeKey = "main") {
+    return upsertCrowdCalendarMarkers([item], scopeKey);
+}
+
+/* ---------------------------------------------------------
+   Leaflet patch guard (stability)
+--------------------------------------------------------- */
 (function patchLeafletMoveEndGuard() {
     const L = globalThis.L;
     if (!L || L.__ozPatchedMoveEnd) return;
@@ -2332,11 +2135,9 @@ function wrapScopeDevWarn(fn, name) {
     const orig = proto._onMoveEnd;
     proto._onMoveEnd = function (...args) {
         try {
-            // If "this" is broken or detached, we silently ignore it.
             if (!this || !this._map) return;
             return orig.apply(this, args);
-        } catch (e) {
-            // swallow in dev
+        } catch {
             return;
         }
     };
@@ -2345,61 +2146,7 @@ function wrapScopeDevWarn(fn, name) {
 window.addEventListener("error", e => console.log("JS error:", e.error));
 window.addEventListener("unhandledrejection", e => console.log("Unhandled promise:", e.reason));
 
-// ------------------------------
-// Legacy bridge (optional)
-// ------------------------------
-//globalThis.OutZenInterop ??= {};
-/*globalThis.OutZenInterop.bootOutZen = bootOutZen;*/
-//globalThis.OutZenInterop ??= {};
-//globalThis.OutZenDebug ??= {};
 
-//globalThis.OutZenInterop.isOutZenReady = isOutZenReady;
-//globalThis.OutZenInterop.disposeOutZen = disposeOutZen;
-
-//globalThis.OutZenInterop.addOrUpdateCrowdMarker = addOrUpdateCrowdMarker;
-//globalThis.OutZenInterop.removeCrowdMarker = removeCrowdMarker;
-//globalThis.OutZenInterop.clearCrowdMarkers = clearCrowdMarkers;
-//globalThis.OutZenInterop.fitToMarkers = fitToMarkers;
-//globalThis.OutZenInterop.refreshMapSize = refreshMapSize;
-
-//globalThis.OutZenInterop.addOrUpdateBundleMarkers = addOrUpdateBundleMarkers;
-//globalThis.OutZenInterop.updateBundleMarker = updateBundleMarker;
-//globalThis.OutZenInterop.scheduleBundleRefresh = scheduleBundleRefresh;
-
-//globalThis.OutZenInterop.enableHybridZoom = enableHybridZoom;
-//globalThis.OutZenInterop.addOrUpdateDetailMarkers = addOrUpdateDetailMarkers;
-
-//globalThis.OutZenInterop.setWeatherChart = setWeatherChart;
-//globalThis.OutZenInterop.upsertWeatherIntoBundleInput = upsertWeatherIntoBundleInput;
-//globalThis.OutZenInterop.debugClusterCount = debugClusterCount;
-//globalThis.OutZenInterop.addOrUpdateWeatherMarkers = addOrUpdateWeatherMarkers;
-//globalThis.OutZenInterop.activateHybridAndZoom = activateHybridAndZoom;
-
-//globalThis.OutZenInterop.forceDetailsMode = forceDetailsMode;
-//globalThis.OutZenInterop.refreshHybridNow = refreshHybridNow;
-//globalThis.OutZenInterop.fitToDetails = fitToDetails;
-//globalThis.OutZenInterop.fitToCalendarMarkers = fitToCalendarMarkers;
-//globalThis.OutZenInterop.getCurrentMapId = getCurrentMapId;
-
-//globalThis.OutZenInterop.dumpState = () => {
-//    const s = globalThis.__OutZenGetS?.();
-//    if (!s) return null;
-//    return {
-//        mapId: s.mapContainerId,
-//        zoom: s.map?.getZoom?.(),
-//        hybrid: s.hybrid,
-//        hasClusterLayer: !!(s.cluster && s.map?.hasLayer?.(s.cluster)),
-//        markers: s.markers?.size,
-//        clusterLayers: s.cluster?.getLayers?.()?.length,
-//        bundleMarkers: s.bundleMarkers?.size,
-//        detailMarkers: s.detailMarkers?.size,
-//    };
-//};
-
-//globalThis.clearCrowdCalendarMarkers = () => clearCrowdCalendarMarkers();
-//globalThis.OutZenDebug ??= {};
-//globalThis.OutZenDebug.clearCrowdCalendarMarkers = clearCrowdCalendarMarkers;
-//globalThis.OutZenDebug.upsertCrowdCalendarMarkers = upsertCrowdCalendarMarkers;
 
 
 

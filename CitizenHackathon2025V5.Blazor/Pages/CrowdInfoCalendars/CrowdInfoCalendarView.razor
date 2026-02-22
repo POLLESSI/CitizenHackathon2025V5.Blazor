@@ -3,12 +3,16 @@
 @using CitizenHackathon2025.Blazor.DTOs;
 @using CitizenHackathon2025V5.Blazor.Client.Components
 @inject CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService Svc
+@inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
+
 @inject NavigationManager Nav
 
 <h3>Crowd Calendar</h3>
 
 <div class="crowd-page">
-    <div class="map-host" id="leafletMap" style="height:480px; min-height:480px;"></div>
+    <div class="oz-map-shell">
+        <div id="@MapId" class="leaflet-host"></div>
+    </div>
 </div>
 
 <div class="mb-3 grid" style="grid-template-columns: repeat(6, minmax(180px, 1fr)); gap: 8px;">

@@ -3,7 +3,7 @@
 @using CitizenHackathon2025.Blazor.DTOs
 @using CitizenHackathon2025V5.Blazor.Client.Constants
 @using CitizenHackathon2025.Contracts.DTOs;
-@implements IAsyncDisposable
+@inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
 
 @inject IJSRuntime js
 @inject WeatherHubClient WeatherHub
@@ -32,8 +32,8 @@
             </NavLink>
         </div>
     </div>
-    <div class="map-shell">
-        <div id="outzenMap_weather"></div>
+    <div class="oz-map-shell">
+        <div id="@MapId" class="leaflet-host"></div>
     </div>
     <div class="chart-toolbar">
         <button class="chip @(_selectedMetric == WeatherMetric.Temperature ? "active" : null)"
@@ -118,10 +118,7 @@
 {
     <div class="oz-empty">No items for these filters.</div>
 }
-@if (_currentRainAlert is not null)
-{
-    <RainAlertToast Alert="_currentRainAlert" OnDismiss="OnAlertDismissed" />
-}
+
 
 
 

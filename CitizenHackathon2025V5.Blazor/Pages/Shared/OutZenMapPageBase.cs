@@ -1,5 +1,6 @@
-﻿using Microsoft.AspNetCore.Components;
+﻿using CitizenHackathon2025V5.Blazor.Client.DTOs.Options;
 using CitizenHackathon2025V5.Blazor.Client.Services.Interop;
+using Microsoft.AspNetCore.Components;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Shared
 {
@@ -7,28 +8,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Shared
     {
         [Inject] protected OutZenMapInterop MapInterop { get; set; } = default!;
 
-        // ===== Page contract =====
         protected abstract string ScopeKey { get; }
         protected abstract string MapId { get; }
 
-        // Some pages may not have a map (ex: AntennaCrowdPanelView)
         protected virtual bool MapEnabled => true;
 
-        // Boot options
         protected virtual (double lat, double lng) DefaultCenter => (50.85, 4.35);
-        protected virtual int DefaultZoom => 12;
+        protected virtual int DefaultZoom => 13;
         protected virtual bool EnableChart => false;
         protected virtual bool EnableWeatherLegend => false;
 
-        // Behavior toggles
         protected virtual bool ForceBootOnFirstRender => false;
         protected virtual bool ResetMarkersOnBoot => false;
         protected virtual bool DisposeOnNavigate => true;
 
-        private bool _booted;
+        protected bool IsMapBooted { get; private set; }
         private bool _disposed;
 
-        // Optional hooks for derived pages
         protected virtual Task OnMapReadyAsync() => Task.CompletedTask;
         protected virtual Task OnBeforeDisposeAsync() => Task.CompletedTask;
 
@@ -37,25 +33,24 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Shared
             if (!firstRender) return;
             if (!MapEnabled) return;
 
-            // Ensures JS is ready
             await MapInterop.EnsureAsync();
 
             var (lat, lng) = DefaultCenter;
-            _booted = await MapInterop.BootAsync(
-                mapId: MapId,
-                scopeKey: ScopeKey,
-                lat: lat,
-                lng: lng,
-                zoom: DefaultZoom,
-                enableChart: EnableChart,
-                force: ForceBootOnFirstRender,
-                enableWeatherLegend: EnableWeatherLegend,
-                resetMarkers: ResetMarkersOnBoot
-            );
 
-            if (_booted)
+            IsMapBooted = await MapInterop.BootAsync(new OutZenBootOptions(
+                MapId: MapId,
+                ScopeKey: ScopeKey,
+                Lat: lat,
+                Lng: lng,
+                Zoom: DefaultZoom,
+                EnableChart: EnableChart,
+                Force: ForceBootOnFirstRender,
+                EnableWeatherLegend: EnableWeatherLegend,
+                ResetMarkers: ResetMarkersOnBoot
+            ));
+
+            if (IsMapBooted)
             {
-                // Fix sizing issues after first layout (common in Blazor)
                 await MapInterop.RefreshSizeAsync(ScopeKey);
                 await OnMapReadyAsync();
             }
@@ -66,12 +61,140 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Shared
             if (_disposed) return;
             _disposed = true;
 
-            try { await OnBeforeDisposeAsync(); } catch { /* swallow */ }
+            try { await OnBeforeDisposeAsync(); } catch { }
 
             if (MapEnabled && DisposeOnNavigate)
             {
-                try { await MapInterop.DisposeMapAsync(ScopeKey, MapId); } catch { /* swallow */ }
+                try { await MapInterop.DisposeMapAsync(ScopeKey, MapId); } catch { }
             }
         }
     }
+
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.

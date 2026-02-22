@@ -1,5 +1,5 @@
 ﻿@* Shared/WeatherAlertBanner.razor *@
-@using CitizenHackathon2025.Blazor.DTOs
+@using CitizenHackathon2025.Contracts.DTOs
 
 @if (Alert is not null)
 {
@@ -24,7 +24,7 @@
 }
 
 @code {
-    [Parameter] public CitizenHackathon2025.Contracts.DTOs.RainAlertDTO? Alert { get; set; }
+    [Parameter] public RainAlertDTO? Alert { get; set; }
     [Parameter] public EventCallback OnDismiss { get; set; }
 
     private async Task DismissAsync()

@@ -1,97 +1,84 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Contracts.Hubs;
-using CitizenHackathon2025V5.Blazor.Client.Pages.OutZens;
+using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
+using CitizenHackathon2025V5.Blazor.Client.DTOs.Options;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interop;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using System.Collections.Concurrent;
-//EventView: scopeKey = $"event:{EventId}", mapId = $"outzenMap_event_{EventId}"
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
 {
-    public partial class EventView 
+    public partial class EventView : OutZenMapPageBase
     {
-    #nullable disable
-        [Inject] public HttpClient Client { get; set; }
+#nullable disable
         [Inject] public EventService EventService { get; set; }
         [Inject] public NavigationManager Navigation { get; set; }
         [Inject] public IJSRuntime JS { get; set; }
-        [Inject] public IHubTokenService HubTokenService { get; set; }
-        [Inject] public IHttpClientFactory HttpFactory { get; set; }
         [Inject] public IConfiguration Config { get; set; }
         [Inject] public IAuthService Auth { get; set; }
         [Inject] public IHubUrlBuilder HubUrls { get; set; }
+
+        // ✅ Inject MapInterop since we do NOT inherit OutZenMapPageBase
+
         [Parameter, SupplyParameterFromQuery(Name = "detailId")]
-        public int EventId { get; set; }
         public int? DetailId { get; set; }
 
-        private IJSObjectReference _outzen;
+        // ===== Map "contract" local =====
+        protected override string ScopeKey => "eventview";
+        protected override string MapId => "leafletMap-eventview";
+        private string _token;
+        protected override int DefaultZoom => 14;
+        protected override (double lat, double lng) DefaultCenter => (50.89, 4.34);
+        // Optional
+        protected override bool ForceBootOnFirstRender => true;
+        protected override bool ResetMarkersOnBoot => true;
+        private static string EvMarkerId(int id) => $"event:{id}";
+
+        private ElementReference ScrollContainerRef;
+
+        private bool _initialMarkersApplied;
+        private bool _disposed;
+
+        private int? BestMatchId { get; set; }
+        private long _lastFitTicks;
+        private CancellationTokenSource _searchCts;
 
         public List<ClientEventDTO> Events { get; set; } = new();
         private List<ClientEventDTO> allEvents = new();
         private List<ClientEventDTO> visibleEvents = new();
+
         private int currentIndex = 0;
         private const int PageSize = 20;
-        private int _applyOnce = 0;
 
-        private int? BestMatchId { get; set; }
-        private CancellationTokenSource _searchCts;
-        private string _speedId = $"speedRange-{Guid.NewGuid():N}";
-
-        public int SelectedId { get; set; }
-        public HubConnection hubConnection { get; set; }
-
-        // Fields used by .razor
-        private ElementReference ScrollContainerRef;
         private string _q = string.Empty;
         private bool _onlyRecent;
-        private bool _booted;
-        private bool _initialDataApplied;
+
+        public HubConnection hubConnection { get; set; }
 
         private readonly ConcurrentQueue<ClientEventDTO> _pendingHubUpdates = new();
-        protected override string ScopeKey => $"event:{EventId}";
-        protected override string MapId => $"outzenMap_event_{EventId}";
 
-        protected override int DefaultZoom => 13;
-
-        protected override async Task OnMapReadyAsync()
-        {
-            // var payload = await BuildEventPayloadAsync(EventId);
-            // await MapInterop.UpsertBundlesAsync(payload, 80, ScopeKey);
-            // await MapInterop.FitToBundlesAsync(ScopeKey);
-        }
         protected override async Task OnInitializedAsync()
         {
-            // 1) Initial REST
-            var fetched = (await EventService.GetLatestEventAsync()).Where(e => e != null).Select(e => e!).ToList();
-
-            Console.WriteLine($"[EventView] fetched events: {fetched.Count}");
-
-            if (fetched.Count > 0)
-            {
-                var first = fetched[0];
-                Console.WriteLine($"[EventView] first event: Id={first.Id}, Name={first.Name}, Lat={first.Latitude}, Lng={first.Longitude}");
-            }
+            // REST
+            var fetched = (await EventService.GetLatestEventAsync())
+                .Where(e => e != null)
+                .Select(e => e!)
+                .ToList();
 
             Events = fetched;
             allEvents = fetched;
+
             visibleEvents.Clear();
             currentIndex = 0;
             LoadMoreItems();
 
-            await InvokeAsync(StateHasChanged);
-
-            // 2) SignalR
-            var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
-            var hubBaseUrl = (Config["SignalR:HubBase"] ?? apiBaseUrl).TrimEnd('/');
-            // EventHubMethods.HubPath = "events"
-            
+            // SignalR
             var url = HubUrls.Build(EventHubMethods.HubPath);
-            // => https://localhost:7254/hubs/events
 
             hubConnection = new HubConnectionBuilder()
                 .WithUrl(url, options =>
@@ -102,10 +89,97 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
                 .Build();
 
             RegisterHubHandlers();
+
             try { await hubConnection.StartAsync(); }
             catch (Exception ex) { Console.Error.WriteLine($"[EventView] Hub start failed: {ex.Message}"); }
+
+            // No need to call StateHasChanged here; data already set before first render
+        }
+        protected override async Task OnMapReadyAsync()
+        {
+            // At this stage: map booted + container OK
+            await FitThrottledAsync();
+            await Task.Delay(50);
+            await FitThrottledAsync();
+
+            await ReseedEventMarkersAsync(fit: true);
+        }
+        private async Task ReseedEventMarkersAsync(bool fit)
+        {
+            if (_disposed) return;
+            if (!IsMapBooted) return;
+
+            try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
+
+            foreach (var dto in allEvents)
+                await ApplySingleEventMarkerAsync(dto);
+
+            await FitThrottledAsync();
+            if (fit)
+            {
+                await FitThrottledAsync();
+            }
+        }
+        private async Task ApplySingleEventMarkerAsync(ClientEventDTO dto)
+        {
+            if (_disposed) return;
+            if (!IsMapBooted) return;
+            if (dto is null) return;
+
+            var lat = dto.Latitude;
+            var lng = dto.Longitude;
+
+            if (!double.IsFinite(lat) || !double.IsFinite(lng) || (lat == 0 && lng == 0) ||
+                lat is < -90 or > 90 || lng is < -180 or > 180)
+            {
+                lat = 50.85;
+                lng = 4.35;
+            }
+            await JS.InvokeVoidAsync(
+                "OutZenInterop.addOrUpdateCrowdMarker",
+                EvMarkerId(dto.Id),
+                lat,
+                lng,
+                new
+                {
+                    name = dto.Name ?? "Event",
+                    dateevent = dto.DateEvent,
+                    place = dto.PlaceId,
+                    isoutdoor = true,
+                    expectedcrowd = dto.ExpectedCrowd,
+                    icon = "🎪"
+                },
+                ScopeKey
+            );
+        }
+        private async Task ApplyInitialMarkersOnceAsync()
+        {
+            if (_initialMarkersApplied) return;
+            _initialMarkersApplied = true;
+
+            await SyncMapMarkersAsync(fit: true);
+
+            while (_pendingHubUpdates.TryDequeue(out var dto))
+                await UpsertMarkerAsync(dto, fit: false);
+
+            try { await MapInterop.FitToDetailsAsync(ScopeKey); } catch { }
+
+            await InvokeAsync(StateHasChanged);
         }
 
+        private async Task FitThrottledAsync(int ms = 250)
+        {
+            var now = Environment.TickCount64;
+            if (now - _lastFitTicks < ms) return;
+            _lastFitTicks = now;
+
+            try
+            {
+                await MapInterop.RefreshSizeAsync(ScopeKey);
+                await MapInterop.FitToDetailsAsync(ScopeKey);
+            }
+            catch { }
+        }
         private void RegisterHubHandlers()
         {
             if (hubConnection is null) return;
@@ -114,22 +188,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
             {
                 UpsertLocal(dto);
 
-                // If the map isn't ready yet → we buffer it
-                if (!_booted || _outzen is null)
+                if (!_initialMarkersApplied || !IsMapBooted)
                 {
                     _pendingHubUpdates.Enqueue(dto);
                     await InvokeAsync(StateHasChanged);
                     return;
                 }
 
-                var lvl = MapCrowdLevelFromExpected(dto.ExpectedCrowd);
-
-                await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
-                    dto.Id.ToString(), dto.Latitude, dto.Longitude, lvl,
-                    new { title = dto.Name, description = $"Event {dto.DateEvent:yyyy-MM-dd HH:mm}" });
-
-                try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
-
+                await UpsertMarkerAsync(dto, fit: false);
                 await InvokeAsync(StateHasChanged);
             });
 
@@ -139,298 +205,101 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
                 allEvents.RemoveAll(c => c.Id == id);
                 visibleEvents.RemoveAll(c => c.Id == id);
 
-                if (_booted && _outzen is not null)
+                if (IsMapBooted)
                 {
-                    await _outzen.InvokeVoidAsync("removeCrowdMarker", id.ToString());
-                    await SyncMapMarkersAsync(fit: false);
+                    try {
+                        await MapInterop.RemoveCrowdMarkerAsync(EvMarkerId(id), ScopeKey);
+                        await SyncMapMarkersAsync(fit: false);
+                    }
+                    catch { }
                 }
 
                 await InvokeAsync(StateHasChanged);
             });
         }
 
-
-        private static int MapCrowdLevelFromExpected(int? expected)
+        private async Task UpsertMarkerAsync(ClientEventDTO dto, bool fit)
         {
-            var v = Math.Max(1, expected ?? 1);
-            // Adjust these thresholds to your domain
-            if (v < 3000) return 1;         // Low
-            if (v < 5000) return 2;        // Medium
-            if (v < 10000) return 3;        // High
-            return 4;                      // Critical
-        }
-
-        private void UpsertLocal(ClientEventDTO dto)
-        {
-            void Upsert(List<ClientEventDTO> list)
-            {
-                var i = list.FindIndex(c => c.Id == dto.Id);
-                if (i >= 0) list[i] = dto; else list.Add(dto);
-            }
-            Upsert(Events);
-            Upsert(allEvents);
-            var j = visibleEvents.FindIndex(c => c.Id == dto.Id);
-            if (j >= 0) visibleEvents[j] = dto;
-        }
-
-        protected override async Task OnAfterRenderAsync(bool firstRender)
-        {
-            // 1) Boot map only on the first render
-            if (firstRender && !_booted)
-            {
-                for (var i = 0; i < 40; i++)
-                {
-                    if (await JS.InvokeAsync<bool>("checkElementExists", "leafletMap")) break;
-                    await Task.Delay(150);
-                    if (i == 39) return;
-                }
-
-                _outzen = await JS.InvokeAsync<IJSObjectReference>("import", "/js/app/leafletOutZen.module.js");
-
-                await _outzen.InvokeVoidAsync("bootOutZen", new
-                {
-                    mapId = "leafletMap",   /*$"outzenMap_event_{EventId}"*/
-                    center = new[] { 50.89, 4.34 },
-                    zoom = 13,
-                    enableChart = false,
-                    force = true
-                });
-
-                // ready polling
-                var ready = false;
-                for (var i = 0; i < 40; i++)
-                {
-                    try { ready = await _outzen.InvokeAsync<bool>("isOutZenReady"); } catch { }
-                    if (ready) break;
-                    await Task.Delay(150);
-                }
-                if (!ready) return;
-
-                try { await _outzen.InvokeVoidAsync("refreshMapSize"); } catch { }
-
-                _booted = true;
-                return;
-            }
-
-            // 2) Apply the markers ONLY ONCE after boot + data
-            if (_booted && allEvents.Any() && Interlocked.Exchange(ref _applyOnce, 1) == 0)
-            {
-                await SyncMapMarkersAsync(fit: true);
-
-                // flush hub buffer (If you want)
-                while (_pendingHubUpdates.TryDequeue(out var dto))
-                {
-                    var lvl = MapCrowdLevelFromExpected(dto.ExpectedCrowd);
-                    await _outzen.InvokeVoidAsync("addOrUpdateCrowdMarker",
-                        dto.Id.ToString(), dto.Latitude, dto.Longitude, lvl,
-                        new { title = dto.Name, description = $"{dto.DateEvent:yyyy-MM-dd HH:mm}" });
-                }
-
-                try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
-            }
-        }
-
-        private async Task SafeRefreshMap()
-        {
-            if (_outzen is null) return;
-            try { await _outzen.InvokeVoidAsync("refreshMapSize"); } catch { }
-            try { await _outzen.InvokeVoidAsync("fitToMarkers"); } catch { }
-        }
-
-        // Called when the URL changes: /eventview <-> /eventdetail/{id}
-        protected override async Task OnParametersSetAsync()
-        {
-            if (DetailId is > 0) SelectedId = DetailId.Value;
-            else SelectedId = 0;
-
-            if (_booted) await SafeRefreshMap();
-        }
-
-        private async Task CloseDetail()
-        {
-            Navigation.NavigateTo("/eventview", replace: false); // SPA historical guard
-            await SafeRefreshMap();
-            StateHasChanged();
-
-        }
-
-        private async Task SyncMapMarkersAsync(bool fit = true)
-        {
-            if (_outzen is null)
-            {
-                Console.WriteLine("[EventView] SyncMapMarkersAsync: _outzen is null");
-                return;
-            }
-
-            // 🔎 Data source for the map
-            var baseSource = visibleEvents.Any() ? visibleEvents : allEvents;
-            var source = FilterEvent(baseSource).ToList();
-
-            Console.WriteLine($"[EventView] SyncMapMarkersAsync: visible={visibleEvents.Count}, all={allEvents.Count}, source(filtered)={source.Count}");
+            var lvl = MapCrowdLevelFromExpected(dto.ExpectedCrowd);
 
             try
             {
-                // 1) Clean up existing markers
-                await _outzen.InvokeVoidAsync("clearCrowdMarkers");
+                double lat = dto.Latitude;
+                double lng = dto.Longitude;
 
-                // 2) Adding markers
+                if (!double.IsFinite(lat) || !double.IsFinite(lng) ||
+                    lat < -90 || lat > 90 || lng < -180 || lng > 180 ||
+                    (lat == 0 && lng == 0))
+                {
+                    lat = 50.85;
+                    lng = 4.35;
+                }
+
+                await MapInterop.UpsertCrowdMarkerAsync(
+                    id: EvMarkerId(dto.Id),
+                    lat: dto.Latitude,
+                    lng: dto.Longitude,
+                    level: lvl,
+                    info: new { title = dto.Name, description = $"{dto.DateEvent:yyyy-MM-dd HH:mm}", kind = "event", icon = "🎪" },
+                    scopeKey: ScopeKey
+                );
+
+                if (fit)
+                {
+                    await FitThrottledAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[EventView] UpsertMarkerAsync failed: {ex.Message}");
+            }
+        }
+
+        private async Task SyncMapMarkersAsync(bool fit)
+        {
+            var baseSource = visibleEvents.Any() ? visibleEvents : allEvents;
+            var source = FilterEvent(baseSource).ToList();
+
+            try
+            {
+                await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
+
                 foreach (var ev in source)
                 {
                     var lvl = MapCrowdLevelFromExpected(ev.ExpectedCrowd);
 
-                    await _outzen.InvokeVoidAsync(
-                        "addOrUpdateCrowdMarker",
-                        ev.Id.ToString(),
-                        ev.Latitude,
-                        ev.Longitude,
-                        lvl,
-                        new
-                        {
-                            title = ev.Name,
-                            description = $"{ev.DateEvent:yyyy-MM-dd HH:mm}"
-                        });
+                    double lat = ev.Latitude;
+                    double lng = ev.Longitude;
+
+                    if (!double.IsFinite(lat) || !double.IsFinite(lng) ||
+                        lat < -90 || lat > 90 || lng < -180 || lng > 180 ||
+                        (lat == 0 && lng == 0))
+                    {
+                        lat = 50.85;
+                        lng = 4.35;
+                    }
+
+                    await MapInterop.UpsertCrowdMarkerAsync(
+                        id: EvMarkerId(ev.Id),
+                        lat: lat,
+                        lng: lng,
+                        level: lvl,
+                        info: new { title = ev.Name, description = $"{ev.DateEvent:yyyy-MM-dd HH:mm}", kind = "event", icon = "🎪" },
+                        scopeKey: ScopeKey
+                    );
                 }
 
-                // 3) Adjusting the view if there is at least one marker
                 if (source.Any())
                 {
-                    await _outzen.InvokeVoidAsync("refreshMapSize");
-
-                    if (fit)
-                    {
-                        await _outzen.InvokeVoidAsync("fitToMarkers");
-                        await Task.Delay(150);
-                        await _outzen.InvokeVoidAsync("fitToMarkers");
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("[EventView] SyncMapMarkersAsync: aucune donnée pour la carte.");
+                    await MapInterop.RefreshSizeAsync(ScopeKey);
+                    if (fit) await MapInterop.FitToDetailsAsync(ScopeKey);
                 }
             }
-            catch (JSException jsex)
+            catch (Exception ex)
             {
-                Console.Error.WriteLine($"❌ JSInterop failed in SyncMapMarkersAsync: {jsex.Message}");
+                Console.Error.WriteLine($"[EventView] SyncMapMarkersAsync failed: {ex.Message}");
             }
         }
-        private void LoadMoreItems()
-        {
-            var next = allEvents.Skip(currentIndex).Take(PageSize).ToList();
-            visibleEvents.AddRange(next);
-            currentIndex += next.Count;
-        }
-
-        private async Task OnSearchInput(ChangeEventArgs e)
-        {
-            _q = e.Value?.ToString() ?? "";
-
-            _searchCts?.Cancel();
-            _searchCts = new CancellationTokenSource();
-            var ct = _searchCts.Token;
-
-            try
-            {
-                await Task.Delay(200, ct); // debounce
-                await HighlightBestEventAsync(ct);
-            }
-            catch (TaskCanceledException) { }
-        }
-
-        private async Task OnSearchChanged(ChangeEventArgs _)
-        {
-            _searchCts?.Cancel();
-            _searchCts = new CancellationTokenSource();
-            var ct = _searchCts.Token;
-
-            try
-            {
-                await Task.Delay(200, ct); // debounce
-                await HighlightBestEventAsync(ct);
-            }
-            catch (TaskCanceledException) { }
-        }
-
-        private async Task HighlightBestEventAsync(CancellationToken ct)
-        {
-            if (ct.IsCancellationRequested) return;
-            if (_outzen is null) return;           // map not ready
-            if (!_booted) return;                  // guard
-
-            var q = _q?.Trim();
-            if (string.IsNullOrWhiteSpace(q))
-            {
-                BestMatchId = null;
-                await InvokeAsync(StateHasChanged);
-                try { await _outzen.InvokeVoidAsync("clearPlaceHighlight"); } catch { }
-                return;
-            }
-
-            var best = allEvents
-                .Select(ev => new { ev.Id, Score = ScoreMatch(q, ev.Name) })
-                .Where(x => x.Score > 0)
-                .OrderByDescending(x => x.Score)
-                .FirstOrDefault();
-
-            if (best is null)
-            {
-                BestMatchId = null;
-                await InvokeAsync(StateHasChanged);
-                try { await _outzen.InvokeVoidAsync("clearPlaceHighlight"); } catch { }
-                return;
-            }
-
-            BestMatchId = best.Id;
-            await InvokeAsync(StateHasChanged);
-
-            // Focus marker (no reset map)
-            try
-            {
-                await _outzen.InvokeAsync<bool>("highlightEventMarker", best.Id, new
-                {
-                    openPopup = true,
-                    panTo = true,
-                    zoom = 15,
-                    dimOthers = false
-                });
-            }
-            catch (JSException ex)
-            {
-                Console.Error.WriteLine($"[EventView] highlightEventMarker failed: {ex.Message}");
-            }
-        }
-
-        private static int ScoreMatch(string q, string name)
-        {
-            q = q.ToLowerInvariant();
-            var s = (name ?? "").ToLowerInvariant();
-            if (s.Length == 0) return 0;
-            if (s == q) return 1000;
-            if (s.StartsWith(q)) return 500;
-            if (s.Contains(q)) return 200;
-            return 0;
-        }
-
-
-        private async Task FocusEventAsync(int id)
-        {
-            if (_outzen is null) return;
-
-            BestMatchId = id;               // surligne aussi la ligne
-            await InvokeAsync(StateHasChanged);
-
-            // scroll (optionnel)
-            try { await JS.InvokeVoidAsync("OutZen.scrollRowIntoView", $"event-row-{id}"); } catch { }
-
-            // focus marker
-            await _outzen.InvokeAsync<bool>("highlightEventMarker", id, new
-            {
-                openPopup = true,
-                panTo = true,
-                zoom = 16,
-                dimOthers = false
-            });
-        }
-
         private IEnumerable<ClientEventDTO> FilterEvent(IEnumerable<ClientEventDTO> source)
         {
             var q = _q?.Trim();
@@ -444,6 +313,59 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
                 .Where(x => !_onlyRecent || x.DateEvent >= cutoff);
         }
 
+        private void LoadMoreItems()
+        {
+            var next = allEvents.Skip(currentIndex).Take(PageSize).ToList();
+            visibleEvents.AddRange(next);
+            currentIndex += next.Count;
+        }
+
+        private void UpsertLocal(ClientEventDTO dto)
+        {
+            void Upsert(List<ClientEventDTO> list)
+            {
+                var i = list.FindIndex(c => c.Id == dto.Id);
+                if (i >= 0) list[i] = dto; else list.Add(dto);
+            }
+
+            Upsert(Events);
+            Upsert(allEvents);
+
+            var j = visibleEvents.FindIndex(c => c.Id == dto.Id);
+            if (j >= 0) visibleEvents[j] = dto;
+        }
+
+        private static int MapCrowdLevelFromExpected(int? expected)
+        {
+            var v = Math.Max(1, expected ?? 1);
+            if (v < 3000) return 1;
+            if (v < 5000) return 2;
+            if (v < 10000) return 3;
+            return 4;
+        }
+
+        private async Task OnSearchInput(ChangeEventArgs e)
+        {
+            _q = e.Value?.ToString() ?? "";
+
+            _searchCts?.Cancel();
+            _searchCts = new CancellationTokenSource();
+            var ct = _searchCts.Token;
+
+            try
+            {
+                await Task.Delay(200, ct);
+                await HighlightBestEventAsync(ct);
+            }
+            catch (TaskCanceledException) { }
+        }
+
+        private void ToggleRecent()
+        {
+            _onlyRecent = !_onlyRecent;
+            _ = SyncMapMarkersAsync(fit: true);
+        }
+
         private async Task HandleScroll()
         {
             var scrollTop = await JS.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
@@ -454,32 +376,119 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
             {
                 LoadMoreItems();
                 await SyncMapMarkersAsync(fit: false);
-                StateHasChanged();
+                await InvokeAsync(StateHasChanged);
             }
         }
 
-        private void ToggleRecent()
+        private async Task HighlightBestEventAsync(CancellationToken ct)
         {
-            _onlyRecent = !_onlyRecent;
-            _ = SyncMapMarkersAsync(fit: true);
+            if (ct.IsCancellationRequested) return;
+            if (!_initialMarkersApplied) return;
+
+            var q = _q?.Trim();
+            if (string.IsNullOrWhiteSpace(q))
+            {
+                BestMatchId = null;
+                await InvokeAsync(StateHasChanged);
+                try {
+                    await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
+                    await SyncMapMarkersAsync(fit: false);
+                }
+                catch { }
+                return;
+            }
+
+            var best = allEvents
+                .Select(ev => new { ev.Id, Score = ScoreMatch(q, ev.Name) })
+                .Where(x => x.Score > 0)
+                .OrderByDescending(x => x.Score)
+                .FirstOrDefault();
+
+            if (best is null)
+            {
+                BestMatchId = null;
+                await InvokeAsync(StateHasChanged);
+                try {
+                    await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
+                    await SyncMapMarkersAsync(fit: false);
+                }
+                catch { }
+                return;
+            }
+
+            BestMatchId = best.Id;
+            await InvokeAsync(StateHasChanged);
+
+            try
+            {
+                await FitThrottledAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[EventView] highlightEventMarker failed: {ex.Message}");
+            }
         }
 
-        private void GoToDetail(int id) => SelectedId = id;
-
-        public async ValueTask DisposeAsync()
+        private static int ScoreMatch(string q, string name)
         {
+            q = (q ?? "").ToLowerInvariant();
+            var s = (name ?? "").ToLowerInvariant();
+            if (s.Length == 0) return 0;
+            if (s == q) return 1000;
+            if (s.StartsWith(q)) return 500;
+            if (s.Contains(q)) return 200;
+            return 0;
+        }
+
+        private async Task FocusEventAsync(int id)
+        {
+            BestMatchId = id;
+            await InvokeAsync(StateHasChanged);
+
+            try { await JS.InvokeVoidAsync("OutZen.scrollRowIntoView", $"event-row-{id}"); } catch { }
+
+            try
+            {
+                await FitThrottledAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[EventView] FocusEventAsync failed: {ex.Message}");
+            }
+        }
+
+        private async Task CloseDetail()
+        {
+            Navigation.NavigateTo("/eventview", replace: false);
+            DetailId = null;
+            BestMatchId = null;
+
+            try
+            {
+                if (IsMapBooted)
+                {
+                    await FitThrottledAsync();
+                }
+            }
+            catch { }
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        protected override async Task OnBeforeDisposeAsync()
+        {
+            _disposed = true;
+
             if (hubConnection is not null)
             {
                 try { await hubConnection.StopAsync(); } catch { }
                 try { await hubConnection.DisposeAsync(); } catch { }
             }
-            if (_outzen is not null)
-            {
-                try { await _outzen.DisposeAsync(); } catch { }
-            }
         }
     }
 }
+
+
 
 
 
