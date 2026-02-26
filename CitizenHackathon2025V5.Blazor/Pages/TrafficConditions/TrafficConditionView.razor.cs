@@ -1,4 +1,5 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025.Contracts.Enums;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
@@ -44,19 +45,19 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 
         protected override (double lat, double lng) DefaultCenter => (50.89, 4.34);
         protected override int DefaultZoom => 14;
+        protected override OutZenMarkerPolicy MarkerPolicy => OutZenMarkerPolicy.OnlyPrefix;
+        protected override string AllowedMarkerPrefix => "traffic:";
+        protected override bool ClearAllOnMapReady => true;
 
         // Optional
         protected override bool ForceBootOnFirstRender => true;
         protected override bool ResetMarkersOnBoot => true;
-        private static string TrMarkerId(int id) => $"trafficcondition:{id}";
+        private static string TrMarkerId(int id) => $"traffic:{id}";
         private string _token;
 
         // ===== State =====
         private bool _disposed;
-        private bool _booted;
-        private bool _mapInitStarted;
-        private bool _markersSeeded;
-
+      
         // ===== Hub =====
         private HubConnection hubConnection;
 
@@ -95,12 +96,49 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             try
             {
                 await hubConnection.StartAsync();
+                await LoadLatestAsync();
+
+                await InvokeAsync(StateHasChanged);
+
+                // IMPORTANT: triggers the seed when the map is ready
+                await NotifyDataLoadedAsync(fit: true);
                 Console.WriteLine($"✅ [TrafficConditionView] Connected: {url}");
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"❌ [TrafficConditionView] hub start failed: {ex.Message}");
             }
+        }
+        private async Task LoadLatestAsync()
+        {
+            var fetched = (await TrafficConditionService.GetLatestTrafficConditionAsync())?.ToList() ?? new();
+
+            TrafficConditions = fetched;
+
+            allTrafficConditions.Clear();
+            allTrafficConditions.AddRange(fetched);
+
+            visibleTrafficConditions.Clear();
+            currentIndex = 0;
+            LoadMoreItems();
+        }
+        protected override async Task SeedAsync(bool fit)
+        {
+            if (_disposed) return;
+
+            // Clear TRAFFIC (pas crowd)
+            await MapInterop.ClearTrafficMarkersAsync(ScopeKey);
+
+            foreach (var tc in TrafficConditions)
+                await ApplySingleTrafficMarkerAsync(tc);
+
+            if (fit && TrafficConditions.Count > 0)
+            {
+                await MapInterop.RefreshSizeAsync(ScopeKey);
+                await MapInterop.FitToDetailsAsync(ScopeKey);
+            }
+
+            Console.WriteLine($"[Traffic] SeedAsync: booted={IsMapBooted} count={TrafficConditions.Count}");
         }
 
         // ----------------------------
@@ -127,7 +165,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                     currentIndex = 0;
                     LoadMoreItems();
 
-                    if (_booted)
+                    if (IsMapBooted)
                         await ReseedTrafficMarkersAsync(fit: false);
 
                     await InvokeAsync(StateHasChanged);
@@ -146,9 +184,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                 allTrafficConditions.RemoveAll(c => c.Id == id);
                 visibleTrafficConditions.RemoveAll(c => c.Id == id);
 
-                if (_booted)
+                if (IsMapBooted)
                 {
-                    try { await JS.InvokeVoidAsync("OutZenInterop.removeCrowdMarker", $"tr:{id}", ScopeKey); } catch { }
+                    try { await MapInterop.RemoveTrafficMarkerAsync(TrMarkerId(id), ScopeKey); } catch { }
                 }
 
                 await InvokeAsync(StateHasChanged);
@@ -156,14 +194,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         }
         protected override async Task OnMapReadyAsync()
         {
-            // À ce stade : map bootée + container OK
-            await FitThrottledAsync();
+            try { await MapInterop.RefreshSizeAsync(ScopeKey); } catch { }
             await Task.Delay(50);
-            await FitThrottledAsync();
+            try { await MapInterop.RefreshSizeAsync(ScopeKey); } catch { }
 
-            await ReseedTrafficMarkersAsync(fit: true);
+            while (_pendingHubUpdates.TryDequeue(out var dto))
+                await ApplySingleTrafficMarkerAsync(dto);
         }
-
 
         // ----------------------------
         // Map marker operations
@@ -171,49 +208,47 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         private async Task ReseedTrafficMarkersAsync(bool fit)
         {
             if (_disposed) return;
-            if (!_booted) return;
+            if (!IsMapBooted) return;
 
-            try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
+            await MapInterop.ClearTrafficMarkersAsync(ScopeKey);
 
             foreach (var tc in TrafficConditions)
                 await ApplySingleTrafficMarkerAsync(tc);
 
             await FitThrottledAsync();
-            if (fit)
-            {
-                await FitThrottledAsync();
-            }
+            if (fit) await FitThrottledAsync();
         }
 
         private async Task ApplySingleTrafficMarkerAsync(ClientTrafficConditionDTO dto)
         {
             if (_disposed) return;
-            if (!_booted) { _pendingHubUpdates.Enqueue(dto); return; }
+            if (!IsMapBooted) { _pendingHubUpdates.Enqueue(dto); return; }
 
             if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude)) return;
             if (dto.Latitude == 0 && dto.Longitude == 0) return;
 
             var level = ResolveLevel(dto);
 
-            var desc = $"{dto.CongestionLevel ?? "N/A"}"
-                       + (string.IsNullOrWhiteSpace(dto.IncidentType) ? "" : $" • {dto.IncidentType}")
-                       + (string.IsNullOrWhiteSpace(dto.Message) ? "" : $" • {dto.Message}")
-                       + $" • {dto.DateCondition:yyyy-MM-dd HH:mm}";
+            var description =
+                $"{dto.CongestionLevel ?? "N/A"}" +
+                (string.IsNullOrWhiteSpace(dto.IncidentType) ? "" : $" • {dto.IncidentType}") +
+                (string.IsNullOrWhiteSpace(dto.Message) ? "" : $" • {dto.Message}") +
+                $" • {dto.DateCondition:yyyy-MM-dd HH:mm}";
 
-            await JS.InvokeVoidAsync(
-                "OutZenInterop.addOrUpdateCrowdMarker",
-                TrMarkerId(dto.Id),
-                dto.Latitude,
-                dto.Longitude,
-                level,
-                new
+            await MapInterop.UpsertCrowdMarkerAsync(
+                id: TrMarkerId(dto.Id),
+                lat: dto.Latitude,
+                lng: dto.Longitude,
+                level: level,
+                info: new
                 {
+                    kind = "traffic",
                     title = dto.IncidentType ?? "Traffic",
-                    description = desc,
+                    description,
                     isTraffic = true,
                     icon = "⚠️"
                 },
-                ScopeKey
+                scopeKey: ScopeKey
             );
         }
 
@@ -288,7 +323,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         {
             _onlyRecent = !_onlyRecent;
             // Optional: resync markers on filter
-            if (_booted) _ = ReseedTrafficMarkersAsync(fit: false);
+            if (IsMapBooted) _ = ReseedTrafficMarkersAsync(fit: false);
         }
 
         private void ClickInfo(int id)

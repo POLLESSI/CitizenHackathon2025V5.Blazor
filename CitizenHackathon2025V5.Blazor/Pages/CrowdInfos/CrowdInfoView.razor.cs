@@ -1,5 +1,6 @@
 ﻿// CrowdInfoView.razor.cs
 using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025.Contracts.Enums;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
@@ -54,13 +55,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
         // Optional
         protected override bool ForceBootOnFirstRender => true;
         protected override bool ResetMarkersOnBoot => true;
+        protected override OutZenMarkerPolicy MarkerPolicy => OutZenMarkerPolicy.OnlyPrefix;
+        protected override string AllowedMarkerPrefix => "crowd:";
+        protected override bool ClearAllOnMapReady => true;
         private static string CIMarkerId(int id) => $"crowd:{id}";
         private string _token;
 
         // ===== State =====
         private bool _disposed;
-        private bool _booted;
-        private bool _mapInitStarted;
         private bool _initialDataApplied;
 
         // ===== Hub buffering until map ready =====
@@ -186,7 +188,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
                     try { await JS.InvokeVoidAsync("OutZenInterop.beepCritical", dto.Id); } catch { }
                 }
 
-                if (!_booted)
+                if (!IsMapBooted)
                 {
                     _pendingHubUpdates.Enqueue(dto);
                     await InvokeAsync(StateHasChanged);
@@ -210,7 +212,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
                 _all.RemoveAll(c => c.Id == id);
                 _visible.RemoveAll(c => c.Id == id);
 
-                if (_booted)
+                if (IsMapBooted)
                 {
                     try { await JS.InvokeVoidAsync("OutZenInterop.removeCrowdMarker", $"cr:{id}", ScopeKey); } catch { }
                     await SyncMapMarkersAsync(fit: false);
@@ -223,7 +225,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
             Console.WriteLine($"✅ Connected to {hubUrl}");
 
             // Catch-up: if map already booted
-            if (_booted && _visible.Count > 0)
+            if (IsMapBooted && _visible.Count > 0)
                 await SyncMapMarkersAsync(fit: true);
         }
 
@@ -261,7 +263,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
         private async Task SyncMapMarkersAsync(bool fit)
         {
             if (_disposed) return;
-            if (!_booted) return;
+            if (!IsMapBooted) return;
 
             var items = FilterCrowd(_visible).ToList();
 
@@ -279,7 +281,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
         private async Task ApplySingleMarkerUpdateAsync(ClientCrowdInfoDTO dto, bool alreadyBooted = false)
         {
             if (_disposed) return;
-            if (!alreadyBooted && !_booted) return;
+            if (!alreadyBooted && !IsMapBooted) return;
 
             if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude)) return;
             if (dto.Latitude == 0 && dto.Longitude == 0) return;
@@ -335,7 +337,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
             if (scrollTop + clientHeight >= scrollHeight - 5 && _currentIndex < _all.Count)
             {
                 LoadMoreItems();
-                if (_booted) await SyncMapMarkersAsync(fit: false);
+                if (IsMapBooted) await SyncMapMarkersAsync(fit: false);
                 await InvokeAsync(StateHasChanged);
             }
         }
@@ -343,7 +345,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
         private void ToggleRecent()
         {
             _onlyRecent = !_onlyRecent;
-            if (_booted) _ = SyncMapMarkersAsync(fit: true);
+            if (IsMapBooted) _ = SyncMapMarkersAsync(fit: true);
         }
 
         private string Q
@@ -352,7 +354,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
             set
             {
                 _q = value;
-                if (_booted) _ = SyncMapMarkersAsync(fit: true);
+                if (IsMapBooted) _ = SyncMapMarkersAsync(fit: true);
             }
         }
 
@@ -372,7 +374,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
         private async Task TestMarkers()
         {
-            if (!_booted) return;
+            if (!IsMapBooted) return;
 
             var testData = new[]
             {
@@ -401,7 +403,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
         private async Task TestBoot()
         {
             // Your boot process is already complete at firstRender. Here you're just testing an insertion.
-            if (!_booted) return;
+            if (!IsMapBooted) return;
 
             try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
 

@@ -52,7 +52,7 @@
 
 
     <div class="chart-wrapper" style="height: 180px; margin-top: 8px;">
-        <canvas id="crowdChart"></canvas>
+        <canvas id="@($"weatherChart-{ScopeKey}")"></canvas>
     </div>
 
     <div class="table-wrapper draggable-container"
@@ -64,7 +64,7 @@
                 <tr>
                     <th>#</th>
                     <th class="col-narrow">TemperatureC</th>
-                    <th class="col-narrow">TemperatureC</th>
+                    @* <th class="col-narrow">TemperatureF</th> *@
                     <th class="col-narrow">Summary</th>
                     <th class="col-actions"></th>
                 </tr>
@@ -81,7 +81,7 @@
                         <tr>
                             <td>•</td>
                             <td>@we.TemperatureC</td>
-                            <td>@we.TemperatureC</td>
+                            @* <td>@we.TemperatureF</td> *@
                             <td>@we.Summary</td>
                             <td>
                             <button class="btn btn-sm wx-chip @GetWeatherCss(@we.IsSevere) btn-glow"

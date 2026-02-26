@@ -104,22 +104,28 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var result = await _httpClient.GetFromJsonAsync<List<ClientSuggestionDTO>>(
-                    "Suggestions/all?all=true", ct);
+                using var resp = await _httpClient.GetAsync("Suggestions/all?limit=1000", ct);
+                var json = await resp.Content.ReadAsStringAsync(ct);
+                Console.WriteLine("[SUGG] status=" + resp.StatusCode);
+                Console.WriteLine("[SUGG] json=" + json);
 
+                resp.EnsureSuccessStatusCode();
+
+                var opts = new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+                var result = System.Text.Json.JsonSerializer.Deserialize<List<ClientSuggestionDTO>>(json, opts);
+                Console.WriteLine("[SUGG] deserialized=" + (result?.Count ?? -1));
                 return result ?? new();
-            }
-            catch (OperationCanceledException)
-            {
-                return new();
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"GetLatestSuggestionAsync failed: {ex.Message}");
+                Console.Error.WriteLine("[SUGG] GetLatestSuggestionAsync failed: " + ex);
                 return new();
             }
         }
-
         public async Task<ClientSuggestionDTO> SaveSuggestionAsync(ClientSuggestionDTO @suggestion)
         {
             try

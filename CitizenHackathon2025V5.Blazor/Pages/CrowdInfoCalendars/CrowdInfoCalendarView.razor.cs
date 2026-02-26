@@ -50,7 +50,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
         private string region = "";
         private int? placeId = null;
         private long _lastFitTicks;
-        private static string CICMarkerId(int id) => $"calendar/{id:int}";
+        private static string CICMarkerId(int id) => $"cc:{id}";
         private string activeFilter = ""; // "", "true", "false"
 
         // Razor expects this exact name:
@@ -88,31 +88,44 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             allCrowdInfoCalendars = _all;
             await StartSignalRAsync();
             await InvokeAsync(StateHasChanged);
+            // ✅ triggers the seed when the map is ready (or immediately if the map has already booted).
+            await NotifyDataLoadedAsync(fit: true);
         }
         protected override async Task OnMapReadyAsync()
         {
-            // À ce stade : map bootée + container OK
-            await FitThrottledAsync();
-            await Task.Delay(50);
-            await FitThrottledAsync();
+            // Optional: a "safe" fit
+            try { await MapInterop.RefreshSizeAsync(ScopeKey); } catch { }
 
-            await ReseedCrowdInfoCalendarMarkersAsync(fit: true);
+            // If hub updates arrived before, you can replay them after seeding.
             while (_pendingHubUpdates.TryDequeue(out var dto))
-                await ApplySingleMarkerUpdateAsync(dto, alreadyBooted: true);
+                await UpsertCalendarMarkerAsync(dto);
+
+            try { await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey); } catch { }
+            await Task.Delay(50);
+            try { await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey); } catch { }
         }
 
-        private async Task ReseedCrowdInfoCalendarMarkersAsync(bool fit)
+        protected override async Task SeedAsync(bool fit)
         {
-            if (_disposed) return;
-            if (!IsMapBooted) return;
+            // 1) clear calendar markers
+            //await MapInterop.ClearCrowdCalendarMarkersAsync(ScopeKey);
 
-            //try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
+            // 2) Source: You can use _all or Filter(_visible)
+            var src = _all; // or Filter(_visible).ToList()
 
-            foreach (var dto in _all)
-                await ApplySingleMarkerUpdateAsync(dto, alreadyBooted: true);
+            await JS.InvokeVoidAsync("OutZenInterop.upsertCrowdCalendarMarkers", src, ScopeKey);
 
-            if (fit) await FitThrottledAsync();
+            if (fit && src.Count > 0)
+            {
+                await MapInterop.RefreshSizeAsync(ScopeKey);
+                await JS.InvokeVoidAsync("OutZenInterop.fitToCalendar", ScopeKey, new { maxZoom = 17 });
+            }
+            Console.WriteLine($"[CIC] SeedAsync: booted={IsMapBooted} count={_all?.Count}");
+
+            var st = await JS.InvokeAsync<object>("OutZenInterop.dumpState", ScopeKey);
+            Console.WriteLine($"[CIC] dumpState: {System.Text.Json.JsonSerializer.Serialize(st)}");
         }
+
         private async Task FitThrottledAsync(int ms = 250)
         {
             var now = Environment.TickCount64;
@@ -122,9 +135,38 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             try
             {
                 await MapInterop.RefreshSizeAsync(ScopeKey);
-                await MapInterop.FitToDetailsAsync(ScopeKey);
+                await JS.InvokeVoidAsync("OutZenInterop.fitToCalendar", ScopeKey, new { maxZoom = 17 });
             }
             catch { }
+        }
+
+        private async Task UpsertCalendarMarkerAsync(ClientCrowdInfoCalendarDTO dto)
+        {
+            if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude)) return;
+            if (dto.Latitude == 0 && dto.Longitude == 0) return;
+
+            var lvl = Math.Clamp(dto.ExpectedLevel.GetValueOrDefault(), 1, SharedConstants.MaxCrowdLevel);
+
+            static string FmtTs(TimeSpan? ts) => ts is null ? "—" : ts.Value.ToString(@"hh\:mm\:ss");
+
+            await MapInterop.UpsertCrowdCalendarMarkerAsync(
+                id: CICMarkerId(dto.Id),              // <= "cc:{id}"
+                lat: dto.Latitude,
+                lng: dto.Longitude,
+                level: lvl,
+                info: new
+                {
+                    eventname = dto.EventName,
+                    description =
+                        $"Start {FmtTs(dto.StartLocalTime)} • End {FmtTs(dto.EndLocalTime)} • " +
+                        $"LeadHours {dto.LeadHours} • Confidence {dto.Confidence}%",
+                    messagetemplate = dto.MessageTemplate,
+                    active = dto.Active,
+                    icon = "🥁🎉"
+                },
+                scopeKey: ScopeKey
+            );
+            Console.WriteLine($"[CIC] upsert {CICMarkerId(dto.Id)} ll={dto.Latitude},{dto.Longitude} lvl={lvl}");
         }
 
         // ----------------------------
@@ -189,11 +231,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             {
                 UpsertLocal(dto);
 
-                // detect level change
-                int prev = _lastLevels.TryGetValue(dto.Id, out var p) ? p : 0;
-                int next = dto.ExpectedLevel.GetValueOrDefault();
-                _lastLevels[dto.Id] = next;
-
                 if (!IsMapBooted)
                 {
                     _pendingHubUpdates.Enqueue(dto);
@@ -201,7 +238,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
                     return;
                 }
 
-                await ApplySingleMarkerUpdateAsync(dto);
+                await UpsertCalendarMarkerAsync(dto);
                 await InvokeAsync(StateHasChanged);
             });
 
@@ -213,8 +250,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
                 if (IsMapBooted)
                 {
-                    //try { await JS.InvokeVoidAsync("OutZenInterop.removeCrowdCalendarMarker", $"calendar:{id}", ScopeKey); } catch { }
-                    await SyncMapMarkersAsync(fit: false);
+                    try { await MapInterop.RemoveCrowdCalendarMarkerAsync(CICMarkerId(id), ScopeKey); } catch { }
                 }
 
                 await InvokeAsync(StateHasChanged);
@@ -246,6 +282,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
         // ----------------------------
         // Map markers
         // ----------------------------
+        public async Task ClearCrowdCalendarMarkersAsync(string scopeKey)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("OutZenInterop.clearCrowdCalendarMarkers", scopeKey);
+            }
+            catch
+            {
+                // fallback: clear all outzen layers OR do nothing
+                // await _js.InvokeVoidAsync("OutZenInterop.clearAllOutZenLayers", scopeKey);
+            }
+        }
         private async Task SyncMapMarkersAsync(bool fit)
         {
             if (!IsMapBooted) return;
@@ -253,7 +301,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             var items = Filter(_visible).ToList();
 
             // Clear calendar markers (global wrapper)
-            //try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdCalendarMarkers", ScopeKey); } catch { }
+            try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdCalendarMarkers", ScopeKey); } catch { }
 
             foreach (var co in items)
                 await ApplySingleMarkerUpdateAsync(co, alreadyBooted: true);
@@ -411,6 +459,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
             if (_hub is not null)
             {
+                try { await JS.InvokeVoidAsync("OutZenInterop.unregisterDotNetRef", ScopeKey); } catch { }
+                try { await JS.InvokeVoidAsync("OutZenInterop.disposeOutZen", new { mapId = MapId, scopeKey = ScopeKey }); } catch { }
                 try { await _hub.StopAsync(); } catch { }
                 try { await _hub.DisposeAsync(); } catch { }
             }

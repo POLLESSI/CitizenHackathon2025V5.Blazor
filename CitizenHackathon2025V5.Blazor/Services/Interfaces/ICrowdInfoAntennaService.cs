@@ -5,6 +5,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services.Interfaces
 {
     public interface ICrowdInfoAntennaService
     {
-        Task<List<ClientCrowdInfoAntennaDTO>?> GetAllAsync(CancellationToken ct = default);
+        Task<List<ClientCrowdInfoAntennaDTO>> GetAllAsync(CancellationToken ct = default);
     }
 }

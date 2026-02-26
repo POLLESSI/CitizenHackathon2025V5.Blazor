@@ -9,6 +9,7 @@ using CitizenHackathon2025V5.Blazor.Client.Services.Interop;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
+using System.Collections.Concurrent;
 using System.Linq;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
@@ -37,8 +38,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         // Optional
         protected override bool ForceBootOnFirstRender => true;
         protected override bool ResetMarkersOnBoot => true;
+        private readonly ConcurrentQueue<ClientWeatherForecastDTO> _pendingHubUpdates = new();
 
-        private static string WeMarkerId(int id) => $"weatherforecast:{id}";
+        private static string WfMarkerId(int id) => $"wf:{id}";
 
         // ===== Data =====
         public List<ClientWeatherForecastDTO> WeatherForecastLists { get; set; } = new();
@@ -58,7 +60,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         // ===== State =====
         private bool _disposed;
         private bool _dataLoaded;
-        private bool _mapInitStarted;
 
         // ===== Hub =====
         public HubConnection hubConnection { get; set; }
@@ -109,15 +110,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
                 if (!IsMapBooted)
                 {
+                    _pendingHubUpdates.Enqueue(dto);
                     await InvokeAsync(StateHasChanged);
                     return;
                 }
 
                 await ApplySingleWeatherMarkerAsync(dto);
-
-                // Avoid systematic fitting if you want a stable map:
-                // try { await JS.InvokeVoidAsync("OutZenInterop.fitToMarkers", ScopeKey); } catch { }
-
                 await UpdateChartAsync();
                 await InvokeAsync(StateHasChanged);
             });
@@ -132,44 +130,145 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
                 if (IsMapBooted)
                 {
-                    try { await JS.InvokeVoidAsync("OutZenInterop.removeCrowdMarker", WeatherMarkerId(id), ScopeKey); } catch { }
+                    try { await JS.InvokeVoidAsync("OutZenInterop.removeCrowdMarker", WfMarkerId(id), ScopeKey); } catch { }
                 }
 
                 await InvokeAsync(StateHasChanged);
             });
 
-            // Rain alert event (si tu l’as)
+            // Rain alert event (if you have it)
             WeatherHub.HeavyRainReceived += OnHeavyRainReceived;
 
-            try { await hubConnection.StartAsync(); }
+            try
+            {
+                await hubConnection.StartAsync();
+                Console.WriteLine($"✅ [WF] Connected: {url}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"❌ [WF] hub start failed: {ex.Message}");
+            }
+
+            await InvokeAsync(StateHasChanged);
+            await NotifyDataLoadedAsync(fit: true);
+        }
+
+        private async Task LoadAllAsync()
+        {
+            var fetched = await WeatherForecastService.GetAllAsync() ?? new List<ClientWeatherForecastDTO>();
+
+            WeatherForecastLists = fetched;
+            allWeatherForecasts = fetched;
+
+            visibleWeatherForecasts.Clear();
+            currentIndex = 0;
+            LoadMoreItems();
+        }
+
+        private async Task StartSignalRAsync()
+        {
+            var url = HubUrls.Build(WeatherForecastHubMethods.HubPath);
+
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl(url, options =>
+                {
+                    options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
+                })
+                .WithAutomaticReconnect()
+                .Build();
+
+            hubConnection.On<ClientWeatherForecastDTO>(WeatherForecastHubMethods.ToClient.ReceiveForecast, async dto =>
+            {
+                if (_disposed || dto is null) return;
+
+                UpsertById(WeatherForecastLists, dto);
+                UpsertById(allWeatherForecasts, dto);
+                UpsertVisible(dto);
+
+                if (!IsMapBooted)
+                {
+                    _pendingHubUpdates.Enqueue(dto);
+                    await InvokeAsync(StateHasChanged);
+                    return;
+                }
+
+                await ApplySingleWeatherMarkerAsync(dto);
+                await UpdateChartAsync();
+                await InvokeAsync(StateHasChanged);
+            });
+
+            hubConnection.On<int>(WeatherForecastHubMethods.ToClient.EventArchived, async id =>
+            {
+                if (_disposed) return;
+
+                WeatherForecastLists.RemoveAll(c => c.Id == id);
+                allWeatherForecasts.RemoveAll(c => c.Id == id);
+                visibleWeatherForecasts.RemoveAll(c => c.Id == id);
+
+                if (IsMapBooted)
+                {
+                    try { await MapInterop.RemoveCrowdMarkerAsync(WfMarkerId(id), ScopeKey); } catch { }
+                }
+
+                await InvokeAsync(StateHasChanged);
+            });
+
+            // Rain alert (if you actually use it)
+            WeatherHub.HeavyRainReceived += OnHeavyRainReceived;
+
+            try
+            {
+                await hubConnection.StartAsync();
+                Console.WriteLine($"✅ [WF] Connected: {url}");
+            }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"❌ [WF] hub start failed: {ex.Message}");
             }
         }
 
+        protected override async Task SeedAsync(bool fit)
+        {
+            if (_disposed) return;
+
+            // ✅ clear the same family as you upsert (crowd/details)
+            await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
+
+            foreach (var dto in allWeatherForecasts)
+                await ApplySingleWeatherMarkerAsync(dto);
+
+            if (fit && allWeatherForecasts.Count > 0)
+            {
+                await MapInterop.RefreshSizeAsync(ScopeKey);
+                await MapInterop.FitToDetailsAsync(ScopeKey);
+            }
+
+            Console.WriteLine($"[WF] SeedAsync: booted={IsMapBooted} count={allWeatherForecasts.Count}");
+        }
+
         protected override async Task OnMapReadyAsync()
         {
-            // At this stage: map booted + container OK
-            await FitThrottledAsync();
+            try { await MapInterop.RefreshSizeAsync(ScopeKey); } catch { }
             await Task.Delay(50);
-            await FitThrottledAsync();
+            try { await MapInterop.RefreshSizeAsync(ScopeKey); } catch { }
 
-            await ReseedWeatherMarkersAsync(fit: true);
+            while (_pendingHubUpdates.TryDequeue(out var dto))
+                await ApplySingleWeatherMarkerAsync(dto);
+
             await UpdateChartAsync();
         }
 
         // ----------------------------
         // Map markers
         // ----------------------------
-        private static string WeatherMarkerId(int id) => $"wf:{id}";
+
 
         private async Task ReseedWeatherMarkersAsync(bool fit)
         {
             if (_disposed) return;
             if (!IsMapBooted) return;
 
-            try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
+            try { await MapInterop.ClearCrowdMarkersAsync(ScopeKey); ; } catch { }
 
             foreach (var dto in allWeatherForecasts)
                 await ApplySingleWeatherMarkerAsync(dto);
@@ -198,7 +297,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         private async Task ApplySingleWeatherMarkerAsync(ClientWeatherForecastDTO dto)
         {
             if (_disposed) return;
-            if (!IsMapBooted) return;
+            if (!IsMapBooted) { _pendingHubUpdates.Enqueue(dto); return; }
             if (dto is null) return;
 
             var lat = dto.Latitude;
@@ -207,27 +306,28 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             if (!double.IsFinite(lat) || !double.IsFinite(lng) || (lat == 0 && lng == 0) ||
                 lat is < -90 or > 90 || lng is < -180 or > 180)
             {
+                // fallback safe
                 lat = 50.85;
                 lng = 4.35;
             }
 
             var level = dto.IsSevere ? 4 : 2;
 
-            await JS.InvokeVoidAsync(
-                "OutZenInterop.addOrUpdateCrowdMarker",
-                WeMarkerId(dto.Id),
-                lat,
-                lng,
-                level,
-                new
+            await MapInterop.UpsertCrowdMarkerAsync(
+                id: WfMarkerId(dto.Id),
+                lat: lat,
+                lng: lng,
+                level: level,
+                info: new
                 {
+                    kind = "weather",
                     title = dto.Summary ?? "Weather",
                     description = $"Temp: {dto.TemperatureC}°C, Vent: {dto.WindSpeedKmh} km/h (Maj {dto.DateWeather:HH:mm:ss})",
                     weatherType = dto.WeatherType.ToString(),
                     isWeather = true,
                     icon = "🌦️"
                 },
-                ScopeKey
+                scopeKey: ScopeKey
             );
         }
 
@@ -328,7 +428,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             // If you don't have it, see the 2 options below.
             try
             {
-                await JS.InvokeVoidAsync("OutZenInterop.setWeatherChart", recent, _selectedMetric.ToString(), ScopeKey);
+                var canvasId = $"weatherChart-{ScopeKey}";
+                await JS.InvokeVoidAsync("OutZenInterop.setWeatherChart", recent, _selectedMetric.ToString(), ScopeKey, canvasId);
             }
             catch
             {

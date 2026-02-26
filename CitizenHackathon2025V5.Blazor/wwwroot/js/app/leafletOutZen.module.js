@@ -111,6 +111,7 @@ function getS(scopeKey = "main") {
             _domToken: null,
 
             cluster: null,
+            wxChart: null,
             layerGroup: null,
 
             markers: new Map(),
@@ -226,11 +227,12 @@ function isContainerVisible(map) {
 /* ---------------------------------------------------------
    Debug exports
 --------------------------------------------------------- */
-export function dumpState(scopeKey = "main") {
+export function dumpState(scopeKey = null, { createIfMissing = false } = {}) {
     const k = pickScopeKeyRead(scopeKey);
-    const s = getS(k);
-    const has = makeHas(s);
+    const s = createIfMissing ? getS(k) : peekS(k);
+    if (!s) return { loaded: true, scopeKey: k, exists: false };
 
+    const has = makeHas(s);
     const safeCount = (arr) => Array.isArray(arr) ? arr.length : 0;
 
     return {
@@ -246,8 +248,13 @@ export function dumpState(scopeKey = "main") {
         markers: s.markers?.size ?? 0,
         bundleMarkers: s.bundleMarkers?.size ?? 0,
         detailMarkers: s.detailMarkers?.size ?? 0,
+        antennaMarkers: s.antennaMarkers?.size ?? 0,
+        hasAntennaLayer: has(s.antennaLayer),
         showing: s.hybrid?.showing ?? null,
         hasDetailLayer: has(s.detailLayer),
+
+        calendarMarkers: s.calendarMarkers?.size ?? 0,
+        hasCalendarLayer: has(s.calendarLayer),
 
         bundleLastInputSizes: s.bundleLastInput ? {
             places: safeCount(s.bundleLastInput.places),
@@ -288,7 +295,7 @@ export function listScopes() {
 /* ---------------------------------------------------------
    Public API: ready
 --------------------------------------------------------- */
-export function isOutZenReady(scopeKey = "main") {
+export function isOutZenReady(scopeKey = null) {
     const s = peekS(pickScopeKeyRead(scopeKey));
     return !!s?.initialized && !!s?.map;
 }
@@ -305,6 +312,11 @@ function destroyChartIfAny(s) {
         try { s.chart.destroy(); } catch { }
     }
     if (s) s.chart = null;
+}
+
+function ensureWeatherChartState(s) {
+    s._wxChart ??= null;
+    s._wxChartCanvasId ??= null;
 }
 
 /**
@@ -340,11 +352,12 @@ export async function bootOutZen({
     resetLeafletDomId(mapId);
 
     // already booted + not force
-    if (s.map && s.mapContainerId === mapId && !force) {
-        const tok = s._domToken ?? host?.dataset?.ozToken ?? null;
-        return { ok: true, token: tok, mapId, scopeKey };
+    if (s.map && s.mapContainerId && s.mapContainerId !== mapId) {
+        disposeOutZen({ mapId: s.mapContainerId, scopeKey, allowNoToken: true });
     }
-    if (s.map && force) disposeOutZen({ mapId: s.mapContainerId, scopeKey });
+    if (s.map && force) {
+        disposeOutZen({ mapId: s.mapContainerId, scopeKey, allowNoToken: true });
+    }
 
     const L = ensureLeaflet();
     if (!L) return bootFail(mapId, scopeKey, "leaflet-missing");
@@ -481,7 +494,7 @@ export function getCurrentMapId(scopeKey = null) {
     return s?.mapContainerId ?? null;
 }
 
-export function disposeOutZen({ mapId, scopeKey = "main", token = null } = {}) {
+export function disposeOutZen({ mapId, scopeKey = "main", token = null, allowNoToken = false } = {}) {
     const s = getS(scopeKey);
     if (!s) return false;
 
@@ -491,12 +504,12 @@ export function disposeOutZen({ mapId, scopeKey = "main", token = null } = {}) {
     // ✅ If external call: token recommended
     const currentTok = host?.dataset?.ozToken ?? s._domToken ?? null;
 
-    const isInternal = (token == null); // <-- simple
-    const tokenOk = isInternal || (token && currentTok && token === currentTok);
-
-    if (!tokenOk) {
-        console.warn("[disposeOutZen] token mismatch -> IGNORE", { mapId, scopeKey, token, currentTok });
-        return false;
+    // ✅ Internal dispose allowed when we explicitly say so
+    if (!allowNoToken) {
+        if (!token || !currentTok || token !== currentTok) {
+            console.warn("[disposeOutZen] token mismatch -> IGNORE", { mapId, scopeKey, token, currentTok });
+            return false;
+        }
     }
 
     try { s.cluster?.clearLayers?.(); } catch { }
@@ -523,6 +536,11 @@ export function disposeOutZen({ mapId, scopeKey = "main", token = null } = {}) {
         try { host.replaceChildren(); } catch { host.innerHTML = ""; }
         try { delete host.dataset.ozToken; } catch { }
     }
+
+    // ✅ HARD RESET: delete singleton to avoid stale scopes
+    const gk = "__OutZenSingleton__" + String(scopeKey || "main");
+    try { delete globalThis[gk]; } catch { globalThis[gk] = undefined; }
+
     return true;
 }
 
@@ -530,35 +548,16 @@ export function disposeOutZen({ mapId, scopeKey = "main", token = null } = {}) {
    Layer add/remove (cluster-aware) - GUARDED
 --------------------------------------------------------- */
 function addLayerSmart(layer, s) {
-    if (!s?.map || !layer) return;
+    // If the cluster exists BUT not on the map => add it directly to the map
+    const hasCluster = !!s.cluster;
+    const clusterOnMap = hasCluster && s.map?.hasLayer?.(s.cluster);
 
-    const looksLikeLeafletLayer =
-        typeof layer.addTo === "function" ||
-        typeof layer.getLatLng === "function" ||
-        typeof layer.getLayers === "function";
-
-    if (!looksLikeLeafletLayer) {
-        console.error("[addLayerSmart] NOT a Leaflet layer", layer);
-        return;
+    if (hasCluster && clusterOnMap && !layer?.options?.__ozNoCluster) {
+        try { s.cluster.addLayer(layer); return; } catch { }
     }
 
-    if (layer?.options?.__ozNoCluster) {
-        try { layer.addTo(s.map); } catch { try { s.map.addLayer(layer); } catch { } }
-        return;
-    }
-
-    const clusterUsable =
-        s.cluster &&
-        typeof s.cluster.addLayer === "function" &&
-        typeof s.map.hasLayer === "function" &&
-        s.map.hasLayer(s.cluster);
-
-    try {
-        if (clusterUsable) s.cluster.addLayer(layer);
-        else (layer.addTo ? layer.addTo(s.map) : s.map.addLayer(layer));
-    } catch (e) {
-        console.warn("[addLayerSmart] failed", e);
-    }
+    // otherwise map direct (or detailLayer if you use it)
+    try { s.map.addLayer(layer); } catch { }
 }
 
 function removeLayerSmart(layer, s) {
@@ -696,14 +695,19 @@ export function addOrUpdatePlaceMarker(place, scopeKey = null) {
     if (!ll) return false;
 
     const id = `place:${place?.Id ?? place?.id}`;
-    return addOrUpdateCrowdMarker(id, ll.lat, ll.lng, 1, {
-        kind: "place",
-        title: place?.Name ?? place?.name ?? "Place",
-        description: place?.Description ?? place?.description ?? "",
-        icon: "🏰"
-    }, k);
-}
 
+    const title =
+        place?.Name ?? place?.name ?? place?.Title ?? place?.title ?? "Place";
+
+    const description =
+        place?.Description ?? place?.description ??
+        place?.Type ?? place?.type ?? "";
+
+    return addOrUpdateCrowdMarker(id, ll.lat, ll.lng, 1,
+        { kind: "place", title, description, icon: "🏰" },
+        k
+    );
+}
 export function addOrUpdateEventMarker(ev, scopeKey = null) {
     const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
@@ -751,16 +755,91 @@ export function clearCrowdMarkers(scopeKey = null) {
     return true;
 }
 
+export function clearCrowdCalendarMarkers(scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+    const { s } = ready;
+
+    try { s.calendarLayer?.clearLayers?.(); } catch { }
+    try { s.calendarMarkers?.clear?.(); } catch { }
+    return true;
+}
+export function clearMarkersByPrefix(prefix, scopeKey = null) {
+    const k = pickScopeKeyRead(scopeKey);
+    const s = getS(k);
+    if (!(s?.markers instanceof Map)) return 0;
+
+    let n = 0;
+    for (const [id, m] of Array.from(s.markers.entries())) {
+        if (!String(id).startsWith(prefix)) continue;
+        try { removeLayerSmart(m, s); } catch { }
+        s.markers.delete(id);
+        n++;
+    }
+
+    // if cluster:refresh
+    try { s.cluster?.refreshClusters?.(); } catch { }
+    return n;
+}
+export function removeCrowdCalendarMarker(markerId, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+    const { s } = ready;
+
+    const key = String(markerId);
+    const m = s.calendarMarkers?.get?.(key);
+    if (!m) return true;
+
+    try {
+        if (s.calendarLayer?.hasLayer?.(m)) s.calendarLayer.removeLayer(m);
+        else removeLayerSmart(m, s);
+    } catch { }
+
+    s.calendarMarkers.delete(key);
+    return true;
+}
+export function clearAllOutZenLayers(scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+    const { s } = ready;
+
+    try { s.cluster?.clearLayers?.(); } catch { }
+    try { s.layerGroup?.clearLayers?.(); } catch { }
+
+    try { for (const m of s.markers?.values?.() ?? []) removeLayerSmart(m, s); } catch { }
+    try { s.markers?.clear?.(); } catch { }
+
+    try { for (const m of s.bundleMarkers?.values?.() ?? []) removeLayerSmart(m, s); } catch { }
+    try { s.bundleMarkers?.clear?.(); } catch { }
+    try { s.bundleIndex?.clear?.(); } catch { }
+    s.bundleLastInput = null;
+
+    try { s.detailLayer?.clearLayers?.(); } catch { }
+    try { s.detailMarkers?.clear?.(); } catch { }
+
+    try { s.calendarLayer?.clearLayers?.(); } catch { }
+    try { s.calendarMarkers?.clear?.(); } catch { }
+
+    try { s.antennaLayer?.clearLayers?.(); } catch { }
+    try { s.antennaMarkers?.clear?.(); } catch { }
+
+    s.hybrid.showing = null;
+    return true;
+}
 /* ---------------------------------------------------------
    Calendar markers (no cluster)
 --------------------------------------------------------- */
 function ensureCalendarLayer(s, L) {
+    if (!s?.map) return null;
+
     if (!s.calendarLayer) {
-        s.calendarLayer = L.featureGroup();
-        s.map.addLayer(s.calendarLayer);
-    } else if (!s.map.hasLayer(s.calendarLayer)) {
+        s.calendarLayer = L.layerGroup(); // simple + stable
+    }
+
+    if (!s.map.hasLayer(s.calendarLayer)) {
         s.calendarLayer.addTo(s.map);
     }
+
     return s.calendarLayer;
 }
 
@@ -782,7 +861,7 @@ function calendarIconEmoji(x) {
     if (tags.includes("folkl") || name.includes("carnaval")) return "🎭";
     if (tags.includes("music") || name.includes("concert")) return "🎵";
     if (tags.includes("sport")) return "🏟️";
-    return "📅";
+    return "🥁🎉";
 }
 
 function calendarPopupHtml(x, s) {
@@ -816,69 +895,26 @@ export function upsertCrowdCalendarMarkers(items, scopeKey = "main") {
     const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
 
-    const { k, s, L } = ready;
+    const { s, L } = ready;
     if (!Array.isArray(items)) return false;
 
     ensureCalendarLayer(s, L);
     s.calendarMarkers ??= new Map();
 
-    let dropped = 0;
-
     for (const x of items) {
         const key = makeCalendarKey(x);
-        if (!key) { dropped++; continue; }
-
+        if (!key) continue;
         const ll = pickLatLng(x, s.utils);
-        if (!ll) {
-            dropped++;
-            if (dropped <= 5) {
-                console.warn("[Bundles] drop sample kind=", kind,
-                    +  "keys=", Object.keys(x || {}),
-                    +  "item=", x
-                );
-            }
-            continue;
-        }
+        if (!ll) continue;
 
-        const level = calendarLevelFromExpected(x);
-        const emoji = calendarIconEmoji(x);
-
-        const icon = buildMarkerIcon(L, level, {
-            kind: "calendar",
-            scopeKey: k,
-            iconOverride: emoji
-        });
-
-        const popup = calendarPopupHtml(x, s);
-
-        const existing = s.calendarMarkers.get(key);
-        if (existing) {
-            try { existing.setLatLng([ll.lat, ll.lng]); } catch { }
-            try { existing.setIcon(icon); } catch { }
-            try { if (existing.getPopup()) existing.setPopupContent(popup); else existing.bindPopup(popup); } catch { }
-            try { if (!s.calendarLayer.hasLayer(existing)) s.calendarLayer.addLayer(existing); } catch { }
-            continue;
-        }
-
-        const marker = L.marker([ll.lat, ll.lng], {
-            icon,
-            title: (x?.EventName ?? x?.eventName ?? key),
-            riseOnHover: true,
-            __ozNoCluster: true
-        });
-
-        try { marker.bindPopup(popup, { maxWidth: 420, closeButton: true, autoPan: true }); } catch { }
-        try { s.calendarLayer.addLayer(marker); } catch { addLayerSmart(marker, s); }
-
-        s.calendarMarkers.set(key, marker);
+        addOrUpdateCrowdCalendarMarker(key, ll.lat, ll.lng, calendarLevelFromExpected(x), {
+            eventname: x?.EventName ?? x?.eventName,
+            description: x?.MessageTemplate ?? x?.messageTemplate ?? ""
+        }, scopeKey);
     }
-
-    if (dropped) console.warn("[Calendar] dropped =", dropped, "(missing id/coords)");
-    try { refreshHybridVisibility(k); } catch { }
 
     return true;
 }
-
 export function pruneCrowdCalendarMarkers(activeIds, scopeKey = "main") {
     const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
@@ -928,7 +964,6 @@ function makeAntennaKey(a) {
 export function addOrUpdateAntennaMarker(antenna, scopeKey = null) {
     const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
-
     const { k, s, L } = ready;
     if (!antenna) return false;
 
@@ -940,10 +975,13 @@ export function addOrUpdateAntennaMarker(antenna, scopeKey = null) {
 
     const key = makeAntennaKey(antenna) ?? `ant:${ll.lat.toFixed(5)},${ll.lng.toFixed(5)}`;
 
-    const icon = buildMarkerIcon(L, 1, {
+    const lvl = Number(antenna.Level ?? antenna.level ?? 1);
+    const iconOverride = antenna.Icon ?? antenna.icon ?? "📡";
+
+    const icon = buildMarkerIcon(L, lvl, {
         kind: "antenna",
         scopeKey: k,
-        iconOverride: "📡"
+        iconOverride
     });
 
     const title = antenna?.Name ?? antenna?.name ?? "Antenna";
@@ -959,13 +997,7 @@ export function addOrUpdateAntennaMarker(antenna, scopeKey = null) {
         return true;
     }
 
-    const m = L.marker([ll.lat, ll.lng], {
-        icon,
-        title,
-        riseOnHover: true,
-        __ozNoCluster: true
-    });
-
+    const m = L.marker([ll.lat, ll.lng], { icon, title, riseOnHover: true, __ozNoCluster: true });
     try { m.bindPopup(popup, { maxWidth: 420, closeButton: true, autoPan: true }); } catch { }
     try { s.antennaLayer.addLayer(m); } catch { addLayerSmart(m, s); }
 
@@ -991,7 +1023,22 @@ export function pruneAntennaMarkers(activeKeys, scopeKey = null) {
     }
     return true;
 }
+export function pruneMarkersByPrefix(allowedPrefix, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+    const { s } = ready;
 
+    const pref = String(allowedPrefix ?? "");
+    if (!pref) return true;
+
+    for (const [key, marker] of Array.from(s.markers.entries())) {
+        if (String(key).startsWith(pref)) continue;
+        try { removeLayerSmart(marker, s); } catch { }
+        s.markers.delete(key);
+    }
+
+    return true;
+}
 /* ---------------------------------------------------------
    Weather markers (standalone)
 --------------------------------------------------------- */
@@ -1402,7 +1449,7 @@ function addDetailMarker(kind, item, s, L, scopeKey = null) {
     const kindLower = String(kind).toLowerCase();
 
     // 1) coords
-    const ll = pickLatLng(item);
+    const ll = pickLatLng(item, s.utils);
     if (!ll) return;
 
     // 2) ✅ Define key/title/sid BEFORE any log/usage (avoids TDZ)
@@ -1412,17 +1459,11 @@ function addDetailMarker(kind, item, s, L, scopeKey = null) {
     const title = s.utils.titleOf(kindLower, item);
 
     // Suggestion id (for click map -> Blazor)
-    const sid =
-        Number(item?.SuggestionId ?? item?.suggestionId ?? item?.Id ?? item?.id);
+    const sid = Number(item?.SuggestionId ?? item?.Id);
 
     if (kindLower === "suggestion") {
         console.log("[DETAILS] suggestion resolved ll", {
-            key,
-            sid,
-            title,
-            rawLat: item?.Latitude ?? item?.latitude ?? item?.lat,
-            rawLng: item?.Longitude ?? item?.longitude ?? item?.lng,
-            ll
+            key, sid, title, ll
         });
     }
 
@@ -1431,14 +1472,14 @@ function addDetailMarker(kind, item, s, L, scopeKey = null) {
         const severe = !!(item?.IsSevere ?? item?.isSevere);
         const level = severe ? 4 : 2;
 
-        const icon = buildMarkerIcon(L, level, {
+        const wxIcon = buildMarkerIcon(L, level, {
             kind: "weather",
             weatherType: (item?.WeatherType ?? item?.weatherType ?? "").toString(),
             isTraffic: false
         });
 
         const m = L.marker([ll.lat, ll.lng], {
-            icon,
+            icon: wxIcon,
             title: `Weather: ${title}`,
             riseOnHover: true,
             pane: "markerPane"
@@ -1503,7 +1544,7 @@ function addDetailMarker(kind, item, s, L, scopeKey = null) {
         return;
     }
 
-    // generic fallback
+    // fallback generic
     const icon = buildMarkerIcon(L, 1, { kind: kindLower, iconOverride: "" });
     const m = L.marker([ll.lat, ll.lng], { icon, title: `${kindLower}: ${title}`, riseOnHover: true, pane: "markerPane" });
     m.bindPopup(`<div class="oz-popup"><b>${s.utils.escapeHtml(kindLower)}</b><br>${s.utils.escapeHtml(title)}</div>`);
@@ -1520,8 +1561,7 @@ function getDotNetRef(scopeKey) {
 }
 
 export function registerDotNetRef(scopeKey, dotnetRef) {
-    const m = globalThis.__ozDotNet;
-    if (!(m instanceof Map)) globalThis.__ozDotNet = new Map();
+    if (!(globalThis.__ozDotNet instanceof Map)) globalThis.__ozDotNet = new Map();
     globalThis.__ozDotNet.set(String(scopeKey || "main"), dotnetRef);
     return true;
 }
@@ -1541,20 +1581,9 @@ export function addOrUpdateDetailMarkers(payload, scopeKey = null) {
 
     const norm = normalizePayload(payload);
 
-    console.log("[DETAILS] suggestions input (first 10):",
-        (norm.suggestions || []).slice(0, 10).map(x => ({
-            id: x.Id ?? x.id,
-            title: x.Title ?? x.title,
-            lat: x.Latitude ?? x.latitude ?? x.lat,
-            lng: x.Longitude ?? x.longitude ?? x.lng
-        }))
-    );
-
     const push = (arr, kind) => {
         if (!Array.isArray(arr)) return;
-        for (const x of arr) {
-            addDetailMarker(kind, x, s, L, scopeKey);
-        }
+        for (const x of arr) addDetailMarker(kind, x, s, L, scopeKey); // ✅ propagated scopeKey
     };
 
     push(norm.events, "event");
@@ -1567,7 +1596,6 @@ export function addOrUpdateDetailMarkers(payload, scopeKey = null) {
 
     return true;
 }
-
 function runWhenMapReallyIdle(map, fn) {
     const tick = () => {
         if (!map) return;
@@ -1611,7 +1639,6 @@ function switchToDetails(s, map, scopeKey) {
     const L = ensureLeaflet();
     if (!L || !s?.map) return;
 
-    // ✅ If there are no payload bundles, the switchover is refused.
     if (!s.bundleLastInput) {
         console.warn("[Hybrid] No bundleLastInput => keep bundles/markers");
         s.hybrid.showing = s.hybrid.showing ?? "bundles";
@@ -1623,8 +1650,8 @@ function switchToDetails(s, map, scopeKey) {
     }
 
     ensureDetailLayer(s, L);
-    //if (s.bundleLastInput)
-    //    addOrUpdateDetailMarkers(s.bundleLastInput, scopeKey);
+
+    // ✅ REACTIVATE
     addOrUpdateDetailMarkers(s.bundleLastInput, scopeKey);
 
     s.hybrid.showing = "details";
@@ -1850,6 +1877,64 @@ export function addOrUpdateBundleMarkers(payload, tolMeters = 80, scopeKey = nul
     return true;
 }
 
+export function fitToAllMarkers(scopeKey = null, opts = {}) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { s, L, map } = ready;
+
+    const padding = opts.padding ?? [22, 22];
+    const maxZoom = opts.maxZoom ?? 17;
+
+    const latlngs = [];
+
+    // 1) crowd markers
+    for (const m of (s.markers?.values?.() ?? [])) {
+        try { latlngs.push(m.getLatLng()); } catch { }
+    }
+
+    // 2) antenna markers
+    for (const m of (s.antennaMarkers?.values?.() ?? [])) {
+        try { latlngs.push(m.getLatLng()); } catch { }
+    }
+
+    // 3) calendar markers
+    for (const m of (s.calendarMarkers?.values?.() ?? [])) {
+        try { latlngs.push(m.getLatLng()); } catch { }
+    }
+
+    const b = _boundsFromLatLngs(L, latlngs);
+    if (!b) return false;
+
+    try { map.fitBounds(b, { padding, animate: false, maxZoom }); } catch { }
+    return true;
+}
+export function clearAllMarkers(scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { s } = ready;
+
+    // crowd markers
+    try { s.cluster?.clearLayers?.(); } catch { }
+    if (!s.cluster) {
+        for (const m of s.markers.values()) {
+            try { s.map.removeLayer(m); } catch { }
+        }
+    }
+    try { s.markers?.clear?.(); } catch { }
+
+    // antenna markers
+    try { s.antennaLayer?.clearLayers?.(); } catch { }
+    try { s.antennaMarkers?.clear?.(); } catch { }
+
+    // calendar markers (optionnel)
+    try { s.calendarLayer?.clearLayers?.(); } catch { }
+    try { s.calendarMarkers?.clear?.(); } catch { }
+
+    return true;
+}
+
 /* ---------------------------------------------------------
    Fit / Resize helpers
 --------------------------------------------------------- */
@@ -1879,6 +1964,16 @@ export function refreshMapSize(scopeKey = null) {
     });
 
     return true;
+}
+
+function ensureCanvas(canvasId) {
+    if (!canvasId) return null;
+    const el = document.getElementById(canvasId);
+    if (!el) return null;
+    const r = el.getBoundingClientRect?.();
+    // avoids the invisible chart because height=0
+    if (r && (r.width < 10 || r.height < 10)) return el; // We're letting Chart try, but it's a signal
+    return el;
 }
 
 /* ---------------------------------------------------------
@@ -1962,9 +2057,14 @@ export function debugDumpMarkers(scopeKey = null) {
     console.log("[DBG] markers keys =", Array.from(s.markers?.keys?.() ?? []));
     console.log("[DBG] bundle keys =", Array.from(s.bundleMarkers?.keys?.() ?? []));
     console.log("[DBG] detail keys =", Array.from(s.detailMarkers?.keys?.() ?? []));
-    console.log("[DBG] map initialized =", !!s.map, "cluster =", !!s.cluster, "showing=", s.hybrid?.showing, "hasDetailLayer=", has(s.detailLayer));
+    console.log("[DBG] calendar keys =", Array.from(s.calendarMarkers?.keys?.() ?? []));
+    console.log("[DBG] map initialized =", !!s.map,
+        "cluster =", !!s.cluster,
+        "showing=", s.hybrid?.showing,
+        "hasDetailLayer=", has(s.detailLayer),
+        "hasCalendarLayer=", has(s.calendarLayer)
+    );
 }
-
 export function debugClusterCount(scopeKey = null) {
     const k = pickScopeKeyRead(scopeKey);
     const s = peekS(k) || getS(k);
@@ -2065,7 +2165,25 @@ export function fitToMarkers(scopeKey = null, opts = {}) {
     try { map.fitBounds(b, { padding, animate: false, maxZoom }); } catch { }
     return true;
 }
+export function fitToCalendar(scopeKey = null, opts = {}) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
 
+    const { s, L, map } = ready;
+    const padding = opts.padding ?? [22, 22];
+    const maxZoom = opts.maxZoom ?? 17;
+
+    const latlngs = [];
+    for (const m of (s.calendarMarkers?.values?.() ?? [])) {
+        try { latlngs.push(m.getLatLng()); } catch { }
+    }
+
+    const b = _boundsFromLatLngs(L, latlngs);
+    if (!b) return false;
+
+    try { map.fitBounds(b, { padding, animate: false, maxZoom }); } catch { }
+    return true;
+}
 // Practical: “active hybrid + fit”
 export function activateHybridAndZoom(scopeKey = null, threshold = 13) {
     const k = pickScopeKeyRead(scopeKey);
@@ -2117,10 +2235,200 @@ export function removeAntennaMarker(key, scopeKey = null) {
     return true;
 }
 
-export function addOrUpdateCrowdCalendarMarker(item, scopeKey = "main") {
-    return upsertCrowdCalendarMarkers([item], scopeKey);
+export function addOrUpdateCrowdCalendarMarker(id, lat, lng, level, info, scopeKey = "main") {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { k, s, L, map } = ready;
+
+    const latNum = toNumLoose(lat);
+    const lngNum = toNumLoose(lng);
+    if (latNum == null || lngNum == null) return false;
+
+    const layer = ensureCalendarLayer(s, L);
+    if (!layer) return false;
+
+    s.calendarMarkers ??= new Map();
+    const key = String(id);
+
+    const title = info?.eventname ?? "Crowd Calendar";
+    const desc = info?.description ?? "";
+
+    // icon calendar (you can use info.icon)
+    const icon = buildMarkerIcon(L, level, {
+        kind: "calendar",
+        scopeKey: k,
+        iconOverride: info?.icon ?? "🥁🎉"
+    });
+
+    const popupHtml = `
+      <div class="outzen-popup">
+        <div class="title">${s.utils.escapeHtml(title)}</div>
+        <div class="desc">${s.utils.escapeHtml(desc)}</div>
+      </div>
+    `.trim();
+
+    let mk = s.calendarMarkers.get(key);
+
+    if (!mk) {
+        mk = L.marker([latNum, lngNum], {
+            icon,
+            title,
+            riseOnHover: true,
+            zIndexOffset: 2000,
+            __ozNoCluster: true
+        });
+
+        try { mk.bindPopup(popupHtml, { maxWidth: 420, closeButton: true, autoPan: true }); } catch { }
+        layer.addLayer(mk);
+        s.calendarMarkers.set(key, mk);
+        return true;
+    }
+
+    try { mk.setLatLng([latNum, lngNum]); } catch { }
+    try { mk.setIcon(icon); } catch { }
+    try {
+        if (mk.getPopup()) mk.setPopupContent(popupHtml);
+        else mk.bindPopup(popupHtml);
+    } catch { }
+
+    try {
+        // if the layer has been recreated/detached
+        if (typeof layer.hasLayer === "function") {
+            if (!layer.hasLayer(mk)) layer.addLayer(mk);
+        } else {
+            // ayerGroup does not have hasLayer => we try addLayer (safe)
+            layer.addLayer(mk);
+        }
+    } catch { }
+
+    return true;
 }
 
+// ---------------------------------------------------------
+// Weather chart (Chart.js) - independent from Leaflet layers
+// ---------------------------------------------------------
+function ensureWxChartState(s) {
+    s._wxChart ??= null;
+    s._wxChartCanvasId ??= null;
+}
+
+function destroyWxChartIfAny(s) {
+    try {
+        if (s?._wxChart && typeof s._wxChart.destroy === "function") {
+            s._wxChart.destroy();
+        }
+    } catch { }
+    if (s) s._wxChart = null;
+}
+export function setWeatherChart(points, metric = "Temperature", scopeKey = null, canvasId = null) {
+    const k = pickScopeKeyRead(scopeKey);
+    const s = getS(k);
+    ensureWxChartState(s);
+
+    const ChartLib = globalThis.Chart;
+    if (!ChartLib) {
+        console.warn("[WX] Chart.js not found (window.Chart missing).");
+        return false;
+    }
+
+    const cid = canvasId || `weatherChart-${k}`;
+    const canvas = document.getElementById(cid);
+    if (!canvas) {
+        console.warn("[WX] canvas not found:", cid);
+        return false;
+    }
+
+    // hot reload / navigation: si le canvas change, on recrée
+    if (s._wxChart && s._wxChartCanvasId !== cid) {
+        destroyWxChartIfAny(s);
+    }
+    s._wxChartCanvasId = cid;
+
+    const arr = Array.isArray(points) ? points : [];
+    const labels = arr.map(p => String(p?.label ?? ""));
+    const data = arr.map(p => Number(p?.value ?? 0));
+
+    const label =
+        metric === "Humidity" ? "Humidité (%)" :
+            metric === "Wind" ? "Vent (km/h)" :
+                metric === "Rain" ? "Pluie (mm)" :
+                    "Température (°C)";
+
+    if (!s._wxChart) {
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return false;
+
+        s._wxChart = new ChartLib(ctx, {
+            type: "line",
+            data: {
+                labels,
+                datasets: [{
+                    label,
+                    data,
+                    tension: 0.25,
+                    pointRadius: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                animation: false,
+                maintainAspectRatio: false
+            }
+        });
+        return true;
+    }
+
+    // update existing
+    try {
+        s._wxChart.data.labels = labels;
+        s._wxChart.data.datasets[0].label = label;
+        s._wxChart.data.datasets[0].data = data;
+        s._wxChart.update("none");
+        return true;
+    } catch (e) {
+        console.warn("[WX] chart update failed -> recreate", e);
+        destroyWxChartIfAny(s);
+        return setWeatherChart(points, metric, k, cid);
+    }
+}
+export function setLineChart(points, seriesLabel = "Série", scopeKey = null, canvasId = null) {
+    const k = pickScopeKeyRead(scopeKey);
+    const s = getS(k);
+    ensureWxChartState(s);
+
+    const ChartLib = globalThis.Chart;
+    if (!ChartLib) return false;
+
+    const cid = canvasId || `chart-${k}`;
+    const canvas = document.getElementById(cid);
+    if (!canvas) return false;
+
+    if (s._wxChart && s._wxChartCanvasId !== cid) destroyWxChartIfAny(s);
+    s._wxChartCanvasId = cid;
+
+    const arr = Array.isArray(points) ? points : [];
+    const labels = arr.map(p => String(p?.label ?? ""));
+    const data = arr.map(p => Number(p?.value ?? 0));
+
+    if (!s._wxChart) {
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return false;
+
+        s._wxChart = new ChartLib(ctx, {
+            type: "line",
+            data: { labels, datasets: [{ label: seriesLabel, data, tension: 0.25, pointRadius: 2 }] },
+            options: { responsive: true, animation: false, maintainAspectRatio: false }
+        });
+        return true;
+    }
+
+    s._wxChart.data.labels = labels;
+    s._wxChart.data.datasets[0].label = seriesLabel;
+    s._wxChart.data.datasets[0].data = data;
+    s._wxChart.update("none");
+    return true;
+}
 /* ---------------------------------------------------------
    Leaflet patch guard (stability)
 --------------------------------------------------------- */
@@ -2142,9 +2450,11 @@ export function addOrUpdateCrowdCalendarMarker(item, scopeKey = "main") {
         }
     };
 })();
-
-window.addEventListener("error", e => console.log("JS error:", e.error));
-window.addEventListener("unhandledrejection", e => console.log("Unhandled promise:", e.reason));
+if (!globalThis.__ozGlobalErrorHooks) {
+    globalThis.__ozGlobalErrorHooks = true;
+    window.addEventListener("error", e => console.log("JS error:", e.error));
+    window.addEventListener("unhandledrejection", e => console.log("Unhandled promise:", e.reason));
+}
 
 
 

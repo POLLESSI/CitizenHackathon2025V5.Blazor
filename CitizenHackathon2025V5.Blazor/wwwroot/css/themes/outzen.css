@@ -780,6 +780,7 @@ nav.main-nav {
         width: 26px;
         height: 26px;
         border-radius: 999px;
+        padding: 6px 8px;
         display: grid;
         place-items: center;
         color: #fff;
@@ -822,50 +823,55 @@ nav.main-nav {
 }
 
 /* Unknown */
-.oz-marker-lvl0 {
+/*.oz-marker-lvl0 {
     background: rgba(120,120,120,.90);
-}
+}*/
 
 /* Low (1) -> green */
-.oz-marker-lvl1 {
+/*.oz-marker-lvl1 {
     background: rgba(46, 204, 113, .95);
-}
+}*/
 
 /* Medium (2) -> orange */
-.oz-marker-lvl2 {
+/*.oz-marker-lvl2 {
     background: rgba(243, 156, 18, .95);
-}
+}*/
 
 /* High (3) -> red */
-.oz-marker-lvl3 {
+/*.oz-marker-lvl3 {
     background: rgba(231, 76, 60, .95);
-}
+}*/
 
 /* Critical (4) -> dark red */
-.oz-marker-lvl4 {
+/*.oz-marker-lvl4 {
     background: rgba(183, 28, 28, .95);
-}
+}*/
 
 /* Low = green */
-.oz-marker-lvl1 .oz-marker-inner {
-    background: rgba(76,175,80,.95);
-}
+/*.oz-marker-lvl1 .oz-marker-inner {
+    background: rgba(46, 204, 113, .95);
+    color: #fff;
+}*/
 /* Medium = orange */
-.oz-marker-lvl2 .oz-marker-inner {
-    background: rgba(255,152,0,.95);
-}
+/*.oz-marker-lvl2 .oz-marker-inner {
+    background: rgba(243, 156, 18, .95);
+    color: #fff;
+}*/
 /* High = red */
-.oz-marker-lvl3 .oz-marker-inner {
-    background: rgba(244,67,54,.95);
-}
+/*.oz-marker-lvl3 .oz-marker-inner {
+    background: rgba(231, 76, 60, .95);
+    color: #fff;
+}*/
 /* Critical = dark red */
-.oz-marker-lvl4 .oz-marker-inner {
-    background: rgba(183,28,28,.98);
-}
+/*.oz-marker-lvl4 .oz-marker-inner {
+    background: rgba(183, 28, 28, .95);
+    color: #fff;
+}*/
 /* Default */
-.oz-marker-lvl0 .oz-marker-inner {
-    background: rgba(120,120,120,.85);
-}
+/*.oz-marker-lvl0 .oz-marker-inner {
+    background: rgba(120,120,120,.90);
+    color: #fff;
+}*/
 
 .oz-marker--place .oz-marker-inner {
     background: rgba(63, 17, 107,.95) !important;

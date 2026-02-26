@@ -1,4 +1,5 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025.Contracts.Enums;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
 using CitizenHackathon2025V5.Blazor.Client.DTOs.Options;
@@ -15,7 +16,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
 {
     public partial class EventView : OutZenMapPageBase
     {
-#nullable disable
+    #nullable disable
         [Inject] public EventService EventService { get; set; }
         [Inject] public NavigationManager Navigation { get; set; }
         [Inject] public IJSRuntime JS { get; set; }
@@ -37,6 +38,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
         // Optional
         protected override bool ForceBootOnFirstRender => true;
         protected override bool ResetMarkersOnBoot => true;
+        protected override OutZenMarkerPolicy MarkerPolicy => OutZenMarkerPolicy.OnlyPrefix;
+        protected override string AllowedMarkerPrefix => "event:";
+        protected override bool ClearAllOnMapReady => true; // Optional but recommended for a single-type page
         private static string EvMarkerId(int id) => $"event:{id}";
 
         private ElementReference ScrollContainerRef;
@@ -93,32 +97,65 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
             try { await hubConnection.StartAsync(); }
             catch (Exception ex) { Console.Error.WriteLine($"[EventView] Hub start failed: {ex.Message}"); }
 
-            // No need to call StateHasChanged here; data already set before first render
+            await NotifyDataLoadedAsync(fit: true);
         }
         protected override async Task OnMapReadyAsync()
         {
-            // At this stage: map booted + container OK
-            await FitThrottledAsync();
-            await Task.Delay(50);
-            await FitThrottledAsync();
-
-            await ReseedEventMarkersAsync(fit: true);
-        }
-        private async Task ReseedEventMarkersAsync(bool fit)
-        {
-            if (_disposed) return;
-            if (!IsMapBooted) return;
-
-            try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
-
-            foreach (var dto in allEvents)
-                await ApplySingleEventMarkerAsync(dto);
-
-            await FitThrottledAsync();
-            if (fit)
+            // Optional: fit after boot (if you want)
+            try
             {
-                await FitThrottledAsync();
+                await MapInterop.RefreshSizeAsync(ScopeKey);
             }
+            catch { }
+
+            // Don't push the markers here: SeedAsync will do it when _dataLoaded=true
+        }
+        protected override async Task SeedAsync(bool fit)
+        {
+            // 1) Clear markers of scope
+            await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
+
+            // 2) Source (filtered if you want)
+            var source = allEvents; // or FilterEvent(...).ToList()
+
+            foreach (var ev in source)
+            {
+                var lvl = MapCrowdLevelFromExpected(ev.ExpectedCrowd);
+
+                var (lat, lng) = Normalize(ev.Latitude, ev.Longitude);
+
+                await MapInterop.UpsertCrowdMarkerAsync(
+                    id: EvMarkerId(ev.Id),
+                    lat: lat,
+                    lng: lng,
+                    level: lvl,
+                    info: new
+                    {
+                        title = ev.Name ?? "Event",
+                        description = $"{ev.DateEvent:yyyy-MM-dd HH:mm}",
+                        kind = "event",
+                        icon = "🎪",
+                        expected = ev.ExpectedCrowd
+                    },
+                    scopeKey: ScopeKey
+                );
+            }
+
+            if (fit && source.Count > 0)
+            {
+                await MapInterop.RefreshSizeAsync(ScopeKey);
+                await MapInterop.FitToDetailsAsync(ScopeKey);
+            }
+        }
+
+        private static (double lat, double lng) Normalize(double lat, double lng)
+        {
+            if (!double.IsFinite(lat) || !double.IsFinite(lng) ||
+                lat < -90 || lat > 90 || lng < -180 || lng > 180 ||
+                (lat == 0 && lng == 0))
+                return (50.85, 4.35);
+
+            return (lat, lng);
         }
         private async Task ApplySingleEventMarkerAsync(ClientEventDTO dto)
         {
@@ -126,47 +163,24 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
             if (!IsMapBooted) return;
             if (dto is null) return;
 
-            var lat = dto.Latitude;
-            var lng = dto.Longitude;
+            var (lat, lng) = Normalize(dto.Latitude, dto.Longitude);
+            var lvl = MapCrowdLevelFromExpected(dto.ExpectedCrowd);
 
-            if (!double.IsFinite(lat) || !double.IsFinite(lng) || (lat == 0 && lng == 0) ||
-                lat is < -90 or > 90 || lng is < -180 or > 180)
-            {
-                lat = 50.85;
-                lng = 4.35;
-            }
-            await JS.InvokeVoidAsync(
-                "OutZenInterop.addOrUpdateCrowdMarker",
-                EvMarkerId(dto.Id),
-                lat,
-                lng,
-                new
+            await MapInterop.UpsertCrowdMarkerAsync(
+                id: EvMarkerId(dto.Id),
+                lat: lat,
+                lng: lng,
+                level: lvl,
+                info: new
                 {
-                    name = dto.Name ?? "Event",
-                    dateevent = dto.DateEvent,
-                    place = dto.PlaceId,
-                    isoutdoor = true,
-                    expectedcrowd = dto.ExpectedCrowd,
+                    title = dto.Name ?? "Event",
+                    description = $"{dto.DateEvent:yyyy-MM-dd HH:mm}",
+                    kind = "event",
                     icon = "🎪"
                 },
-                ScopeKey
+                scopeKey: ScopeKey
             );
         }
-        private async Task ApplyInitialMarkersOnceAsync()
-        {
-            if (_initialMarkersApplied) return;
-            _initialMarkersApplied = true;
-
-            await SyncMapMarkersAsync(fit: true);
-
-            while (_pendingHubUpdates.TryDequeue(out var dto))
-                await UpsertMarkerAsync(dto, fit: false);
-
-            try { await MapInterop.FitToDetailsAsync(ScopeKey); } catch { }
-
-            await InvokeAsync(StateHasChanged);
-        }
-
         private async Task FitThrottledAsync(int ms = 250)
         {
             var now = Environment.TickCount64;
@@ -237,8 +251,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
 
                 await MapInterop.UpsertCrowdMarkerAsync(
                     id: EvMarkerId(dto.Id),
-                    lat: dto.Latitude,
-                    lng: dto.Longitude,
+                    lat: lat,
+                    lng: lng,
                     level: lvl,
                     info: new { title = dto.Name, description = $"{dto.DateEvent:yyyy-MM-dd HH:mm}", kind = "event", icon = "🎪" },
                     scopeKey: ScopeKey

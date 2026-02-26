@@ -6,7 +6,6 @@
 @using Microsoft.JSInterop
 @inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
 @inject Blazored.Toast.Services.IToastService ToastService
-@inject GptInteractionService GptService
 
 <PageTitle>OutZen - Home</PageTitle>
 
@@ -15,7 +14,7 @@
     <!-- Summary map -->
     <div class="oz-page oz-page--home">
         <div class="homeMapCard">
-            <div id="leafletMap-home" class="oz-map"></div>
+            <div id="@MapId" class="oz-map"></div>
            @*  <div id="leafletMap-home" class="leaflet-host"></div> *@
             <!-- Optional: canvas for the weather chart if you want to put it back -->
             @* <canvas id="crowdChart"></canvas> *@

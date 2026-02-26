@@ -24,8 +24,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services.Interop
                 scopeKey = opt.ScopeKey,
                 center = new[] { opt.Lat, opt.Lng },
                 zoom = opt.Zoom,
-                enableHybrid = false,
-                enableCluster = false,
+                enableHybrid = opt.EnableHybrid,
+                enableCluster = opt.EnableCluster,
+                hybridThreshold = opt.HybridThreshold,
                 resetMarkers = opt.ResetMarkers,
                 force = opt.Force
             });
@@ -89,7 +90,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services.Interop
             => _js.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdCalendarMarker", id, lat, lng, level, info, scopeKey).AsTask();
 
         public Task FitToMarkersAsync(string scopeKey)
-    => _js.InvokeVoidAsync("OutZenInterop.fitToMarkers", scopeKey).AsTask();
+            => _js.InvokeVoidAsync("OutZenInterop.fitToMarkers", scopeKey).AsTask();
+
+        public Task ClearAllOutZenLayersAsync(string scopeKey)
+            => _js.InvokeVoidAsync("OutZenInterop.clearAllOutZenLayers", scopeKey).AsTask();
+
+        public Task PruneMarkersByPrefixAsync(string allowedPrefix, string scopeKey)
+            => _js.InvokeVoidAsync("OutZenInterop.pruneMarkersByPrefix", allowedPrefix, scopeKey).AsTask();
+
+        public Task ClearTrafficMarkersAsync(string scopeKey)
+            => _js.InvokeVoidAsync("OutZenInterop.clearTrafficMarkers", scopeKey).AsTask();
+
+        public ValueTask RemoveTrafficMarkerAsync(string id, string scopeKey)
+            => _js.InvokeVoidAsync("OutZenInterop.removeTrafficMarker", id, scopeKey);
+
+        public ValueTask UpsertTrafficMarkerAsync(string id, double lat, double lng, int level, object info, string scopeKey)
+            => _js.InvokeVoidAsync("OutZenInterop.upsertTrafficMarker", id, lat, lng, level, info, scopeKey);
+
         private sealed class BootResult
         {
             public bool Ok { get; set; }

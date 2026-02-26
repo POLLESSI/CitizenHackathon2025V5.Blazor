@@ -1,4 +1,5 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025.Contracts.Enums;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
@@ -29,11 +30,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         private const string ApiBase = "https://localhost:7254";
 
         //private IJSObjectReference _outzen;
-        private bool _booted;
-        private bool _mapBooted;
-        private bool _initialDataApplied;
-        private bool _interopReady;
-        private bool _mapInitStarted;
+        
         private bool _disposed;
 
         public HubConnection hubConnection { get; set; }
@@ -53,8 +50,19 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         // Optionnel
         protected override bool ForceBootOnFirstRender => true;
         protected override bool ResetMarkersOnBoot => true;
+        protected override OutZenMarkerPolicy MarkerPolicy => OutZenMarkerPolicy.OnlyPrefix;
+        protected override string AllowedMarkerPrefix => "place:";
+        protected override bool ClearAllOnMapReady => true;
         private static string PlMarkerId(int id) => $"place:{id}";
-        private string _token;
+        protected override async Task SeedAsync(bool fit)
+        {
+            // Here you put YOUR official seed
+            await ReseedPlaceMarkersAsync(fit: fit);
+        }
+        private static int PlaceLevel(ClientPlaceDTO dto) =>
+        dto.Capacity >= 150 ? 4 :
+        dto.Capacity >= 1500 ? 3 :
+        dto.Capacity >= 3500 ? 2 : 1;
 
         private bool _dataLoaded;
 
@@ -98,6 +106,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
                 _dataLoaded = true;
                 await InvokeAsync(StateHasChanged);
+
+                await NotifyDataLoadedAsync(fit: true);
 
                 Console.WriteLine($"[PlaceView] REST fetched places = {allPlaces.Count}");
             }
@@ -154,7 +164,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
                 UpsertLocal(client);
 
-                if (!_booted)
+                if (!IsMapBooted)
                 {
                     _pendingHubUpdates.Enqueue(client);
                     await InvokeAsync(StateHasChanged);
@@ -183,35 +193,47 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         
         private async Task AddOrUpdatePlaceMarkerAsync(ClientPlaceDTO dto, bool fit = false)
         {
-            if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude))
-                return;
+            if (IsDisposed) return;
+            if (!IsMapBooted) return;
+
+            var lat = dto.Latitude;
+            var lng = dto.Longitude;
+
+            if (!double.IsFinite(lat) || !double.IsFinite(lng) || (lat == 0 && lng == 0) ||
+                lat is < -90 or > 90 || lng is < -180 or > 180)
+            {
+                return; // or fallback to Brussels if you prefer
+            }
 
             var level =
                 dto.Capacity >= 3500 ? 1 :
                 dto.Capacity >= 1500 ? 2 :
                 dto.Capacity >= 150 ? 3 : 4;
 
-            var desc = $"{dto.Type ?? "Unknown"}"
-                       + (dto.Indoor ? " (indoor)" : " (outdoor)")
-                       + $" • Cap: {dto.Capacity}"
-                       + (string.IsNullOrWhiteSpace(dto.Tag) ? "" : $" • Tag: {dto.Tag}");
+            var description =
+                $"{dto.Type ?? "Unknown"}" +
+                (dto.Indoor ? " (indoor)" : " (outdoor)") +
+                $" • Cap: {dto.Capacity}" +
+                (string.IsNullOrWhiteSpace(dto.Tag) ? "" : $" • Tag: {dto.Tag}");
 
             await EnsureOutZenAsync();
 
-            await JS.InvokeAsync<bool>(
-                "OutZenInterop.addOrUpdateCrowdMarker",
-                PlMarkerId(dto.Id),
-                dto.Latitude,
-                dto.Longitude,
-                dto.Type,
-                new { title = dto.Name, desc, icon = "🏰" },
-                ScopeKey
+            await MapInterop.UpsertCrowdMarkerAsync(
+                id: PlMarkerId(dto.Id),
+                lat: lat,
+                lng: lng,
+                level: level,
+                info: new
+                {
+                    kind = "place",
+                    title = dto.Name ?? "Place",
+                    description,
+                    icon = "🏰"
+                },
+                scopeKey: ScopeKey
             );
 
-            if (fit)
-            {
-                await FitThrottledAsync();
-            }
+            if (fit) await FitThrottledAsync();
 
             Console.WriteLine($"[PlaceView] Send place marker #{dto.Id}: {dto.Latitude},{dto.Longitude}");
         }
@@ -219,22 +241,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         {
             Console.WriteLine($"[PlaceView] SyncMapMarkersAsync: visiblePlaces={visiblePlaces.Count}, allPlaces={allPlaces.Count}");
 
-            try
-            {
-                await EnsureOutZenAsync();
-                await JS.InvokeAsync<bool>("OutZenInterop.clearCrowdMarkers", ScopeKey); // ⚠️ Wrapper needs to be exposed too
-                foreach (var pl in FilterPlace(visiblePlaces))
-                    await AddOrUpdatePlaceMarkerAsync(pl, fit: false);
+            if (IsDisposed) return;
+            if (!IsMapBooted) return;
 
-                if (visiblePlaces.Any() && fit)
-                {
-                    await FitThrottledAsync();
-                }
-            }
-            catch (JSException jsex)
-            {
-                Console.Error.WriteLine($"❌ [PlaceView] JSInterop failed in SyncMapMarkersAsync: {jsex.Message}");
-            }
+            await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
+
+            foreach (var pl in FilterPlace(visiblePlaces))
+                await AddOrUpdatePlaceMarkerAsync(pl, fit: false);
+
+            if (visiblePlaces.Any() && fit)
+                await FitThrottledAsync();
         }
 
         private async Task FitThrottledAsync(int ms = 250)
@@ -307,28 +323,28 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         }
         protected override async Task OnMapReadyAsync()
         {
-            // À ce stade : map bootée + container OK
+            // At this stage: map booted + container OK
             await FitThrottledAsync();
             await Task.Delay(50);
             await FitThrottledAsync();
 
             await ReseedPlaceMarkersAsync(fit: true);
+
+            while (_pendingHubUpdates.TryDequeue(out var dto))
+                await AddOrUpdatePlaceMarkerAsync(dto, fit: false);
         }
         private async Task ReseedPlaceMarkersAsync(bool fit)
         {
             if (_disposed) return;
             if (!IsMapBooted) return;
 
-            try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
+            await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
 
             foreach (var dto in allPlaces)
-                await ApplySinglePlaceMarkerAsync(dto);
+                await AddOrUpdatePlaceMarkerAsync(dto, fit: false);
 
             await FitThrottledAsync();
-            if (fit)
-            {
-                await FitThrottledAsync();
-            }
+            if (fit) await FitThrottledAsync();
         }
         private async Task ApplySinglePlaceMarkerAsync(ClientPlaceDTO dto)
         {
@@ -346,22 +362,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
                 lng = 4.35;
             }
 
+            ///    var level = PlaceLevel(dto);
+            var level = 1;
+
             await JS.InvokeVoidAsync(
                 "OutZenInterop.addOrUpdateCrowdMarker",
                 PlMarkerId(dto.Id),
                 lat,
                 lng,
+                level,
                 new
                 {
-                    name = dto.Name ?? "Place",
-                    type = dto.Type,
-                    indoor = true,
-                    capacity = dto.Capacity,
-                    icon = "🏰",
-                    tag = dto.Tag
+                    kind = "place",
+                    title = dto.Name ?? "Place",
+                    description = $"{dto.Type ?? "Unknown"} • Cap: {dto.Capacity}" +
+                                  (string.IsNullOrWhiteSpace(dto.Tag) ? "" : $" • Tag: {dto.Tag}"),
+                    icon = "🏰"
                 },
                 ScopeKey
             );
+            await JS.InvokeVoidAsync("OutZenInterop.addOrUpdatePlaceMarker", dto, ScopeKey);
         }
 
         private async Task HighlightBestMatchAsync(CancellationToken ct)
@@ -449,8 +469,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
         protected override async Task OnBeforeDisposeAsync()
         {
-            _disposed = true;
-
             if (hubConnection is not null)
             {
                 try { await hubConnection.StopAsync(); } catch { }
