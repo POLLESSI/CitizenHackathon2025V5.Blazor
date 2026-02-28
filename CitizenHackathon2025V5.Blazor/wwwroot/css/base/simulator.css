@@ -12,29 +12,29 @@
     z-index: 9999;
 }
 
-    .map-simulator-panel.collapsed {
-        transform: translateX(230px);
-    }
+.map-simulator-panel.collapsed {
+    transform: translateX(230px);
+}
 
-    .map-simulator-panel .header {
-        padding: 10px;
-        background-color: #ddd;
-        font-weight: bold;
-        cursor: pointer;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
+.map-simulator-panel .header {
+    padding: 10px;
+    background-color: #ddd;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
 
-    .map-simulator-panel .body {
-        padding: 10px;
-    }
+.map-simulator-panel .body {
+    padding: 10px;
+}
 
-    .map-simulator-panel .buttons {
-        margin-top: 10px;
-        display: flex;
-        gap: 8px;
-    }
+.map-simulator-panel .buttons {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+}
 
 
 

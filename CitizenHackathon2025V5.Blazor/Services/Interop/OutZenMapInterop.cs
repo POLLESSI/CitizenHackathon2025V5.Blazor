@@ -12,40 +12,58 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services.Interop
 
         public OutZenMapInterop(IJSRuntime js) => _js = js;
 
-        public Task EnsureAsync() => _js.InvokeVoidAsync("OutZen.ensure").AsTask();
+        public async Task EnsureAsync()
+        {
+            // 1) wait for the "interop ready" promise if it exists
+            try
+            {
+                await _js.InvokeVoidAsync("eval", "globalThis.__OZ_INTEROP_READY_P__ && globalThis.__OZ_INTEROP_READY_P__");
+            }
+            catch
+            {
+                // Ignore (some policies block eval). In this case, fallback:
+            }
+
+            // 2) ensure normal
+            await _js.InvokeVoidAsync("OutZen.ensure");
+        }
 
         public async Task<bool> BootAsync(OutZenBootOptions opt)
         {
             await EnsureAsync();
 
-            var boot = await _js.InvokeAsync<BootResult>("OutZenInterop.bootOutZen", new
+            var res = await _js.InvokeAsync<BootResult>("OutZenInterop.bootOutZen", new
             {
                 mapId = opt.MapId,
                 scopeKey = opt.ScopeKey,
                 center = new[] { opt.Lat, opt.Lng },
                 zoom = opt.Zoom,
+                enableChart = opt.EnableChart,
+                force = opt.Force,
+                resetMarkers = opt.ResetMarkers,
                 enableHybrid = opt.EnableHybrid,
                 enableCluster = opt.EnableCluster,
-                hybridThreshold = opt.HybridThreshold,
-                resetMarkers = opt.ResetMarkers,
-                force = opt.Force
+                hybridThreshold = opt.HybridThreshold
             });
 
-            if (boot?.Ok == true && !string.IsNullOrWhiteSpace(boot.Token))
-                _tokens[opt.ScopeKey] = boot.Token;
+            if (res?.Ok == true && !string.IsNullOrWhiteSpace(res.Token))
+                _tokens[opt.ScopeKey] = res.Token;
 
-            return boot?.Ok == true;
+            return res?.Ok == true;
         }
 
         public async Task DisposeMapAsync(string scopeKey, string mapId)
         {
+            await EnsureAsync();
+
             _tokens.TryGetValue(scopeKey, out var token);
 
             await _js.InvokeVoidAsync("OutZenInterop.disposeOutZen", new
             {
                 mapId,
                 scopeKey,
-                token
+                token,
+                allowNoToken = false
             });
 
             _tokens.Remove(scopeKey);

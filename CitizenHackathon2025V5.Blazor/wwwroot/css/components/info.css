@@ -11,22 +11,22 @@
     box-shadow: 0 0 10px rgba(0, 255, 255, 0.2);
 }
 
-    .oz-info h2 {
-        margin-bottom: 0.5rem;
-        font-size: 1.25rem;
-        color: var(--color-primary-light, var(--color-accent));
-    }
+.oz-info h2 {
+    margin-bottom: 0.5rem;
+    font-size: 1.25rem;
+    color: var(--color-primary-light, var(--color-accent));
+}
 
-    .oz-info p {
-        font-size: 1rem;
-        line-height: 1.5;
-    }
+.oz-info p {
+    font-size: 1rem;
+    line-height: 1.5;
+}
 
-    .oz-info .icon {
-        font-size: 1.2rem;
-        color: var(--color-secondary, var(--color-warning));
-        margin-right: 0.5rem;
-    }
+.oz-info .icon {
+    font-size: 1.2rem;
+    color: var(--color-secondary, var(--color-warning));
+    margin-right: 0.5rem;
+}
 
 
 

@@ -17,7 +17,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 {
     public partial class CrowdInfoCalendarView : OutZenMapPageBase
     {
-#nullable disable
+    #nullable disable
         // ===== Inject =====
         [Inject] public CrowdInfoCalendarService CrowdInfoCalendarService { get; set; } = default!;
         [Inject] public NavigationManager Navigation { get; set; } = default!;
@@ -99,10 +99,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             // If hub updates arrived before, you can replay them after seeding.
             while (_pendingHubUpdates.TryDequeue(out var dto))
                 await UpsertCalendarMarkerAsync(dto);
-
-            try { await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey); } catch { }
-            await Task.Delay(50);
-            try { await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey); } catch { }
         }
 
         protected override async Task SeedAsync(bool fit)
@@ -124,6 +120,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
             var st = await JS.InvokeAsync<object>("OutZenInterop.dumpState", ScopeKey);
             Console.WriteLine($"[CIC] dumpState: {System.Text.Json.JsonSerializer.Serialize(st)}");
+
+            try { await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey); } catch { }
+            await Task.Delay(50);
+            try { await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey); } catch { }
         }
 
         private async Task FitThrottledAsync(int ms = 250)
@@ -460,7 +460,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             if (_hub is not null)
             {
                 try { await JS.InvokeVoidAsync("OutZenInterop.unregisterDotNetRef", ScopeKey); } catch { }
-                try { await JS.InvokeVoidAsync("OutZenInterop.disposeOutZen", new { mapId = MapId, scopeKey = ScopeKey }); } catch { }
+                //try { await JS.InvokeVoidAsync("OutZenInterop.disposeOutZen", new { mapId = MapId, scopeKey = ScopeKey }); } catch { }
                 try { await _hub.StopAsync(); } catch { }
                 try { await _hub.DisposeAsync(); } catch { }
             }

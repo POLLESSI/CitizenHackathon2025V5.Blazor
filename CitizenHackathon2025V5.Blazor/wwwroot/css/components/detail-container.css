@@ -17,28 +17,28 @@
     animation: fadeInDetail 0.6s ease-in-out;
 }
 
-    .detail-container p {
-        margin: 0.75rem 0;
-        padding: 0.5rem 1rem;
-        background: var(--info-bg);
-        border-left: 3px solid var(--info-border);
-        border-radius: 6px;
-        transition: transform 0.2s ease, background-color 0.3s ease;
-    }
+.detail-container p {
+    margin: 0.75rem 0;
+    padding: 0.5rem 1rem;
+    background: var(--info-bg);
+    border-left: 3px solid var(--info-border);
+    border-radius: 6px;
+    transition: transform 0.2s ease, background-color 0.3s ease;
+}
 
-        .detail-container p:hover {
-            background-color: var(--info-bg-hover);
-            transform: scale(1.01);
-        }
-    /* OutZen variant */
-    .detail-container.maroon p {
-        background: rgba(135, 206, 250, 0.1);
-        border-left: 3px solid deepskyblue;
-    }
+.detail-container p:hover {
+    background-color: var(--info-bg-hover);
+    transform: scale(1.01);
+}
+/* OutZen variant */
+.detail-container.maroon p {
+    background: rgba(135, 206, 250, 0.1);
+    border-left: 3px solid deepskyblue;
+}
 
-        .detail-container.maroon p:hover {
-            background-color: rgba(135, 206, 250, 0.2);
-        }
+.detail-container.maroon p:hover {
+    background-color: rgba(135, 206, 250, 0.2);
+}
 
 
 

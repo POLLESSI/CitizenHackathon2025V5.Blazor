@@ -17,9 +17,9 @@
     font-family: 'Poppins', sans-serif;
 }
 
-    .blazored-toast .blazored-toast-close {
-        color: #fff;
-    }
+.blazored-toast .blazored-toast-close {
+    color: #fff;
+}
 
 .blazored-toast-success {
     border-left: 4px solid #189d18;

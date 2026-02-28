@@ -972,6 +972,36 @@ export function removeCrowdCalendarMarker(markerId, scopeKey = null) {
     return true;
 }
 
+// Bulk upsert expected by Blazor: OutZenInterop.upsertCrowdCalendarMarkers(items, scopeKey)
+export function upsertCrowdCalendarMarkers(items, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { k } = ready;
+    if (!Array.isArray(items)) return false;
+
+    for (const it of items) {
+        const ll = pickLatLng(it);
+        if (!ll) continue;
+
+        // id: adapt if your DTO has a CalendarId / CrowdCalendarId / Id
+        const id = it?.Id ?? it?.id ?? it?.CalendarId ?? it?.calendarId ?? `${ll.lat},${ll.lng}`;
+
+        // level: adapt to your DTO
+        const level = Number(it?.Level ?? it?.level ?? it?.CrowdLevel ?? it?.crowdLevel ?? 1);
+
+        // info: what your popup wants to display
+        const info = {
+            title: it?.Title ?? it?.title ?? it?.EventName ?? it?.eventName ?? "Crowd Calendar",
+            description: it?.Description ?? it?.description ?? it?.Message ?? it?.message ?? "",
+            icon: it?.Icon ?? it?.icon ?? "🥁🎉",
+        };
+
+        addOrUpdateCrowdCalendarMarker(id, ll.lat, ll.lng, level, info, k);
+    }
+    return true;
+}
+
 /* ---------------------------------------------------------
    Antenna markers (NO cluster)
 --------------------------------------------------------- */
@@ -1780,6 +1810,25 @@ export function fitToAllMarkers(scopeKey = null, opts = {}) {
     return true;
 }
 
+export function fitToCalendar(scopeKey = null, opts = {}) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { s, L, map } = ready;
+    const padding = opts.padding ?? [22, 22];
+    const maxZoom = opts.maxZoom ?? 17;
+
+    const latlngs = [];
+    for (const m of (s.calendarMarkers?.values?.() ?? [])) {
+        try { latlngs.push(m.getLatLng()); } catch { }
+    }
+
+    const b = _boundsFromLatLngs(L, latlngs);
+    if (!b) return false;
+
+    try { map.fitBounds(b, { padding, animate: false, maxZoom }); } catch { }
+    return true;
+}
 export function fitToBundles(scopeKey = null, opts = {}) {
     const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
@@ -1991,6 +2040,33 @@ export function debugExplainBundles(scopeKey = null) {
     };
 }
 
+export function clearAllOutZenLayers(scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { s } = ready;
+
+    // Clear everything we manage
+    try { s.cluster?.clearLayers?.(); } catch { }
+    try { s.layerGroup?.clearLayers?.(); } catch { }
+    try { s.detailLayer?.clearLayers?.(); } catch { }
+    try { s.calendarLayer?.clearLayers?.(); } catch { }
+    try { s.antennaLayer?.clearLayers?.(); } catch { }
+
+    // Reset registries
+    try { s.markers?.clear?.(); } catch { }
+    try { s.bundleMarkers?.clear?.(); } catch { }
+    try { s.bundleIndex?.clear?.(); } catch { }
+    try { s.detailMarkers?.clear?.(); } catch { }
+    try { s.calendarMarkers?.clear?.(); } catch { }
+    try { s.antennaMarkers?.clear?.(); } catch { }
+
+    // Reset bundle cache (optionnel mais cohérent si tu “clear all”)
+    s.bundleLastInput = null;
+
+    return true;
+}
+
 /* ---------------------------------------------------------
    waitForMarkerElement
 --------------------------------------------------------- */
@@ -2110,6 +2186,14 @@ export function setWeatherChart(points, metric = "Temperature", scopeKey = null,
         destroyWxChartIfAny(s);
         return setWeatherChart(points, metric, k, cid);
     }
+}
+export function peekState(scopeKey = null) {
+    const k = pickScopeKey(scopeKey);
+    return peekS(k);
+}
+export function getActiveState() {
+    const k = globalThis.__OutZenActiveScope || "main";
+    return peekS(k);
 }
 
 export function setLineChart(points, seriesLabel = "Série", scopeKey = null, canvasId = null) {

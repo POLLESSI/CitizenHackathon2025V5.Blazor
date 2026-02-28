@@ -12,18 +12,18 @@
     display: none;
 }
 
-    #blazor-error-ui.show {
-        display: block;
-    }
+#blazor-error-ui.show {
+    display: block;
+}
 
-    #blazor-error-ui button {
-        background: none;
-        border: none;
-        color: white;
-        float: right;
-        font-size: 1.2rem;
-        cursor: pointer;
-    }
+#blazor-error-ui button {
+    background: none;
+    border: none;
+    color: white;
+    float: right;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
 
 .blazor-error-boundary {
     border: 1px dashed var(--color-danger);
@@ -31,13 +31,13 @@
     background-color: rgba(220, 53, 69, 0.1);
 }
 
-    .blazor-error-boundary::before {
-        content: "Blazor Error:";
-        color: var(--color-danger);
-        font-weight: bold;
-        display: block;
-        margin-bottom: 0.5rem;
-    }
+.blazor-error-boundary::before {
+    content: "Blazor Error:";
+    color: var(--color-danger);
+    font-weight: bold;
+    display: block;
+    margin-bottom: 0.5rem;
+}
 
 
 

@@ -5,6 +5,9 @@
    - All listeners/timers stored per-instance and removed on dispose
 */
 
+if (globalThis.__EARTH_ROT_LOADED__) { console.warn("earthRotation already loaded"); }
+else { globalThis.__EARTH_ROT_LOADED__ = true; /* init */ }
+
 // Default textures (in case Blazor doesn't apply them)
 const DEFAULT_DAY_URL = "/images/earth_texture.jpg?v=1";
 const DEFAULT_NIGHT_URL = "/images/earth_texture_night.jpg?v=1";
@@ -258,7 +261,8 @@ async function _loadAndCreatePlanet(state, opts = {}) {
 
 function _startAnimation(state) {
     function animate() {
-        const now = (globalThis.performance?.now?.() ?? Date.now());
+        const now = safeNow();
+       /* const now = (globalThis.performance?.now?.() ?? Date.now());*/
         const dt = (now - state.lastTime) / 1000;
         state.lastTime = now;
 
@@ -467,7 +471,7 @@ function setDayNightInstance(state, night, immediate = false) {
         return;
     }
 
-    const start = performance.now();
+    const start = safeNow();
     const dur = 900;
     const startBase = state.currentHaloBase;
 
@@ -617,6 +621,16 @@ function minutesUTCToLocalDate(baseUTC, minutes) {
     );
     d.setUTCMinutes(minutes);
     return new Date(d.getTime()); // local
+}
+
+function safeNow() {
+    try {
+        const p = globalThis && globalThis.performance;
+        const n = p && typeof p.now === "function" ? p.now() : Date.now();
+        return Number.isFinite(n) ? n : Date.now();
+    } catch {
+        return Date.now();
+    }
 }
 
 const toRad = d => d * Math.PI / 180;

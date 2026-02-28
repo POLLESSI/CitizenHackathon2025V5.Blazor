@@ -28,46 +28,46 @@
     transition: filter .15s ease, transform .12s ease, background-color .2s ease;
 }
 
-    /* Fixed colors per level (0–5) */
-    .btn.info-chip.info--lvl0 {
-        background: #6c757d;
-        border-color: #6c757d;
-    }
-    /* grey (unknown/0) */
-    .btn.info-chip.info--lvl1,
-    .btn.info-chip.info--lvl2 {
-        background: #28a745;
-        border-color: #28a745;
-    }
-    /* green (1–2) */
-    .btn.info-chip.info--lvl3 {
-        background: #fd7e14;
-        border-color: #fd7e14;
-    }
-    /* orange (3) */
-    .btn.info-chip.info--lvl4 {
-        background: #dc3545;
-        border-color: #dc3545;
-    }
-    /* red (4) */
-    .btn.info-chip.info--lvl5 {
-        background: #170338;
-        border-color: #170338;
-    }
-    /* purple (5) */
+/* Fixed colors per level (0–5) */
+.btn.info-chip.info--lvl0 {
+    background: #6c757d;
+    border-color: #6c757d;
+}
+/* grey (unknown/0) */
+.btn.info-chip.info--lvl1,
+.btn.info-chip.info--lvl2 {
+    background: #28a745;
+    border-color: #28a745;
+}
+/* green (1–2) */
+.btn.info-chip.info--lvl3 {
+    background: #fd7e14;
+    border-color: #fd7e14;
+}
+/* orange (3) */
+.btn.info-chip.info--lvl4 {
+    background: #dc3545;
+    border-color: #dc3545;
+}
+/* red (4) */
+.btn.info-chip.info--lvl5 {
+    background: #170338;
+    border-color: #170338;
+}
+/* purple (5) */
 
-    /* Overview: Keep the color, just a slight lift */
-    .btn.info-chip:hover {
-        filter: brightness(1.05);
-        background: inherit !important;
-        border-color: inherit !important;
-        color: #fff !important;
-    }
+/* Overview: Keep the color, just a slight lift */
+.btn.info-chip:hover {
+    filter: brightness(1.05);
+    background: inherit !important;
+    border-color: inherit !important;
+    color: #fff !important;
+}
 
-    /* Active: small tap feedback */
-    .btn.info-chip:active {
-        transform: scale(.98);
-    }
+/* Active: small tap feedback */
+.btn.info-chip:active {
+    transform: scale(.98);
+}
 
 /* Traffic button — Low/Medium/High */
 
@@ -84,36 +84,36 @@
     transition: filter .15s ease, transform .12s ease;
 }
 
-    .btn.traffic-chip.level--low {
-        background: #28a745;
-        border-color: #28a745;
-    }
-    /* green */
-    .btn.traffic-chip.level--medium {
-        background: #fd7e14;
-        border-color: #fd7e14;
-    }
-    /* orange */
-    .btn.traffic-chip.level--high {
-        background: #dc3545;
-        border-color: #dc3545;
-    }
-    /* red */
-    .btn.traffic-chip.level--unknown {
-        background: #4f5357;
-        border-color: #4f5357;
-    }
-    /* grey */
+.btn.traffic-chip.level--low {
+    background: #28a745;
+    border-color: #28a745;
+}
+/* green */
+.btn.traffic-chip.level--medium {
+    background: #fd7e14;
+    border-color: #fd7e14;
+}
+/* orange */
+.btn.traffic-chip.level--high {
+    background: #dc3545;
+    border-color: #dc3545;
+}
+/* red */
+.btn.traffic-chip.level--unknown {
+    background: #4f5357;
+    border-color: #4f5357;
+}
+/* grey */
 
-    .btn.traffic-chip:hover {
-        filter: brightness(1.05);
-        background: inherit !important;
-        border-color: inherit !important;
-    }
+.btn.traffic-chip:hover {
+    filter: brightness(1.05);
+    background: inherit !important;
+    border-color: inherit !important;
+}
 
-    .btn.traffic-chip:active {
-        transform: scale(.98);
-    }
+.btn.traffic-chip:active {
+    transform: scale(.98);
+}
 
 /* Weather button — severe vs. normal */
 .btn.wx-chip {
@@ -129,26 +129,26 @@
     transition: filter .15s ease, transform .12s ease;
 }
 
-    .btn.wx-chip.severe--false {
-        background: #28a745;
-        border-color: #28a745;
-    }
-    /* green */
-    .btn.wx-chip.severe--true {
-        background: #dc3545;
-        border-color: #dc3545;
-    }
-    /* red */
+.btn.wx-chip.severe--false {
+    background: #28a745;
+    border-color: #28a745;
+}
+/* green */
+.btn.wx-chip.severe--true {
+    background: #dc3545;
+    border-color: #dc3545;
+}
+/* red */
 
-    .btn.wx-chip:hover {
-        filter: brightness(1.05);
-        background: inherit !important;
-        border-color: inherit !important;
-    }
+.btn.wx-chip:hover {
+    filter: brightness(1.05);
+    background: inherit !important;
+    border-color: inherit !important;
+}
 
-    .btn.wx-chip:active {
-        transform: scale(.98);
-    }
+.btn.wx-chip:active {
+    transform: scale(.98);
+}
 
 /* Keep green buttons on hover (don’t fall back to secondary) */
 .btn:not(.info-chip):not(.traffic-chip):hover {
@@ -164,10 +164,10 @@
     border-color: #28a745;
 }
 
-    .btn:hover, .btn-primary:hover {
-        background-color: #218838;
-        border-color: #218838;
-    }
+.btn:hover, .btn-primary:hover {
+    background-color: #218838;
+    border-color: #218838;
+}
 
 /* === Halo pulsant pour boutons === */
 
@@ -184,15 +184,15 @@
     will-change: box-shadow, transform;
 }
 
-    /* extra halo under the button (softer) */
-    .btn-glow::after {
-        content: "";
-        position: absolute;
-        inset: -6px;
-        border-radius: inherit;
-        z-index: -1;
-        box-shadow: 0 0 0.6rem rgba(var(--btn-color-rgb), .35), 0 0 1.8rem rgba(var(--btn-color-rgb), .25);
-    }
+/* extra halo under the button (softer) */
+.btn-glow::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: inherit;
+    z-index: -1;
+    box-shadow: 0 0 0.6rem rgba(var(--btn-color-rgb), .35), 0 0 1.8rem rgba(var(--btn-color-rgb), .25);
+}
 /* Recommended for touch: better visible targets and focus */
 .btn,
 .info-chip,
@@ -202,59 +202,59 @@
     border-radius: 8px; /* soft angles, no pill */
 }
 
-    .btn:focus-visible,
-    .info-chip:focus-visible,
-    .traffic-chip:focus-visible {
-        outline: 3px solid rgba(255,255,255,.45);
-        outline-offset: 2px;
-    }
-    /* CrowdInfo (your existing classes) */
-    .info-chip.info--lvl0 {
-        --btn-color: #6c757d;
-        --btn-color-rgb: 108,117,125;
-    }
+.btn:focus-visible,
+.info-chip:focus-visible,
+.traffic-chip:focus-visible {
+    outline: 3px solid rgba(255,255,255,.45);
+    outline-offset: 2px;
+}
+/* CrowdInfo (your existing classes) */
+.info-chip.info--lvl0 {
+    --btn-color: #6c757d;
+    --btn-color-rgb: 108,117,125;
+}
 
-    .info-chip.info--lvl1 {
-        --btn-color: #28a745;
-        --btn-color-rgb: 40,167,69;
-    }
+.info-chip.info--lvl1 {
+    --btn-color: #28a745;
+    --btn-color-rgb: 40,167,69;
+}
 
-    .info-chip.info--lvl2 {
-        --btn-color: #28a745;
-        --btn-color-rgb: 40,167,69;
-    }
+.info-chip.info--lvl2 {
+    --btn-color: #28a745;
+    --btn-color-rgb: 40,167,69;
+}
 
-    .info-chip.info--lvl3 {
-        --btn-color: #fd7e14;
-        --btn-color-rgb: 253,126,20;
-    }
+.info-chip.info--lvl3 {
+    --btn-color: #fd7e14;
+    --btn-color-rgb: 253,126,20;
+}
 
-    .info-chip.info--lvl4 {
-        --btn-color: #dc3545;
-        --btn-color-rgb: 220,53,69;
-    }
+.info-chip.info--lvl4 {
+    --btn-color: #dc3545;
+    --btn-color-rgb: 220,53,69;
+}
 
-    .info-chip.info--lvl5 {
-        --btn-color: #2f0242;
-        --btn-color-rgb: 47,2,66;
-    }
-    /* ou #6610f2 => 102,16,242 */
+.info-chip.info--lvl5 {
+    --btn-color: #2f0242;
+    --btn-color-rgb: 47,2,66;
+}
+/* ou #6610f2 => 102,16,242 */
 
-    /* TrafficCondition */
-    .traffic-chip.level--low {
-        --btn-color: #28a745;
-        --btn-color-rgb: 40,167,69;
-    }
+/* TrafficCondition */
+.traffic-chip.level--low {
+    --btn-color: #28a745;
+    --btn-color-rgb: 40,167,69;
+}
 
-    .traffic-chip.level--medium {
-        --btn-color: #fd7e14;
-        --btn-color-rgb: 253,126,20;
-    }
+.traffic-chip.level--medium {
+    --btn-color: #fd7e14;
+    --btn-color-rgb: 253,126,20;
+}
 
-    .traffic-chip.level--high {
-        --btn-color: #dc3545;
-        --btn-color-rgb: 220,53,69;
-    }
+.traffic-chip.level--high {
+    --btn-color: #dc3545;
+    --btn-color-rgb: 220,53,69;
+}
 
 .info-chip { /* Optionally duplicate the style of .btn.info-chip */
 }
@@ -301,9 +301,9 @@
     color: #fff;
 }
 
-    .btn.btn-glow:hover {
-        filter: brightness(1.05);
-    }
+.btn.btn-glow:hover {
+    filter: brightness(1.05);
+}
 /* Accessibility: if the user prefers fewer animations */
 @media (prefers-reduced-motion: reduce) {
     .btn-glow {

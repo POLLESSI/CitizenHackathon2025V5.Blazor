@@ -125,9 +125,9 @@ a {
     transition: color 0.2s ease-in-out;
 }
 
-    a:hover {
-        color: var(--color-primary);
-    }
+a:hover {
+    color: var(--color-primary);
+}
 
 .card {
     background: var(--color-panel);
@@ -137,9 +137,9 @@ a {
     transition: transform 0.3s ease;
 }
 
-    .card:hover {
-        transform: scale(1.02);
-    }
+.card:hover {
+    transform: scale(1.02);
+}
 
 .btn {
     background: var(--color-accent);
@@ -152,10 +152,10 @@ a {
     transition: background 0.3s ease;
 }
 
-    .btn:hover {
-        background: white;
-        color: var(--color-accent);
-    }
+.btn:hover {
+    background: white;
+    color: var(--color-accent);
+}
 .alert {
     padding: 1rem;
     border-radius: 8px;
@@ -210,24 +210,24 @@ a {
     transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
-    .oz-btn:hover {
-        background-color: var(--color-primary-dark, var(--color-accent-soft));
-        transform: scale(1.05);
-    }
+.oz-btn:hover {
+    background-color: var(--color-primary-dark, var(--color-accent-soft));
+    transform: scale(1.05);
+}
 
-    .oz-btn:active {
-        transform: scale(0.95);
-    }
+.oz-btn:active {
+    transform: scale(0.95);
+}
 
-    .oz-btn[disabled] {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
+.oz-btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
 
-    .oz-btn .icon {
-        margin-right: 0.5rem;
-        display: inline-block;
-    }
+.oz-btn .icon {
+    margin-right: 0.5rem;
+    display: inline-block;
+}
 
 .oz-modal-backdrop {
     position: fixed;
@@ -298,10 +298,10 @@ a {
     transition: all 0.8s ease;
 }
 
-    .scroll-reveal.visible {
-        opacity: 1;
-        transform: none;
-    }
+.scroll-reveal.visible {
+    opacity: 1;
+    transform: none;
+}
 
 section {
     margin-bottom: 3rem;
@@ -310,10 +310,10 @@ section {
     transition: opacity 0.8s, transform 0.8s;
 }
 
-    section.visible {
-        opacity: 1;
-        transform: none;
-    }
+section.visible {
+    opacity: 1;
+    transform: none;
+}
 
 h1, h2, h3, h4, h5, h6 {
     font-weight: bold;
@@ -377,29 +377,29 @@ h1, h2, h3, h4, h5, h6 {
     z-index: 9999;
 }
 
-    .map-simulator-panel.collapsed {
-        transform: translateX(230px);
-    }
+.map-simulator-panel.collapsed {
+    transform: translateX(230px);
+}
 
-    .map-simulator-panel .header {
-        padding: 10px;
-        background-color: #ddd;
-        font-weight: bold;
-        cursor: pointer;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
+.map-simulator-panel .header {
+    padding: 10px;
+    background-color: #ddd;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
 
-    .map-simulator-panel .body {
-        padding: 10px;
-    }
+.map-simulator-panel .body {
+    padding: 10px;
+}
 
-    .map-simulator-panel .buttons {
-        margin-top: 10px;
-        display: flex;
-        gap: 8px;
-    }
+.map-simulator-panel .buttons {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+}
 
 /* ================================================================
    UTILITIES
@@ -429,39 +429,39 @@ h1, h2, h3, h4, h5, h6 {
     font-family: 'Poppins', sans-serif;
 }
 
-    .globe-controls .row {
-        display: grid;
-        grid-template-columns: 140px 1fr;
-        gap: .75rem;
-        align-items: center;
-        margin: .35rem 0;
-    }
+.globe-controls .row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: .75rem;
+    align-items: center;
+    margin: .35rem 0;
+}
 
-    .globe-controls label {
-        font-size: .95rem;
-        color: #eaeaea;
-        white-space: nowrap;
-    }
+.globe-controls label {
+    font-size: .95rem;
+    color: #eaeaea;
+    white-space: nowrap;
+}
 
-    .globe-controls input[type="range"] {
-        width: 100%;
-        accent-color: #00e5ee;
-        height: 4px;
-    }
+.globe-controls input[type="range"] {
+    width: 100%;
+    accent-color: #00e5ee;
+    height: 4px;
+}
 
-    .globe-controls .toggle {
-        display: flex;
-        align-items: center;
-        gap: .5rem;
-        margin-top: .4rem;
-        color: #eaeaea;
-        font-size: .95rem;
-    }
+.globe-controls .toggle {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-top: .4rem;
+    color: #eaeaea;
+    font-size: .95rem;
+}
 
-        .globe-controls .toggle input {
-            width: 22px;
-            height: 22px;
-        }
+.globe-controls .toggle input {
+    width: 22px;
+    height: 22px;
+}
 
 /* ------------------------------
    RESPONSIVE HELPERS

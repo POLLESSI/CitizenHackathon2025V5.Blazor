@@ -125,7 +125,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Shared
                 && PruneForeignMarkersOnMapReady
                 && !string.IsNullOrWhiteSpace(AllowedMarkerPrefix))
             {
-                await MapInterop.PruneMarkersByPrefixAsync(AllowedMarkerPrefix!, ScopeKey);
+                try
+                {
+                    Console.WriteLine($"[OZ] Prune? policy={MarkerPolicy} prefix={AllowedMarkerPrefix} scope={ScopeKey}");
+                    await MapInterop.PruneMarkersByPrefixAsync(AllowedMarkerPrefix!, ScopeKey);
+                }
+                catch (Microsoft.JSInterop.JSException jsEx)
+                {
+                    Console.WriteLine($"[OutZen] pruneMarkersByPrefix missing/failed: {jsEx.Message}");
+                    // possible fallback: clearAllOutZenLayers or nothing
+                }
             }
 
             await OnMapReadyAsync();

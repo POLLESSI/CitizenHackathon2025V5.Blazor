@@ -12,18 +12,18 @@ body {
     overflow-x: hidden;
     scroll-behavior: smooth;
 }
-    /* Scrollbars */
-    body::-webkit-scrollbar {
-        width: 8px;
-    }
+/* Scrollbars */
+body::-webkit-scrollbar {
+    width: 8px;
+}
 
-    body::-webkit-scrollbar-thumb {
-        background-color: var(--color-accent);
-        border-radius: 4px;
-    }
-    body.night-mode {
-        background-image: url('/images/night.jpg');
-    }
+body::-webkit-scrollbar-thumb {
+    background-color: var(--color-accent);
+    border-radius: 4px;
+}
+body.night-mode {
+    background-image: url('/images/night.jpg');
+}
 
 [data-theme="outzen"] body {
     background: linear-gradient(135deg, #2c113f, #000000);
@@ -35,9 +35,9 @@ a {
     transition: color 0.2s ease-in-out;
 }
 
-    a:hover {
-        color: var(--color-primary);
-    }
+a:hover {
+    color: var(--color-primary);
+}
 
 .container {
     max-width: 1200px;
@@ -71,10 +71,10 @@ a {
     box-shadow: 0 0 0.5rem rgba(255, 0, 0, 0.5);
 }
 
-    .signal-status.connected {
-        background: var(--color-success);
-        box-shadow: 0 0 0.5rem rgba(0, 255, 0, 0.5);
-    }
+.signal-status.connected {
+    background: var(--color-success);
+    box-shadow: 0 0 0.5rem rgba(0, 255, 0, 0.5);
+}
 
 /* Ultra luxe */
 .ultraluxe {
@@ -91,10 +91,10 @@ a {
     transition: opacity 0.6s ease, transform 0.6s ease;
 }
 
-    .reveal.active {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.reveal.active {
+    opacity: 1;
+    transform: translateY(0);
+}
 
 p {
     margin-bottom: var(--spacing-sm);
@@ -115,17 +115,17 @@ p {
     transition: background-color 0.2s;
 }
 
-    .btn:hover {
-        background-color: var(--btn-bg-hover, var(--color-secondary));
-    }
+.btn:hover {
+    background-color: var(--btn-bg-hover, var(--color-secondary));
+}
 
-    /* Info variant (without !important, thanks to variables) */
-    .btn.info-dynamic {
-        --btn-bg: var(--info-color, #9E9E9E);
-        --btn-border: var(--info-color, #9E9E9E);
-        --btn-fg: #fff;
-        --btn-bg-hover: var(--info-color, #9E9E9E);
-    }
+/* Info variant (without !important, thanks to variables) */
+.btn.info-dynamic {
+    --btn-bg: var(--info-color, #9E9E9E);
+    --btn-border: var(--info-color, #9E9E9E);
+    --btn-fg: #fff;
+    --btn-bg-hover: var(--info-color, #9E9E9E);
+}
 
 /* Neutral Info button, color comes in inline-style */
 .crowdinfoview .btn.info-dynamic {
@@ -136,13 +136,13 @@ p {
     transition: background-color .25s ease, border-color .25s ease, transform .12s ease;
 }
 
-    .btn.info-dynamic:hover {
-        filter: brightness(0.95);
-    }
+.btn.info-dynamic:hover {
+    filter: brightness(0.95);
+}
 
-    .btn.info-dynamic:active {
-        transform: scale(.98);
-    }
+.btn.info-dynamic:active {
+    transform: scale(.98);
+}
 /* existing general rule */
 .btn:hover {
     background-color: var(--color-secondary);
