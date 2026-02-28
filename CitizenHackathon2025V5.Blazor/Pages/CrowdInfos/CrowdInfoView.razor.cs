@@ -108,6 +108,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
             await ReseedCrowdInfoMarkersAsync(fit: true);
             //await UpdateChartAsync();
+            await Task.Delay(50);
+            await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey);
         }
 
         private async Task ReseedCrowdInfoMarkersAsync(bool fit)

@@ -164,6 +164,18 @@
 </head>
 <body>
     <script>
+        (function () {
+            const orig = document.head.appendChild;
+            document.head.appendChild = function (node) {
+                if (node?.tagName === "SCRIPT" && String(node.src || "").includes("outzen-interop")) {
+                    console.warn("[HOOK] script injected:", node.src);
+                    console.trace();
+                }
+                return orig.call(this, node);
+            };
+        })();
+    </script>
+    <script>
         (function hookLeafletMapDebug() {
             const isLocalhost =
                 location.hostname === "localhost" ||
@@ -244,7 +256,6 @@
     <!--<script src="/js/navMenuInterop.js" defer></script>-->
     <script src="/js/outzen-nav.js"></script>
     <!-- Minimal global bridge -->
-    
     <!--<script src="/js/outzen-interop.js" defer></script>-->
     <!-- === Utility / Visual Modules === -->
     <script type="module" src="/js/app/timeEffects.js"></script>

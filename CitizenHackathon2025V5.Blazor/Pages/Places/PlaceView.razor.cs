@@ -60,9 +60,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
             await ReseedPlaceMarkersAsync(fit: fit);
         }
         private static int PlaceLevel(ClientPlaceDTO dto) =>
-        dto.Capacity >= 150 ? 4 :
-        dto.Capacity >= 1500 ? 3 :
-        dto.Capacity >= 3500 ? 2 : 1;
+            dto.Capacity >= 3500 ? 1 :
+            dto.Capacity >= 1500 ? 2 :
+            dto.Capacity >= 150 ? 3 : 4;
 
         private bool _dataLoaded;
 
@@ -332,6 +332,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
             while (_pendingHubUpdates.TryDequeue(out var dto))
                 await AddOrUpdatePlaceMarkerAsync(dto, fit: false);
+            await Task.Delay(50);
+            await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey);
         }
         private async Task ReseedPlaceMarkersAsync(bool fit)
         {

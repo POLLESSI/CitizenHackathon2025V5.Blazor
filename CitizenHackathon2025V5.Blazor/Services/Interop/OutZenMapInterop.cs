@@ -99,10 +99,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services.Interop
             => _js.InvokeVoidAsync("OutZenInterop.pruneMarkersByPrefix", allowedPrefix, scopeKey).AsTask();
 
         public Task ClearTrafficMarkersAsync(string scopeKey)
-            => _js.InvokeVoidAsync("OutZenInterop.clearTrafficMarkers", scopeKey).AsTask();
+    => _js.InvokeVoidAsync("OutZenInterop.clearMarkersByPrefix", "traffic:", scopeKey).AsTask();
 
-        public ValueTask RemoveTrafficMarkerAsync(string id, string scopeKey)
-            => _js.InvokeVoidAsync("OutZenInterop.removeTrafficMarker", id, scopeKey);
+        public Task RemoveTrafficMarkerAsync(string id, string scopeKey)
+            => _js.InvokeVoidAsync("OutZenInterop.removeCrowdMarker", id, scopeKey).AsTask();
 
         public ValueTask UpsertTrafficMarkerAsync(string id, double lat, double lng, int level, object info, string scopeKey)
             => _js.InvokeVoidAsync("OutZenInterop.upsertTrafficMarker", id, lat, lng, level, info, scopeKey);
@@ -115,7 +115,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services.Interop
         }
     }
 
-}
+}   
 
 
 

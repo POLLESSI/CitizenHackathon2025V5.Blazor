@@ -1703,30 +1703,63 @@ tr.oz-row-hot {
     border: 0;
 }
 
-    .leaflet-marker-icon.oz-ant-icon .oz-ant-dot {
-        width: 14px;
-        height: 14px;
-        border-radius: 999px;
-        border: 2px solid rgba(255,255,255,.85);
-        box-shadow: 0 0 0 2px rgba(0,0,0,.25);
-    }
+.leaflet-marker-icon.oz-ant-icon .oz-ant-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    border: 2px solid rgba(255,255,255,.85);
+    box-shadow: 0 0 0 2px rgba(0,0,0,.25);
+}
 
-    .leaflet-marker-icon.oz-ant-icon.oz-ant-lvl1 .oz-ant-dot {
-        background: #0ccc3c;
-    }
+.leaflet-marker-icon.oz-ant-icon.oz-ant-lvl1 .oz-ant-dot {
+    background: #0ccc3c;
+}
 
-    .leaflet-marker-icon.oz-ant-icon.oz-ant-lvl2 .oz-ant-dot {
-        background: #cf6406;
-    }
+.leaflet-marker-icon.oz-ant-icon.oz-ant-lvl2 .oz-ant-dot {
+    background: #cf6406;
+}
 
-    .leaflet-marker-icon.oz-ant-icon.oz-ant-lvl3 .oz-ant-dot {
-        background: #e74c3c;
-    }
+.leaflet-marker-icon.oz-ant-icon.oz-ant-lvl3 .oz-ant-dot {
+    background: #e74c3c;
+}
 
-    .leaflet-marker-icon.oz-ant-icon.oz-ant-lvl4 .oz-ant-dot {
-        background: #ff0044;
-    }
+.leaflet-marker-icon.oz-ant-icon.oz-ant-lvl4 .oz-ant-dot {
+    background: #ff0044;
+}
+/* Pop-ups always on top */
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom {
+    z-index: 400;
+}
 
+.leaflet-popup-pane {
+    z-index: 700;
+}
+
+.leaflet-tooltip-pane {
+    z-index: 650;
+}
+
+/* If you have custom overlays on top of the map */
+.outzen-overlay, .earth-overlay, canvas.earth {
+    pointer-events: none; /* critical if it blocks clicks */
+}
+
+.leaflet-popup-content-wrapper.oz-popup,
+.oz-popup .leaflet-popup-content-wrapper {
+    border-radius: 14px;
+}
+
+.oz-popup .outzen-popup .title {
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.oz-popup .outzen-popup .desc {
+    opacity: .9;
+    line-height: 1.25rem;
+}
 
 
 

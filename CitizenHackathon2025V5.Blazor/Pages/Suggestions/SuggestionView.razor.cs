@@ -125,31 +125,38 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
             await TryRenderSuggestionChartAsync();
             await MapInterop.RefreshSizeAsync(ScopeKey);
         }
-        
+
         protected override async Task SeedAsync(bool fit)
         {
-            // 1) build payload details
-            var payload = BuildSuggestionDetailsPayload(); // should produce suggestions[] with Latitude/Longitude
+            var payload = BuildSuggestionDetailsPayload();
 
-            // 2) Push markers (DETAILS = better for SuggestionView)
+            // 1) ✅ set bundleLastInput + bundles (even if you don't display the bundles at this zoom)
+            await JS.InvokeAsync<bool>(
+                "OutZenInterop.__esm.addOrUpdateBundleMarkers",
+                payload,
+                80,            // tolMeters
+                ScopeKey
+            );
+
+            // 2) ✅ details
             await JS.InvokeAsync<bool>(
                 "OutZenInterop.__esm.addOrUpdateDetailMarkers",
                 payload,
                 ScopeKey
             );
 
-            // 3) hybrid / mode / refresh (if you are using hybrid)
-            await JS.InvokeVoidAsync("OutZenInterop.__esm.enableHybridZoom", ScopeKey, HybridThreshold);
-            await JS.InvokeVoidAsync("OutZenInterop.__esm.refreshHybridNow", ScopeKey);
+            // 3) ✅ hybrid (correct signature)
+            await JS.InvokeVoidAsync("OutZenInterop.__esm.enableHybridZoom", true, HybridThreshold, ScopeKey);
 
-            // 4) fit (after seed only)
+            // Useful option: strength consistency + fit according to mode
+            await JS.InvokeAsync<bool>("OutZenInterop.__esm.activateHybridAndZoom", ScopeKey, HybridThreshold);
+
             if (fit)
             {
                 await MapInterop.RefreshSizeAsync(ScopeKey);
                 await MapInterop.FitToDetailsAsync(ScopeKey);
             }
 
-            // 5) chart (optional here)
             await TryRenderSuggestionChartAsync();
         }
 
