@@ -1,14 +1,16 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
-using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025.Contracts.Enums;
 using CitizenHackathon2025.Contracts.Hubs;
+using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
+using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
-using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 {
-    public partial class GptInteractionView : IAsyncDisposable
+    public partial class GptInteractionView
     {
 #nullable disable
         [Inject] public HttpClient Client { get; set; }
@@ -18,7 +20,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         [Inject] public IConfiguration Config { get; set; }
         [Inject] public IAuthService Auth { get; set; }
         [Inject] public IHubUrlBuilder HubUrls { get; set; }
-
+        protected override string MapId => "leafletMap-gptinteractionview";
+        protected override string ScopeKey => "gptinteractionview";
+        protected override int DefaultZoom => 14;
+        protected override (double lat, double lng) DefaultCenter => (50.29, 4.99);
+        protected override OutZenMarkerPolicy MarkerPolicy => OutZenMarkerPolicy.OnlyPrefix;
+        protected override string AllowedMarkerPrefix => "gpt:";
+        protected override bool ClearAllOnMapReady => true;
         public List<ClientGptInteractionDTO> GptInteractions { get; set; } = new();
         private List<ClientGptInteractionDTO> allGptInteractions = new();
         private List<ClientGptInteractionDTO> visibleGptInteractions = new();
@@ -33,6 +41,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         private ElementReference ScrollContainerRef;
         private string _q;
         private bool _onlyRecent;
+        private bool _disposed;
 
         protected override async Task OnInitializedAsync()
         {
@@ -142,8 +151,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         private void ToggleRecent() => _onlyRecent = !_onlyRecent;
 
-        public async ValueTask DisposeAsync()
+        protected override async Task OnBeforeDisposeAsync()
         {
+            _disposed = true;
+
             if (hubConnection is not null)
             {
                 try { await hubConnection.StopAsync(); } catch { }

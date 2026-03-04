@@ -113,6 +113,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Shared
                 HybridThreshold: HybridThreshold
             ));
 
+            await MapInterop.RefreshSizeAsync(ScopeKey);
+            await Task.Delay(50);
+            await MapInterop.RefreshSizeAsync(ScopeKey);
+            await Task.Delay(250);
+            await MapInterop.RefreshSizeAsync(ScopeKey);
+
             if (!IsMapBooted) return;
 
             // size refresh can be too early if container just appeared

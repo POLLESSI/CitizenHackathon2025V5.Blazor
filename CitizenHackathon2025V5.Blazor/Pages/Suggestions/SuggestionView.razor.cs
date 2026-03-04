@@ -16,7 +16,7 @@ using System.Threading.Tasks;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
 {
-    public partial class SuggestionView : OutZenMapPageBase
+    public partial class SuggestionView 
     {
     #nullable disable
         [Inject]

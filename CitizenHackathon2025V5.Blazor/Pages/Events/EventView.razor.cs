@@ -14,7 +14,7 @@ using System.Collections.Concurrent;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
 {
-    public partial class EventView : OutZenMapPageBase
+    public partial class EventView 
     {
     #nullable disable
         [Inject] public EventService EventService { get; set; }
@@ -55,6 +55,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
         public List<ClientEventDTO> Events { get; set; } = new();
         private List<ClientEventDTO> allEvents = new();
         private List<ClientEventDTO> visibleEvents = new();
+        private readonly ConcurrentQueue<ClientEventDTO> _pendingHubUpdates = new();
 
         private int currentIndex = 0;
         private const int PageSize = 20;
@@ -63,8 +64,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
         private bool _onlyRecent;
 
         public HubConnection hubConnection { get; set; }
-
-        private readonly ConcurrentQueue<ClientEventDTO> _pendingHubUpdates = new();
 
         protected override async Task OnInitializedAsync()
         {

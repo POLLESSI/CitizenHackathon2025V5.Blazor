@@ -17,9 +17,9 @@ using CrowdHub = CitizenHackathon2025.Contracts.Hubs.CrowdHubMethods;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 {
-    public partial class CrowdInfoView : OutZenMapPageBase
+    public partial class CrowdInfoView 
     {
-#nullable disable
+    #nullable disable
         // ===== Inject =====
         [Inject] public CrowdInfoService CrowdInfoService { get; set; } = default!;
         [Inject] public NavigationManager Navigation { get; set; } = default!;

@@ -14,7 +14,7 @@ using System.Reflection;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 {
-    public partial class PlaceView : OutZenMapPageBase
+    public partial class PlaceView 
     {
 #nullable disable
         [Inject] public HttpClient Client { get; set; }

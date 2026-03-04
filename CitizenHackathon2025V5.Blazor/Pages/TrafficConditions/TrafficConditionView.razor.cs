@@ -14,7 +14,7 @@ using System.Linq;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 {
-    public partial class TrafficConditionView : OutZenMapPageBase
+    public partial class TrafficConditionView 
     {
 #nullable disable
         [Inject] public TrafficConditionService TrafficConditionService { get; set; }

@@ -1,5 +1,6 @@
 ﻿// CrowdInfoCalendarView.razor.cs
 using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025.Contracts.Enums;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
@@ -15,7 +16,7 @@ using System.Collections.Concurrent;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 {
-    public partial class CrowdInfoCalendarView : OutZenMapPageBase
+    public partial class CrowdInfoCalendarView 
     {
     #nullable disable
         // ===== Inject =====
@@ -33,6 +34,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
         // ⚠️ MPORTANT: correct your typo: "crowdinfocaledarview" -> "crowdinfocaledarview"
         protected override string MapId => "leafletMap-crowdinfocalendarview";
+        protected override bool ClearAllOnMapReady => true;
+        // ou
+        protected override OutZenMarkerPolicy MarkerPolicy => OutZenMarkerPolicy.OnlyPrefix;
+        protected override string AllowedMarkerPrefix => "calendar:";
 
         // boot options
         protected override (double lat, double lng) DefaultCenter => (50.89, 4.34);

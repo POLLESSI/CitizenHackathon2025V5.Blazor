@@ -14,7 +14,7 @@ using System.Linq;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 {
-    public partial class WeatherForecastView : OutZenMapPageBase
+    public partial class WeatherForecastView 
     {
 #nullable disable
         [Inject] public WeatherForecastService WeatherForecastService { get; set; }
@@ -32,7 +32,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         protected override string ScopeKey => "weatherforecastview";
         protected override string MapId => "leafletMap-weatherforecastview";
         // boot options
-        protected override (double lat, double lng) DefaultCenter => (50.89, 4.34);
+        protected override (double lat, double lng) DefaultCenter => (50.322708, 5.008791);
         protected override int DefaultZoom => 14;
 
         // Optional
@@ -355,6 +355,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             currentIndex += next.Count;
         }
 
+        private void ApplyFilterAndReset()
+        {
+            currentIndex = 0;
+            //visibleGptInteractions.Clear();
+
+            //var filtered = FilterGptInteraction(allGptInteractions).ToList();
+            //visibleGptInteractions.AddRange(filtered.Take(PageSize));
+            //currentIndex = visibleGptInteractions.Count;
+        }
+
+        private Task OnQueryChanged(ChangeEventArgs _)
+        {
+            ApplyFilterAndReset();
+            return InvokeAsync(StateHasChanged);
+        }
         private async Task HandleScroll()
         {
             var scrollTop = await JS.InvokeAsync<double>("getScrollTop", ScrollContainerRef);
@@ -380,10 +395,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
                 .Where(x => !_onlyRecent || x.DateWeather >= cutoff);
         }
 
-        private void ToggleRecent()
+        private async Task ToggleRecent()
         {
             _onlyRecent = !_onlyRecent;
-            if (IsMapBooted) _ = ReseedWeatherMarkersAsync(fit: false);
+            ApplyFilterAndReset();
+            await InvokeAsync(StateHasChanged);
         }
 
         private void ClickInfo(int id) => SelectedId = id;
