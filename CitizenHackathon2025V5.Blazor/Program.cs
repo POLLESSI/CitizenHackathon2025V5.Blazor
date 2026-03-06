@@ -22,7 +22,7 @@ static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
         .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
 static IAsyncPolicy<HttpResponseMessage> GetTimeoutPolicy() =>
-    Policy.TimeoutAsync<HttpResponseMessage>(10);
+    Policy.TimeoutAsync<HttpResponseMessage>(30);
 
 static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy() =>
     HttpPolicyExtensions

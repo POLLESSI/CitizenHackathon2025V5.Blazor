@@ -39,6 +39,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         public HubConnection hubConnection { get; set; }
 
         private ElementReference ScrollContainerRef;
+        private string NewPrompt { get; set; } = string.Empty;
         private string _q;
         private bool _onlyRecent;
         private bool _disposed;
@@ -148,6 +149,42 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                             || (!string.IsNullOrEmpty(x.Response) && x.Response.Contains(q, StringComparison.OrdinalIgnoreCase)))
                 .Where(x => !_onlyRecent || x.CreatedAt >= cutoff);
         }
+
+        private async Task HandleAskGpt()
+        {
+            Console.WriteLine($"DEBUG: NewPrompt = '{NewPrompt}'");
+
+            if (string.IsNullOrWhiteSpace(NewPrompt))
+            {
+                Console.WriteLine("DEBUG: Prompt emptiness, abandonment."); // ✅ Log if empty
+                return;
+            }
+            try
+            {
+                // 1. Send the prompt to Mistral
+                Console.WriteLine("DEBUG: Call to AskGpt..."); // ✅ Log before call
+                await GptInteractionService.AskGpt(new ClientGptInteractionDTO { Prompt = NewPrompt });
+                Console.WriteLine("DEBUG: Response received, refresher..."); // ✅ Log after call
+
+                // 2. Refresh the list of interactions
+                var fetched = (await GptInteractionService.GetAllInteractions())?.ToList() ?? new();
+                GptInteractions = fetched;
+                allGptInteractions = fetched;
+                visibleGptInteractions.Clear();
+                currentIndex = 0;
+                LoadMoreItems();
+
+                NewPrompt = string.Empty; // Reset the field
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Error: {ex.Message}");
+                // Display an error message to the user (e.g., with a toast icon)
+            }
+        }
+
+
 
         private void ToggleRecent() => _onlyRecent = !_onlyRecent;
 

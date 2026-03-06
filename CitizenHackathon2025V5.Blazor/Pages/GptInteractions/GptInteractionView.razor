@@ -8,6 +8,10 @@
 
 <span class="fas fa-certificate me-2"></span> Gpt Interactions
 
+<div class="input-group">
+    <input @bind="NewPrompt" placeholder="Ask your question to Mistral..." class="form-control" />
+    <button @onclick="HandleAskGpt" class="btn btn-primary">Send</button>
+</div>
 <div class="oz-page oz-page--event">
     <div class="oz-map-shell">
         <div id="@MapId" class="oz-map"></div>
@@ -27,7 +31,7 @@
         <div class="right">
             <button class="chip @( _onlyRecent ? "active" : null )"
                     @onclick="() => ToggleRecent()">
-                Récents
+                Recent
             </button>
         </div>
         <div>
@@ -50,10 +54,14 @@
                 @if (!FilterGpt(visibleGptInteractions).Any())
                 {
                     <tr>
-                    <td colspan="99">
-                        <div class="empty-state">No GptInteractions available at the moment.</div>
-                    </td>
+                        <td colspan="99">
+                            <div class="empty-state">No GptInteractions available at the moment.</div>
+                        </td>
                     </tr>
+                    <td>
+                        <span class="badge bg-primary">Mistral Local</span>
+                    </td>
+                   
                 }
                 else
                 {

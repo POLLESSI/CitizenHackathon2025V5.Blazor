@@ -7,14 +7,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
     public class GptInteractionService
     {
-#nullable disable
+    #nullable disable
         private readonly HttpClient _httpClient;
-        //private const string Base = "api/gpt";
+        private readonly HttpClient _ollamaClient;
 
-        public GptInteractionService(HttpClient httpClient)
+        public GptInteractionService(HttpClient httpClient, HttpClient ollamaClient)
         {
             _httpClient = httpClient;
+            _ollamaClient = ollamaClient;
         }
+
+        //private const string Base = "api/gpt";
         public async Task<List<ClientGptInteractionDTO>> GetAllInteractions(CancellationToken ct = default)
         {
             try
@@ -85,24 +88,36 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         //    }
         //    return Enumerable.Empty<GptInteractionModel>();
         //}
-        public async Task AskGpt(ClientGptInteractionDTO prompt)
+        public async Task<ClientGptInteractionDTO> AskGpt(ClientGptInteractionDTO prompt)
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("Gpt/ask-gpt", prompt);
-                if (response.StatusCode == HttpStatusCode.NotFound) return;
+                // ✅ Use _ollamaClient to avoid the timeout
+                var response = await _ollamaClient.PostAsJsonAsync("gpt/ask-mistral", new
+                {
+                    Prompt = prompt.Prompt,
+                    Model = "mistral",
+                    MaxTokens = 500 // ✅ Limit the size of the response
+                });
+
                 response.EnsureSuccessStatusCode();
 
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<ClientGptInteractionDTO>>();
-                return;
+                var result = await response.Content.ReadFromJsonAsync<ClientGptAnswerDTO>();
+                return new ClientGptInteractionDTO
+                {
+                    Id = result?.Id ?? 0,
+                    Prompt = prompt.Prompt,
+                    Response = result?.Response ?? "No response from Mistral.",
+                    CreatedAt = result?.CreatedAt ?? DateTime.UtcNow
+                };
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Unexpected error in AskGpt: {ex.Message}");
+                Console.Error.WriteLine($"ERROR in AskGpt: {ex.Message}");
                 throw;
             }
-            
         }
+
         public async Task Delete(int id)
         {
             try
@@ -111,15 +126,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 if (response.StatusCode == HttpStatusCode.NotFound) return;
                 response.EnsureSuccessStatusCode();
 
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<ClientGptInteractionDTO>>();
-                return;
+                //var list = await response.Content.ReadFromJsonAsync<IEnumerable<ClientGptInteractionDTO>>();
+                //return;  
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in DeleteAsync: {ex.Message}");
                 throw;
             }
-            
         }
         public async Task ReplayInteraction(int id)
         {
