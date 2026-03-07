@@ -11,10 +11,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         private readonly HttpClient _httpClient;
         private readonly HttpClient _ollamaClient;
 
-        public GptInteractionService(HttpClient httpClient, HttpClient ollamaClient)
+        public GptInteractionService(HttpClient httpClient, IHttpClientFactory httpClientFactory)
         {
             _httpClient = httpClient;
-            _ollamaClient = ollamaClient;
+            _ollamaClient = httpClientFactory.CreateClient("OllamaClient");
         }
 
         //private const string Base = "api/gpt";
@@ -97,7 +97,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 {
                     Prompt = prompt.Prompt,
                     Model = "mistral",
-                    MaxTokens = 500 // ✅ Limit the size of the response
+                    MaxTokens = 500
                 });
 
                 response.EnsureSuccessStatusCode();

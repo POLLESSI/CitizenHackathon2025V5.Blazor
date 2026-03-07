@@ -22,12 +22,12 @@ static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
         .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
 static IAsyncPolicy<HttpResponseMessage> GetTimeoutPolicy() =>
-    Policy.TimeoutAsync<HttpResponseMessage>(30);
+    Policy.TimeoutAsync<HttpResponseMessage>(300);
 
 static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy() =>
     HttpPolicyExtensions
         .HandleTransientHttpError()
-        .CircuitBreakerAsync(5, TimeSpan.FromSeconds(30));
+        .CircuitBreakerAsync(5, TimeSpan.FromSeconds(300));
 
 // -----------------------------
 // Host Builder
@@ -109,6 +109,16 @@ builder.Services.AddHttpClient("ApiRootAuth", c =>
 .AddPolicyHandler(GetTimeoutPolicy())
 .AddPolicyHandler(GetCircuitBreakerPolicy());
 
+// 4) Dedicated client for Ollama (without Timeout Policy)
+builder.Services.AddHttpClient("OllamaClient", c =>
+{
+    c.BaseAddress = new Uri(apiRestBase);
+    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+})
+.AddHttpMessageHandler<JwtAttachHandler>() // ✅ Keep JWT authentication
+.AddPolicyHandler(GetRetryPolicy())        // ✅ Keep the retry policy
+// .AddPolicyHandler(GetTimeoutPolicy())  // ❌ DO NOT add the TimeoutPolicy
+.AddPolicyHandler(GetCircuitBreakerPolicy()); // ✅ Keep the circuit breaker
 
 
 // =============================
