@@ -9,8 +9,21 @@
 <span class="fas fa-certificate me-2"></span> Gpt Interactions
 
 <div class="input-group">
-    <input @bind="NewPrompt" placeholder="Ask your question to Mistral..." class="form-control" />
-    <button @onclick="HandleAskGpt" class="btn btn-primary">Send</button>
+    <input @bind="NewPrompt"
+           @bind:event="oninput"
+           placeholder="Ask your question to Mistral..."
+           class="form-control" />
+
+    <button type="button"
+            @onclick="HandleAskGpt"
+            class="btn btn-primary">
+        Send
+    </button>
+    @* <button type="button"
+            class="btn btn-primary"
+            @onclick="() => Console.WriteLine(\" [GPT] Send clicked\")  ">
+        Send
+    </button> *@
 </div>
 <div class="page-list">
     <div class="list-toolbar">

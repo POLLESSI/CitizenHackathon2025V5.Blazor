@@ -169,7 +169,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         // -----------------------------
         protected override async Task SeedAsync(bool fit)
         {
-            // Seed = push bundles + calendar markers
             var payload = new
             {
                 events = _events,
@@ -182,7 +181,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             };
 
             await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateBundleMarkers", payload, 80, ScopeKey);
-            await JS.InvokeVoidAsync("OutZenInterop.upsertCrowdCalendarMarkers", _allCal, ScopeKey);
+
+            var nowUtc = DateTime.UtcNow;
+            var todayCalendar = _allCal.Where(x => IsNowActive(x, nowUtc)).ToList();
+
+            await JS.InvokeVoidAsync("OutZenInterop.upsertCrowdCalendarMarkers", todayCalendar, ScopeKey);
 
             if (fit)
             {
@@ -255,15 +258,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         {
             if (!IsMapBooted) return;
 
-            var now = DateTime.UtcNow;
-            var active = _allCal.Where(x => IsNowActive(x, now)).ToList();
+            var nowUtc = DateTime.UtcNow;
+            var active = _allCal.Where(x => IsNowActive(x, nowUtc)).ToList();
 
             await JS.InvokeVoidAsync("OutZenInterop.upsertCrowdCalendarMarkers", active, ScopeKey);
 
             var activeIds = active.Select(x => $"cc:{x.Id}").ToList();
             await JS.InvokeVoidAsync("OutZenInterop.pruneCrowdCalendarMarkers", activeIds, ScopeKey);
         }
-
         // -----------------------------
         // SignalR: Antenna hub
         // -----------------------------
@@ -487,17 +489,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             if (!double.IsFinite(x.Latitude) || !double.IsFinite(x.Longitude)) return false;
             if (x.Latitude == 0 && x.Longitude == 0) return false;
 
-            var startUtc = x.DateUtc.AddHours(-Math.Max(0, x.LeadHours));
-
-            TimeSpan duration = TimeSpan.FromHours(6);
-            if (x.StartLocalTime.HasValue && x.EndLocalTime.HasValue)
-            {
-                var d = x.EndLocalTime.Value - x.StartLocalTime.Value;
-                if (d > TimeSpan.Zero && d < TimeSpan.FromHours(48)) duration = d;
-            }
-
-            var endUtc = x.DateUtc.Add(duration);
-            return utcNow >= startUtc && utcNow <= endUtc;
+            return x.DateUtc.Date == utcNow.Date;
         }
 
         // -----------------------------

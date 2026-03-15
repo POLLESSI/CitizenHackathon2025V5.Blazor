@@ -14,7 +14,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
 
         protected override async Task OnInitializedAsync()
         {
-            _messages = await MessageService.GetLatestAsync(100) ?? new();
+            try
+            {
+                _messages = await MessageService.GetLatestAsync(100) ?? new();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[MessageFloatingContent] Initial load failed: {ex.Message}");
+                _messages = new();
+            }
 
             var apiBaseUrl = (Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254");
             var hubBaseUrl = (Config["SignalR:HubBase"] ?? apiBaseUrl).TrimEnd('/');
@@ -25,8 +33,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
                 .WithUrl(url, options =>
                 {
                     options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
-                    options.Transports = Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets
-                                      | Microsoft.AspNetCore.Http.Connections.HttpTransportType.ServerSentEvents;
+                    options.Transports =
+                        Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets |
+                        Microsoft.AspNetCore.Http.Connections.HttpTransportType.ServerSentEvents;
                 })
                 .WithAutomaticReconnect()
                 .Build();
@@ -38,10 +47,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
                 await InvokeAsync(StateHasChanged);
             });
 
-            try { await _hubConnection.StartAsync(); }
-            catch (Exception ex) { Console.Error.WriteLine($"[MessageFloatingContent] Hub start failed: {ex.Message}"); }
+            try
+            {
+                await _hubConnection.StartAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[MessageFloatingContent] Hub start failed: {ex.Message}");
+            }
         }
-
         private async Task SendAsync()
         {
             var content = _newContent?.Trim();

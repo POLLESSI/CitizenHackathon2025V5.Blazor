@@ -22,7 +22,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                using var response = await _httpClient.GetAsync("Gpt/all", ct);
+                using var response = await _httpClient.GetAsync("api/gpt/all", ct);
 
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return new List<ClientGptInteractionDTO>();
@@ -31,10 +31,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
                 var list = await response.Content.ReadFromJsonAsync<List<ClientGptInteractionDTO>>(cancellationToken: ct);
                 return list ?? new List<ClientGptInteractionDTO>();
-            }
-            catch (OperationCanceledException)
-            {
-                return new List<ClientGptInteractionDTO>();
             }
             catch (Exception ex)
             {
@@ -49,7 +45,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             try
             {
-                using var response = await _httpClient.GetAsync($"Gpt/{id}", ct);
+                using var response = await _httpClient.GetAsync($"api/Gpt/{id}", ct);
 
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return null;
@@ -92,12 +88,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                // ✅ Use _ollamaClient to avoid the timeout
-                var response = await _ollamaClient.PostAsJsonAsync("gpt/ask-mistral", new
+                var response = await _httpClient.PostAsJsonAsync("api/gpt/ask-mistral", new
                 {
                     Prompt = prompt.Prompt,
-                    Model = "mistral",
-                    MaxTokens = 500
+                    Latitude = 50.0,
+                    Longitude = 4.5
                 });
 
                 response.EnsureSuccessStatusCode();
@@ -117,7 +112,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 throw;
             }
         }
-
         public async Task Delete(int id)
         {
             try
@@ -139,7 +133,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync($"Gpt/replay/{id}", new { });
+                var response = await _httpClient.PostAsJsonAsync($"api/gpt/replay/{id}", new { });
                 if (response.StatusCode == HttpStatusCode.NotFound) return;
                 response.EnsureSuccessStatusCode();
                 

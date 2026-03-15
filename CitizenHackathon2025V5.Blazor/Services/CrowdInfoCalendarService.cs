@@ -1,6 +1,8 @@
-﻿using System.Net.Http.Json;
+﻿using CitizenHackathon2025.Blazor.DTOs;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Json;
 using System.Text.Json;
-using CitizenHackathon2025.Blazor.DTOs;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
@@ -10,7 +12,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     /// </summary>
     public class CrowdInfoCalendarService
     {
-        private readonly HttpClient _http;
+        private readonly HttpClient _httpClient;
         private readonly JsonSerializerOptions _json;
 
         // Adapt if your API has a different prefix
@@ -19,7 +21,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
         public CrowdInfoCalendarService(HttpClient http)
         {
-            _http = http;
+            _httpClient = http;
             _json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
             // .NET 8 can (de)serialize TimeSpan natively to "HH:mm:ss"
             // If your server strictly requires HH:mm:ss, keep xx:xx:00 values ​​on the UI side.
@@ -29,18 +31,25 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
         /// <summary>GET api/crowd/calendar/all (returns everything, even inactive ones if the server allows it)</summary>
         public Task<List<ClientCrowdInfoCalendarDTO>?> GetAllAsync(CancellationToken ct = default) =>
-            _http.GetFromJsonAsync<List<ClientCrowdInfoCalendarDTO>>($"{BaseRoute}/all", _json, ct);
+            _httpClient.GetFromJsonAsync<List<ClientCrowdInfoCalendarDTO>>($"{BaseRoute}/all", _json, ct);
 
         public async Task<List<ClientCrowdInfoCalendarDTO>> GetAllSafeAsync(CancellationToken ct = default)
         {
-            var url = $"{BaseRoute}/all";
-            using var res = await _http.GetAsync(url, ct);
-            var body = await res.Content.ReadAsStringAsync(ct);
+            try
+            {
+                using var response = await _httpClient.GetAsync("api/crowd/calendar/all", ct);
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return new List<ClientCrowdInfoCalendarDTO>();
 
-            if (!res.IsSuccessStatusCode)
-                throw new HttpRequestException($"GET {url} failed: {(int)res.StatusCode} {res.ReasonPhrase}. Body: {body}");
-
-            return JsonSerializer.Deserialize<List<ClientCrowdInfoCalendarDTO>>(body, _json) ?? [];
+                response.EnsureSuccessStatusCode();
+                var list = await response.Content.ReadFromJsonAsync<List<ClientCrowdInfoCalendarDTO>>(cancellationToken: ct);
+                return list ?? new List<ClientCrowdInfoCalendarDTO>();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Unexpected error in GetAllSafeAsync: {ex.Message}");
+                return new List<ClientCrowdInfoCalendarDTO>();
+            }
         }
 
         /// <summary>GET api/crowd/calendar?from=..&to=..&region=..&placeId=..&active=..</summary>
@@ -60,19 +69,19 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             if (active is not null) qs.Add($"active={(active.Value ? "true" : "false")}");
 
             var url = $"{BaseRoute}" + (qs.Count > 0 ? "?" + string.Join("&", qs) : string.Empty);
-            return await _http.GetFromJsonAsync<List<ClientCrowdInfoCalendarDTO>>(url, _json, ct);
+            return await _httpClient.GetFromJsonAsync<List<ClientCrowdInfoCalendarDTO>>(url, _json, ct);
         }
 
         /// <summary>GET api/crowd/calendar/{id}</summary>
         public Task<ClientCrowdInfoCalendarDTO?> GetByIdAsync(int id, CancellationToken ct = default) =>
-            _http.GetFromJsonAsync<ClientCrowdInfoCalendarDTO>($"{BaseRoute}/{id}", _json, ct);
+            _httpClient.GetFromJsonAsync<ClientCrowdInfoCalendarDTO>($"{BaseRoute}/{id}", _json, ct);
 
         /// <summary>GET api/crowd/advisories?region=...&placeId=...</summary>
         public Task<List<string>?> GetAdvisoriesAsync(string region, int? placeId = null, CancellationToken ct = default)
         {
             var url = $"{AdvisoriesRoute}?region={Uri.EscapeDataString(region)}";
             if (placeId is not null) url += $"&placeId={placeId.Value}";
-            return _http.GetFromJsonAsync<List<string>>(url, _json, ct);
+            return _httpClient.GetFromJsonAsync<List<string>>(url, _json, ct);
         }
 
         // ---- CREATE / UPDATE / UPSERT ----
@@ -81,7 +90,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         public async Task<ClientCrowdInfoCalendarDTO?> CreateAsync(ClientCrowdInfoCalendarDTO dto, CancellationToken ct = default)
         {
             NormalizeTimes(dto);
-            var res = await _http.PostAsJsonAsync(BaseRoute, dto, _json, ct);
+            var res = await _httpClient.PostAsJsonAsync(BaseRoute, dto, _json, ct);
             if (!res.IsSuccessStatusCode)
                 throw await CreateHttpError(res, "create");
 
@@ -93,7 +102,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         public async Task UpdateAsync(int id, ClientCrowdInfoCalendarDTO dto, CancellationToken ct = default)
         {
             NormalizeTimes(dto);
-            var res = await _http.PutAsJsonAsync($"{BaseRoute}/{id}", dto, _json, ct);
+            var res = await _httpClient.PutAsJsonAsync($"{BaseRoute}/{id}", dto, _json, ct);
             if (!res.IsSuccessStatusCode)
                 throw await CreateHttpError(res, "update");
         }
@@ -102,7 +111,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         public async Task<ClientCrowdInfoCalendarDTO?> UpsertAsync(ClientCrowdInfoCalendarDTO dto, CancellationToken ct = default)
         {
             NormalizeTimes(dto);
-            var res = await _http.PostAsJsonAsync($"{BaseRoute}/upsert", dto, _json, ct);
+            var res = await _httpClient.PostAsJsonAsync($"{BaseRoute}/upsert", dto, _json, ct);
             if (!res.IsSuccessStatusCode)
                 throw await CreateHttpError(res, "upsert");
 
@@ -114,7 +123,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         /// <summary>DELETE api/crowd/calendar/{id} (soft delete)</summary>
         public async Task SoftDeleteAsync(int id, CancellationToken ct = default)
         {
-            var res = await _http.DeleteAsync($"{BaseRoute}/{id}", ct);
+            var res = await _httpClient.DeleteAsync($"{BaseRoute}/{id}", ct);
             if (!res.IsSuccessStatusCode)
                 throw await CreateHttpError(res, "soft-delete");
         }
@@ -122,7 +131,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         /// <summary>POST api/crowd/calendar/{id}/restore</summary>
         public async Task RestoreAsync(int id, CancellationToken ct = default)
         {
-            var res = await _http.PostAsync($"{BaseRoute}/{id}/restore", content: null, ct);
+            var res = await _httpClient.PostAsync($"{BaseRoute}/{id}/restore", content: null, ct);
             if (!res.IsSuccessStatusCode)
                 throw await CreateHttpError(res, "restore");
         }
@@ -130,7 +139,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         /// <summary>DELETE api/crowd/calendar/{id}/hard</summary>
         public async Task HardDeleteAsync(int id, CancellationToken ct = default)
         {
-            var res = await _http.DeleteAsync($"{BaseRoute}/{id}/hard", ct);
+            var res = await _httpClient.DeleteAsync($"{BaseRoute}/{id}/hard", ct);
             if (!res.IsSuccessStatusCode)
                 throw await CreateHttpError(res, "hard-delete");
         }

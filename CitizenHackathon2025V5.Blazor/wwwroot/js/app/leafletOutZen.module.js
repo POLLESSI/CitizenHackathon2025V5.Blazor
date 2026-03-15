@@ -907,11 +907,12 @@ export function addOrUpdateCrowdCalendarMarker(id, lat, lng, level, info, scopeK
 
     const title = info?.eventname ?? info?.title ?? "Crowd Calendar";
     const desc = info?.description ?? "";
+    const isHomeWarning = k === "home";
 
     const icon = buildMarkerIcon(L, level, {
         kind: "calendar",
         scopeKey: k,
-        iconOverride: info?.icon ?? "🥁🎉",
+        iconOverride: info?.icon ?? "🥁🎉"
     });
 
     const popupHtml = buildPopupHtml({ title, description: desc }, s);
@@ -924,12 +925,34 @@ export function addOrUpdateCrowdCalendarMarker(id, lat, lng, level, info, scopeK
             title,
             riseOnHover: true,
             zIndexOffset: 2000,
-            __ozNoCluster: true,
+            __ozNoCluster: true
         });
 
         safeBindPopup(mk, popupHtml, { maxWidth: 420, closeButton: true, autoPan: true });
         layer.addLayer(mk);
         s.calendarMarkers.set(key, mk);
+
+        waitForMarkerElement(mk).then(el => {
+            console.log("[CIC][marker:new]", { key, scopeKey: k, isHomeWarning, el });
+            if (!el) return;
+
+            const inner = el.querySelector(".oz-marker-inner");
+            if (!inner) {
+                console.warn("[CIC][marker:new] inner not found", { key, scopeKey: k });
+                return;
+            }
+
+            inner.classList.toggle("oz-calendar-warning-inner", isHomeWarning);
+
+            if (isHomeWarning) {
+                inner.setAttribute("data-oz-warning", "1");
+            } else {
+                inner.removeAttribute("data-oz-warning");
+            }
+
+            console.log("[CIC][marker:new][innerClassName]", inner.className);
+        });
+
         return true;
     }
 
@@ -940,10 +963,31 @@ export function addOrUpdateCrowdCalendarMarker(id, lat, lng, level, info, scopeK
         else safeBindPopup(mk, popupHtml);
     } catch { }
 
-    try { layer.addLayer(mk); } catch { } // layerGroup can safely re-add
+    try { layer.addLayer(mk); } catch { }
+
+    waitForMarkerElement(mk).then(el => {
+        console.log("[CIC][marker:update]", { key, scopeKey: k, isHomeWarning, el });
+        if (!el) return;
+
+        const inner = el.querySelector(".oz-marker-inner");
+        if (!inner) {
+            console.warn("[CIC][marker:update] inner not found", { key, scopeKey: k });
+            return;
+        }
+
+        inner.classList.toggle("oz-calendar-warning-inner", isHomeWarning);
+
+        if (isHomeWarning) {
+            inner.setAttribute("data-oz-warning", "1");
+        } else {
+            inner.removeAttribute("data-oz-warning");
+        }
+
+        console.log("[CIC][marker:update][innerClassName]", inner.className);
+    });
+
     return true;
 }
-
 export function clearCrowdCalendarMarkers(scopeKey = null) {
     const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
@@ -953,7 +997,6 @@ export function clearCrowdCalendarMarkers(scopeKey = null) {
     try { s.calendarMarkers?.clear?.(); } catch { }
     return true;
 }
-
 export function removeCrowdCalendarMarker(markerId, scopeKey = null) {
     const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
@@ -984,24 +1027,58 @@ export function upsertCrowdCalendarMarkers(items, scopeKey = null) {
         const ll = pickLatLng(it);
         if (!ll) continue;
 
-        // id: adapt if your DTO has a CalendarId / CrowdCalendarId / Id
-        const id = it?.Id ?? it?.id ?? it?.CalendarId ?? it?.calendarId ?? `${ll.lat},${ll.lng}`;
+        const rawId = it?.Id ?? it?.id ?? it?.CalendarId ?? it?.calendarId ?? `${ll.lat},${ll.lng}`;
 
-        // level: adapt to your DTO
-        const level = Number(it?.Level ?? it?.level ?? it?.CrowdLevel ?? it?.crowdLevel ?? 1);
+        const id = `cc:${rawId}`;
 
-        // info: what your popup wants to display
-        const info = {
-            title: it?.Title ?? it?.title ?? it?.EventName ?? it?.eventName ?? "Crowd Calendar",
-            description: it?.Description ?? it?.description ?? it?.Message ?? it?.message ?? "",
-            icon: it?.Icon ?? it?.icon ?? "🥁🎉",
+        const level = Number(it?.ExpectedLevel ?? it?.expectedLevel ?? it?.Level ?? it?.level ?? it?.CrowdLevel ?? it?.crowdLevel ?? 1);
+
+        const startLocalTime = it?.StartLocalTime ?? it?.startLocalTime ?? "—";
+
+        const endLocalTime = it?.EndLocalTime ?? it?.endLocalTime ?? "—";
+
+        const leadHours = it?.LeadHours ?? it?.leadHours ?? "—";
+
+        const confidence = it?.Confidence ?? it?.confidence ?? "—";
+
+        const info = {eventname: it?.EventName ?? it?.eventName ?? it?.Title ?? it?.title ?? "Crowd Calendar",
+
+            description: `Start ${startLocalTime} • End ${endLocalTime} • LeadHours ${leadHours} • Confidence ${confidence}%`,
+
+            messagetemplate: it?.MessageTemplate ?? it?.messageTemplate ?? "",
+
+            active: it?.Active ?? it?.active ?? true,
+
+            icon: it?.Icon ?? it?.icon ?? "🥁🎉"
         };
 
         addOrUpdateCrowdCalendarMarker(id, ll.lat, ll.lng, level, info, k);
     }
+
     return true;
 }
+export function pruneCrowdCalendarMarkers(activeIds, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
 
+    const { s } = ready;
+
+    s.calendarMarkers ??= new Map();
+    const keep = new Set((activeIds ?? []).map(String));
+
+    for (const [key, marker] of Array.from(s.calendarMarkers.entries())) {
+        if (keep.has(key)) continue;
+
+        try {
+            if (s.calendarLayer?.removeLayer) s.calendarLayer.removeLayer(marker);
+            else removeLayerSmart(marker, s);
+        } catch { }
+
+        s.calendarMarkers.delete(key);
+    }
+
+    return true;
+}
 /* ---------------------------------------------------------
    Antenna markers (NO cluster)
 --------------------------------------------------------- */
@@ -1880,6 +1957,32 @@ export function activateHybridAndZoom(scopeKey = null, threshold = 13) {
     return wantDetails ? fitToDetails(k) : fitToBundles(k);
 }
 
+export function pruneMarkersByPrefix(scopeKey = null, prefix = "") {
+    const k = pickScopeKey(scopeKey);
+    const s = peekS(k) || getS(k);
+    if (!(s?.markers instanceof Map)) return 0;
+
+    let removed = 0;
+
+    for (const [key, marker] of Array.from(s.markers.entries())) {
+        if (!String(key).startsWith(prefix)) continue;
+
+        try {
+            if (s.cluster?.hasLayer?.(marker)) s.cluster.removeLayer(marker);
+        } catch { }
+
+        try {
+            if (s.map?.hasLayer?.(marker)) s.map.removeLayer(marker);
+        } catch { }
+
+        s.markers.delete(key);
+        removed++;
+    }
+
+    try { s.cluster?.refreshClusters?.(); } catch { }
+
+    return removed;
+}
 /* ---------------------------------------------------------
    Resize helper
 --------------------------------------------------------- */

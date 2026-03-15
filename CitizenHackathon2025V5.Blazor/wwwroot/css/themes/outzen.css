@@ -395,6 +395,45 @@ nav.main-nav {
 }
 /* red */
 
+/* Old outer-class convention + new inner-class convention */
+.leaflet-marker-icon.oz-calendar-warning .oz-marker-inner,
+.leaflet-marker-icon.oz-marker .oz-marker-inner.oz-calendar-warning-inner {
+    animation: ozCalendarWarnPulse 0.9s infinite ease-in-out !important;
+    box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.20), 0 0 12px rgba(255, 87, 34, 0.55), 0 0 22px rgba(255, 0, 0, 0.35) !important;
+    border-radius: 999px !important;
+    will-change: transform, opacity, filter !important;
+}
+
+html body .leaflet-marker-icon.oz-marker .oz-marker-inner.oz-calendar-warning-inner {
+    animation-name: ozCalendarWarnPulse !important;
+    animation-duration: 0.9s !important;
+    animation-timing-function: ease-in-out !important;
+    animation-iteration-count: infinite !important;
+    box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.20), 0 0 12px rgba(255, 87, 34, 0.55), 0 0 22px rgba(255, 0, 0, 0.35) !important;
+    outline: 3px solid lime !important; /* debug */
+    border-radius: 999px !important;
+    will-change: transform, filter, opacity;
+}
+
+@keyframes ozCalendarWarnPulse {
+    0% {
+        transform: scale(1);
+        filter: brightness(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.18);
+        filter: brightness(1.35);
+        opacity: 0.78;
+    }
+
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
+        opacity: 1;
+    }
+}
 /* Blink only level 4 */
 @keyframes ozBlink {
     0%, 100% {
@@ -411,7 +450,6 @@ nav.main-nav {
 .oz-cal-critical .oz-cal-pin {
     animation: ozBlink 0.8s infinite;
 }
-
 
 .oz-detail-marker {
     stroke: rgba(255,255,255,.85);
@@ -1613,7 +1651,21 @@ tr.oz-row-hot {
         transform: scale(1);
     }
 }
-
+html body .leaflet-marker-icon.oz-marker .oz-marker-inner.oz-calendar-warning-inner {
+    animation-name: ozCalendarWarnPulse !important;
+    animation-duration: 0.9s !important;
+    animation-timing-function: ease-in-out !important;
+    animation-iteration-count: infinite !important;
+    animation-fill-mode: both !important;
+    animation-play-state: running !important;
+}
+/* CrowdInfoCalendar warning pulse on inner marker only */
+.leaflet-marker-icon.oz-marker .oz-marker-inner.oz-calendar-warning-inner {
+    animation: ozCalendarWarnPulse 0.9s infinite ease-in-out !important;
+    box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.20), 0 0 12px rgba(255, 87, 34, 0.55), 0 0 22px rgba(255, 0, 0, 0.35) !important;
+    border-radius: 999px !important;
+    will-change: transform, opacity, filter !important;
+}
 
 
 

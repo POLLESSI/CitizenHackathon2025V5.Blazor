@@ -159,6 +159,10 @@ builder.Services.AddScoped<IMultiHubSignalRClient>(sp =>
         tokenProvider: () => auth.GetAccessTokenAsync()
     );
 });
+builder.Services.AddScoped(sp => new HttpClient
+{
+    BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7254/api/")
+});
 builder.Services.AddScoped<IHubUrlBuilder, HubUrlBuilder>();
 builder.Services.AddScoped<IOutZenSignalRFactory, OutZenSignalRFactory>();
 builder.Services.AddScoped<OutZenMapInterop>();

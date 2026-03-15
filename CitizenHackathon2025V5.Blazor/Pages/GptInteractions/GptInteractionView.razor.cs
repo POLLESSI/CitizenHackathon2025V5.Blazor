@@ -7,12 +7,13 @@ using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
+using System.Net.Http.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 {
     public partial class GptInteractionView
     {
-#nullable disable
+    #nullable disable
         [Inject] public HttpClient Client { get; set; }
         [Inject] public GptInteractionService GptInteractionService { get; set; }
         [Inject] public NavigationManager Navigation { get; set; }
@@ -25,7 +26,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         protected override int DefaultZoom => 14;
         protected override (double lat, double lng) DefaultCenter => (50.29, 4.99);
         protected override OutZenMarkerPolicy MarkerPolicy => OutZenMarkerPolicy.OnlyPrefix;
-        protected override string AllowedMarkerPrefix => "gpt:";
+        //protected override string AllowedMarkerPrefix => "gpt:";
         protected override bool ClearAllOnMapReady => true;
         public List<ClientGptInteractionDTO> GptInteractions { get; set; } = new();
         private List<ClientGptInteractionDTO> allGptInteractions = new();
@@ -46,7 +47,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         protected override async Task OnInitializedAsync()
         {
-            // 1) Initial REST
             var fetched = (await GptInteractionService.GetAllInteractions())?.ToList() ?? new();
             GptInteractions = fetched;
             allGptInteractions = fetched;
@@ -56,14 +56,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             await InvokeAsync(StateHasChanged);
 
-            // 2) SignalR GPT (only to refresh the list)
             var apiBaseUrl = Config["ApiBaseUrl"]?.TrimEnd('/') ?? "https://localhost:7254";
             var hubBaseUrl = (Config["SignalR:HubBase"] ?? apiBaseUrl).TrimEnd('/');
 
-            var url = HubUrls.Build(HubPaths.GptInteraction);
-
             hubConnection = new HubConnectionBuilder()
-                .WithUrl(url, options =>
+                .WithUrl($"{hubBaseUrl}/hubs/gptHub", options =>
                 {
                     options.AccessTokenProvider = async () =>
                         await Auth.GetAccessTokenAsync() ?? string.Empty;
@@ -71,8 +68,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 .WithAutomaticReconnect()
                 .Build();
 
-            // Handlers
-            hubConnection.On<ClientGptInteractionDTO>(GptInteractionHubMethods.ToClient.NotifyNewGpt, async dto =>
+            hubConnection.On<ClientGptInteractionDTO>("ReceiveGptResponse", async dto =>
             {
                 if (dto is null) return;
 
@@ -92,24 +88,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 await InvokeAsync(StateHasChanged);
             });
 
-            hubConnection.On<int>("GptInteractionArchived", async id =>
-            {
-                GptInteractions.RemoveAll(c => c.Id == id);
-                allGptInteractions.RemoveAll(c => c.Id == id);
-                visibleGptInteractions.RemoveAll(c => c.Id == id);
-                await InvokeAsync(StateHasChanged);
-            });
-
             try
             {
                 await hubConnection.StartAsync();
+                Console.WriteLine("[GptInteractionView] Hub started.");
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[GptInteractionView] Hub start failed: {ex.Message}");
+                Console.Error.WriteLine($"[GptInteractionView] Hub start failed: {ex}");
             }
         }
-
         private void LoadMoreItems()
         {
             var next = allGptInteractions.Skip(currentIndex).Take(PageSize).ToList();
@@ -152,40 +140,50 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         private async Task HandleAskGpt()
         {
-            Console.WriteLine($"DEBUG: NewPrompt = '{NewPrompt}'");
+            Console.WriteLine($"[GPT] HandleAskGpt called. Raw prompt = '{NewPrompt}'");
+            Console.WriteLine($"[GPT] Client.BaseAddress = {Client.BaseAddress}");
 
             if (string.IsNullOrWhiteSpace(NewPrompt))
             {
-                Console.WriteLine("DEBUG: Prompt emptiness, abandonment."); // ✅ Log if empty
+                Console.WriteLine("[GPT] Prompt is empty -> request cancelled.");
                 return;
             }
+
             try
             {
-                // 1. Send the prompt to Mistral
-                Console.WriteLine("DEBUG: Call to AskGpt..."); // ✅ Log before call
-                await GptInteractionService.AskGpt(new ClientGptInteractionDTO { Prompt = NewPrompt });
-                Console.WriteLine("DEBUG: Response received, refresher..."); // ✅ Log after call
+                var request = new
+                {
+                    Prompt = NewPrompt.Trim(),
+                    Latitude = 50.0,
+                    Longitude = 4.5
+                };
 
-                // 2. Refresh the list of interactions
-                var fetched = (await GptInteractionService.GetAllInteractions())?.ToList() ?? new();
-                GptInteractions = fetched;
-                allGptInteractions = fetched;
+                Console.WriteLine("[GPT] Sending POST api/gpt/ask-mistral ...");
+
+                var response = await Client.PostAsJsonAsync("api/gpt/ask-mistral", request);
+
+                Console.WriteLine($"[GPT] Response status = {(int)response.StatusCode} {response.StatusCode}");
+
+                var raw = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[GPT] Response body = {raw}");
+
+                response.EnsureSuccessStatusCode();
+
+                var fetched = await GptInteractionService.GetAllInteractions();
+                GptInteractions = fetched?.ToList() ?? new();
+                allGptInteractions = GptInteractions;
                 visibleGptInteractions.Clear();
                 currentIndex = 0;
                 LoadMoreItems();
 
-                NewPrompt = string.Empty; // Reset the field
+                NewPrompt = string.Empty;
                 await InvokeAsync(StateHasChanged);
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Error: {ex.Message}");
-                // Display an error message to the user (e.g., with a toast icon)
+                Console.Error.WriteLine($"[GPT] HandleAskGpt failed: {ex}");
             }
         }
-
-
-
         private void ToggleRecent() => _onlyRecent = !_onlyRecent;
 
         protected override async Task OnBeforeDisposeAsync()

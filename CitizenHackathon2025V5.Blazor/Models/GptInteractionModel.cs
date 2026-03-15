@@ -2,7 +2,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Models
 {
     public class GptInteractionModel
     {
-#nullable disable
+    #nullable disable
         public int Id { get; set; }
         public string Prompt { get; set; }
         public string PromptHash { get; set; }

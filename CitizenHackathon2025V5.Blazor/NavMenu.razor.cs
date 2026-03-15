@@ -67,7 +67,7 @@ namespace CitizenHackathon2025V5.Blazor.Client
             new MenuItem("Traffic", "/trafficconditionview", "🚦"),
             new MenuItem("Weather", "/weatherforecastview", "🌤"),
             new MenuItem("Users", "/userview", "👤"),
-            new MenuItem("Privacy", "/privacy", "🔐"),
+            new MenuItem("GDPR", "/privacy", "🔐"),
             new MenuItem("Help", "/help", "❓"),
             new MenuItem("Comments", "/messageview", "💬"),
         };
