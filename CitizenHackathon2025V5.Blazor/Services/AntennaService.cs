@@ -6,10 +6,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     public sealed class AntennaService
     {
         private readonly HttpClient _http;
-        public AntennaService(HttpClient http) => _http = http;
 
-        public Task<List<ClientCrowdInfoAntennaDTO>?> GetAllAsync(CancellationToken ct = default)
-            => _http.GetFromJsonAsync<List<ClientCrowdInfoAntennaDTO>>("crowdinfoantenna", ct);
+        public AntennaService(HttpClient http)
+        {
+            _http = http;
+        }
+
+        public async Task<List<ClientCrowdInfoAntennaDTO>> GetAllAsync(CancellationToken ct = default)
+        {
+            Console.WriteLine($"[AntennaService] BaseAddress = {_http.BaseAddress}");
+            var result = await _http.GetFromJsonAsync<List<ClientCrowdInfoAntennaDTO>>(
+                "crowdinfoantenna",
+                cancellationToken: ct);
+
+            return result ?? new List<ClientCrowdInfoAntennaDTO>();
+        }
     }
 }
 

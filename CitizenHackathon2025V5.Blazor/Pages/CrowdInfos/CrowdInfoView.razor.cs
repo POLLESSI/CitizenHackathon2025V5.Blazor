@@ -145,22 +145,25 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
                 lng = 4.35;
             }
 
+            var lvl = Math.Clamp(dto.CrowdLevel, 1, SharedConstants.MaxCrowdLevel);
+
             await JS.InvokeVoidAsync(
                 "OutZenInterop.addOrUpdateCrowdMarker",
                 CIMarkerId(dto.Id),
                 lat,
                 lng,
+                lvl,
                 new
                 {
-                    locationname = dto.LocationName ?? "Crowd Info",
-                    timestamp = dto.Timestamp,
+                    kind = "crowd",
+                    title = dto.LocationName ?? "Crowd Info",
+                    description = $"Maj {dto.Timestamp:HH:mm:ss}",
                     crowdlevel = dto.CrowdLevel,
                     icon = "👥"
                 },
                 ScopeKey
             );
         }
-
         // ----------------------------
         // SignalR
         // ----------------------------
@@ -216,7 +219,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
                 if (IsMapBooted)
                 {
-                    try { await JS.InvokeVoidAsync("OutZenInterop.removeCrowdMarker", $"cr:{id}", ScopeKey); } catch { }
+                    try { await JS.InvokeVoidAsync("OutZenInterop.removeCrowdMarker", CIMarkerId(id), ScopeKey); } catch { }
                     await SyncMapMarkersAsync(fit: false);
                 }
 
@@ -297,8 +300,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
                 lvl,
                 new
                 {
-                    title = dto.LocationName,
+                    kind = "crowd",
+                    title = dto.LocationName ?? "Crowd Info",
                     description = $"Maj {dto.Timestamp:HH:mm:ss}",
+                    crowdlevel = dto.CrowdLevel,
                     icon = "👥"
                 },
                 ScopeKey);
@@ -411,7 +416,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
             await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdMarker",
                 "test:999",
-                50.89, 4.34, 5,
+                50.89, 4.34, 4,
                 new { title = "TEST", description = "debug", icon = "🧪" },
                 ScopeKey);
 

@@ -57,8 +57,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
         private ElementReference ScrollContainerRef;
         private ElementReference TableScrollRef;
         private string _q = string.Empty;
-        private bool _onlyRecent;
 
+        private bool _onlyRecent;
+        private bool _hubStarted;
+        private bool _seedCompleted;
         private bool _disposed;
 
         private readonly ConcurrentQueue<ClientCrowdInfoCalendarDTO> _pendingHubUpdates = new();
@@ -70,7 +72,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
         {
             await LoadAllAsync();
             allCrowdInfoCalendars = _all;
-            await StartSignalRAsync();
             await InvokeAsync(StateHasChanged);
             await NotifyDataLoadedAsync(fit: true);
         }
@@ -78,6 +79,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
         protected override async Task OnMapReadyAsync()
         {
             try { await MapInterop.RefreshSizeAsync(ScopeKey); } catch { }
+
+            if (!_hubStarted)
+            {
+                _hubStarted = true;
+                await StartSignalRAsync();
+            }
 
             while (_pendingHubUpdates.TryDequeue(out var dto))
                 await UpsertCalendarMarkerAsync(dto);
@@ -94,6 +101,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
                 await MapInterop.RefreshSizeAsync(ScopeKey);
                 await JS.InvokeVoidAsync("OutZenInterop.fitToCalendar", ScopeKey, new { maxZoom = 17 });
             }
+
+            _seedCompleted = true;
 
             Console.WriteLine($"[CIC] SeedAsync: booted={IsMapBooted} count={src.Count}");
 
@@ -266,12 +275,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
         {
             if (!IsMapBooted) return;
 
-            var items = Filter(_visible).ToList();
+            var items = Filter(_all).ToList();
 
             try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdCalendarMarkers", ScopeKey); } catch { }
-
-            foreach (var co in items)
-                await ApplySingleMarkerUpdateAsync(co, alreadyBooted: true);
+            try { await JS.InvokeVoidAsync("OutZenInterop.upsertCrowdCalendarMarkers", items, ScopeKey); } catch { }
 
             if (fit && items.Any())
                 await FitThrottledAsync();

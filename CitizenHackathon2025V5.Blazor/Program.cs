@@ -12,10 +12,6 @@ using Polly;
 using Polly.Extensions.Http;
 using System.Net.Http;
 
-
-// -----------------------------
-// Polly Policies
-// -----------------------------
 static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
     HttpPolicyExtensions
         .HandleTransientHttpError()
@@ -29,23 +25,15 @@ static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy() =>
         .HandleTransientHttpError()
         .CircuitBreakerAsync(5, TimeSpan.FromSeconds(300));
 
-// -----------------------------
-// Host Builder
-// -----------------------------
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
-// =============================
-// Configuration (API + SignalR)
-// =============================
 var configuration = builder.Configuration;
 
-// Base API (ex: https://localhost:7254)
 var apiBaseUrl = (configuration["ApiBaseUrl"] ?? "https://localhost:7254").TrimEnd('/');
 
-// Base REST (ex: https://localhost:7254/api/)
 var apiRestBase = configuration["Api:RestBase"];
 if (string.IsNullOrWhiteSpace(apiRestBase))
 {
@@ -53,119 +41,95 @@ if (string.IsNullOrWhiteSpace(apiRestBase))
 }
 apiRestBase = apiRestBase.TrimEnd('/') + "/";
 
-// SignalR base for the multi-hub client
-// ⚠️ Here, HubBase is considered to be the root (host) expected by MultiHubSignalRClient.
-// The /hubs/* logic is handled on the MultiHub + HubPaths.* side (do not force /hubs here to avoid breaking it).
 var hubBaseUrl = (configuration["SignalR:HubBase"] ?? apiBaseUrl).TrimEnd('/');
 
-// =============================
-// Auth / DI de base
-// =============================
 builder.Services.AddOptions();
 builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, SimpleAuthStateProvider>();
-
-// Handler JWT (injected only on the HttpClients that need it)
 builder.Services.AddTransient<JwtAttachHandler>();
 
-// =============================
-// HttpClients
-// =============================
-
-// 1) Client applicatif /api/* avec JWT
-builder.Services.AddHttpClient("ApiWithAuth", c =>
+builder.Services.AddHttpClient("ApiWithAuth", client =>
 {
-    c.BaseAddress = new Uri(apiRestBase); // ex: https://localhost:7254/api/
-    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
-    c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+    client.BaseAddress = new Uri(apiRestBase);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 })
 .AddHttpMessageHandler<JwtAttachHandler>()
 .AddPolicyHandler(GetRetryPolicy())
 .AddPolicyHandler(GetTimeoutPolicy())
 .AddPolicyHandler(GetCircuitBreakerPolicy());
 
-// 2) Client "Default" (also /api/*) with JWT
-builder.Services.AddHttpClient("Default", c =>
+builder.Services.AddHttpClient("Default", client =>
 {
-    c.BaseAddress = new Uri(apiRestBase);
-    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
-    c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+    client.BaseAddress = new Uri(apiRestBase);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 })
 .AddHttpMessageHandler<JwtAttachHandler>()
 .AddPolicyHandler(GetRetryPolicy())
 .AddPolicyHandler(GetTimeoutPolicy())
 .AddPolicyHandler(GetCircuitBreakerPolicy());
 
-// 3) Root client for login/hub-token/refresh WITHOUT JWT handler
-builder.Services.AddHttpClient("ApiRootAuth", c =>
+builder.Services.AddHttpClient("ApiRootAuth", client =>
 {
-    var root = apiBaseUrl.EndsWith("/") ? apiBaseUrl : apiBaseUrl + "/";
-    c.BaseAddress = new Uri(root); // ex: https://localhost:7254/
-    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
-    c.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+    client.BaseAddress = new Uri(apiBaseUrl.EndsWith("/") ? apiBaseUrl : apiBaseUrl + "/");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 })
-// .AddHttpMessageHandler<JwtAttachHandler>() // especially not here
 .AddPolicyHandler(GetRetryPolicy())
 .AddPolicyHandler(GetTimeoutPolicy())
 .AddPolicyHandler(GetCircuitBreakerPolicy());
 
-// 4) Dedicated client for Ollama (without Timeout Policy)
-builder.Services.AddHttpClient("OllamaClient", c =>
+builder.Services.AddHttpClient("OllamaClient", client =>
 {
-    c.BaseAddress = new Uri(apiRestBase);
-    c.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+    client.BaseAddress = new Uri(apiRestBase);
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
 })
-.AddHttpMessageHandler<JwtAttachHandler>() // ✅ Keep JWT authentication
-.AddPolicyHandler(GetRetryPolicy())        // ✅ Keep the retry policy
-// .AddPolicyHandler(GetTimeoutPolicy())  // ❌ DO NOT add the TimeoutPolicy
-.AddPolicyHandler(GetCircuitBreakerPolicy()); // ✅ Keep the circuit breaker
-
-
-// =============================
-// Authentication Services
-// =============================
-builder.Services.AddScoped<IAuthService>(sp =>
-{
-    var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient("ApiRootAuth");
-    var js = sp.GetRequiredService<IJSRuntime>();
-    var provider = sp.GetRequiredService<AuthenticationStateProvider>();
-    return new AuthService(http, js, provider);
-});
-// HttpClient is injected by default when you simply request "HttpClient".
+.AddHttpMessageHandler<JwtAttachHandler>()
+.AddPolicyHandler(GetRetryPolicy())
+.AddPolicyHandler(GetCircuitBreakerPolicy());
 
 builder.Services.AddScoped(sp =>
     sp.GetRequiredService<IHttpClientFactory>().CreateClient("ApiWithAuth"));
 
-// =============================
-// Application services
-// =============================
-builder.Services.AddScoped<AntennaService>();
-builder.Services.AddScoped<AntennaCrowdService>();
-builder.Services.AddScoped<ICrowdInfoAntennaService, CrowdInfoAntennaService>();
-builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService>();
-builder.Services.AddScoped<CrowdInfoService>();
-builder.Services.AddScoped<EventService>();
-builder.Services.AddScoped<GptInteractionService>();
-builder.Services.AddScoped<IMultiHubSignalRClient>(sp =>
+builder.Services.AddScoped<IAuthService>(sp =>
 {
-    var config = sp.GetRequiredService<IConfiguration>();
-    var auth = sp.GetRequiredService<IAuthService>();
+    var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient("ApiRootAuth");
+    var js = sp.GetRequiredService<IJSRuntime>();
+    var authStateProvider = sp.GetRequiredService<AuthenticationStateProvider>();
+    return new AuthService(http, js, authStateProvider);
+});
 
-    var apiBaseUrl = (config["ApiBaseUrl"] ?? "https://localhost:7254").TrimEnd('/');
-    var hubBaseUrl = (config["SignalR:HubBase"] ?? apiBaseUrl).TrimEnd('/');
+builder.Services.AddScoped<IHubTokenService, HubTokenService>();
+
+builder.Services.AddScoped<IHubUrlBuilder, HubUrlBuilder>();
+builder.Services.AddScoped<IOutZenSignalRFactory, OutZenSignalRFactory>();
+
+builder.Services.AddScoped<MultiHubSignalRClient>(sp =>
+{
+    var auth = sp.GetRequiredService<IAuthService>();
 
     return new MultiHubSignalRClient(
         baseUrl: hubBaseUrl,
         tokenProvider: () => auth.GetAccessTokenAsync()
     );
 });
-builder.Services.AddScoped(sp => new HttpClient
-{
-    BaseAddress = new Uri(builder.Configuration["ApiBaseUrl"] ?? "https://localhost:7254/api/")
-});
-builder.Services.AddScoped<IHubUrlBuilder, HubUrlBuilder>();
-builder.Services.AddScoped<IOutZenSignalRFactory, OutZenSignalRFactory>();
+
+builder.Services.AddScoped<IMultiHubSignalRClient>(sp =>
+    sp.GetRequiredService<MultiHubSignalRClient>());
+
 builder.Services.AddScoped<OutZenMapInterop>();
+
+builder.Services.AddBlazoredToast();
+
+builder.Services.AddScoped<AntennaService>();
+builder.Services.AddScoped<AntennaCrowdService>();
+builder.Services.AddScoped<ICrowdInfoAntennaService, CrowdInfoAntennaService>();
+
+builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService>();
+builder.Services.AddScoped<CrowdInfoService>();
+builder.Services.AddScoped<EventService>();
+builder.Services.AddScoped<GptInteractionService>();
 builder.Services.AddScoped<MessageService>();
 builder.Services.AddScoped<PlaceService>();
 builder.Services.AddScoped<SuggestionService>();
@@ -174,33 +138,16 @@ builder.Services.AddScoped<TrafficConditionService>();
 builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.UserService>();
 builder.Services.AddScoped<TrafficStateService>();
 builder.Services.AddScoped<WeatherForecastService>();
+
 builder.Services.AddScoped<WeatherHubClient>();
 builder.Services.AddScoped<WeatherForecastHubClient>();
-builder.Services.AddScoped<IHubTokenService, HubTokenService>();
 builder.Services.AddScoped<CrowdCalendarHubClient>();
 
-// Toasts
-builder.Services.AddBlazoredToast();
-
-// =============================
-// SignalR multi-hubs
-// =============================
 builder.Services.AddSingleton<TrafficServiceBlazor>();
 builder.Services.AddSingleton<TrafficSignalRService>();
-builder.Services.AddScoped<IOutZenSignalRFactory, OutZenSignalRFactory>();
 
-builder.Services.AddScoped(sp =>
-{
-    var auth = sp.GetRequiredService<IAuthService>();
-    Func<Task<string?>> tokenProvider = async () => await auth.GetAccessTokenAsync();
-    return new MultiHubSignalRClient(hubBaseUrl, tokenProvider);
-});
+Console.WriteLine("✅ PROGRAM CLIENT V5 - Blazor DI cleaned and loaded");
 
-Console.WriteLine("✅ PROGRAM CLIENT V5 - AntennaService REGISTERED");
-
-// =============================
-// Run
-// =============================
 await builder.Build().RunAsync();
 
 

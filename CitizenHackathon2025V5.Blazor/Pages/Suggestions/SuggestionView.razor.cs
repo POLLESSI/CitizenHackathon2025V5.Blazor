@@ -16,7 +16,7 @@ using System.Threading.Tasks;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
 {
-    public partial class SuggestionView 
+    public partial class SuggestionView : OutZenMapPageBase
     {
     #nullable disable
         [Inject]
@@ -105,22 +105,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
 
         protected override async Task OnMapReadyAsync()
         {
-            //await FitThrottledAsync();
-            //await Task.Delay(50);
-            //await FitThrottledAsync();
-
-            //// Map ready but data not ready => exit (OnInitializedAsync reseedera)
-            //if (!_dataLoaded) return;
-            //await SeedSuggestionMapOnceAsync(fit: true);
-
-            //if (!_seededOnce)
-            //{
-            //    _seededOnce = true;
-            //    await SeedSuggestionMapOnceAsync(fit: true);
-            //}
-
-            //await ReseedSuggestionMarkersAsync(fit: true);
-
+            if (_dotnetRef is null)
+            {
+                _dotnetRef = DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("OutZenInterop.__esm.registerDotNetRef", ScopeKey, _dotnetRef);
+            }
             // ---- CHART
             await TryRenderSuggestionChartAsync();
             await MapInterop.RefreshSizeAsync(ScopeKey);
@@ -382,13 +371,25 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
         {
             _disposed = true;
 
+            try
+            {
+                await JS.InvokeVoidAsync("OutZenInterop.__esm.unregisterDotNetRef", ScopeKey);
+            }
+            catch { }
+
+            try
+            {
+                _dotnetRef?.Dispose();
+                _dotnetRef = null;
+            }
+            catch { }
+
             if (hubConnection is not null)
             {
                 try { await hubConnection.StopAsync(); } catch { }
                 try { await hubConnection.DisposeAsync(); } catch { }
             }
         }
-
     }
 }
 

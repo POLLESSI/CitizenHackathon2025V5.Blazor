@@ -303,14 +303,15 @@ a:hover {
     transform: none;
 }
 
-section {
-    margin-bottom: 3rem;
+.scroll-reveal,
+.oz-reveal-section {
     opacity: 0;
     transform: translateY(30px);
     transition: opacity 0.8s, transform 0.8s;
 }
 
-section.visible {
+.scroll-reveal.visible,
+.oz-reveal-section.visible {
     opacity: 1;
     transform: none;
 }

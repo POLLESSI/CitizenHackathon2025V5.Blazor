@@ -73,18 +73,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
             {
                 if (!_dragWired)
                 {
-                    try { _dragWired = await JS.InvokeAsync<bool>("OutZen.makeDrawerDraggable", Id); }
+                    try { _dragWired = await JS.InvokeAsync<bool>("OutZen.safeMakeDrawerDraggable", Id); }
                     catch { _dragWired = false; }
                 }
 
                 if (!_resizeWired)
                 {
-                    try { _resizeWired = await JS.InvokeAsync<bool>("OutZen.makeDrawerResizable", Id); }
+                    try { _resizeWired = await JS.InvokeAsync<bool>("OutZen.safeMakeDrawerResizable", Id); }
                     catch { _resizeWired = false; }
                 }
 
-                await JS.InvokeVoidAsync("OutZen.bringToFront", Id);
-                await JS.InvokeVoidAsync("OutZen.avoidOverlap", Id);
+                try { await JS.InvokeVoidAsync("OutZen.safeBringToFront", Id); } catch { }
+                try { await JS.InvokeVoidAsync("OutZen.safeAvoidOverlap", Id); } catch { }
             }
 
             if (!IsOpen)

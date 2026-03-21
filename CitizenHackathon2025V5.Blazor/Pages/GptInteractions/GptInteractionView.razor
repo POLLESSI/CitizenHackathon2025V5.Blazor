@@ -1,119 +1,137 @@
 @page "/gptinteractionview"
 @namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 @using CitizenHackathon2025V5.Blazor.Client.Constants
-@using CitizenHackathon2025.Blazor.DTOs;
+@using CitizenHackathon2025.Blazor.DTOs
 @inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
 @implements IAsyncDisposable
 @inject IJSRuntime js
 
-<span class="fas fa-certificate me-2"></span> Gpt Interactions
+<div class="gpt-page">
+    <div class="gpt-header">
+        <h3 class="gpt-title">
+            <span class="fas fa-certificate me-2"></span>
+            GPT Interactions
+        </h3>
 
-<div class="input-group">
-    <input @bind="NewPrompt"
-           @bind:event="oninput"
-           placeholder="Ask your question to Mistral..."
-           class="form-control" />
+        <div class="gpt-composer">
+            <textarea @bind="NewPrompt"
+                      @bind:event="oninput"
+                      class="gpt-composer-input"
+                      rows="4"
+                      placeholder="Ask your question to Mistral..."></textarea>
 
-    <button type="button"
-            @onclick="HandleAskGpt"
-            class="btn btn-primary">
-        Send
-    </button>
-    @* <button type="button"
-            class="btn btn-primary"
-            @onclick="() => Console.WriteLine(\" [GPT] Send clicked\")  ">
-        Send
-    </button> *@
-</div>
-<div class="page-list">
-    <div class="list-toolbar">
-        <div class="left">
-            <input class="input-compact" placeholder="Search..."
-                   @bind="_q" @bind:event="oninput" />
-            @if (!string.IsNullOrWhiteSpace(_q))
+            <div class="gpt-composer-actions">
+                <button type="button"
+                        @onclick="HandleAskGpt"
+                        class="btn btn-primary"
+                        disabled="@(_isSending || string.IsNullOrWhiteSpace(NewPrompt))">
+                    @(_isSending ? "Sending..." : "Send")
+                </button>
+                <NavLink class="chip add-chip" href="/gptinteractioncreate">
+                    Add
+                </NavLink>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-list">
+        <div class="list-toolbar">
+            <div class="left">
+                <input class="input-compact"
+                       placeholder="Search..."
+                       @bind="_q"
+                       @bind:event="oninput" />
+
+                @if (!string.IsNullOrWhiteSpace(_q))
+                {
+                    <span class="badge badge-info">“@_q”</span>
+                }
+            </div>
+
+            <div class="right">
+                <button class="chip @(_onlyRecent ? "active" : null)"
+                        @onclick="ToggleRecent">
+                    Recent
+                </button>
+            </div>
+        </div>
+
+        <div class="gpt-list-shell draggable-container"
+             @ref="ScrollContainerRef"
+             @onscroll="HandleScroll">
+
+            @if (!FilterGpt(visibleGptInteractions).Any())
             {
-                <span class="badge badge-info">“@_q”</span>
+                <div class="oz-empty">
+                    No GPT interactions available at the moment.
+                </div>
+
+                <div class="mt-2">
+                    <span class="badge bg-primary">Mistral Local</span>
+                </div>
+            }
+            else
+            {
+                @foreach (var gp in FilterGpt(visibleGptInteractions))
+                {
+                    <article class="gpt-card @(SelectedId == gp.Id ? "gpt-card--selected" : null)">
+                        <div class="gpt-card-top">
+                            <div class="gpt-meta">
+                                <span class="gpt-id">#@gp.Id</span>
+
+                                @if (gp.CreatedAt != default)
+                                {
+                                    <span class="gpt-date">@gp.CreatedAt.ToLocalTime().ToString("g")</span>
+                                }
+                            </div>
+
+                            <div class="gpt-card-actions">
+                                <button class="btn btn-sm btn-glow ev-chip"
+                                        @onclick="() => ClickInfo(gp.Id)">
+                                    Info
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="gpt-block">
+                            <div class="gpt-block-label">Prompt</div>
+                            <pre class="gpt-pre gpt-pre--prompt">@(string.IsNullOrWhiteSpace(gp.Prompt) ? "— Prompt vide —" : gp.Prompt)</pre>
+                        </div>
+
+                        <div class="gpt-block">
+                            <div class="gpt-block-label">Response</div>
+                            <pre class="gpt-pre gpt-pre--response">@(string.IsNullOrWhiteSpace(gp.Response) ? "— Response vide —" : gp.Response)</pre>
+                        </div>
+                    </article>
+                }
             }
         </div>
+    </div>
 
-        <div class="right">
-            <button class="chip @( _onlyRecent ? "active" : null )"
-                    @onclick="() => ToggleRecent()">
-                Recent
-            </button>
-        </div>
-        <div>
-            <NavLink class="chip add-chip" href="/gptinteractioncreate">
-                Add
-            </NavLink>
+    <div class="oz-page oz-page--event">
+        <div class="oz-map-shell">
+            <div id="@MapId" class="oz-map"></div>
         </div>
     </div>
-    <div class="table-wrapper draggable-container" @ref="ScrollContainerRef" @onscroll="HandleScroll" style="height: 300px; overflow-y: auto; border: 1px solid #444;">
-        <table class="table table-striped table-dark styled-table data-list">
-            <thead>
-                <tr>
-                    <th class="col-narrow">#</th>
-                    <th class="col-narrow">Prompt</th>
-                    <th class="col-narrow">Response</th>
-                    <th class="col-actions">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (!FilterGpt(visibleGptInteractions).Any())
-                {
-                    <tr>
-                        <td colspan="99">
-                            <div class="empty-state">No GptInteractions available at the moment.</div>
-                        </td>
-                    </tr>
-                    <td>
-                        <span class="badge bg-primary">Mistral Local</span>
-                    </td>
-                   
-                }
-                else
-                {
-                    @foreach (var gp in FilterGpt(visibleGptInteractions))
-                    {
-                    <tr>
-                        <td class="col-narrow">@gp.Id</td>                
-                        <td class="text-ellipsis" title="@gp.Prompt">@gp.Prompt</td>
-                        <td class="text-ellipsis" title="@gp.Response">@gp.Response</td>
-                        <td class="col-actions">
-                            <button class="btn btn-sm btn-glow ev-chip" @onclick="() => ClickInfo(gp.Id)">Info</button>
-                        </td>
-                    </tr>
-                    }
-                }
-            </tbody>
-        </table>
-    </div>
+
+    <Globe />
+
+    @if (SelectedId > 0)
+    {
+        <div class="detail-wrapper">
+            <div class="list-toolbar">
+                <div class="left">
+                    <span class="badge badge-info">Details #@SelectedId</span>
+                </div>
+                <div class="right">
+                    <button class="chip" @onclick="() => SelectedId = 0">Fermer</button>
+                </div>
+            </div>
+
+            <GptInteractionDetail Id="@SelectedId" />
+        </div>
+    }
 </div>
-<div class="oz-page oz-page--event">
-    <div class="oz-map-shell">
-        <div id="@MapId" class="oz-map"></div>
-    </div>
-</div>
-
-<Globe />
-
-@if (SelectedId > 0)
-{
-  <div class="detail-wrapper">
-    <div class="list-toolbar">
-      <div class="left"><span class="badge badge-info">Details #@SelectedId</span></div>
-      <div class="right">
-        <button class="chip" @onclick="() => SelectedId = 0">Fermer</button>
-      </div>
-    </div>
-        <GptInteractionDetail Id="@SelectedId" />
-  </div>
-}
-
-@if (!FilterGpt(visibleGptInteractions).Any())
-{
-    <div class="oz-empty">No items for these filters.</div>
-}
 
 
 

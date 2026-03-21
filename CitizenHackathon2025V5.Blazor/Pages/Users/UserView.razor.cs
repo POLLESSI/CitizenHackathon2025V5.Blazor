@@ -2,7 +2,6 @@
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Auths;
 using CitizenHackathon2025V5.Blazor.Client.Services;
-using CitizenHackathon2025.Contracts.Hubs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;

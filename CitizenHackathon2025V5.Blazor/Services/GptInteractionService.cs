@@ -1,15 +1,17 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
-using CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
     public class GptInteractionService
     {
-    #nullable disable
+#nullable disable
         private readonly HttpClient _httpClient;
         private readonly HttpClient _ollamaClient;
+
+        private const string BaseRoute = "Gpt";
 
         public GptInteractionService(HttpClient httpClient, IHttpClientFactory httpClientFactory)
         {
@@ -17,12 +19,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             _ollamaClient = httpClientFactory.CreateClient("OllamaClient");
         }
 
-        //private const string Base = "api/gpt";
         public async Task<List<ClientGptInteractionDTO>> GetAllInteractions(CancellationToken ct = default)
         {
             try
             {
-                using var response = await _httpClient.GetAsync("api/gpt/all", ct);
+                Console.WriteLine($"[GptInteractionService] BaseAddress = {_httpClient.BaseAddress}");
+
+                using var response = await _httpClient.GetAsync($"{BaseRoute}/all", ct);
 
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return new List<ClientGptInteractionDTO>();
@@ -45,14 +48,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             try
             {
-                using var response = await _httpClient.GetAsync($"api/Gpt/{id}", ct);
+                using var response = await _httpClient.GetAsync($"{BaseRoute}/{id}", ct);
 
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return null;
 
                 response.EnsureSuccessStatusCode();
 
-                // ⚠️ L’endpoint /api/gpt/{id} devrait renvoyer UN objet, pas une liste
                 var item = await response.Content.ReadFromJsonAsync<ClientGptInteractionDTO>(cancellationToken: ct);
                 return item;
             }
@@ -66,62 +68,51 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 return null;
             }
         }
-        //public async Task<IEnumerable<GptInteractionModel>> GetSuggestionsByForecastIdAsync(int id)
-        //{
-        //    var response = await _httpClient.GetAsync($"api/gpt/forecast/{id}");
-        //    if (response.IsSuccessStatusCode)
-        //    {
-        //        return await response.Content.ReadFromJsonAsync<IEnumerable<GptInteractionModel>>();
-        //    }
-        //    return Enumerable.Empty<GptInteractionModel>();
-        //}
-        //public async Task<IEnumerable<GptInteractionModel>> GetSuggestionsByTrafficIdAsync(int id)
-        //{
-        //    var response = await _httpClient.GetAsync($"api/gpt/traffic/{id}");
-        //    if (response.IsSuccessStatusCode)
-        //    {
-        //        return await response.Content.ReadFromJsonAsync<IEnumerable<GptInteractionModel>>();
-        //    }
-        //    return Enumerable.Empty<GptInteractionModel>();
-        //}
+
         public async Task<ClientGptInteractionDTO> AskGpt(ClientGptInteractionDTO prompt)
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync("api/gpt/ask-mistral", new
+                var response = await _httpClient.PostAsJsonAsync($"{BaseRoute}/ask-mistral", new
                 {
                     Prompt = prompt.Prompt,
                     Latitude = 50.0,
                     Longitude = 4.5
                 });
 
+                var raw = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[AskGpt] Status={(int)response.StatusCode} Body={raw}");
+
                 response.EnsureSuccessStatusCode();
 
-                var result = await response.Content.ReadFromJsonAsync<ClientGptAnswerDTO>();
+                var result = JsonSerializer.Deserialize<ClientGptAnswerDTO>(raw, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
                 return new ClientGptInteractionDTO
                 {
                     Id = result?.Id ?? 0,
-                    Prompt = prompt.Prompt,
+                    Prompt = result?.Prompt ?? prompt.Prompt,
                     Response = result?.Response ?? "No response from Mistral.",
-                    CreatedAt = result?.CreatedAt ?? DateTime.UtcNow
+                    CreatedAt = result?.CreatedAt ?? DateTime.UtcNow,
+                    Active = true
                 };
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"ERROR in AskGpt: {ex.Message}");
+                Console.Error.WriteLine($"ERROR in AskGpt: {ex}");
                 throw;
             }
         }
+
         public async Task Delete(int id)
         {
             try
             {
-                var response = await _httpClient.DeleteAsync($"Gpt/{id}");
+                var response = await _httpClient.DeleteAsync($"{BaseRoute}/{id}");
                 if (response.StatusCode == HttpStatusCode.NotFound) return;
                 response.EnsureSuccessStatusCode();
-
-                //var list = await response.Content.ReadFromJsonAsync<IEnumerable<ClientGptInteractionDTO>>();
-                //return;  
             }
             catch (Exception ex)
             {
@@ -129,23 +120,24 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 throw;
             }
         }
+
         public async Task ReplayInteraction(int id)
         {
             try
             {
-                var response = await _httpClient.PostAsJsonAsync($"api/gpt/replay/{id}", new { });
+                var response = await _httpClient.PostAsJsonAsync($"{BaseRoute}/replay/{id}", new { });
                 if (response.StatusCode == HttpStatusCode.NotFound) return;
                 response.EnsureSuccessStatusCode();
-                
-                var list = await response.Content.ReadFromJsonAsync<IEnumerable<ClientGptInteractionDTO>>();
-                return;
+
+                // The endpoint does NOT return IEnumerable<ClientGptInteractionDTO>
+                var raw = await response.Content.ReadAsStringAsync();
+                Console.WriteLine($"[ReplayInteraction] Response = {raw}");
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Unexpected error in ReplayInteraction: {ex.Message}");
                 throw;
             }
-            
         }
     }
 }

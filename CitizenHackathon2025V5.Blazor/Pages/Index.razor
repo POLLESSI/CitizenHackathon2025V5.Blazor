@@ -30,13 +30,13 @@
                       FabBottom="84px"
                       StartLeft="24px"
                       StartTop="420px"
-                      Width="360px"
-                      MinWidth="280px"
+                      Width="420px"
+                      MinWidth="320px"
                       MaxWidth="900px">
         <MessageFloatingContent />
     </OzFloatingWindow>
     <OzFloatingWindow Id="gptDrawer"
-                      Class="oz-glass oz-drawer--fill"
+                      Class="oz-glass oz-drawer--fill oz-drawer--gpt"
                       Title="OutZen GPT"
                       Subtitle="Suggestions"
                       FabIcon="IA Suggestions"
@@ -45,38 +45,136 @@
                       FabBottom="18px"
                       StartLeft="24px"
                       StartTop="120px"
-                      Width="360px"
-                      MinWidth="280px"
-                      MaxWidth="900px">
+                      Width="420px"
+                      MinWidth="320px"
+                      MaxWidth="960px">
 
-        <input class="oz-input" placeholder="To research..." @bind="_q" @bind:event="oninput" />
+        <div class="gpt-drawer-content">
+            <input class="oz-input"
+                   placeholder="To research..."
+                   @bind="_q"
+                   @bind:event="oninput" />
 
-        <div class="oz-prompt-compose">
-            <textarea class="oz-input" rows="3" placeholder="Write your prompt..." @bind="_userPrompt"></textarea>
-            <div class="oz-compose-actions">
-                <button type="button" class="oz-btn" @onclick="SendUserPromptAsync" disabled="@string.IsNullOrWhiteSpace(_userPrompt)">
-                    Send to AI
-                </button>
+            <div class="oz-prompt-compose">
+                <textarea class="oz-input"
+                          rows="3"
+                          placeholder="Write your prompt..."
+                          @bind="_userPrompt"></textarea>
+
+                <div class="oz-compose-actions">
+                    <button type="button"
+                            class="oz-btn"
+                            @onclick="SendUserPromptAsync"
+                            disabled="@(_isSendingPrompt || string.IsNullOrWhiteSpace(_userPrompt))">
+                        @(_isSendingPrompt ? "Sending..." : "Send to AI")
+                    </button>
+                </div>
             </div>
-        </div>
 
-        <div class="oz-scrollfill">
-            <div class="oz-list">
-                @foreach (var x in FilterGpt(_visible))
-                {
-                    <div class="oz-item">
-                        <div class="oz-item-title">@x.Prompt</div>
-                        <div class="oz-item-meta">@x.CreatedAt.ToLocalTime()</div>
+            @{
+                var filtered = FilterGpt(_visible).ToList();
+                var latest = filtered.FirstOrDefault();
+                var history = filtered.Skip(1).ToList();
+            }
+
+            @if (latest is not null)
+            {
+                <div class="gpt-latest-shell">
+                    <div class="gpt-latest-header">
+                        <span class="gpt-latest-title">Last reply</span>
+                        <span class="gpt-latest-date">@latest.CreatedAt.ToLocalTime().ToString("g")</span>
+                    </div>
+
+                    <article class="gpt-card gpt-card--latest">
+                        <div class="gpt-card-top">
+                            <div class="gpt-meta">
+                                <span class="gpt-id">#@latest.Id</span>
+                                <span class="gpt-date">@latest.CreatedAt.ToLocalTime().ToString("g")</span>
+                            </div>
+
+                            <div class="oz-actions">
+                                <button type="button" class="oz-mini" @onclick="@(() => Replay(latest.Id))">Replay</button>
+                                <button type="button" class="oz-mini" @onclick="@(() => Copy(latest.Prompt))">Copy prompt</button>
+                                <button type="button" class="oz-mini" @onclick="@(() => Copy(latest.Response))">Copy response</button>
+                            </div>
+                        </div>
+
+                        <div class="gpt-block">
+                            <div class="gpt-block-label">Prompt</div>
+                            <pre class="gpt-pre gpt-pre--prompt">@(string.IsNullOrWhiteSpace(latest.Prompt) ? "— Prompt empty —" : latest.Prompt)</pre>
+                        </div>
+
+                        <div class="gpt-block">
+                            <div class="gpt-block-label">Response</div>
+                            <div class="gpt-rich-response gpt-pre gpt-pre--response">
+                                @FormatGptResponse(latest.Response)
+                            </div>
+                        </div>
+                    </article>
+                </div>
+
+                <div class="gpt-history-shell @(_historyCollapsed ? "is-collapsed" : null)">
+                    <div class="gpt-history-header">
+                        <span class="gpt-history-title">History</span>
+
                         <div class="oz-actions">
-                            <button type="button" class="oz-mini" @onclick="@(() => Replay(x.Id))">Replay</button>
-                            <button type="button" class="oz-mini" @onclick="@(() => Copy(x.Prompt))">Copy</button>
+                            <span class="gpt-history-count">@history.Count element(s)</span>
+                            <button type="button"
+                                    class="gpt-history-toggle"
+                                    @onclick="ToggleHistory">
+                                @(_historyCollapsed ? "Show" : "Hide")
+                            </button>
                         </div>
                     </div>
-                }
-            </div>
+
+                    <div class="oz-scrollfill oz-scrollfill--gpt-history">
+                        @if (history.Count == 0)
+                        {
+                            <div class="oz-empty">No additional history.</div>
+                        }
+                        else
+                        {
+                            <div class="oz-list oz-list--gpt">
+                                @foreach (var x in history)
+                                {
+                                    <article class="gpt-card gpt-card--compact">
+                                        <div class="gpt-card-top">
+                                            <div class="gpt-meta">
+                                                <span class="gpt-id">#@x.Id</span>
+                                                <span class="gpt-date">@x.CreatedAt.ToLocalTime().ToString("g")</span>
+                                            </div>
+
+                                            <div class="oz-actions">
+                                                <button type="button" class="oz-mini" @onclick="@(() => Replay(x.Id))">Replay</button>
+                                                <button type="button" class="oz-mini" @onclick="@(() => Copy(x.Prompt))">Copy prompt</button>
+                                                <button type="button" class="oz-mini" @onclick="@(() => Copy(x.Response))">Copy response</button>
+                                            </div>
+                                        </div>
+
+                                        <div class="gpt-block">
+                                            <div class="gpt-block-label">Prompt</div>
+                                            <pre class="gpt-pre gpt-pre--prompt">@(string.IsNullOrWhiteSpace(x.Prompt) ? "— Prompt vide —" : x.Prompt)</pre>
+                                        </div>
+
+                                        <div class="gpt-block">
+                                            <div class="gpt-block-label">Response</div>
+                                            <div class="gpt-rich-response gpt-pre gpt-pre--response">
+                                                @FormatGptResponse(x.Response)
+                                            </div>
+                                        </div>
+                                    </article>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="oz-empty">No AI interactions yet.</div>
+            }
         </div>
     </OzFloatingWindow>
-
 
     <!-- Top banner: title + globe -->
     <div class="home-header">
@@ -96,40 +194,6 @@
     <div class="home-main">
         <!-- Side panel: GPT + message -->
         <aside class="home-side-panel scroll-fade">
-            <section class="home-block">
-                <h2>AI Suggestions (GPT)</h2>
-                <p class="home-block-subtitle">
-                    Last generated suggestions and insights.
-                </p>
-                <div class="gpt-table-wrapper">
-                    <table class="oz-table compact">
-                        <thead>
-                            <tr>
-                                <th>Type</th>
-                                <th>Title / Prompt</th>
-                                <th>Summary</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @if (GptInteractions is { Count: > 0 })
-                            {
-                                @foreach (var g in GptInteractions)
-                                {
-                                    <tr>
-                                        <td>@(g.SourceType ?? "GPT")</td>
-                                        <td>@(g.Prompt ?? $"#{g.Id}")</td>
-                                        <td>@Shorten(g.Response, 120)</td>
-                                    </tr>
-                                }
-                            }
-                            else
-                            {
-                                <tr><td colspan="3" class="text-muted">No AI interactions yet.</td></tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            </section>
             <section class="home-block">
                 <h2>Your message</h2>
                 <EditForm Model="@Model" OnValidSubmit="SendMessageAsync">

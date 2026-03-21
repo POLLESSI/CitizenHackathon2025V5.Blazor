@@ -15,12 +15,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             var p = (hubPathOrRelative ?? "").Trim();
 
-            // accepte: "trafficHub", "/trafficHub", "hubs/trafficHub", "/hubs/trafficHub"
+            // accepted: "trafficHub", "/trafficHub", "hubs/trafficHub", "/hubs/trafficHub"
             p = p.TrimStart('/');
             if (p.StartsWith("hubs/", StringComparison.OrdinalIgnoreCase))
                 p = p.Substring("hubs/".Length);
 
-            // résultat: https://host/hubs/{p}
+            // result: https://host/hubs/{p}
             return $"{hubBase}/hubs/{p}";
         }
     }

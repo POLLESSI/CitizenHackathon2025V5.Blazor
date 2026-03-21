@@ -44,6 +44,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         private string _q;
         private bool _onlyRecent;
         private bool _disposed;
+        private bool _isSending;
 
         protected override async Task OnInitializedAsync()
         {
@@ -76,14 +77,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 {
                     var i = list.FindIndex(g => g.Id == dto.Id);
                     if (i >= 0) list[i] = dto;
-                    else list.Add(dto);
+                    else list.Insert(0, dto);
                 }
 
                 Upsert(GptInteractions);
                 Upsert(allGptInteractions);
-
-                var j = visibleGptInteractions.FindIndex(c => c.Id == dto.Id);
-                if (j >= 0) visibleGptInteractions[j] = dto;
+                Upsert(visibleGptInteractions);
 
                 await InvokeAsync(StateHasChanged);
             });
@@ -100,7 +99,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         }
         private void LoadMoreItems()
         {
-            var next = allGptInteractions.Skip(currentIndex).Take(PageSize).ToList();
+            var filtered = allGptInteractions ?? new List<ClientGptInteractionDTO>();
+            var next = filtered.Skip(currentIndex).Take(PageSize).ToList();
+
+            if (next.Count == 0)
+                return;
+
             visibleGptInteractions.AddRange(next);
             currentIndex += next.Count;
         }
@@ -138,50 +142,50 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 .Where(x => !_onlyRecent || x.CreatedAt >= cutoff);
         }
 
+        //private MarkupString FormatText(string text)
+        //{
+        //    if (string.IsNullOrEmpty(text)) return (MarkupString)"";
+        //    var safe = System.Net.WebUtility.HtmlEncode(text);
+        //    return (MarkupString)safe.Replace("\n", "<br>");
+        //}
+
         private async Task HandleAskGpt()
         {
-            Console.WriteLine($"[GPT] HandleAskGpt called. Raw prompt = '{NewPrompt}'");
-            Console.WriteLine($"[GPT] Client.BaseAddress = {Client.BaseAddress}");
-
-            if (string.IsNullOrWhiteSpace(NewPrompt))
-            {
-                Console.WriteLine("[GPT] Prompt is empty -> request cancelled.");
+            if (_isSending)
                 return;
-            }
+
+            var prompt = NewPrompt?.Trim();
+            if (string.IsNullOrWhiteSpace(prompt))
+                return;
 
             try
             {
-                var request = new
-                {
-                    Prompt = NewPrompt.Trim(),
-                    Latitude = 50.0,
-                    Longitude = 4.5
-                };
-
-                Console.WriteLine("[GPT] Sending POST api/gpt/ask-mistral ...");
-
-                var response = await Client.PostAsJsonAsync("api/gpt/ask-mistral", request);
-
-                Console.WriteLine($"[GPT] Response status = {(int)response.StatusCode} {response.StatusCode}");
-
-                var raw = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"[GPT] Response body = {raw}");
-
-                response.EnsureSuccessStatusCode();
-
-                var fetched = await GptInteractionService.GetAllInteractions();
-                GptInteractions = fetched?.ToList() ?? new();
-                allGptInteractions = GptInteractions;
-                visibleGptInteractions.Clear();
-                currentIndex = 0;
-                LoadMoreItems();
-
-                NewPrompt = string.Empty;
+                _isSending = true;
                 await InvokeAsync(StateHasChanged);
+
+                var created = await GptInteractionService.AskGpt(new ClientGptInteractionDTO
+                {
+                    Prompt = prompt
+                });
+
+                if (created is not null)
+                {
+                    allGptInteractions.Insert(0, created);
+                    visibleGptInteractions.Insert(0, created);
+                    GptInteractions = allGptInteractions.ToList();
+
+                    SelectedId = created.Id;
+                    NewPrompt = string.Empty;
+                }
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[GPT] HandleAskGpt failed: {ex}");
+            }
+            finally
+            {
+                _isSending = false;
+                await InvokeAsync(StateHasChanged);
             }
         }
         private void ToggleRecent() => _onlyRecent = !_onlyRecent;

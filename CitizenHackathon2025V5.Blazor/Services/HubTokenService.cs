@@ -17,7 +17,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
         public async Task<string?> GetHubTokenAsync(CancellationToken ct = default)
         {
-            // endpoint est mappé hors /api → client "ApiRootAuth"
+            // endpoint is mapped outside /api → client "ApiRootAuth"
             var http = _factory.CreateClient("ApiRootAuth");
             using var resp = await http.GetAsync("auth/hub-token", ct);
             if (!resp.IsSuccessStatusCode) return null;

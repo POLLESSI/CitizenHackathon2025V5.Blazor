@@ -112,9 +112,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
             try
             {
                 await MapInterop.RefreshSizeAsync(ScopeKey);
-                await JS.InvokeVoidAsync("OutZenInterop.fitToMarkers", ScopeKey, new { maxZoom = 17 });
+                await JS.InvokeVoidAsync("OutZenInterop.fitToAllMarkers", ScopeKey, new { maxZoom = 17 });
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"❌ FitThrottledAsync error: {ex.Message}");
+            }
         }
         protected override async Task OnMapReadyAsync()
         {
@@ -146,7 +149,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
 
             if (_disposed || !IsMapBooted) return;
 
-            try { await JS.InvokeVoidAsync("OutZenInterop.clearAllMarkers", ScopeKey); } catch { }
+            try
+            {
+                await JS.InvokeVoidAsync("OutZenInterop.clearAllOutZenLayers", ScopeKey);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"❌ clearAllOutZenLayers failed: {ex.Message}");
+            }
 
             foreach (var dto in _allAntennas)
             {

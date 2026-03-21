@@ -7,6 +7,7 @@ using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.AspNetCore.Components;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
@@ -32,7 +33,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         [Inject] public PlaceService PlaceService { get; set; } = default!;
         [Inject] public WeatherForecastService WeatherForecastService { get; set; } = default!;
         [Inject] public GptInteractionService GptInteractionService { get; set; } = default!;
-        [Inject] public GptInteractionService GptService { get; set; } = default!;
+        //[Inject] public GptInteractionService GptService { get; set; } = default!;
         [Inject] public NavigationManager Navigation { get; set; } = default!;
         [Inject] public IHubUrlBuilder HubUrls { get; set; } = default!;
         [Inject] public IAuthService Auth { get; set; } = default!;
@@ -53,6 +54,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         // UI / Data
         // -----------------------------
         public MessageFormModel Model { get; } = new();
+        private bool _isSendingPrompt;
         protected bool IsSending { get; set; }
         protected string NewMessage { get; set; } = string.Empty;
 
@@ -84,6 +86,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private long _lastToggleMs;
         private bool _dragWired;
         private bool drawerOpen;
+        private bool _historyCollapsed = true; // hidden by default to lighten the GPT drawer
         private string _userPrompt = "";
 
         // -----------------------------
@@ -370,18 +373,41 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         // -----------------------------
         private async Task EnsureGptHubAsync()
         {
-            if (_gptHub is not null) return;
+            if (_gptHub is not null &&
+                _gptHub.State is HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting)
+            {
+                return;
+            }
 
-            var url = Navigation.ToAbsoluteUri(GptInteractionHubMethods.HubPath).ToString();
+            var url = HubUrls.Build(HubPaths.GptInteraction);
+
+            Console.WriteLine($"[HOME GPT] Hub URL = {url}");
 
             _gptHub = new HubConnectionBuilder()
                 .WithUrl(url, opt =>
                 {
-                    opt.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? "";
+                    opt.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
                     opt.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents;
                 })
                 .WithAutomaticReconnect()
                 .Build();
+
+            _gptHub.On<ClientGptInteractionDTO>("ReceiveGptResponse", async dto =>
+            {
+                if (dto is null) return;
+
+                var idxAll = _all.FindIndex(x => x.Id == dto.Id);
+                if (idxAll >= 0) _all[idxAll] = dto;
+                else _all.Insert(0, dto);
+
+                var idxVisible = _visible.FindIndex(x => x.Id == dto.Id);
+                if (idxVisible >= 0) _visible[idxVisible] = dto;
+                else _visible.Insert(0, dto);
+
+                GptInteractions = _all.OrderByDescending(x => x.CreatedAt).ToList();
+
+                await InvokeAsync(StateHasChanged);
+            });
 
             await _gptHub.StartAsync();
         }
@@ -389,11 +415,53 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private async Task SendUserPromptAsync()
         {
             var prompt = _userPrompt?.Trim();
-            if (string.IsNullOrWhiteSpace(prompt)) return;
+            if (string.IsNullOrWhiteSpace(prompt) || _isSendingPrompt)
+                return;
 
-            await EnsureGptHubAsync();
-            await _gptHub!.InvokeAsync(GptInteractionHubMethods.FromClient.RefreshGpt, prompt);
-            _userPrompt = "";
+            _isSendingPrompt = true;
+
+            try
+            {
+                await EnsureGptHubAsync();
+
+                var created = await GptInteractionService.AskGpt(new ClientGptInteractionDTO
+                {
+                    Prompt = prompt
+                });
+
+                Console.WriteLine($"[HOME GPT] created.Id={created?.Id}");
+                Console.WriteLine($"[HOME GPT] created.Prompt={created?.Prompt}");
+                Console.WriteLine($"[HOME GPT] created.Response={created?.Response}");
+
+                if (created is not null)
+                {
+                    var idxAll = _all.FindIndex(x => x.Id == created.Id);
+                    if (idxAll >= 0) _all[idxAll] = created;
+                    else _all.Insert(0, created);
+
+                    var idxVisible = _visible.FindIndex(x => x.Id == created.Id);
+                    if (idxVisible >= 0) _visible[idxVisible] = created;
+                    else _visible.Insert(0, created);
+
+                    GptInteractions = _all.OrderByDescending(x => x.CreatedAt).ToList();
+                }
+
+                if (_visible.Count > 30)
+                {
+                    _visible.RemoveRange(30, _visible.Count - 30);
+                }
+
+                _userPrompt = string.Empty;
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[HOME GPT] SendUserPromptAsync failed: {ex}");
+            }
+            finally
+            {
+                _isSendingPrompt = false;
+            }
         }
         private void LoadMore()
         {
@@ -402,6 +470,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             _currentIndex += next.Count;
         }
 
+        private void ToggleHistory()
+        {
+            _historyCollapsed = !_historyCollapsed;
+        }
         private IEnumerable<ClientGptInteractionDTO> FilterGpt(IEnumerable<ClientGptInteractionDTO> src)
         {
             var q = _q?.Trim();
@@ -490,6 +562,25 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             if (x.Latitude == 0 && x.Longitude == 0) return false;
 
             return x.DateUtc.Date == utcNow.Date;
+        }
+        private MarkupString FormatGptResponse(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return (MarkupString)"<span class='gpt-empty'>— Response vide —</span>";
+
+            var safe = System.Net.WebUtility.HtmlEncode(text.Trim());
+
+            var parts = Regex.Split(
+                safe,
+                @"(?<=[\.!\?])\s+(?=[A-ZÀÂÄÇÉÈÊËÎÏÔÖÙÛÜ])")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+
+            if (parts.Count <= 1)
+                return (MarkupString)$"<p>{safe}</p>";
+
+            var html = string.Join("", parts.Select(p => $"<p>{p.Trim()}</p>"));
+            return (MarkupString)html;
         }
 
         // -----------------------------

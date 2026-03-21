@@ -6,16 +6,11 @@ using System.Text.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
-    /// <summary>
-    /// Client service to call the CrowdCalendar API (CRUD + upsert + advisories).
-    /// Uses the unique ClientCrowdInfoCalendarDTO contract (API mirror).
-    /// </summary>
     public class CrowdInfoCalendarService
     {
         private readonly HttpClient _httpClient;
         private readonly JsonSerializerOptions _json;
 
-        // Adapt if your API has a different prefix
         private const string BaseRoute = "crowd/calendar";
         private const string AdvisoriesRoute = "crowd/advisories";
 
@@ -23,13 +18,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             _httpClient = http;
             _json = new JsonSerializerOptions(JsonSerializerDefaults.Web);
-            // .NET 8 can (de)serialize TimeSpan natively to "HH:mm:ss"
-            // If your server strictly requires HH:mm:ss, keep xx:xx:00 values ​​on the UI side.
         }
 
-        // ---- READ ----
-
-        /// <summary>GET api/crowd/calendar/all (returns everything, even inactive ones if the server allows it)</summary>
         public Task<List<ClientCrowdInfoCalendarDTO>?> GetAllAsync(CancellationToken ct = default) =>
             _httpClient.GetFromJsonAsync<List<ClientCrowdInfoCalendarDTO>>($"{BaseRoute}/all", _json, ct);
 
@@ -37,11 +27,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             try
             {
-                using var response = await _httpClient.GetAsync("api/crowd/calendar/all", ct);
+                Console.WriteLine($"[CrowdInfoCalendarService] BaseAddress = {_httpClient.BaseAddress}");
+
+                using var response = await _httpClient.GetAsync($"{BaseRoute}/all", ct);
+
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return new List<ClientCrowdInfoCalendarDTO>();
 
                 response.EnsureSuccessStatusCode();
+
                 var list = await response.Content.ReadFromJsonAsync<List<ClientCrowdInfoCalendarDTO>>(cancellationToken: ct);
                 return list ?? new List<ClientCrowdInfoCalendarDTO>();
             }
@@ -52,7 +46,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
         }
 
-        /// <summary>GET api/crowd/calendar?from=..&to=..&region=..&placeId=..&active=..</summary>
         public async Task<List<ClientCrowdInfoCalendarDTO>?> ListAsync(
             DateTime? from = null,
             DateTime? to = null,
@@ -72,11 +65,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             return await _httpClient.GetFromJsonAsync<List<ClientCrowdInfoCalendarDTO>>(url, _json, ct);
         }
 
-        /// <summary>GET api/crowd/calendar/{id}</summary>
         public Task<ClientCrowdInfoCalendarDTO?> GetByIdAsync(int id, CancellationToken ct = default) =>
             _httpClient.GetFromJsonAsync<ClientCrowdInfoCalendarDTO>($"{BaseRoute}/{id}", _json, ct);
 
-        /// <summary>GET api/crowd/advisories?region=...&placeId=...</summary>
         public Task<List<string>?> GetAdvisoriesAsync(string region, int? placeId = null, CancellationToken ct = default)
         {
             var url = $"{AdvisoriesRoute}?region={Uri.EscapeDataString(region)}";
@@ -84,9 +75,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             return _httpClient.GetFromJsonAsync<List<string>>(url, _json, ct);
         }
 
-        // ---- CREATE / UPDATE / UPSERT ----
-
-        /// <summary>POST api/crowd/calendar</summary>
         public async Task<ClientCrowdInfoCalendarDTO?> CreateAsync(ClientCrowdInfoCalendarDTO dto, CancellationToken ct = default)
         {
             NormalizeTimes(dto);
@@ -94,11 +82,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             if (!res.IsSuccessStatusCode)
                 throw await CreateHttpError(res, "create");
 
-            // the API returns CreatedAtAction => reloads the element
             return await res.Content.ReadFromJsonAsync<ClientCrowdInfoCalendarDTO>(_json, ct);
         }
 
-        /// <summary>PUT api/crowd/calendar/{id}</summary>
         public async Task UpdateAsync(int id, ClientCrowdInfoCalendarDTO dto, CancellationToken ct = default)
         {
             NormalizeTimes(dto);
@@ -107,7 +93,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 throw await CreateHttpError(res, "update");
         }
 
-        /// <summary>POST api/crowd/calendar/upsert</summary>
         public async Task<ClientCrowdInfoCalendarDTO?> UpsertAsync(ClientCrowdInfoCalendarDTO dto, CancellationToken ct = default)
         {
             NormalizeTimes(dto);
@@ -118,9 +103,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             return await res.Content.ReadFromJsonAsync<ClientCrowdInfoCalendarDTO>(_json, ct);
         }
 
-        // ---- DELETE / RESTORE ----
-
-        /// <summary>DELETE api/crowd/calendar/{id} (soft delete)</summary>
         public async Task SoftDeleteAsync(int id, CancellationToken ct = default)
         {
             var res = await _httpClient.DeleteAsync($"{BaseRoute}/{id}", ct);
@@ -128,7 +110,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 throw await CreateHttpError(res, "soft-delete");
         }
 
-        /// <summary>POST api/crowd/calendar/{id}/restore</summary>
         public async Task RestoreAsync(int id, CancellationToken ct = default)
         {
             var res = await _httpClient.PostAsync($"{BaseRoute}/{id}/restore", content: null, ct);
@@ -136,7 +117,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 throw await CreateHttpError(res, "restore");
         }
 
-        /// <summary>DELETE api/crowd/calendar/{id}/hard</summary>
         public async Task HardDeleteAsync(int id, CancellationToken ct = default)
         {
             var res = await _httpClient.DeleteAsync($"{BaseRoute}/{id}/hard", ct);
@@ -144,15 +124,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 throw await CreateHttpError(res, "hard-delete");
         }
 
-        // ---- Helpers ----
-
-        /// <summary>
-        /// The backend expects TimeSpan in HH:mm:ss format.
-        /// This normalization avoids 400 if you arrive with "06:30".
-        /// </summary>
         private static void NormalizeTimes(ClientCrowdInfoCalendarDTO dto)
         {
-            // nothing to do if null; System.Text.Json will return null.
             if (dto.StartLocalTime is TimeSpan s && s.Seconds == 0)
                 dto.StartLocalTime = new TimeSpan(s.Hours, s.Minutes, 0);
 

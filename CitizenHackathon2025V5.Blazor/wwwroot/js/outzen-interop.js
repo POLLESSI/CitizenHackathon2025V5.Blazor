@@ -1,72 +1,105 @@
-﻿/* wwwroot/js/outzen-interop.js
-   Minimal, reload-safe ESM loader for Blazor + __esm compatibility
-*/
+﻿/* wwwroot/js/outzen-interop.js */
 (() => {
     "use strict";
 
-    if (globalThis.__OZ_INTEROP_LOADER_LOADED__ === true) {
-        console.warn("[OutZen] outzen-interop already loaded; skipping.");
-        return;
-    }
-    globalThis.__OZ_INTEROP_LOADER_LOADED__ = true;
+    console.log("[outzen-interop] loaded");
 
-    globalThis.__OZ_INTEROP_READY_P__ = globalThis.__OZ_INTEROP_READY_P__ || (async () => {
-        globalThis.OutZen = (typeof globalThis.OutZen === "object" && globalThis.OutZen) ? globalThis.OutZen : {};
-        globalThis.OutZenInterop = (typeof globalThis.OutZenInterop === "object" && globalThis.OutZenInterop) ? globalThis.OutZenInterop : {};
+    globalThis.OutZen = (typeof globalThis.OutZen === "object" && globalThis.OutZen) ? globalThis.OutZen : {};
+    globalThis.OutZenInterop = (typeof globalThis.OutZenInterop === "object" && globalThis.OutZenInterop) ? globalThis.OutZenInterop : {};
 
-        const OZ = globalThis.OutZenInterop;
+    const isDev =
+        location.hostname === "localhost" ||
+        location.hostname === "127.0.0.1";
 
-        const BUILD = globalThis.__ozBuild || "20260315-calendar-warning-fix-1";
-        const url = `/js/app/leafletOutZen.module.js?v=${encodeURIComponent(BUILD)}`;
+    const BUILD = globalThis.__ozBuild || "20260318-calendar-fix-2";
 
-        if (globalThis.__OutZenImportUrl !== url) {
+    const url = isDev
+        ? `/js/app/leafletOutZen.module.js?v=${encodeURIComponent(BUILD)}&t=${Date.now()}`
+        : `/js/app/leafletOutZen.module.js?v=${encodeURIComponent(BUILD)}`;
+
+    async function loadModule(force = false) {
+        if (force || globalThis.__OutZenImportUrl !== url || !globalThis.__OutZenImportP) {
             globalThis.__OutZenImportUrl = url;
             globalThis.__OutZenImportP = import(url);
         }
 
-        globalThis.OutZen.ensure = async () => {
-            const m = await globalThis.__OutZenImportP;
-            for (const [k, v] of Object.entries(m)) {
-                globalThis.OutZenInterop[k] = v;
-            }
-            globalThis.OutZenInterop.__esm = m;
-            globalThis.OutZenInterop.module = m;
-            return true;
-        };
+        const m = await globalThis.__OutZenImportP;
 
-        OZ.pruneMarkersByPrefix = async (prefix, scopeKey) => {
-            await globalThis.OutZen.ensure();
-            const m = globalThis.OutZenInterop.__esm;
+        for (const [k, v] of Object.entries(m)) {
+            globalThis.OutZenInterop[k] = v;
+        }
 
-            if (m?.pruneMarkersByPrefix) {
-                return m.pruneMarkersByPrefix(scopeKey, prefix);
-            }
+        globalThis.OutZenInterop.__esm = m;
+        globalThis.OutZenInterop.module = m;
 
-            console.warn("[OutZenInterop] pruneMarkersByPrefix: missing ESM export, noop.", {
-                url,
-                esmKeys: m ? Object.keys(m) : []
-            });
-            return 0;
-        };
+        return m;
+    }
 
-        await globalThis.OutZen.ensure();
-
-        const oldPrune = globalThis.OutZenInterop.pruneMarkersByPrefix;
-        globalThis.OutZenInterop.pruneMarkersByPrefix = async (...args) => {
-            console.log("[DBG] pruneMarkersByPrefix called", args, {
-                hasEsm: !!globalThis.OutZenInterop.__esm,
-                esmKeys: globalThis.OutZenInterop.__esm ? Object.keys(globalThis.OutZenInterop.__esm) : [],
-                keys: Object.keys(globalThis.OutZenInterop || {}).slice(0, 20)
-            });
-            return oldPrune?.(...args);
-        };
-
-        console.log("[OutZen] ✅ interop ready:", Object.keys(globalThis.OutZenInterop));
+    globalThis.OutZen.ensure = async (force = false) => {
+        await loadModule(force);
         return true;
-    })();
+    };
+
+    globalThis.OutZen.reload = async () => {
+        globalThis.__OutZenImportP = null;
+        globalThis.__OutZenImportUrl = null;
+        await loadModule(true);
+        return true;
+    };
+
+    globalThis.OutZenInterop.pruneMarkersByPrefix = async (prefix, scopeKey) => {
+        const m = await loadModule(false);
+
+        if (m?.pruneMarkersByPrefix) {
+            return m.pruneMarkersByPrefix(prefix, scopeKey);
+        }
+
+        console.warn("[OutZenInterop] pruneMarkersByPrefix missing export", {
+            url,
+            esmKeys: m ? Object.keys(m) : []
+        });
+
+        return 0;
+    };
 
     globalThis.OutZenReady = async () => {
-        return await globalThis.__OZ_INTEROP_READY_P__;
+        await globalThis.OutZen.ensure(false);
+        console.log("[OutZen] ✅ interop ready:", Object.keys(globalThis.OutZenInterop));
+        return true;
+    };
+    window.OutZen = window.OutZen || {};
+    window.OutZen.safeMakeDrawerDraggable = function (id) {
+        try {
+            if (typeof window.OutZen.makeDrawerDraggable === "function") {
+                return !!window.OutZen.makeDrawerDraggable(id);
+            }
+        } catch { }
+        return false;
+    };
+
+    window.OutZen.safeMakeDrawerResizable = function (id) {
+        try {
+            if (typeof window.OutZen.makeDrawerResizable === "function") {
+                return !!window.OutZen.makeDrawerResizable(id);
+            }
+        } catch { }
+        return false;
+    };
+
+    window.OutZen.safeBringToFront = function (id) {
+        try {
+            if (typeof window.OutZen.bringToFront === "function") {
+                window.OutZen.bringToFront(id);
+            }
+        } catch { }
+    };
+
+    window.OutZen.safeAvoidOverlap = function (id) {
+        try {
+            if (typeof window.OutZen.avoidOverlap === "function") {
+                window.OutZen.avoidOverlap(id);
+            }
+        } catch { }
     };
 })();
 

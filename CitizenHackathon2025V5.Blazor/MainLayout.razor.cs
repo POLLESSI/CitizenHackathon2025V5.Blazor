@@ -14,16 +14,14 @@ namespace CitizenHackathon2025V5.Blazor.Client
         [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
         [Inject] private IToastService ToastService { get; set; } = default!;
         [Inject] public IOutZenSignalRFactory SignalRFactory { get; set; } = default!;
-        [Inject] public MultiHubSignalRClient Hubs { get; set; } = default!;
+        [Inject] public IMultiHubSignalRClient Hubs { get; set; } = default!;
         [Inject] NavigationManager Nav { get; set; } = default!;
 
         private OutZenSignalRService? SignalRService;
         private IJSObjectReference? _layoutModule;
         private bool _disposed;
-
         private bool _wired;
 
-        // --- Background Image Logic ---
         private string GetBackgroundImage()
         {
             var hour = DateTime.Now.Hour;
@@ -48,7 +46,6 @@ namespace CitizenHackathon2025V5.Blazor.Client
             };
         }
 
-        // --- Lifecycle Methods ---
         protected override async Task OnInitializedAsync()
         {
             try
@@ -56,6 +53,7 @@ namespace CitizenHackathon2025V5.Blazor.Client
                 try
                 {
                     var token = await SignalRFactory.GetAccessTokenAsync();
+
                     if (!string.IsNullOrWhiteSpace(token))
                     {
                         // 1) OutZen
@@ -68,82 +66,58 @@ namespace CitizenHackathon2025V5.Blazor.Client
                     }
 
                     // 2) Other hubs
-                    await Hubs.ConnectAsync(new[]
-                    {
-                        HubName.Crowd,
-                        HubName.Suggestions,
-                        HubName.Weather
-                    });
+                    await Hubs.ConnectAsync(HubName.Crowd);
+                    await Hubs.ConnectAsync(HubName.Suggestions);
+                    await Hubs.ConnectAsync(HubName.Weather);
 
                     // 3) Handlers (once only)
                     if (!_wired)
                     {
                         _wired = true;
 
-                        Hubs.RegisterHandler<string>(HubName.Crowd, "notifynewCrowd", msg =>
-                            Console.WriteLine($"[Crowd] {msg}"));
+                        Hubs.RegisterHandler<string>(
+                            HubName.Crowd,
+                            "notifynewCrowd",
+                            msg => Console.WriteLine($"[Crowd] {msg}")
+                        );
 
-                        Hubs.RegisterHandler(HubName.Suggestions, "NewSuggestion", () =>
-                            Console.WriteLine("[Suggestion] NewSuggestion"));
+                        Hubs.RegisterHandler(
+                            HubName.Suggestions,
+                            "NewSuggestion",
+                            () => Console.WriteLine("[Suggestion] NewSuggestion")
+                        );
 
-                        Hubs.RegisterHandler<string>(HubName.Weather, "NewWeatherForecast", forecast =>
-                            Console.WriteLine($"[WF] {forecast}"));
+                        Hubs.RegisterHandler<string>(
+                            HubName.Weather,
+                            "NewWeatherForecast",
+                            forecast => Console.WriteLine($"[WF] {forecast}")
+                        );
                     }
                 }
                 catch (Exception ex)
                 {
-
                     Console.WriteLine($"OutZen init skipped: {ex.Message}");
                 }
 
-                // 4) Subscriptions on OutZen (if present)
                 if (SignalRService is not null)
                 {
-                    SignalRService.OnCrowdInfoUpdated += _ => Console.WriteLine("?? CrowdInfo (OutZen)");
-                    SignalRService.OnSuggestionsUpdated += _ => Console.WriteLine("?? Suggestions (OutZen)");
-                    SignalRService.OnWeatherUpdated += _ => Console.WriteLine("?? Weather (OutZen)");
-                    SignalRService.OnTrafficUpdated += _ => Console.WriteLine("?? Traffic (OutZen)");
+                    SignalRService.OnCrowdInfoUpdated += _ => Console.WriteLine("CrowdInfo (OutZen)");
+                    SignalRService.OnSuggestionsUpdated += _ => Console.WriteLine("Suggestions (OutZen)");
+                    SignalRService.OnWeatherUpdated += _ => Console.WriteLine("Weather (OutZen)");
+                    SignalRService.OnTrafficUpdated += _ => Console.WriteLine("Traffic (OutZen)");
                 }
-
-                // 4) OutZen service side subscriptions — ?? no return Task
-                //SignalRService.OnCrowdInfoUpdated += dto =>
-                //{
-                //    Console.WriteLine("?? CrowdInfo received (OutZen)");
-                //};
-                //SignalRService.OnSuggestionsUpdated += suggestions =>
-                //{
-                //    Console.WriteLine("?? Suggestions received (OutZen)");
-                //};
-                //SignalRService.OnWeatherUpdated += forecast =>
-                //{
-                //    Console.WriteLine("?? Weather received (OutZen)");
-                //};
-                //SignalRService.OnTrafficUpdated += traffic =>
-                //{
-                //    Console.WriteLine("?? Traffic received (OutZen)");
-                //};
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"SignalR init error: {ex.Message}");
             }
         }
+
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (!firstRender || _disposed) return;
 
-            //var uri = Nav.ToBaseRelativePath(Nav.Uri);
-            //if (!string.Equals(uri, "", StringComparison.OrdinalIgnoreCase)) return;
-            //_layoutModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-            //    "import", "/js/app/leafletOutZen.module.js");
-
-            //await _layoutModule.InvokeVoidAsync("bootOutZen", new
-            //{
-            //    mapId = "leafletMap",
-            //    center = new[] { 50.89, 4.34 },
-            //    zoom = 13,
-            //    enableChart = true
-            //});
+            await Task.CompletedTask;
         }
 
         private void ShowTestToast()
@@ -154,6 +128,7 @@ namespace CitizenHackathon2025V5.Blazor.Client
         public async ValueTask DisposeAsync()
         {
             _disposed = true;
+
             try
             {
                 if (_layoutModule is not null)
@@ -162,7 +137,10 @@ namespace CitizenHackathon2025V5.Blazor.Client
                 if (SignalRService is not null)
                     await SignalRService.DisposeAsync();
             }
-            catch { /* noop */ }
+            catch
+            {
+                // noop
+            }
         }
     }
 }

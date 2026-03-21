@@ -190,6 +190,21 @@ function ensureMapReady(scopeKey = null) {
     return { k, s, L, map: s.map, has: makeHas(s) };
 }
 
+function ensureCustomPane(map, name, zIndex) {
+    if (!map) return null;
+
+    let pane = map.getPane(name);
+    if (!pane) {
+        pane = map.createPane(name);
+    }
+
+    pane.style.zIndex = String(zIndex);
+    pane.style.pointerEvents = "auto";
+    pane.classList.add(name);
+
+    return pane;
+}
+
 /* ---------------------------------------------------------
    Popup binding (supports plugin OR fallback to bindPopup)
    - supports both signatures:
@@ -309,7 +324,41 @@ function pickLatLng(o) {
 
     return { lat, lng };
 }
+function isInsideBelgium(lat, lng, sOrScopeKey = null) {
+    let bounds = null;
 
+    if (typeof sOrScopeKey === "string" || sOrScopeKey == null) {
+        const s = peekS(pickScopeKey(sOrScopeKey)) || getS(pickScopeKey(sOrScopeKey));
+        bounds = s?.consts?.BELGIUM ?? null;
+    } else {
+        bounds = sOrScopeKey?.consts?.BELGIUM ?? null;
+    }
+
+    bounds ??= { minLat: 49.45, maxLat: 51.6, minLng: 2.3, maxLng: 6.6 };
+
+    return lat >= bounds.minLat &&
+        lat <= bounds.maxLat &&
+        lng >= bounds.minLng &&
+        lng <= bounds.maxLng;
+}
+
+function pickLatLngBelgiumOnly(o, sOrScopeKey = null) {
+    const ll = pickLatLng(o);
+    if (!ll) return null;
+    if (!isInsideBelgium(ll.lat, ll.lng, sOrScopeKey)) return null;
+    return ll;
+}
+function buildCalendarMarkerIcon(L, level, iconOverride = "🥁🎉", scopeKey = null) {
+    const lvl = normalizeLevel(level);
+
+    return L.divIcon({
+        className: `oz-marker oz-marker--calendar oz-marker-lvl${lvl} ${scopeKey ? `oz-scope--${String(scopeKey).toLowerCase()}` : ""}`.trim(),
+        html: `<div class="oz-marker-inner oz-calendar-inner">${iconOverride}</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+        popupAnchor: [0, -15],
+    });
+}
 /* ---------------------------------------------------------
    Icons
 --------------------------------------------------------- */
@@ -516,7 +565,7 @@ export async function bootOutZen({
         zoomAnimation: false,
         fadeAnimation: false,
         markerZoomAnimation: false,
-        preferCanvas: true,
+        preferCanvas: false,
         zoomControl: true,
         trackResize: true,
         minZoom: 5,
@@ -524,6 +573,8 @@ export async function bootOutZen({
         zoomSnap: 1,
         zoomDelta: 1
     }).setView(center, zoom);
+
+    ensureCustomPane(map, "ozCalendarPane", 5000);
 
     // Base tile
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -573,10 +624,15 @@ export async function bootOutZen({
     s.layerGroup ??= L.layerGroup();
     if (!map.hasLayer(s.layerGroup)) s.layerGroup.addTo(map);
 
-    s.calendarLayer ??= L.layerGroup();
-    if (!map.hasLayer(s.calendarLayer)) s.calendarLayer.addTo(map);
+    // RECREATE calendar layer on each boot
+    try { s.calendarLayer?.clearLayers?.(); } catch { }
+    s.calendarLayer = L.layerGroup();
+    s.calendarLayer.addTo(map);
 
-    // antenna layer created on demand
+    // antenna can also be recreated defensively
+    try { s.antennaLayer?.clearLayers?.(); } catch { }
+    s.antennaLayer = null;
+
     // detail layer created on demand
 
     // Reset logic
@@ -604,8 +660,13 @@ export async function bootOutZen({
         s.bundleMarkers ??= new Map();
         s.bundleIndex ??= new Map();
         s.detailMarkers ??= new Map();
-        s.calendarMarkers ??= new Map();
-        s.antennaMarkers ??= new Map();
+
+        // IMPORTANT: calendar markers must not survive a boot on a recreated map
+        s.calendarMarkers = new Map();
+
+        // safer for antenna too
+        s.antennaMarkers = new Map();
+
         s._weatherById ??= new Map();
     }
 
@@ -735,8 +796,16 @@ export function addOrUpdateCrowdMarker(id, lat, lng, level, info, scopeKey = nul
     const existing = s.markers.get(key);
 
     const popupHtml = buildPopupHtml(info ?? {}, s);
+
+    const resolvedKind =
+        info?.kind ??
+        (info?.weatherType ? "weather" :
+            (info?.isTraffic ? "traffic" : "crowd"));
+
+    const warn = shouldWarnMarker(resolvedKind, level, info, k);
+
     const icon = buildMarkerIcon(L, level, {
-        kind: info?.kind ?? (info?.weatherType ? "weather" : (info?.isTraffic ? "traffic" : "generic")),
+        kind: resolvedKind,
         scopeKey: k,
         isTraffic: !!info?.isTraffic,
         weatherType: info?.weatherType ?? info?.WeatherType ?? null,
@@ -750,6 +819,8 @@ export function addOrUpdateCrowdMarker(id, lat, lng, level, info, scopeKey = nul
             if (existing.getPopup()) existing.setPopupContent(popupHtml);
             else safeBindPopup(existing, popupHtml);
         } catch { }
+
+        applyWarningStateToMarker(existing, { warn, isCalendar: false });
         return true;
     }
 
@@ -762,6 +833,8 @@ export function addOrUpdateCrowdMarker(id, lat, lng, level, info, scopeKey = nul
     safeBindPopup(marker, popupHtml);
     addLayerSmart(marker, s);
     s.markers.set(key, marker);
+
+    applyWarningStateToMarker(marker, { warn, isCalendar: false });
     return true;
 }
 
@@ -815,7 +888,7 @@ export function clearMarkersByPrefix(prefix, scopeKey = null) {
 export function addOrUpdatePlaceMarker(place, scopeKey = null) {
     const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
-    const { k, s } = ready;
+    const { k } = ready;
 
     const ll = pickLatLng(place);
     if (!ll) return false;
@@ -824,7 +897,12 @@ export function addOrUpdatePlaceMarker(place, scopeKey = null) {
     const title = place?.Name ?? place?.name ?? place?.Title ?? place?.title ?? "Place";
     const description = place?.Description ?? place?.description ?? place?.Type ?? place?.type ?? "";
 
-    return addOrUpdateCrowdMarker(id, ll.lat, ll.lng, 1, { kind: "place", title, description, icon: "🏰" }, k);
+    return addOrUpdateCrowdMarker(id, ll.lat, ll.lng, 1, {
+        kind: "place",
+        title,
+        description,
+        icon: "🏰"
+    }, k);
 }
 
 export function addOrUpdateEventMarker(ev, scopeKey = null) {
@@ -893,11 +971,18 @@ export function addOrUpdateCrowdCalendarMarker(id, lat, lng, level, info, scopeK
     const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
 
-    const { k, s, L } = ready;
+    const { k, s, L, map } = ready;
 
     const latNum = toNumLoose(lat);
     const lngNum = toNumLoose(lng);
     if (latNum == null || lngNum == null) return false;
+
+    if (!isInsideBelgium(latNum, lngNum, s)) {
+        console.warn("[CIC][reject-marker-outside-belgium]", { id, lat: latNum, lng: lngNum, scopeKey: k });
+        return false;
+    }
+
+    ensureCustomPane(map, "ozCalendarPane", 5000);
 
     const layer = ensureCalendarLayer(s, L);
     if (!layer) return false;
@@ -907,14 +992,10 @@ export function addOrUpdateCrowdCalendarMarker(id, lat, lng, level, info, scopeK
 
     const title = info?.eventname ?? info?.title ?? "Crowd Calendar";
     const desc = info?.description ?? "";
-    const isHomeWarning = k === "home";
+    const lvl = normalizeLevel(level);
+    const isCalendarWarning = k === "crowdinfocalendarview" && lvl >= 2;
 
-    const icon = buildMarkerIcon(L, level, {
-        kind: "calendar",
-        scopeKey: k,
-        iconOverride: info?.icon ?? "🥁🎉"
-    });
-
+    const icon = buildCalendarMarkerIcon(L, level, info?.icon ?? "🥁🎉", k);
     const popupHtml = buildPopupHtml({ title, description: desc }, s);
 
     let mk = s.calendarMarkers.get(key);
@@ -922,9 +1003,11 @@ export function addOrUpdateCrowdCalendarMarker(id, lat, lng, level, info, scopeK
     if (!mk) {
         mk = L.marker([latNum, lngNum], {
             icon,
+            pane: "ozCalendarPane",
             title,
             riseOnHover: true,
-            zIndexOffset: 2000,
+            zIndexOffset: 10000,
+            keyboard: false,
             __ozNoCluster: true
         });
 
@@ -932,26 +1015,13 @@ export function addOrUpdateCrowdCalendarMarker(id, lat, lng, level, info, scopeK
         layer.addLayer(mk);
         s.calendarMarkers.set(key, mk);
 
-        waitForMarkerElement(mk).then(el => {
-            console.log("[CIC][marker:new]", { key, scopeKey: k, isHomeWarning, el });
-            if (!el) return;
-
-            const inner = el.querySelector(".oz-marker-inner");
-            if (!inner) {
-                console.warn("[CIC][marker:new] inner not found", { key, scopeKey: k });
-                return;
-            }
-
-            inner.classList.toggle("oz-calendar-warning-inner", isHomeWarning);
-
-            if (isHomeWarning) {
-                inner.setAttribute("data-oz-warning", "1");
-            } else {
-                inner.removeAttribute("data-oz-warning");
-            }
-
-            console.log("[CIC][marker:new][innerClassName]", inner.className);
+        applyWarningStateToMarker(mk, {
+            warn: isCalendarWarning,
+            isCalendar: true
         });
+
+        console.log("[CIC][marker:new]", { key, scopeKey: k, isCalendarWarning, pane: mk?.options?.pane });
+        console.log("[CIC][warning-check]", { key, scopeKey: k, level, lvl, isCalendarWarning });
 
         return true;
     }
@@ -959,32 +1029,23 @@ export function addOrUpdateCrowdCalendarMarker(id, lat, lng, level, info, scopeK
     try { mk.setLatLng([latNum, lngNum]); } catch { }
     try { mk.setIcon(icon); } catch { }
     try {
-        if (mk.getPopup()) mk.setPopupContent(popupHtml);
-        else safeBindPopup(mk, popupHtml);
+        if (mk.getPopup()) {
+            mk.setPopupContent(popupHtml);
+        } else {
+            safeBindPopup(mk, popupHtml, { maxWidth: 420, closeButton: true, autoPan: true });
+        }
     } catch { }
 
-    try { layer.addLayer(mk); } catch { }
+    try {
+        if (!layer.hasLayer(mk)) layer.addLayer(mk);
+    } catch { }
 
-    waitForMarkerElement(mk).then(el => {
-        console.log("[CIC][marker:update]", { key, scopeKey: k, isHomeWarning, el });
-        if (!el) return;
-
-        const inner = el.querySelector(".oz-marker-inner");
-        if (!inner) {
-            console.warn("[CIC][marker:update] inner not found", { key, scopeKey: k });
-            return;
-        }
-
-        inner.classList.toggle("oz-calendar-warning-inner", isHomeWarning);
-
-        if (isHomeWarning) {
-            inner.setAttribute("data-oz-warning", "1");
-        } else {
-            inner.removeAttribute("data-oz-warning");
-        }
-
-        console.log("[CIC][marker:update][innerClassName]", inner.className);
+    applyWarningStateToMarker(mk, {
+        warn: isCalendarWarning,
+        isCalendar: true
     });
+
+    console.log("[CIC][marker:update]", { key, scopeKey: k, isCalendarWarning, pane: mk?.options?.pane });
 
     return true;
 }
@@ -1023,36 +1084,62 @@ export function upsertCrowdCalendarMarkers(items, scopeKey = null) {
     const { k } = ready;
     if (!Array.isArray(items)) return false;
 
+    const allCoords = [];
+
     for (const it of items) {
-        const ll = pickLatLng(it);
-        if (!ll) continue;
+        const raw = pickLatLng(it);
+        if (raw) allCoords.push(raw);
+
+        const ll = pickLatLngBelgiumOnly(it, k);
+        if (!ll) {
+            console.warn("[CIC][skip-outside-belgium]", {
+                id: it?.Id ?? it?.id,
+                lat: it?.Latitude ?? it?.latitude,
+                lng: it?.Longitude ?? it?.longitude,
+                region: it?.RegionCode ?? it?.regionCode,
+                event: it?.EventName ?? it?.eventName
+            });
+            continue;
+        }
 
         const rawId = it?.Id ?? it?.id ?? it?.CalendarId ?? it?.calendarId ?? `${ll.lat},${ll.lng}`;
-
         const id = `cc:${rawId}`;
 
-        const level = Number(it?.ExpectedLevel ?? it?.expectedLevel ?? it?.Level ?? it?.level ?? it?.CrowdLevel ?? it?.crowdLevel ?? 1);
+        const level = Number(
+            it?.ExpectedLevel ?? it?.expectedLevel ??
+            it?.Level ?? it?.level ??
+            it?.CrowdLevel ?? it?.crowdLevel ?? 1
+        );
 
         const startLocalTime = it?.StartLocalTime ?? it?.startLocalTime ?? "—";
-
         const endLocalTime = it?.EndLocalTime ?? it?.endLocalTime ?? "—";
-
         const leadHours = it?.LeadHours ?? it?.leadHours ?? "—";
-
         const confidence = it?.Confidence ?? it?.confidence ?? "—";
 
-        const info = {eventname: it?.EventName ?? it?.eventName ?? it?.Title ?? it?.title ?? "Crowd Calendar",
-
+        const info = {
+            eventname: it?.EventName ?? it?.eventName ?? it?.Title ?? it?.title ?? "Crowd Calendar",
             description: `Start ${startLocalTime} • End ${endLocalTime} • LeadHours ${leadHours} • Confidence ${confidence}%`,
-
             messagetemplate: it?.MessageTemplate ?? it?.messageTemplate ?? "",
-
             active: it?.Active ?? it?.active ?? true,
-
             icon: it?.Icon ?? it?.icon ?? "🥁🎉"
         };
 
+        console.log("[CIC][upsert:item]", {
+            rawId, id, lat: ll.lat, lng: ll.lng, level,
+            event: it?.EventName ?? it?.eventName,
+            region: it?.RegionCode ?? it?.regionCode
+        });
+
         addOrUpdateCrowdCalendarMarker(id, ll.lat, ll.lng, level, info, k);
+    }
+
+    if (allCoords.length) {
+        console.log("[CIC][coords-range]", {
+            minLat: Math.min(...allCoords.map(x => x.lat)),
+            maxLat: Math.max(...allCoords.map(x => x.lat)),
+            minLng: Math.min(...allCoords.map(x => x.lng)),
+            maxLng: Math.max(...allCoords.map(x => x.lng))
+        });
     }
 
     return true;
@@ -1111,6 +1198,8 @@ export function addOrUpdateAntennaMarker(antenna, scopeKey = null) {
 
     const key = makeAntennaKey(antenna) ?? `ant:${ll.lat.toFixed(5)},${ll.lng.toFixed(5)}`;
     const lvl = Number(antenna.Level ?? antenna.level ?? 1);
+    const warn = shouldWarnMarker("antenna", lvl, antenna, k);
+
     const iconOverride = antenna.Icon ?? antenna.icon ?? "📡";
     const icon = buildMarkerIcon(L, lvl, { kind: "antenna", scopeKey: k, iconOverride });
 
@@ -1127,6 +1216,8 @@ export function addOrUpdateAntennaMarker(antenna, scopeKey = null) {
             else safeBindPopup(existing, popup);
         } catch { }
         try { layer.addLayer(existing); } catch { }
+
+        applyWarningStateToMarker(existing, { warn, isCalendar: false });
         return true;
     }
 
@@ -1140,6 +1231,8 @@ export function addOrUpdateAntennaMarker(antenna, scopeKey = null) {
     safeBindPopup(m, popup);
     try { layer.addLayer(m); } catch { addLayerSmart(m, s); }
     s.antennaMarkers.set(key, m);
+
+    applyWarningStateToMarker(m, { warn, isCalendar: false });
     return true;
 }
 
@@ -1280,6 +1373,7 @@ function makeDetailKey(kind, item) {
 
 function addDetailMarker(kind, item, s, L, scopeKey) {
     if (!s?.map) return;
+
     const layer = ensureDetailLayer(s, L);
     if (!layer) return;
 
@@ -1310,62 +1404,152 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
             __ozNoCluster: true,
         });
 
-        const desc = `Temp: ${item?.TemperatureC ?? item?.temperatureC ?? "?"}°C • Wind: ${item?.WindSpeedKmh ?? item?.windSpeedKmh ?? "?"} km/h`;
         safeBindPopup(m, buildPopupHtml({
             title: item?.Summary ?? item?.summary ?? title,
             description: `Temp: ${item?.TemperatureC ?? item?.temperatureC ?? "?"}°C • Vent: ${item?.WindSpeedKmh ?? item?.windSpeedKmh ?? "?"} km/h`
         }, s));
+
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
+
+        //applyWarningStateToMarker(m, {
+        //    warn: shouldWarnMarker("weather", level, item, scopeKey),
+        //    isCalendar: false
+        //});
         return;
     }
 
     // --- Place
     if (kindLower === "place") {
-        const icon = buildMarkerIcon(L, 1, { kind: "place", iconOverride: "🏰" });
-        const m = L.marker([ll.lat, ll.lng], { icon, title: `Place: ${title}`, riseOnHover: true, pane: "markerPane", __ozNoCluster: true });
-        safeBindPopup(m, buildPopupHtml({ title, description: item?.Description ?? item?.description ?? "" }, s));
+        const level = 1;
+        const icon = buildMarkerIcon(L, level, { kind: "place", iconOverride: "🏰" });
+
+        const m = L.marker([ll.lat, ll.lng], {
+            icon,
+            title: `Place: ${title}`,
+            riseOnHover: true,
+            pane: "markerPane",
+            __ozNoCluster: true
+        });
+
+        safeBindPopup(m, buildPopupHtml({
+            title,
+            description: item?.Description ?? item?.description ?? ""
+        }, s));
+
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
+
+        //applyWarningStateToMarker(m, {
+        //    warn: shouldWarnMarker("place", level, item, scopeKey),
+        //    isCalendar: false
+        //});
         return;
     }
 
     // --- Event
     if (kindLower === "event") {
-        const icon = buildMarkerIcon(L, 2, { kind: "event", iconOverride: "🎪" });
-        const m = L.marker([ll.lat, ll.lng], { icon, title: `Event: ${title}`, riseOnHover: true, pane: "markerPane", __ozNoCluster: true });
-        safeBindPopup(m, buildPopupHtml({ title, description: item?.Description ?? item?.description ?? "" }, s));
+        const level = 2;
+        const icon = buildMarkerIcon(L, level, { kind: "event", iconOverride: "🎪" });
+
+        const m = L.marker([ll.lat, ll.lng], {
+            icon,
+            title: `Event: ${title}`,
+            riseOnHover: true,
+            pane: "markerPane",
+            __ozNoCluster: true
+        });
+
+        safeBindPopup(m, buildPopupHtml({
+            title,
+            description: item?.Description ?? item?.description ?? ""
+        }, s));
+
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
+
+        //applyWarningStateToMarker(m, {
+        //    warn: shouldWarnMarker("event", level, item, scopeKey),
+        //    isCalendar: false
+        //});
         return;
     }
 
-    // --- Crowd (fallback)
+    // --- Crowd
     if (kindLower === "crowd") {
         const level = clampLevel14(item?.CrowdLevel ?? item?.crowdLevel ?? item?.Level ?? item?.level ?? 2);
         const icon = buildMarkerIcon(L, level, { kind: "crowd" });
-        const m = L.marker([ll.lat, ll.lng], { icon, title: `Crowd: ${title}`, riseOnHover: true, pane: "markerPane", __ozNoCluster: true });
-        safeBindPopup(m, buildPopupHtml({ title, description: item?.Message ?? item?.message ?? "" }, s));
+
+        const m = L.marker([ll.lat, ll.lng], {
+            icon,
+            title: `Crowd: ${title}`,
+            riseOnHover: true,
+            pane: "markerPane",
+            __ozNoCluster: true
+        });
+
+        safeBindPopup(m, buildPopupHtml({
+            title,
+            description: item?.Message ?? item?.message ?? ""
+        }, s));
+
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
+
+        //applyWarningStateToMarker(m, {
+        //    warn: shouldWarnMarker("crowd", level, item, scopeKey),
+        //    isCalendar: false
+        //});
         return;
     }
 
-    // --- Traffic (fallback)
+    // --- Traffic
     if (kindLower === "traffic") {
         const level = clampLevel14(item?.TrafficLevel ?? item?.trafficLevel ?? item?.CongestionLevel ?? item?.level ?? 2);
-        const icon = buildMarkerIcon(L, level, { kind: "traffic", isTraffic: true, iconOverride: "🚗" });
-        const m = L.marker([ll.lat, ll.lng], { icon, title: `Traffic: ${title}`, riseOnHover: true, pane: "markerPane", __ozNoCluster: true });
-        safeBindPopup(m, buildPopupHtml({ title, description: item?.Description ?? item?.description ?? "" }, s));
+        const icon = buildMarkerIcon(L, level, {
+            kind: "traffic",
+            isTraffic: true,
+            iconOverride: "🚗"
+        });
+
+        const m = L.marker([ll.lat, ll.lng], {
+            icon,
+            title: `Traffic: ${title}`,
+            riseOnHover: true,
+            pane: "markerPane",
+            __ozNoCluster: true
+        });
+
+        safeBindPopup(m, buildPopupHtml({
+            title,
+            description: item?.Description ?? item?.description ?? ""
+        }, s));
+
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
+
+        //applyWarningStateToMarker(m, {
+        //    warn: shouldWarnMarker("traffic", level, item, scopeKey),
+        //    isCalendar: false
+        //});
         return;
     }
 
-    // --- Suggestion (click -> Blazor)
+    // --- Suggestion
     if (kindLower === "suggestion") {
-        const icon = buildMarkerIcon(L, 2, { kind: "suggestion", iconOverride: "💡" });
-        const m = L.marker([ll.lat, ll.lng], { icon, title: `Suggestion: ${title}`, riseOnHover: true, pane: "markerPane", __ozNoCluster: true });
+        const level = 2;
+        const icon = buildMarkerIcon(L, level, {
+            kind: "suggestion",
+            iconOverride: "💡"
+        });
+
+        const m = L.marker([ll.lat, ll.lng], {
+            icon,
+            title: `Suggestion: ${title}`,
+            riseOnHover: true,
+            pane: "markerPane",
+            __ozNoCluster: true
+        });
 
         const popupDesc = [
             item?.Reason ? `Reason: ${item.Reason}` : null,
@@ -1374,9 +1558,12 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
             (item?.DistanceKm != null) ? `Distance: ${item.DistanceKm} km` : null,
         ].filter(Boolean).join(" • ");
 
-        safeBindPopup(m, buildPopupHtml({ title, description: popupDesc }, s));
+        safeBindPopup(m, buildPopupHtml({
+            title,
+            description: popupDesc
+        }, s));
 
-        const sid = Number(item?.SuggestionId ?? item?.Id ?? item?.id);
+        const sid = Number(item?.SuggestionId ?? item?.suggestionId ?? item?.Id ?? item?.id);
         m.on("click", () => {
             try { m.openPopup(); } catch { }
             if (!Number.isFinite(sid)) return;
@@ -1389,15 +1576,40 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
 
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
+
+        applyWarningStateToMarker(m, {
+            warn: shouldWarnMarker("suggestion", level, item, scopeKey),
+            isCalendar: false
+        });
         return;
     }
 
-    // Generic fallback
-    const icon = buildMarkerIcon(L, 1, { kind: kindLower });
-    const m = L.marker([ll.lat, ll.lng], { icon, title: `${kindLower}: ${title}`, riseOnHover: true, pane: "markerPane", __ozNoCluster: true });
-    safeBindPopup(m, buildPopupHtml({ title, description: item?.Description ?? item?.description ?? "" }, s));
-    layer.addLayer(m);
-    s.detailMarkers.set(key, m);
+    // --- Generic fallback
+    {
+        const level = 1;
+        const icon = buildMarkerIcon(L, level, { kind: kindLower });
+
+        const m = L.marker([ll.lat, ll.lng], {
+            icon,
+            title: `${kindLower}: ${title}`,
+            riseOnHover: true,
+            pane: "markerPane",
+            __ozNoCluster: true
+        });
+
+        safeBindPopup(m, buildPopupHtml({
+            title,
+            description: item?.Description ?? item?.description ?? ""
+        }, s));
+
+        layer.addLayer(m);
+        s.detailMarkers.set(key, m);
+
+        applyWarningStateToMarker(m, {
+            warn: shouldWarnMarker(kindLower, level, item, scopeKey),
+            isCalendar: false
+        });
+    }
 }
 
 export function addOrUpdateDetailMarkers(payload, scopeKey = null) {
@@ -1754,7 +1966,6 @@ function computeBundles(payload, tolMeters) {
 
     return buckets;
 }
-
 export function updateBundleMarker(b, scopeKey = "main") {
     const ready = ensureMapReady(scopeKey);
     if (!ready) return;
@@ -1865,6 +2076,31 @@ function _boundsFromLatLngs(L, latlngs) {
     return b && b.isValid && b.isValid() ? b : null;
 }
 
+function applyWarningStateToMarker(marker, {
+    warn = false,
+    isCalendar = false
+} = {}) {
+    if (!marker) return;
+
+    waitForMarkerElement(marker).then(el => {
+        if (!el) return;
+
+        el.classList.toggle("oz-marker-warning", !!warn);
+        el.toggleAttribute("data-oz-warning", !!warn);
+
+        const inner =
+            el.querySelector(".oz-marker-inner") ||
+            el.querySelector(".oz-ant-dot");
+
+        if (!inner) return;
+
+        if (isCalendar) {
+            inner.classList.toggle("oz-calendar-warning-inner", !!warn);
+        } else {
+            inner.classList.remove("oz-calendar-warning-inner");
+        }
+    });
+}
 export function fitToAllMarkers(scopeKey = null, opts = {}) {
     const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
@@ -1897,7 +2133,21 @@ export function fitToCalendar(scopeKey = null, opts = {}) {
 
     const latlngs = [];
     for (const m of (s.calendarMarkers?.values?.() ?? [])) {
-        try { latlngs.push(m.getLatLng()); } catch { }
+        try {
+            const ll = m.getLatLng();
+            if (!ll) continue;
+            if (!isInsideBelgium(ll.lat, ll.lng, s)) {
+                console.warn("[CIC][fit-skip-outside-belgium]", ll);
+                continue;
+            }
+            latlngs.push(ll);
+        } catch { }
+    }
+
+    if (!latlngs.length) {
+        console.warn("[CIC][fitToCalendar] no valid Belgium markers, fallback");
+        try { map.setView([50.5039, 4.4699], 8, { animate: false }); } catch { }
+        return false;
     }
 
     const b = _boundsFromLatLngs(L, latlngs);
@@ -1957,7 +2207,7 @@ export function activateHybridAndZoom(scopeKey = null, threshold = 13) {
     return wantDetails ? fitToDetails(k) : fitToBundles(k);
 }
 
-export function pruneMarkersByPrefix(scopeKey = null, prefix = "") {
+export function pruneMarkersByPrefix(prefix = "", scopeKey = null) {
     const k = pickScopeKey(scopeKey);
     const s = peekS(k) || getS(k);
     if (!(s?.markers instanceof Map)) return 0;
@@ -2192,6 +2442,39 @@ export function waitForMarkerElement(marker, tries = 30) {
     });
 }
 
+function shouldWarnMarker(kind, level, item = null, scopeKey = null) {
+    const k = String(kind || "").toLowerCase();
+    const lvl = normalizeLevel(level);
+
+    switch (k) {
+        case "crowd":
+            return lvl >= 2;
+
+        case "event":
+            return true;
+
+        case "suggestion":
+            return true;
+
+        case "traffic":
+            return lvl >= 2;
+
+        case "weather":
+            return lvl >= 2 || !!(item?.IsSevere ?? item?.isSevere);
+
+        case "antenna":
+            return true;
+
+        case "place":
+            return true;
+
+        case "calendar":
+            return scopeKey === "crowdinfocalendarview" && lvl >= 2;
+
+        default:
+            return false;
+    }
+}
 /* ---------------------------------------------------------
    Leaflet patch guard (stability)
 --------------------------------------------------------- */

@@ -1,1311 +1,138 @@
 ﻿/*wwwroot.css.themes.outzen.css*/
-/* === OutZen NAV (desktop + mobile) === */
+/* =========================================================
+   OUTZEN — LEAFLET / MARKERS CLEAN
+   ========================================================= */
+
 :root {
-    --home-lift: 0px;
-    --map-lift: 50px;
-    --nav-h: 72px;
-    --nav-z: 2000;
-    --nav-z-below: 1999;
-    --nav-z-above: 2001;
-    --nav-bg: rgba(8,12,20,.92);
-    --nav-border: rgba(255,255,255,.08);
-    --overlay: rgba(0,0,0,.55);
-    --drawer-w: min(360px, 86vw);
-}
-/* Shift the content below the nav */
-.page-content {
-    padding-top: 0;
-}
-
-.app-container {
-    padding-top: var(--nav-h);
+    --oz-nav-h: 72px;
+    --oz-nav-z: 2000;
+    --oz-lvl0: rgba(120,120,120,.85);
+    --oz-lvl1: rgba(76,175,80,.95);
+    --oz-lvl2: rgba(255,152,0,.95);
+    --oz-lvl3: rgba(244,67,54,.95);
+    --oz-lvl4: rgba(183,28,28,.98);
+    --oz-place: rgba(63,17,107,.95);
+    --oz-event: rgba(240,7,189,.95);
+    --oz-suggestion: rgba(155,89,255,.95);
+    --oz-marker-size: 26px;
+    --oz-bundle-size: 34px;
+    --oz-calendar-size: 30px;
 }
 
-/* Often the header has its own margin/padding; tighten it */
-.home-header,
-.home-main {
-    transform: none;
-}
-.home-main {
-    margin-top: 0 !important;
-}
-/* controlled space under nav (e.g., 8px) */
-.home-header {
-    margin-top: 8px;
-}
-.index-title {
-    margin: 0;
-}
-.index-subtitle {
-    margin: 6px 0 0;
-}
-#outzenMap_weather,
-#leafletMap-weatherforecastview {
-    height: 100%;
+/* =========================================================
+   MAP CONTAINERS
+   ========================================================= */
+
+.leaflet-host,
+.oz-map-shell {
     width: 100%;
-    border-radius: 12px;
-}
-#leafletMap-weatherforecastview,
-#leafletMap-eventview {
-    height: 420px; /* or 100% if parent sized */
-    min-height: 320px;
-}
-#leafletMap-suggestionview {
-    height: 70vh;
     min-height: 420px;
-    width: 100%;
 }
 
-/* NAV fixed to the viewport */
-nav.main-nav {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: var(--nav-h);
-    z-index: var(--nav-z);
-    background: var(--nav-bg);
-    border-bottom: 1px solid var(--nav-border);
+.oz-map-shell {
+    height: clamp(420px, 60vh, 720px);
+    position: relative;
 }
 
-/* Barre interne */
-nav.main-nav .nav-container {
+.oz-map-shell > .leaflet-host {
     height: 100%;
-    width: min(1200px, 92vw);
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: .75rem;
-}
-
-/* Desktop */
-.nav-links.desktop {
-    display: flex;
-    gap: .6rem;
-    margin: 0;
-    padding: 0;
-    list-style: none;
-    overflow-x: auto;
-    white-space: nowrap;
-}
-
-/* Burger */
-.nav-toggle {
-    width: 44px;
-    height: 44px;
-    border: 1px solid rgba(255,255,255,.14);
-    border-radius: 12px;
-    background: rgba(255,255,255,.06);
-    cursor: pointer;
-    display: none;
-}
-
-.burger,
-.burger::before,
-.burger::after {
-    content: "";
     display: block;
-    width: 18px;
-    height: 2px;
-    background: #fff;
-    border-radius: 2px;
-    position: relative;
-    transition: transform .18s ease, opacity .18s ease, top .18s ease;
-}
-
-.burger::before {
-    position: absolute;
-    left: 0;
-    top: -6px;
-}
-
-.burger::after {
-    position: absolute;
-    left: 0;
-    top: 6px;
-}
-
-nav.main-nav.is-open .burger {
-    background: transparent;
-}
-
-nav.main-nav.is-open .burger::before {
-    top: 0;
-    transform: rotate(45deg);
-}
-
-nav.main-nav.is-open .burger::after {
-    top: 0;
-    transform: rotate(-45deg);
-}
-
-/* Overlay */
-.nav-overlay {
-    position: fixed;
-    inset: 0;
-    background: var(--overlay);
-    z-index: var(--nav-z-below);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity .18s ease;
-}
-
-.nav-overlay.show {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-/* Drawer */
-.nav-drawer {
-    position: fixed;
-    top: 0;
-    right: 0;
-    height: 100vh;
-    width: var(--drawer-w);
-    background: rgba(10,14,24,.96);
-    border-left: 1px solid rgba(255,255,255,.10);
-    transform: translateX(100%);
-    transition: transform .20s ease;
-    z-index: var(--nav-z-above);
-    padding-top: var(--nav-h);
-}
-
-    .nav-drawer.show {
-        transform: translateX(0);
-    }
-
-.nav-links.mobile {
-    list-style: none;
-    margin: 0;
-    padding: .75rem;
-    display: flex;
-    flex-direction: column;
-    gap: .25rem;
-}
-
-.map-shell {
-    height: clamp(320px, 55vh, 560px);
-    min-height: 320px;
-    width: 100%;
-    min-width: 320px; /* Important: Avoid 142px */
-    position: relative;
-    display: block;
-    flex: 0 0 auto;
-}
-
-/* Home */
-.homeMapCard {
-    height: 520px; /* or clamp(320px, 60vh, 720px) */
-    min-height: 320px;
-    margin-top: 8px;
-    /*transform: translateY(calc(-1 * var(--map-lift)));*/
-    will-change: transform;
-    overflow: visible;
-}
-
-.homeMapCard {
-    margin-top: calc(8px - var(--map-lift)); /* goes back */
 }
 
 #leafletMap-home {
     position: relative;
     z-index: 10;
 }
-/* Pages (if you have a generic #leafletMap) */
-#leafletMap, .leaflet-host {
+
+#leafletMap,
+.leaflet-host {
     height: 520px;
-    min-height: 320px;
     width: 100%;
-    scroll-margin-top: var(--nav-h);
-
-}
-
-.leaflet-popup-content .oz-bundle-popup {
-    font-family: system-ui, Segoe UI, Arial;
-    font-size: 13px;
-}
-
-.leaflet-popup-content .oz-sec-title {
-    font-weight: 700;
-    margin: 8px 0 4px;
-}
-
-/* Tooltip readability */
-.leaflet-tooltip {
-    font-weight: 600;
-}
-
-/* Safety: avoids overbearing parents */
-.home-main, .page-content {
-    min-height: 0;
-}
-
-.home-earth-canvas,
-.globe-overlay {
-    z-index: 1;
-    pointer-events: none;
-}
-
-/* ✅ Allow Chart.js */
-#crowdChart {
-    pointer-events: auto;
-}
-
-#outzenMap_traffic {
-    height: 100%;
-    min-height: 420px;
-    width: 100%;
-    border-radius: 12px;
-}
-
-#outzenMap_weather {
-    position: relative;
-    z-index: 0;
-}
-
-nav.main-nav {
-    z-index: 2000;
-}
-/* Base antenne */
-.oz-ant-icon {
-    border-radius: 999px;
-    width: 18px;
-    height: 18px;
-    display: grid;
-    place-items: center;
-    box-shadow: 0 0 0 2px rgba(0,0,0,.25);
-}
-
-/* Dot */
-.oz-ant-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 999px;
-    background: currentColor;
-    box-shadow: 0 0 0 2px rgba(0,0,0,.35);
-}
-
-/* Levels (exemples) */
-.oz-ant-lvl1 {
-    color: #2ecc71;
-}
-
-.oz-ant-lvl2 {
-    color: #f39c12;
-}
-
-.oz-ant-lvl3 {
-    color: #e74c3c;
-}
-
-.oz-ant-lvl4 {
-    color: #ff0033;
-}
-
-/* ✅ Blink critical */
-.oz-ant-critical {
-    animation: ozPulse 1s infinite ease-in-out;
-    box-shadow: 0 0 0 0 rgba(255,0,0,.0);
-}
-
-.oz-body {
-    padding: 10px 12px;
-    overflow: auto;
-    max-height: calc(min(70vh, 560px) - 44px);
-}
-/* Ensures that the divIcon bundle is visible */
-.oz-bundle-icon {
-    pointer-events: auto !important;
-    display: block !important;
-    opacity: 1 !important;
-    z-index: 99999 !important;
-    filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));
-}
-
-/* Bundle icon: green with black border */
-.oz-bundle-icon .oz-bundle {
-    width: 34px;
-    height: 34px;
-    border-radius: 999px;
-    display: grid;
-    place-items: center;
-    color: #fff;
-    font-weight: 900;
-    border: 2px solid rgba(0,0,0,.65);
-    box-shadow: 0 8px 22px rgba(0,0,0,.35);
-}
-
-/* Optional: improve the readability of the number */
-.oz-bundle-icon .oz-bundle .oz-count {
-    filter: drop-shadow(0 2px 2px rgba(0,0,0,.35));
-}
-.oz-bundle, .oz-badge, .oz-bundle-tag {
-    display: grid !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-}
-/* Base */
-.oz-cal-icon {
-    background: transparent !important;
-    border: none !important;
-}
-
-.oz-cal-pin {
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 2px solid rgba(255,255,255,.85);
-    box-shadow: 0 6px 18px rgba(0,0,0,.35);
-    backdrop-filter: blur(2px);
-}
-
-.oz-cal-emoji {
-    font-size: 14px;
-    line-height: 1;
-}
-
-.oz-cal-shadow {
-    width: 10px;
-    height: 10px;
-    margin: -2px auto 0;
-    border-radius: 999px;
-    background: rgba(0,0,0,.25);
-    filter: blur(2px);
-}
-
-/* Colors by ExpectedLevel */
-.oz-cal-lvl1 .oz-cal-pin {
-    background: rgba(40, 180, 99, .95);
-}
-/* green */
-.oz-cal-lvl2 .oz-cal-pin {
-    background: rgba(241, 196, 15, .95);
-}
-/* yellow */
-.oz-cal-lvl3 .oz-cal-pin {
-    background: rgba(230, 126, 34, .95);
-}
-/* orange */
-.oz-cal-lvl4 .oz-cal-pin {
-    background: rgba(231, 76, 60, .98);
-}
-/* red */
-
-/* Old outer-class convention + new inner-class convention */
-.leaflet-marker-icon.oz-calendar-warning .oz-marker-inner,
-.leaflet-marker-icon.oz-marker .oz-marker-inner.oz-calendar-warning-inner {
-    animation: ozCalendarWarnPulse 0.9s infinite ease-in-out !important;
-    box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.20), 0 0 12px rgba(255, 87, 34, 0.55), 0 0 22px rgba(255, 0, 0, 0.35) !important;
-    border-radius: 999px !important;
-    will-change: transform, opacity, filter !important;
-}
-
-html body .leaflet-marker-icon.oz-marker .oz-marker-inner.oz-calendar-warning-inner {
-    animation-name: ozCalendarWarnPulse !important;
-    animation-duration: 0.9s !important;
-    animation-timing-function: ease-in-out !important;
-    animation-iteration-count: infinite !important;
-    box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.20), 0 0 12px rgba(255, 87, 34, 0.55), 0 0 22px rgba(255, 0, 0, 0.35) !important;
-    outline: 3px solid lime !important; /* debug */
-    border-radius: 999px !important;
-    will-change: transform, filter, opacity;
-}
-
-@keyframes ozCalendarWarnPulse {
-    0% {
-        transform: scale(1);
-        filter: brightness(1);
-        opacity: 1;
-    }
-
-    50% {
-        transform: scale(1.18);
-        filter: brightness(1.35);
-        opacity: 0.78;
-    }
-
-    100% {
-        transform: scale(1);
-        filter: brightness(1);
-        opacity: 1;
-    }
-}
-/* Blink only level 4 */
-@keyframes ozBlink {
-    0%, 100% {
-        transform: scale(1);
-        filter: brightness(1);
-    }
-
-    50% {
-        transform: scale(1.10);
-        filter: brightness(1.35);
-    }
-}
-
-.oz-cal-critical .oz-cal-pin {
-    animation: ozBlink 0.8s infinite;
-}
-
-.oz-detail-marker {
-    stroke: rgba(255,255,255,.85);
-    stroke-width: 2;
-    fill: #00c2ff;
-    fill-opacity: .95;
-}
-/* Place = violet */
-.oz-detail-marker--place {
-    fill: #3f116b; /* mauve */
-}
-/* Event = fuchsia */
-.oz-detail-marker--event {
-    fill: chartreuse; /* fuchsia */
-}
-
-/* Dots categories (if you use them) — to be adapted */
-.oz-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    border: 1px solid rgba(0,0,0,.55);
-}
-
-.oz-dot-events {
-    background: chartreuse;
-}
-
-.oz-dot-places {
-    background: #3f116b;
-}
-
-.oz-dot-crowds {
-    background: #ff5aa5;
-}
-
-.oz-dot-traffic {
-    background: #ff3b30;
-}
-
-.oz-dot-gpt {
-    background: #9b59ff;
-}
-
-.oz-dot-weather {
-    background: #9aa7ff;
-}
-
-.oz-bundle-popup {
-    min-width: 240px;
-}
-
-/* Floating Window */
-.oz-gpt-drawer {
-    position: fixed;
-    left: 24px; /* starting point */
-    top: 120px; /* starting point */
-    width: min(420px, 92vw);
-    max-height: min(70vh, 560px);
-    z-index: 30000; /* > leaflet (and > nav 2000) */
-    background: rgba(10,14,24,.96);
-    border: 1px solid rgba(255,255,255,.12);
-    border-radius: 14px;
-    box-shadow: 0 18px 50px rgba(0,0,0,.45);
-    overflow: hidden; /* internal body scroll */
-    transform: translateY(0); /* it is no longer animated by translateY */
-    display: none; /* close */
-    pointer-events: auto !important;
-}
-
-/* IMPORTANT: during drag, avoid selection */
-.oz-dragging, .oz-dragging * {
-    user-select: none !important;
-}
-
-.oz-dragging .oz-titlebar {
-    cursor: grabbing;
-}
-
-.leaflet-popup-content-wrapper {
-    background: rgba(10,14,24,.96);
-    color: #fff;
-    border: 1px solid rgba(255,255,255,.10);
-}
-.leaflet-marker-icon.oz-bundle-icon {
-    filter: none !important;
-}
-
-.oz-bundle-icon .oz-dots {
-    position: absolute;
-    bottom: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 3px;
-}
-
-.oz-bundle-icon .oz-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 999px;
-    border: 1px solid rgba(0,0,0,.55);
-}
-
-.oz-ant-icon {
-    background: transparent;
-    border: 0;
-}
-
-.oz-ant-dot {
-    width: 14px;
-    height: 14px;
-    border-radius: 999px;
-    border: 2px solid rgba(255,255,255,.85);
-    box-shadow: 0 0 0 2px rgba(0,0,0,.25);
-}
-
-.oz-ant-lvl1 .oz-ant-dot {
-    background: #0ccc3c;
-}
-/* green */
-.oz-ant-lvl2 .oz-ant-dot {
-    background: #cf6406;
-}
-/* orange */
-.oz-ant-lvl3 .oz-ant-dot {
-    background: #e74c3c;
-}
-/* red */
-.oz-ant-lvl4 .oz-ant-dot {
-    background: #ff0044;
-}
-/* bright red */
-
-.oz-bundle-popup .oz-sec-title {
-    font-weight: 800;
-}
-
-.oz-bundle-popup .oz-row {
-    display: flex;
-    gap: .6rem;
-}
-
-.oz-bundle-popup .oz-k {
-    opacity: .75;
-    min-width: 80px;
-}
-
-.oz-bundle-popup .oz-v {
-    font-weight: 600;
-}
-
-
-.oz-bundle-head {
-    margin-bottom: .5rem;
-}
-
-.oz-bundle-title {
-    font-weight: 800;
-    font-size: 14px;
-}
-
-.oz-bundle-sub {
-    opacity: .85;
-    font-size: 12px;
-    margin-top: 2px;
-}
-
-.oz-bundle-coords {
-    opacity: .7;
-    font-size: 11px;
-    margin-top: 2px;
-}
-
-.oz-bundle-sec {
-    margin-top: .55rem;
-    padding-top: .45rem;
-    border-top: 1px solid rgba(255,255,255,.10);
-}
-
-.oz-bundle-sec-title {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-weight: 700;
-    font-size: 12px;
-}
-
-.oz-badge {
-    font-size: 11px;
-    padding: 0 6px;
-    border-radius: 999px;
-    background: rgba(255,255,255,.10);
-}
-
-/* Highlighting the best match line */
-.oz-best-row {
-    outline: 2px solid rgba(255, 215, 0, 0.55);
-    box-shadow: 0 0 0 2px rgba(102, 102, 99, 0.15) inset;
-    background: rgba(237, 237, 228, 0.08) !important;
-}
-
-/* A small "glow" on the first cell to guide the eye */
-.oz-best-row td:first-child {
-    font-weight: 700;
-}
-
-
-.oz-bundle-list {
-    margin: .25rem 0 0;
-    padding-left: 1.1rem;
-}
-
-.oz-bundle-list li {
-    margin: .15rem 0;
-}
-
-.oz-map {
-    width: 100%;
-    height: 420px;
-    min-height: 420px;
-    display: block;
-    outline: 2px solid lime;
-}
-.oz-map-shell {
-    min-height: 420px; /* or 60vh */
-    height: clamp(420px, 60vh, 720px);
-    width: 100%;
-    position: relative;
-}
-.oz-map-shell > .leaflet-host {
-    width: 100%;
-    height: 100%;
-    min-height: 420px;
-    display: block;
-}
-/* safety net if a parent flexes the height */
-.oz-map-shell, .leaflet-host {
-    min-height: 420px;
-}
-/* ===== Marker (divIcon) color levels ===== */
-.oz-marker {
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    display: grid;
-    place-items: center;
-    border: 2px solid rgba(0,0,0,.75);
-    box-shadow: 0 8px 22px rgba(0,0,0,.35);
-}
-
-/* Individual markers (divIcon) */
-.oz-marker .oz-marker-inner {
-    font-size: 16px;
-    line-height: 26px;
-    text-align: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
-    padding: 6px 8px;
-    display: grid;
-    place-items: center;
-    color: #fff;
-    font-weight: 800;
-    border: 2px solid rgba(0,0,0,.55);
-    box-shadow: 0 10px 18px rgba(0,0,0,.25);
-}
-/* Place = Violet */
-.oz-marker--place { /* possibly border */
-}
-
-.oz-marker--place .oz-marker-inner {
-    background: rgba(111, 0, 255,.95);
-}
-
-/* Event = fuschia */
-.oz-marker--event .oz-marker-inner {
-    background: rgba(163, 60, 143,.95);
-}
-
-/* Traffic = rouge + outline distinct */
-/*.oz-marker--traffic .oz-marker-inner {
-    background: rgba(255,59,48,.95);
-    outline: 2px solid rgba(255,255,255,.35);
-}*/
-
-/* Suggestion = violet */
-.oz-marker--suggestion .oz-marker-inner {
-    background: rgba(155,89,255,.95);
-}
-
-/* Weather = gris/bleu clair (or based on severity) */
-/*.oz-marker--weather .oz-marker-inner {
-    background: rgba(120,120,120,.85);*/
-/*}*/
-
-.oz-marker-inner {
-    width: 100% !important;
-    height: 100% !important;
-}
-
-.oz-marker--place .oz-marker-inner {
-    background: rgba(63, 17, 107,.95) !important;
-}
-
-.oz-marker--event .oz-marker-inner {
-    background: rgba(240, 7, 189,.95) !important;
-}
-/* Optional: “traffic” adds an outline or distinctive style */
-.oz-marker--traffic .oz-marker-inner {
-    outline: 2px solid rgba(255,255,255,.35);
-}
-
-/* Low (1) green */
-.oz-bundle.oz-sev-1 {
-    background: rgba(46, 204, 113, .95);
-}
-
-/* Medium (2) orange */
-.oz-bundle.oz-sev-2 {
-    background: rgba(243, 156, 18, .95);
-}
-
-/* High (3) red */
-.oz-bundle.oz-sev-3 {
-    background: rgba(231, 76, 60, .95);
-}
-
-/* Critical (4) dark red */
-.oz-bundle.oz-sev-4 {
-    background: rgba(183, 28, 28, .95);
-}
-
-/* Low */
-.oz-bundle-icon .oz-bundle.oz-bundle-lvl1 {
-    background: rgba(76,175,80,.95);
-}
-/* Medium */
-.oz-bundle-icon .oz-bundle.oz-bundle-lvl2 {
-    background: rgba(255,152,0,.95);
-}
-/* High */
-.oz-bundle-icon .oz-bundle.oz-bundle-lvl3 {
-    background: rgba(244,67,54,.95);
-}
-/* Critical */
-.oz-bundle-icon .oz-bundle.oz-bundle-lvl4 {
-    background: rgba(183,28,28,.98);
-}
-/* Default */
-.oz-bundle-icon .oz-bundle.oz-bundle-lvl0 {
-    background: rgba(120,120,120,.85);
-}
-
-.oz-bundle-weather .oz-bundle-tag {
-    position: absolute;
-    right: -6px;
-    top: -8px;
-    font-size: 14px;
-    filter: drop-shadow(0 1px 2px rgba(0,0,0,.6));
-}
-
-.oz-card {
-    padding: 14px;
-    border: 1px solid rgba(255,255,255,.10);
-    border-radius: 14px;
-    background: rgba(10,14,22,.72);
-}
-
-.oz-card-header {
-    margin-bottom: 10px;
-}
-
-.oz-title {
-    font-size: 16px;
-    font-weight: 700;
-}
-/* Prevents the browser from interpreting drag as scroll/zoom on mobile */
-.oz-titlebar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: .5rem;
-    padding: 10px 12px;
-    cursor: grab;
-    user-select: none;
-    border-bottom: 1px solid rgba(255,255,255,.10);
-    background: rgba(255,255,255,.04);
-    touch-action: none; /* IMPORTANT for pointer events */
-}
-
-/* Ensures the window is above the map */
-.oz-drawer {
-    position: fixed;
-    left: 24px;
-    top: 120px;
-    width: min(420px, 92vw);
-    max-width: none;
-    max-height: min(70vh, 560px);
-    /*resize: both;*/
-    min-width: 260px;
-    min-height: 120px;
-    z-index: 30000;
-    background: rgba(10,14,24,.35);
-    /* ⬇️ glass effect */
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,.12);
-    border-radius: 14px;
-    box-shadow: 0 18px 50px rgba(0,0,0,.45);
-    overflow: hidden;
-    display: none; /* closed */
-    pointer-events: auto;
-}
-
-.oz-drawer.open {
-    display: block;
-}
-
-.oz-drawer.oz-front {
-    z-index: 65000;
-}
-
-.oz-drawer.oz-dragging .oz-titlebar {
-    cursor: grabbing;
-}
-
-/* states */
-.oz-drawer.pin-top {
-    z-index: 65000;
-}
-
-.oz-drawer.dock-right {
-    right: 18px;
-    left: auto !important;
-    top: 120px;
-}
-
-.oz-drawer.minimized .oz-body {
-    display: none;
-}
-
-.oz-drawer.minimized {
-    max-height: none;
-}
-
-/* bring-to-front helper class */
-.oz-drawer.oz-front {
-    z-index: 70000;
-}
-
-.oz-drawer.oz-resizing {
-    transition: none !important;
-    will-change: width, height;
-}
-/* ===== Common: drawer content fills and internal panes can scroll ===== */
-/* 1) oz-body becomes a flex column that can shrink */
-.oz-drawer.oz-drawer--fill .oz-body {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    height: 100%;
-    min-height: 0; /* CRITIQUE */
-    overflow: hidden; /* We let the children scroll, not the body */
-}
-
-/* 2) Any card inside must be able to shrink */
-.oz-drawer.oz-drawer--fill .oz-card {
-    display: flex;
-    flex-direction: column;
-    min-height: 0; /* CRITIQUE */
-}
-
-/* 3) This is your reusable "fill remaining space and scroll" block */
-.oz-drawer.oz-drawer--fill .table-wrapper--fill,
-.oz-drawer.oz-drawer--fill .oz-scrollfill {
-    flex: 1 1 auto;
-    min-height: 0; /* CRITIQUE */
-    overflow: auto;
-}
-
-.table-wrapper--fill .oz-scrollfill {
-    overflow: auto;
-}
-/* 4) Stable table sizing */
-.oz-drawer.oz-drawer--fill table {
-    width: 100%;
-    table-layout: fixed;
-}
-
-.oz-resize-handle {
-    pointer-events: auto;
-    z-index: 5;
-}
-
-.oz-glass {
-    background: rgba(10,14,24,.35);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,.12);
-    box-shadow: 0 18px 50px rgba(0,0,0,.45);
-}
-
-.rain-toast {
-    position: fixed;
-    right: 16px;
-    bottom: 16px;
-    z-index: 9999;
-    display: flex;
-    gap: 12px;
-    align-items: flex-start;
-    padding: 12px 14px;
-    border-radius: 14px;
-    background: rgba(30,30,30,.92);
-    border: 1px solid rgba(255,255,255,.12);
-    max-width: 420px;
-    box-shadow: 0 12px 30px rgba(0,0,0,.35);
-}
-
-.rain-toast__icon {
-    font-size: 20px;
-    margin-top: 2px;
-}
-
-.rain-toast__title {
-    font-weight: 700;
-    margin-bottom: 4px;
-}
-
-.rain-toast__msg {
-    opacity: .95;
-}
-
-.rain-toast__meta {
-    opacity: .75;
-    font-size: .9em;
-    margin-top: 6px;
-}
-
-.rain-toast__close {
-    background: transparent;
-    border: none;
-    color: rgba(255,255,255,.8);
-    font-size: 16px;
-    cursor: pointer;
-    padding: 2px 6px;
-}
-
-#gptDrawer.oz-drawer {
-    background: rgba(10,14,24,.55);
-}
-
-#gptDrawer .oz-body {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
-
-#gptDrawer .oz-scrollfill {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow: auto;
-}
-
-/* === Message drawer narrower === */
-#msgDrawer.oz-drawer {
-    width: min(420px, 92vw);
-    max-width: none;
-}
-
-/* 1) The drawer body must be a flexible column */
-#msgDrawer .oz-body {
-    display: flex;
-    flex-direction: column;
-    gap: 10px; /* optional */
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-}
-
-/* Prevent tables from forcing window width */
-#msgDrawer .table-wrapper {
-    width: 100%;
-    overflow: auto;
-}
-
-#msgDrawer table {
-    width: 100%;
-    table-layout: fixed; /* Key: avoids exploding columns */
-}
-
-#msgDrawer td:nth-child(4) {
-    white-space: normal;
-}
-
-/* 2) The card and its contents must be able to shrink.*/
-#msgDrawer .oz-card {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-}
-
-#msgDrawer td, #msgDrawer th {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-#msgDrawer .styled-table {
-    table-layout: fixed;
-    width: 100%;
-}
-
-/* Line 1: meta */
-#msgDrawer tr.msg-head td {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    opacity: .95;
-}
-
-/* Option: reduce the "false" column 4 */
-#msgDrawer td.c-spacer {
-    width: 0;
-    padding: 0;
-}
-
-/* Line 2: content */
-#msgDrawer tr.msg-body td {
-    padding-top: 6px;
-    padding-bottom: 10px;
-    border-top: none;
-}
-
-#msgDrawer .msg-content {
-    white-space: normal;
-    overflow-wrap: anywhere;
-    line-height: 1.25;
-    opacity: 0.98;
-}
-
-/* 3) The table-wrapper fills the remaining space and scrolls */
-#msgDrawer .table-wrapper--fill {
-    flex: 1 1 auto;
-    min-height: 220px; 
-    overflow: auto;
-    border: 1px solid rgba(255,255,255,.12);
-    border-radius: 12px;
-}
-
-    /* 4) Optional: more stable tableS */
-#msgDrawer .table-wrapper--fill table {
-    width: 100%;
-    table-layout: fixed;
-}
-
-.oz-subtitle {
-    font-size: 12px;
-    opacity: .75;
-}
-
-.oz-row {
-    display: flex;
-    gap: 14px;
-    margin: 10px 0;
-}
-
-.oz-resize-handle {
-    position: absolute;
-    right: 6px;
-    bottom: 6px;
-    width: 14px;
-    height: 14px;
-    cursor: se-resize;
-    opacity: .75;
-    border-right: 2px solid rgba(255,255,255,.35);
-    border-bottom: 2px solid rgba(255,255,255,.35);
-}
-
-.oz-resize-handle:hover {
-    opacity: 1;
-}
-
-.oz-kv {
-    flex: 1;
-}
-
-.oz-k {
-    font-size: 12px;
-    opacity: .7;
-}
-
-.oz-v {
-    font-size: 14px;
-    font-weight: 700;
-}
-
-.oz-metric {
-    flex: 1;
-    padding: 10px;
-    border-radius: 12px;
-    background: rgba(255,255,255,.04);
-}
-
-.oz-metric-label {
-    font-size: 12px;
-    opacity: .7;
-}
-
-.oz-metric-value {
-    font-size: 18px;
-    font-weight: 800;
-}
-
-.oz-muted {
-    font-size: 12px;
-    opacity: .75;
-}
-
-.oz-warn {
-    font-size: 12px;
-    color: #ffcc66;
-}
-
-.oz-wx-row {
-    display: grid;
-    gap: 2px;
-}
-
-.oz-wx-head {
-    font-weight: 800;
-}
-
-.oz-wx-sub {
-    opacity: .85;
-    font-size: 12px;
-}
-
-.oz-wx-metrics {
-    opacity: .9;
-    font-size: 12px;
-}
-
-.oz-pill {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 1px 6px;
-    border-radius: 999px;
-    font-size: 11px;
-    background: rgba(255,255,255,.12);
-    border: 1px solid rgba(255,255,255,.14);
-}
-
-.oz-pill-sev {
-    background: rgba(244,67,54,.22);
-    border-color: rgba(244,67,54,.35);
-}
-
-/* highlight on inner only */
-.oz-marker-highlight .oz-marker-inner {
-    transform: scale(1.25);
-    transform-origin: center;
-    transition: transform 120ms ease, filter 120ms ease;
-    filter: drop-shadow(0 0 8px rgba(255,255,255,.9));
-}
-
-.oz-marker-dim {
-    opacity: .35;
-}
-
-/* marker focus animation */
-.oz-pulse {
-    animation: ozPulse 1.2s ease-out 1;
-    transform-origin: bottom center;
-}
-
-.link-like {
-    background: none;
-    border: 0;
-    padding: 0;
-    color: inherit;
-    text-decoration: underline;
-    cursor: pointer;
-}
-
-tr.oz-row-hot {
-    outline: 2px solid rgba(255,255,255,.25);
-    box-shadow: 0 0 0 2px rgba(0,0,0,.2) inset;
-}
-
-.oz-more {
-    opacity: .8;
-    font-size: 11px;
-    margin-top: .2rem;
+    scroll-margin-top: var(--oz-nav-h);
 }
 
 /* =========================================================
-   OUTZEN — LEAFLET MARKERS (LEAFLET-SAFE)
-   RULE: NEVER set transform on .leaflet-marker-icon itself.
-   Animate/scale ONLY inside (.oz-marker-inner / .oz-cal-pin / etc.)
+   LEAFLET PANES
    ========================================================= */
 
-/* ---------- Leaflet containers: sizing only (NO transform) ---------- */
+.leaflet-tile-pane {
+    z-index: 200 !important;
+}
+
+.leaflet-overlay-pane {
+    z-index: 400 !important;
+}
+
+.leaflet-shadow-pane {
+    z-index: 500 !important;
+}
+
+.leaflet-marker-pane {
+    z-index: 600 !important;
+}
+
+.leaflet-tooltip-pane {
+    z-index: 650 !important;
+}
+
+.leaflet-popup-pane {
+    z-index: 700 !important;
+}
+
+.leaflet-pane.ozCalendarPane {
+    z-index: 680 !important;
+    pointer-events: auto !important;
+}
+
+/* =========================================================
+   GENERIC MARKER CONTAINERS
+   ========================================================= */
+
 .leaflet-marker-icon.oz-marker,
 .leaflet-marker-icon.oz-bundle-icon,
 .leaflet-marker-icon.oz-cal-icon,
 .leaflet-marker-icon.oz-ant-icon {
-    width: 26px !important;
-    height: 26px !important;
-    min-width: 26px !important;
-    min-height: 26px !important;
-    max-width: 26px !important;
-    max-height: 26px !important;
     opacity: 1 !important;
     visibility: visible !important;
     display: block !important;
-    /* DO NOT set transform here */
 }
 
-/* Bundle bigger */
+.leaflet-marker-icon.oz-marker,
+.leaflet-marker-icon.oz-cal-icon,
+.leaflet-marker-icon.oz-ant-icon {
+    width: var(--oz-marker-size) !important;
+    height: var(--oz-marker-size) !important;
+    min-width: var(--oz-marker-size) !important;
+    min-height: var(--oz-marker-size) !important;
+    max-width: var(--oz-marker-size) !important;
+    max-height: var(--oz-marker-size) !important;
+}
+
 .leaflet-marker-icon.oz-bundle-icon {
-    width: 34px !important;
-    height: 34px !important;
-    min-width: 34px !important;
-    min-height: 34px !important;
-    max-width: 34px !important;
-    max-height: 34px !important;
+    width: var(--oz-bundle-size) !important;
+    height: var(--oz-bundle-size) !important;
+    min-width: var(--oz-bundle-size) !important;
+    min-height: var(--oz-bundle-size) !important;
+    max-width: var(--oz-bundle-size) !important;
+    max-height: var(--oz-bundle-size) !important;
     z-index: 99999 !important;
+    pointer-events: auto !important;
 }
 
-/* Optional pane layering (safe) */
-.leaflet-marker-pane {
-    z-index: 650;
-}
-
-.leaflet-tooltip-pane {
-    z-index: 700;
-}
-
-.leaflet-popup-pane {
-    z-index: 750;
-}
-
-/* ---------- Generic marker wrapper: NO transform ---------- */
-/* IMPORTANT: .oz-marker is often on the SAME element as .leaflet-marker-icon */
+/* IMPORTANT: never transform the leaflet container */
 .leaflet-marker-icon.oz-marker {
     border-radius: 999px;
     display: grid;
     place-items: center;
-    /* DO NOT set transform */
 }
 
-/* Inner = you own it (safe to animate/scale) */
+/* =========================================================
+MARKER INNER
+========================================================= */
+
 .leaflet-marker-icon.oz-marker .oz-marker-inner {
-    width: 26px !important;
-    height: 26px !important;
+    width: var(--oz-marker-size) !important;
+    height: var(--oz-marker-size) !important;
     border-radius: 999px;
     display: grid;
     place-items: center;
@@ -1316,54 +143,85 @@ tr.oz-row-hot {
     border: 2px solid rgba(0,0,0,.55);
     box-shadow: 0 10px 18px rgba(0,0,0,.25);
     transform-origin: center;
-    /* transform allowed here */
 }
 
-/* Severity background (wrapper carries lvlX, inner gets color) */
+/* =========================================================
+LEVEL COLORS
+========================================================= */
+
 .leaflet-marker-icon.oz-marker.oz-marker-lvl0 .oz-marker-inner {
-    background: rgba(120,120,120,.85);
+    background: var(--oz-lvl0);
 }
 
 .leaflet-marker-icon.oz-marker.oz-marker-lvl1 .oz-marker-inner {
-    background: rgba(76,175,80,.95);
+    background: var(--oz-lvl1);
 }
 
 .leaflet-marker-icon.oz-marker.oz-marker-lvl2 .oz-marker-inner {
-    background: rgba(255,152,0,.95);
+    background: var(--oz-lvl2);
 }
 
 .leaflet-marker-icon.oz-marker.oz-marker-lvl3 .oz-marker-inner {
-    background: rgba(244,67,54,.95);
+    background: var(--oz-lvl3);
 }
 
 .leaflet-marker-icon.oz-marker.oz-marker-lvl4 .oz-marker-inner {
-    background: rgba(183,28,28,.98);
+    background: var(--oz-lvl4);
 }
 
-/* Category overrides (safe: affects inner only) */
+/* Category overrides */
 .leaflet-marker-icon.oz-marker.oz-marker--place .oz-marker-inner {
-    background: rgba(63,17,107,.95) !important;
+    background: var(--oz-place) !important;
 }
 
 .leaflet-marker-icon.oz-marker.oz-marker--event .oz-marker-inner {
-    background: rgba(240,7,189,.95) !important;
+    background: var(--oz-event) !important;
 }
 
 .leaflet-marker-icon.oz-marker.oz-marker--suggestion .oz-marker-inner {
-    background: rgba(155,89,255,.95) !important;
+    background: var(--oz-suggestion) !important;
 }
 
 .leaflet-marker-icon.oz-marker.oz-marker--traffic .oz-marker-inner {
     outline: 2px solid rgba(255,255,255,.35);
 }
 
-/* Dim (safe on container, no transform) */
+/* CrowdInfoView crowd markers: force visible */
+.leaflet-marker-icon.oz-marker.oz-scope--crowdinfoview,
+.leaflet-marker-icon.oz-marker.oz-scope--crowdinfoview .oz-marker-inner {
+    opacity: 1 !important;
+    filter: none !important;
+}
+
+.leaflet-marker-icon.oz-marker.oz-marker--crowd.oz-marker-lvl1 .oz-marker-inner {
+    background: var(--oz-lvl1) !important;
+}
+
+.leaflet-marker-icon.oz-marker.oz-marker--crowd.oz-marker-lvl2 .oz-marker-inner {
+    background: var(--oz-lvl2) !important;
+}
+
+.leaflet-marker-icon.oz-marker.oz-marker--crowd.oz-marker-lvl3 .oz-marker-inner {
+    background: var(--oz-lvl3) !important;
+}
+
+.leaflet-marker-icon.oz-marker.oz-marker--crowd.oz-marker-lvl4 .oz-marker-inner {
+    background: var(--oz-lvl4) !important;
+}
+
+/* Optional dim mode */
 .leaflet-marker-icon.oz-marker.oz-marker-dim {
     opacity: .35 !important;
 }
 
-/* ---------- Highlight (FIXED): NEVER transform the container ---------- */
-/* You can style the container with filters, but scale only the inner. */
+.leaflet-marker-icon.oz-marker.oz-scope--crowdinfoview.oz-marker-dim {
+    opacity: 1 !important;
+}
+
+/* =========================================================
+HIGHLIGHT / PULSE
+========================================================= */
+
 .leaflet-marker-icon.oz-marker.oz-marker-highlight {
     filter: drop-shadow(0 0 8px rgba(255,255,255,.35));
 }
@@ -1378,15 +236,17 @@ tr.oz-row-hot {
     animation: ozMarkerPulse 1.2s ease-out 1;
 }
 
-/* ---------- Bundle (divIcon content) ---------- */
+/* =========================================================
+   BUNDLES
+   ========================================================= */
+
 .leaflet-marker-icon.oz-bundle-icon {
-    pointer-events: auto !important;
     filter: drop-shadow(0 10px 18px rgba(0,0,0,.25));
 }
 
 .leaflet-marker-icon.oz-bundle-icon .oz-bundle {
-    width: 34px;
-    height: 34px;
+    width: var(--oz-bundle-size);
+    height: var(--oz-bundle-size);
     border-radius: 999px;
     display: grid;
     place-items: center;
@@ -1400,28 +260,26 @@ tr.oz-row-hot {
     filter: drop-shadow(0 2px 2px rgba(0,0,0,.35));
 }
 
-/* Bundle levels */
 .leaflet-marker-icon.oz-bundle-icon .oz-bundle.oz-bundle-lvl0 {
-    background: rgba(120,120,120,.85);
+    background: var(--oz-lvl0);
 }
 
 .leaflet-marker-icon.oz-bundle-icon .oz-bundle.oz-bundle-lvl1 {
-    background: rgba(76,175,80,.95);
+    background: var(--oz-lvl1);
 }
 
 .leaflet-marker-icon.oz-bundle-icon .oz-bundle.oz-bundle-lvl2 {
-    background: rgba(255,152,0,.95);
+    background: var(--oz-lvl2);
 }
 
 .leaflet-marker-icon.oz-bundle-icon .oz-bundle.oz-bundle-lvl3 {
-    background: rgba(244,67,54,.95);
+    background: var(--oz-lvl3);
 }
 
 .leaflet-marker-icon.oz-bundle-icon .oz-bundle.oz-bundle-lvl4 {
-    background: rgba(183,28,28,.98);
+    background: var(--oz-lvl4);
 }
 
-/* Bundle dots (transform inside is OK) */
 .leaflet-marker-icon.oz-bundle-icon .oz-dots {
     position: absolute;
     bottom: -6px;
@@ -1438,7 +296,6 @@ tr.oz-row-hot {
     border: 1px solid rgba(0,0,0,.55);
 }
 
-/* Weather tag on bundle */
 .leaflet-marker-icon.oz-bundle-icon .oz-bundle-weather .oz-bundle-tag {
     position: absolute;
     right: -6px;
@@ -1447,51 +304,68 @@ tr.oz-row-hot {
     filter: drop-shadow(0 1px 2px rgba(0,0,0,.6));
 }
 
-/* ---------- Calendar icon ---------- */
-.leaflet-marker-icon.oz-cal-icon {
-    background: transparent !important;
-    border: none !important;
+/* =========================================================
+   CALENDAR MARKERS
+   ========================================================= */
+
+.leaflet-marker-icon.oz-marker.oz-marker--calendar .oz-marker-inner {
+    width: var(--oz-calendar-size) !important;
+    height: var(--oz-calendar-size) !important;
+    border-radius: 999px !important;
+    display: grid !important;
+    place-items: center !important;
+    color: #fff !important;
+    font-size: 15px !important;
+    line-height: 1 !important;
+    border: 2px solid rgba(255,255,255,.90) !important;
+    box-shadow: 0 8px 20px rgba(0,0,0,.35) !important;
 }
-/* safe to animate pin (inner) */
-.leaflet-marker-icon.oz-cal-icon .oz-cal-pin {
-    width: 26px;
-    height: 26px;
-    border-radius: 999px;
+
+.leaflet-marker-icon.oz-marker.oz-marker--calendar.oz-marker-lvl1 .oz-marker-inner {
+    background: rgba(40,180,99,.95) !important;
+}
+
+.leaflet-marker-icon.oz-marker.oz-marker--calendar.oz-marker-lvl2 .oz-marker-inner {
+    background: rgba(241,196,15,.95) !important;
+}
+
+.leaflet-marker-icon.oz-marker.oz-marker--calendar.oz-marker-lvl3 .oz-marker-inner {
+    background: rgba(230,126,34,.95) !important;
+}
+
+.leaflet-marker-icon.oz-marker.oz-marker--calendar.oz-marker-lvl4 .oz-marker-inner {
+    background: rgba(231,76,60,.98) !important;
+}
+
+.oz-calendar-inner {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 2px solid rgba(255,255,255,.85);
-    box-shadow: 0 6px 18px rgba(0,0,0,.35);
-    backdrop-filter: blur(2px);
+    width: var(--oz-calendar-size);
+    height: var(--oz-calendar-size);
+    border-radius: 50%;
     transform-origin: center;
+    will-change: transform, box-shadow, filter, opacity;
 }
 
-.leaflet-marker-icon.oz-cal-icon .oz-cal-emoji {
-    font-size: 14px;
-    line-height: 1;
+.oz-calendar-warning-inner {
+    animation: ozCalendarWarningPulse 0.95s ease-in-out infinite !important;
+    box-shadow: 0 0 10px rgba(255, 80, 0, 0.28);
+    transform-origin: center center !important;
+    will-change: transform, filter, opacity, box-shadow;
+}
+.oz-scrollfill--gpt {
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    /*padding-right: 0.25rem;*/
 }
 
-.leaflet-marker-icon.oz-cal-icon.oz-cal-lvl1 .oz-cal-pin {
-    background: rgba(40,180,99,.95);
-}
+/* =========================================================
+   ANTENNA MARKERS
+   ========================================================= */
 
-.leaflet-marker-icon.oz-cal-icon.oz-cal-lvl2 .oz-cal-pin {
-    background: rgba(241,196,15,.95);
-}
-
-.leaflet-marker-icon.oz-cal-icon.oz-cal-lvl3 .oz-cal-pin {
-    background: rgba(230,126,34,.95);
-}
-
-.leaflet-marker-icon.oz-cal-icon.oz-cal-lvl4 .oz-cal-pin {
-    background: rgba(231,76,60,.98);
-}
-
-.leaflet-marker-icon.oz-cal-icon.oz-cal-critical .oz-cal-pin {
-    animation: ozCalBlink .8s infinite;
-}
-
-/* ---------- Antenna icon ---------- */
 .leaflet-marker-icon.oz-ant-icon {
     background: transparent;
     border: 0;
@@ -1520,28 +394,15 @@ tr.oz-row-hot {
 .leaflet-marker-icon.oz-ant-icon.oz-ant-lvl4 .oz-ant-dot {
     background: #ff0044;
 }
-/* Pop-ups always on top */
-.leaflet-pane,
-.leaflet-top,
-.leaflet-bottom {
-    z-index: 400;
-}
 
-.leaflet-popup-pane {
-    z-index: 700;
-}
+/* =========================================================
+   POPUPS
+   ========================================================= */
 
-.leaflet-tooltip-pane {
-    z-index: 650;
-}
-
-/* If you have custom overlays on top of the map */
-.outzen-overlay, .earth-overlay, canvas.earth {
-    pointer-events: none; /* critical if it blocks clicks */
-}
-
-.leaflet-popup-content-wrapper.oz-popup,
-.oz-popup .leaflet-popup-content-wrapper {
+.leaflet-popup-content-wrapper {
+    background: rgba(10,14,24,.96);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.10);
     border-radius: 14px;
 }
 
@@ -1555,89 +416,528 @@ tr.oz-row-hot {
     line-height: 1.25rem;
 }
 
-@keyframes ozCriticalBlink {
-    0% {
-        transform: scale(1);
-        filter: brightness(1);
-        box-shadow: 0 0 0 0 rgba(255,0,0,.0);
-    }
-
-    50% {
-        transform: scale(1.15);
-        filter: brightness(1.4);
-        box-shadow: 0 0 18px 6px rgba(255,0,0,.45);
-    }
-
-    100% {
-        transform: scale(1);
-        filter: brightness(1);
-        box-shadow: 0 0 0 0 rgba(255,0,0,.0);
-    }
+.oz-text-wrap {
+    white-space: pre-wrap; /* respect \n */
+    word-break: break-word; /* breaks down long words */
+    overflow-wrap: anywhere; /* avoids screen overflow */
+    line-height: 1.4;
+    max-width: 600px;
 }
 
-/* Responsive */
+.gpt-page {
+    display: block;
+    color: #f5f7fb;
+}
+
+.gpt-header {
+    margin-bottom: 1rem;
+}
+
+.gpt-title {
+    margin-bottom: 0.75rem;
+    color: #ffffff;
+}
+
+.gpt-composer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.gpt-composer-input {
+    width: 100%;
+    min-height: 110px;
+    resize: vertical;
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    border: 1px solid rgba(255,255,255,.16);
+    background: rgba(20,24,35,.9);
+    color: #fff;
+    line-height: 1.45;
+    white-space: pre-wrap;
+}
+
+.gpt-composer-input::placeholder {
+    color: rgba(255,255,255,.55);
+}
+
+/*.gpt-composer-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+}*/
+
+.gpt-list-shell {
+    height: 420px;
+    overflow-y: auto;
+    padding: 0.5rem;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    background: rgba(8, 12, 22, 0.35);
+}
+
+.gpt-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,.08);
+    background: rgba(18, 24, 38, 0.92);
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+    color: #f5f7fb;
+}
+
+.gpt-card--selected {
+    border-color: rgba(95, 170, 255, 0.55);
+    box-shadow: 0 0 0 1px rgba(95,170,255,.25), 0 10px 30px rgba(0,0,0,.22);
+}
+
+.gpt-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.gpt-card--compact .gpt-pre {
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+/* =========================================================
+   HOME GPT DRAWER
+   Dernière réponse + historique scrollable
+   ========================================================= */
+
+.gpt-latest-shell {
+    margin-top: 0.85rem;
+    margin-bottom: 1rem;
+    flex: 0 0 auto;
+}
+
+.gpt-latest-header,
+.gpt-history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.55rem;
+}
+
+.gpt-latest-title,
+.gpt-history-title {
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.02em;
+}
+
+.gpt-latest-date,
+.gpt-history-count {
+    font-size: 0.86rem;
+    color: rgba(255,255,255,.72);
+}
+
+/* =========================================================
+   HOME GPT DRAWER
+   Last reply + collapsible history
+   ========================================================= */
+
+.oz-drawer--gpt .oz-body {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 180px);
+    max-height: 78vh;
+    overflow: hidden;
+    min-width: 0;
+    min-height: 0;
+}
+
+.gpt-drawer-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    gap: 0.75rem;
+}
+
+.gpt-latest-shell {
+    flex: 0 0 auto;
+    margin-top: 0.5rem;
+}
+
+.gpt-latest-header,
+.gpt-history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.55rem;
+}
+
+.gpt-latest-title,
+.gpt-history-title {
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.02em;
+}
+
+.gpt-latest-date,
+.gpt-history-count {
+    font-size: 0.86rem;
+    color: rgba(255,255,255,.72);
+}
+
+.gpt-card--latest {
+    border-color: rgba(95, 170, 255, 0.38);
+    box-shadow: 0 0 0 1px rgba(95,170,255,.14), 0 10px 26px rgba(0,0,0,.22);
+}
+
+.gpt-history-shell {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+}
+
+.gpt-history-shell.is-collapsed .oz-scrollfill--gpt-history {
+    display: none;
+}
+
+.gpt-rich-response {
+    white-space: normal !important;
+    line-height: 1.7 !important;
+}
+
+.gpt-rich-response br + br {
+    content: "";
+}
+
+.gpt-rich-response p {
+    margin: 0 0 0.75rem 0;
+}
+
+.gpt-rich-response p:last-child {
+    margin-bottom: 0;
+}
+
+.gpt-empty {
+    color: rgba(255,255,255,.45);
+    font-style: italic;
+}
+
+.oz-scrollfill--gpt-history {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-top: 0.75rem;
+    padding-right: 0.25rem;
+    border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.gpt-pre--response {
+    white-space: pre-wrap !important;
+    line-height: 1.7 !important;
+    text-wrap: pretty;
+}
+
+.oz-list--gpt {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.gpt-card--compact {
+    margin-bottom: 0;
+    padding: 0.8rem;
+    opacity: 0.96;
+}
+
+.gpt-card--latest .gpt-pre--prompt {
+    max-height: 90px;
+    overflow-y: auto;
+}
+
+.gpt-card--latest .gpt-pre--response {
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.gpt-card--compact .gpt-pre--prompt {
+    max-height: 60px;
+    overflow-y: auto;
+}
+
+.gpt-card--compact .gpt-pre--response {
+    max-height: 88px;
+    overflow-y: auto;
+}
+
+.gpt-history-toggle {
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.04);
+    color: #fff;
+    border-radius: 10px;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    transition: background .18s ease, border-color .18s ease, transform .12s ease;
+}
+
+.gpt-history-toggle:hover {
+    background: rgba(255,255,255,.08);
+    border-color: rgba(255,255,255,.2);
+}
+
+.gpt-history-toggle:active {
+    transform: scale(.98);
+}
+
+.gpt-card--latest .gpt-pre,
+.gpt-card--compact .gpt-pre,
+.oz-scrollfill--gpt-history {
+    scrollbar-width: thin;
+}
+
+.gpt-card--latest .gpt-pre::-webkit-scrollbar,
+.gpt-card--compact .gpt-pre::-webkit-scrollbar,
+.oz-scrollfill--gpt-history::-webkit-scrollbar {
+    width: 8px;
+}
+
+.gpt-card--latest .gpt-pre::-webkit-scrollbar-thumb,
+.gpt-card--compact .gpt-pre::-webkit-scrollbar-thumb,
+.oz-scrollfill--gpt-history::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,.18);
+    border-radius: 999px;
+}
+
+/* =========================================================
+   MESSAGE FLOATING DRAWER
+   latest 2 + collapsible history
+   ========================================================= */
+
+.msg-drawer-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+}
+
+.msg-latest-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.msg-latest-header,
+.msg-history-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.msg-latest-title,
+.msg-history-title {
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.02em;
+}
+
+.msg-latest-count,
+.msg-history-count {
+    font-size: 0.86rem;
+    color: rgba(255,255,255,.72);
+}
+
+.msg-history-shell {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+    .msg-history-shell.is-collapsed .msg-scrollfill {
+        display: none;
+    }
+
+.msg-scrollfill {
+    max-height: 220px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-top: 0.75rem;
+    padding-right: 0.25rem;
+    border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.msg-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+
+.msg-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    padding: 0.9rem;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.08);
+    background: rgba(18, 24, 38, 0.92);
+    box-shadow: 0 8px 24px rgba(0,0,0,.18);
+    color: #f5f7fb;
+}
+
+.msg-card--latest {
+    border-color: rgba(95, 170, 255, 0.28);
+    box-shadow: 0 0 0 1px rgba(95,170,255,.10), 0 10px 26px rgba(0,0,0,.22);
+}
+
+.msg-card--compact {
+    padding: 0.8rem;
+    opacity: 0.96;
+}
+
+.msg-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+}
+
+.msg-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+}
+
+.msg-id {
+    font-weight: 700;
+    color: #9ecbff;
+}
+
+.msg-date {
+    font-size: 0.9rem;
+    color: rgba(255,255,255,.78);
+}
+
+.msg-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.msg-block-label {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #ffffff;
+    opacity: 0.92;
+}
+
+.msg-bubble {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.75rem 0.9rem;
+    border-radius: 12px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    color: #f8fbff;
+    font-size: 0.95rem;
+}
+
+.msg-bubble--meta {
+    background: rgba(70, 110, 180, 0.16);
+    border: 1px solid rgba(110, 170, 255, 0.18);
+}
+
+.msg-bubble--content {
+    background: rgba(50, 160, 110, 0.16);
+    border: 1px solid rgba(110, 220, 170, 0.18);
+}
+
+.msg-history-toggle {
+    border: 1px solid rgba(255,255,255,.12);
+    background: rgba(255,255,255,.04);
+    color: #fff;
+    border-radius: 10px;
+    padding: 0.4rem 0.7rem;
+    cursor: pointer;
+    transition: background .18s ease, border-color .18s ease, transform .12s ease;
+}
+
+.msg-history-toggle:hover {
+    background: rgba(255,255,255,.08);
+    border-color: rgba(255,255,255,.2);
+}
+
+.msg-history-toggle:active {
+    transform: scale(.98);
+}
+
+.msg-scrollfill::-webkit-scrollbar {
+    width: 8px;
+}
+
+.msg-scrollfill::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,.18);
+    border-radius: 999px;
+}
+
 @media (max-width: 768px) {
-    .nav-toggle {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+    .oz-drawer--gpt .oz-body {
+        height: calc(100vh - 140px);
+        max-height: 82vh;
     }
 
-    .nav-links.desktop {
-        display: none;
+    .oz-scrollfill--gpt-history {
+        min-height: 140px;
     }
 }
+/* =========================================================
+   GENERIC WARNING / ALERT MARKERS
+   ========================================================= */
 
-@media (min-width: 769px) {
-    .nav-overlay, .nav-drawer {
-        display: none;
-    }
-}
-/* Avoid negative padding issues: if calc goes negative, clamp with a min */
-@supports (padding-top: max(0px, 1px)) {
-    .home-page {
-        padding-top: 0 !important;
-    }
+.leaflet-marker-icon.oz-marker.oz-marker-warning,
+.leaflet-marker-icon.oz-ant-icon.oz-marker-warning {
+    filter: drop-shadow(0 0 10px rgba(255,255,255,.18));
 }
 
-@keyframes ozPulse {
-    0% {
-        transform: scale(1);
-        filter: drop-shadow(0 0 0 rgba(255,215,0,0));
-        box-shadow: 0 0 0 0 rgba(255,0,51,.35);
-    }
-
-    30% {
-        transform: scale(1.15);
-        filter: drop-shadow(0 0 10px rgba(255,215,0,0.9));
-        box-shadow: 0 0 0 0 rgba(255,0,51,.35);
-    }
-
-    70% {
-        transform: scale(1.15);
-        filter: drop-shadow(0 0 10px rgba(255,215,0,1.1));
-        box-shadow: 0 0 0 10px rgba(255,0,51,35);
-    }
-
-    100% {
-        transform: scale(1);
-        filter: drop-shadow(0 0 0 rgba(255,215,0,0));
-        box-shadow: 0 0 0 0 rgba(255,0,51,0);
-    }
+.leaflet-marker-icon.oz-marker.oz-marker-warning .oz-marker-inner,
+.leaflet-marker-icon.oz-ant-icon.oz-marker-warning .oz-ant-dot {
+    animation: ozMarkerWarningPulse 1s ease-in-out infinite !important;
+    transform-origin: center center !important;
+    will-change: transform, filter, opacity, box-shadow;
 }
 
-@keyframes ozCalBlink {
-    0%,100% {
-        transform: scale(1);
-        filter: brightness(1);
+/* =========================================================
+   ANIMATIONS
+   ========================================================= */
+@media (max-width: 768px) {
+    .gpt-card-top {
+        flex-direction: column;
+        align-items: stretch;
     }
 
-    50% {
-        transform: scale(1.10);
-        filter: brightness(1.35);
+    .gpt-card-actions {
+        align-self: flex-end;
+    }
+
+    .gpt-list-shell {
+        height: 360px;
+    }
+    .oz-scrollfill--gpt-history {
+        max-height: 220px;
     }
 }
-/* Pulse (safe): animate inner, not container */
 @keyframes ozMarkerPulse {
     0% {
         transform: scale(1);
@@ -1651,23 +951,99 @@ tr.oz-row-hot {
         transform: scale(1);
     }
 }
-html body .leaflet-marker-icon.oz-marker .oz-marker-inner.oz-calendar-warning-inner {
-    animation-name: ozCalendarWarnPulse !important;
-    animation-duration: 0.9s !important;
-    animation-timing-function: ease-in-out !important;
-    animation-iteration-count: infinite !important;
-    animation-fill-mode: both !important;
-    animation-play-state: running !important;
-}
-/* CrowdInfoCalendar warning pulse on inner marker only */
-.leaflet-marker-icon.oz-marker .oz-marker-inner.oz-calendar-warning-inner {
-    animation: ozCalendarWarnPulse 0.9s infinite ease-in-out !important;
-    box-shadow: 0 0 0 4px rgba(255, 193, 7, 0.20), 0 0 12px rgba(255, 87, 34, 0.55), 0 0 22px rgba(255, 0, 0, 0.35) !important;
-    border-radius: 999px !important;
-    will-change: transform, opacity, filter !important;
+
+@keyframes ozCalendarWarnPulse {
+    0% {
+        transform: scale(1);
+        filter: brightness(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.18);
+        filter: brightness(1.35);
+        opacity: 0.78;
+    }
+
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
+        opacity: 1;
+    }
 }
 
+@keyframes ozCalendarWarningPulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+        filter: brightness(1);
+        box-shadow: 0 0 0 0 rgba(255, 140, 0, 0.80), 0 0 10px rgba(255, 80, 0, 0.35);
+    }
 
+    35% {
+        transform: scale(1.14);
+        opacity: 1;
+        filter: brightness(1.15);
+        box-shadow: 0 0 0 8px rgba(255, 140, 0, 0.18), 0 0 20px rgba(255, 60, 0, 0.45);
+    }
+
+    70% {
+        transform: scale(0.96);
+        opacity: 0.92;
+        filter: brightness(1.05);
+        box-shadow: 0 0 0 14px rgba(255, 140, 0, 0), 0 0 12px rgba(255, 60, 0, 0.20);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+        filter: brightness(1);
+        box-shadow: 0 0 0 0 rgba(255, 140, 0, 0), 0 0 10px rgba(255, 80, 0, 0.28);
+    }
+}
+
+@keyframes ozBlink {
+    0%, 100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+
+    50% {
+        transform: scale(1.10);
+        filter: brightness(1.35);
+    }
+}
+
+/* Crowd / event / suggestion / traffic / weather */
+@keyframes ozMarkerWarningPulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+        filter: brightness(1);
+        box-shadow: 0 0 0 0 rgba(255, 90, 90, 0.55), 0 0 10px rgba(255, 80, 0, 0.20);
+    }
+
+    35% {
+        transform: scale(1.18);
+        opacity: 1;
+        filter: brightness(1.28);
+        box-shadow: 0 0 0 8px rgba(255, 90, 90, 0.22), 0 0 18px rgba(255, 60, 0, 0.38);
+    }
+
+    70% {
+        transform: scale(0.96);
+        opacity: 0.88;
+        filter: brightness(1.08);
+        box-shadow: 0 0 0 14px rgba(255, 90, 90, 0), 0 0 10px rgba(255, 60, 0, 0.15);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+        filter: brightness(1);
+        box-shadow: 0 0 0 0 rgba(255, 90, 90, 0), 0 0 10px rgba(255, 80, 0, 0.20);
+    }
+}
 
 
 

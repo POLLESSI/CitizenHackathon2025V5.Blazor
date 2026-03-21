@@ -1,61 +1,110 @@
 ﻿@using CitizenHackathon2025.Blazor.DTOs
 @using CitizenHackathon2025.Contracts.Hubs
-@inject CitizenHackathon2025V5.Blazor.Client.Services.MessageService MessageService
-@inject NavigationManager Navigation
-@inject IJSRuntime JS
-@inject IConfiguration Config
-@inject CitizenHackathon2025V5.Blazor.Client.Services.Interfaces.IAuthService Auth
 
-<div class="oz-card">
+<div class="msg-drawer-content">
     <div class="oz-row" style="align-items:center;">
         <input class="input-compact"
                placeholder="Your message..."
                @bind="_newContent"
                @bind:event="oninput" />
-        <button class="chip add-chip" @onclick="SendAsync" disabled="@string.IsNullOrWhiteSpace(_newContent)">Send</button>
+
+        <button class="chip add-chip"
+                @onclick="SendAsync"
+                disabled="@(_isSending || string.IsNullOrWhiteSpace(_newContent))">
+            @(_isSending ? "Sending..." : "Send")
+        </button>
     </div>
 
-    <div class="table-wrapper table-wrapper--fill"
-         @ref="ScrollContainerRef"
-         style="overflow-y: auto; border: 1px solid rgba(255,255,255,.12); border-radius: 12px;">
-        <table class="table table-striped table-dark styled-table data-list">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>When</th>
-                    <th>Source</th>
-                    <th>Content</th>
-                </tr>
-            </thead>
-            <tbody>
-                @if (!_messages.Any())
+    @{
+        var latest = _messages.Take(2).ToList();
+        var history = _messages.Skip(2).ToList();
+    }
+
+    @if (!_messages.Any())
+    {
+        <div class="oz-empty">No messages yet.</div>
+    }
+    else
+    {
+        <div class="msg-latest-shell">
+            <div class="msg-latest-header">
+                <span class="msg-latest-title">Latest comments</span>
+                <span class="msg-latest-count">@latest.Count item(s)</span>
+            </div>
+
+            <div class="msg-list msg-list--latest">
+                @foreach (var m in latest)
                 {
-                    <tr>
-                        <td colspan="99"><div class="empty-state">No messages yet.</div></td>
-                    </tr>
+                    <article class="msg-card msg-card--latest">
+                        <div class="msg-card-top">
+                            <div class="msg-meta">
+                                <span class="msg-id">#@m.Id</span>
+                                <span class="msg-date">@m.CreatedAt.ToLocalTime().ToString("g")</span>
+                            </div>
+                        </div>
+
+                        <div class="msg-block">
+                            <div class="msg-block-label">Source</div>
+                            <div class="msg-bubble msg-bubble--meta">@BuildSource(m)</div>
+                        </div>
+
+                        <div class="msg-block">
+                            <div class="msg-block-label">Content</div>
+                            <div class="msg-bubble msg-bubble--content">@ShortenContent(m.Content, 220)</div>
+                        </div>
+                    </article>
+                }
+            </div>
+        </div>
+
+        <div class="msg-history-shell @(_historyCollapsed ? "is-collapsed" : null)">
+            <div class="msg-history-header">
+                <span class="msg-history-title">History</span>
+
+                <div class="oz-actions">
+                    <span class="msg-history-count">@history.Count item(s)</span>
+                    <button type="button"
+                            class="msg-history-toggle"
+                            @onclick="ToggleHistory">
+                        @(_historyCollapsed ? "Show" : "Hide")
+                    </button>
+                </div>
+            </div>
+
+            <div class="msg-scrollfill" @ref="ScrollContainerRef">
+                @if (history.Count == 0)
+                {
+                    <div class="oz-empty">No additional history.</div>
                 }
                 else
                 {
-                    @foreach (var m in _messages)
-                    {
-                        <tr class="msg-head">
-                            <td class="c-id">@m.Id</td>
-                            <td class="c-when">@m.CreatedAt.ToLocalTime().ToString("g")</td>
-                            <td class="c-src">@((m.SourceType ?? "N/A")) @m.RelatedName</td>
-                            <td class="c-spacer"></td>
-                        </tr>
+                    <div class="msg-list msg-list--history">
+                        @foreach (var m in history)
+                        {
+                            <article class="msg-card msg-card--compact">
+                                <div class="msg-card-top">
+                                    <div class="msg-meta">
+                                        <span class="msg-id">#@m.Id</span>
+                                        <span class="msg-date">@m.CreatedAt.ToLocalTime().ToString("g")</span>
+                                    </div>
+                                </div>
 
-                        <tr class="msg-body">
-                            <td colspan="4">
-                                <div class="msg-content">@m.Content</div>
-                            </td>
-                        </tr>
-                    }
+                                <div class="msg-block">
+                                    <div class="msg-block-label">Source</div>
+                                    <div class="msg-bubble msg-bubble--meta">@BuildSource(m)</div>
+                                </div>
 
+                                <div class="msg-block">
+                                    <div class="msg-block-label">Content</div>
+                                    <div class="msg-bubble msg-bubble--content">@ShortenContent(m.Content, 120)</div>
+                                </div>
+                            </article>
+                        }
+                    </div>
                 }
-            </tbody>
-        </table>
-    </div>
+            </div>
+        </div>
+    }
 </div>
 
 
