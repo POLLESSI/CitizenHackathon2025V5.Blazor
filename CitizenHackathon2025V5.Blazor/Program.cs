@@ -33,21 +33,22 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 var configuration = builder.Configuration;
 
 var apiBaseUrl = (configuration["ApiBaseUrl"] ?? "https://localhost:7254").TrimEnd('/');
-
-var apiRestBase = configuration["Api:RestBase"];
-if (string.IsNullOrWhiteSpace(apiRestBase))
-{
-    apiRestBase = $"{apiBaseUrl}/api";
-}
-apiRestBase = apiRestBase.TrimEnd('/') + "/";
-
+var apiRestBase = (configuration["Api:RestBase"] ?? $"{apiBaseUrl}/api").TrimEnd('/') + "/";
 var hubBaseUrl = (configuration["SignalR:HubBase"] ?? apiBaseUrl).TrimEnd('/');
 
+// ===============================
+// Core
+// ===============================
 builder.Services.AddOptions();
 builder.Services.AddAuthorizationCore();
 builder.Services.AddScoped<AuthenticationStateProvider, SimpleAuthStateProvider>();
 builder.Services.AddTransient<JwtAttachHandler>();
 
+// ===============================
+// HTTP Clients
+// ===============================
+
+// 1) Authenticated API (main REST client)
 builder.Services.AddHttpClient("ApiWithAuth", client =>
 {
     client.BaseAddress = new Uri(apiRestBase);
@@ -59,17 +60,7 @@ builder.Services.AddHttpClient("ApiWithAuth", client =>
 .AddPolicyHandler(GetTimeoutPolicy())
 .AddPolicyHandler(GetCircuitBreakerPolicy());
 
-builder.Services.AddHttpClient("Default", client =>
-{
-    client.BaseAddress = new Uri(apiRestBase);
-    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
-    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
-})
-.AddHttpMessageHandler<JwtAttachHandler>()
-.AddPolicyHandler(GetRetryPolicy())
-.AddPolicyHandler(GetTimeoutPolicy())
-.AddPolicyHandler(GetCircuitBreakerPolicy());
-
+// 2) Root API for auth/hub-token
 builder.Services.AddHttpClient("ApiRootAuth", client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl.EndsWith("/") ? apiBaseUrl : apiBaseUrl + "/");
@@ -80,48 +71,63 @@ builder.Services.AddHttpClient("ApiRootAuth", client =>
 .AddPolicyHandler(GetTimeoutPolicy())
 .AddPolicyHandler(GetCircuitBreakerPolicy());
 
-builder.Services.AddHttpClient("OllamaClient", client =>
+// 3) Potential anonymous customer
+builder.Services.AddHttpClient("ApiAnonymous", client =>
 {
     client.BaseAddress = new Uri(apiRestBase);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 })
-.AddHttpMessageHandler<JwtAttachHandler>()
 .AddPolicyHandler(GetRetryPolicy())
+.AddPolicyHandler(GetTimeoutPolicy())
 .AddPolicyHandler(GetCircuitBreakerPolicy());
 
+// Default HttpClient injected into legacy services
 builder.Services.AddScoped(sp =>
     sp.GetRequiredService<IHttpClientFactory>().CreateClient("ApiWithAuth"));
 
+// ===============================
+// Auth / Token
+// ===============================
 builder.Services.AddScoped<IAuthService>(sp =>
 {
     var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient("ApiRootAuth");
     var js = sp.GetRequiredService<IJSRuntime>();
     var authStateProvider = sp.GetRequiredService<AuthenticationStateProvider>();
+
     return new AuthService(http, js, authStateProvider);
 });
 
 builder.Services.AddScoped<IHubTokenService, HubTokenService>();
-
 builder.Services.AddScoped<IHubUrlBuilder, HubUrlBuilder>();
+
+// ===============================
+// SignalR
+// ===============================
 builder.Services.AddScoped<IOutZenSignalRFactory, OutZenSignalRFactory>();
 
 builder.Services.AddScoped<MultiHubSignalRClient>(sp =>
 {
-    var auth = sp.GetRequiredService<IAuthService>();
+    var hubTokenService = sp.GetRequiredService<IHubTokenService>();
 
     return new MultiHubSignalRClient(
         baseUrl: hubBaseUrl,
-        tokenProvider: () => auth.GetAccessTokenAsync()
+        tokenProvider: () => hubTokenService.GetHubTokenAsync()
     );
 });
 
 builder.Services.AddScoped<IMultiHubSignalRClient>(sp =>
     sp.GetRequiredService<MultiHubSignalRClient>());
 
+// ===============================
+// JS / UI
+// ===============================
 builder.Services.AddScoped<OutZenMapInterop>();
-
 builder.Services.AddBlazoredToast();
 
+// ===============================
+// Domain / Front services
+// ===============================
 builder.Services.AddScoped<AntennaService>();
 builder.Services.AddScoped<AntennaCrowdService>();
 builder.Services.AddScoped<ICrowdInfoAntennaService, CrowdInfoAntennaService>();
@@ -143,10 +149,11 @@ builder.Services.AddScoped<WeatherHubClient>();
 builder.Services.AddScoped<WeatherForecastHubClient>();
 builder.Services.AddScoped<CrowdCalendarHubClient>();
 
-builder.Services.AddSingleton<TrafficServiceBlazor>();
-builder.Services.AddSingleton<TrafficSignalRService>();
+// To verify: if these services maintain user state, Scoped is preferable.
+builder.Services.AddScoped<TrafficServiceBlazor>();
+builder.Services.AddScoped<TrafficSignalRService>();
 
-Console.WriteLine("✅ PROGRAM CLIENT V5 - Blazor DI cleaned and loaded");
+Console.WriteLine("✅ PROGRAM CLIENT V5 - cleaned and loaded");
 
 await builder.Build().RunAsync();
 

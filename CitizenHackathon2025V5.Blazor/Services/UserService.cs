@@ -32,8 +32,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 var token = await _authService.GetAccessTokenAsync();
                 if (string.IsNullOrEmpty(token)) return new List<JwtPayload>();
 
-                _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
                 var users = await _httpClient.GetFromJsonAsync<List<JwtPayload>>("user");
                 return users ?? [];
             }
