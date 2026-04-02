@@ -1,22 +1,41 @@
 ﻿/*wwwroot.css.components.map.css*/
-.map {
+/*.map {
     height: 400px;
     width: 100%;
     border-radius: 12px;
     border: 2px solid var(--color-primary);
-}
+}*/
 
-.map-container {
+/*.map-container {
     height: 350px;
     border: 2px solid var(--color-gold);
     border-radius: 12px;
     margin-top: 1rem;
+}*/
+
+.map-section {
+    padding: 2rem;
+    margin: 2rem auto;
+    max-width: 900px;
+    background: #1e1e1e;
+    border-radius: 12px;
+    box-shadow: 0 0 15px rgba(0, 188, 212, 0.3);
 }
 
 .map-shell {
-    height: 520px; /* or 70vh if you prefer */
-    min-height: 420px;
     width: 100%;
+    height: 520px;
+    min-height: 420px;
+}
+
+#leafletMap,
+.leaflet-host {
+    width: 100%;
+    height: 100%;
+    min-height: 420px;
+    border-radius: 12px;
+    border: 2px solid var(--color-primary);
+    overflow: hidden;
 }
 
 .leaflet-host {
@@ -53,20 +72,20 @@
     margin: 4px 0 2px;
 }
 
-    .chart-toolbar .chip {
-        padding: 4px 10px;
-        border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.25);
-        font-size: 11px;
-        cursor: pointer;
-        background: rgba(0,0,0,0.4);
-    }
+.chart-toolbar .chip {
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.25);
+    font-size: 11px;
+    cursor: pointer;
+    background: rgba(0,0,0,0.4);
+}
 
-        .chart-toolbar .chip.active {
-            background: #ff9800;
-            color: #000;
-            border-color: #ffb74d;
-        }
+.chart-toolbar .chip.active {
+    background: #ff9800;
+    color: #000;
+    border-color: #ffb74d;
+}
 
 
 #crowdChart {
@@ -101,10 +120,10 @@
     min-height: 520px;
 }
 
-#leafletMap, .map-host {
+/*#leafletMap, .map-host {
     height: 420px;
     min-height: 300px;
-}
+}*/
 
 .earth-canvas {
     width: 320px;

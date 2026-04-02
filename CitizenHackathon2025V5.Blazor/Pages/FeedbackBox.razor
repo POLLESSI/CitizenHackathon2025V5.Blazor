@@ -1,0 +1,198 @@
+﻿@using CitizenHackathon2025.Blazor.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.Services
+@inject MessageService MessageService
+
+<div class="feedback-board">
+    <h2>User feedback</h2>
+    <p class="feedback-subtitle">
+        Share your opinion about the presentation and review recent comments below.
+    </p>
+
+    <div class="feedback-form">
+        <textarea class="feedback-textarea"
+                  @bind="_content"
+                  @bind:event="oninput"
+                  maxlength="500"
+                  placeholder="Write your opinion here..."></textarea>
+
+        <div class="feedback-meta">
+            <span>@(_content?.Length ?? 0)/500</span>
+        </div>
+
+        <div class="feedback-actions">
+            <button class="btn btn-primary"
+                    @onclick="SendAsync"
+                    disabled="@_isSending">
+                @(_isSending ? "Sending..." : "Send feedback")
+            </button>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_successMessage))
+        {
+            <div class="feedback-success">@_successMessage</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_errorMessage))
+        {
+            <div class="feedback-error">@_errorMessage</div>
+        }
+    </div>
+
+    <div class="feedback-table-shell">
+        <h3>Latest comments</h3>
+
+        @if (_messages.Count == 0)
+        {
+            <div class="feedback-empty">No feedback yet.</div>
+        }
+        else
+        {
+            <div class="feedback-table-wrapper">
+                <table class="feedback-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>User</th>
+                            <th>Source</th>
+                            <th>Comment</th>
+                            @if (CanModerate)
+                            {
+                                <th>Action</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _messages)
+                        {
+                            <tr>
+                                <td>@item.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                                <td>@(string.IsNullOrWhiteSpace(item.UserId) ? "anon" : item.UserId)</td>
+                                <td>
+                                    @if (!string.IsNullOrWhiteSpace(item.SourceType))
+                                    {
+                                        <span class="feedback-badge">@item.SourceType</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="feedback-badge">Other</span>
+                                    }
+                                </td>
+                                <td class="feedback-comment-cell">@item.Content</td>
+
+                                @if (CanModerate)
+                                {
+                                    <td>
+                                        <button class="btn btn-danger btn-sm"
+                                                @onclick="() => DeleteAsync(item.Id)"
+                                                disabled="@_deletingIds.Contains(item.Id)">
+                                            @(_deletingIds.Contains(item.Id) ? "Deleting..." : "Delete")
+                                        </button>
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool CanModerate { get; set; }
+
+    private string _content = string.Empty;
+    private bool _isSending;
+    private string? _successMessage;
+    private string? _errorMessage;
+    private List<ClientMessageDTO> _messages = new();
+    private HashSet<int> _deletingIds = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _messages = await MessageService.GetLatestAsync(20) ?? new();
+    }
+
+    private async Task SendAsync()
+    {
+        _successMessage = null;
+        _errorMessage = null;
+
+        var content = _content?.Trim();
+
+        if (string.IsNullOrWhiteSpace(content))
+        {
+            _errorMessage = "Please enter a message before sending.";
+            return;
+        }
+
+        if (content.Length < 3)
+        {
+            _errorMessage = "Your feedback is too short.";
+            return;
+        }
+
+        try
+        {
+            _isSending = true;
+
+            var created = await MessageService.PostAsync(content);
+
+            if (created is null)
+            {
+                _errorMessage = "The feedback could not be saved.";
+                return;
+            }
+
+            _messages.Insert(0, created);
+            _messages = _messages
+                .OrderByDescending(x => x.CreatedAt)
+                .Take(20)
+                .ToList();
+
+            _content = string.Empty;
+            _successMessage = "Thank you. Your feedback has been sent.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"An error occurred while sending feedback: {ex.Message}";
+        }
+        finally
+        {
+            _isSending = false;
+        }
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        if (!CanModerate)
+            return;
+
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            _deletingIds.Add(id);
+
+            var ok = await MessageService.DeleteAsync(id);
+
+            if (!ok)
+            {
+                _errorMessage = "Comment not found or already deleted.";
+                return;
+            }
+
+            _messages = _messages.Where(x => x.Id != id).ToList();
+            _successMessage = "Comment deleted successfully.";
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Deletion failed: {ex.Message}";
+        }
+        finally
+        {
+            _deletingIds.Remove(id);
+        }
+    }
+}

@@ -1,42 +1,74 @@
 ﻿@page "/presentation"
-@implements IAsyncDisposable
-@inject IJSRuntime JS
-@inject Blazored.Toast.Services.IToastService ToastService
-@inject NavigationManager Navigation
+@using CitizenHackathon2025V5.Blazor.Client.Pages.Shared
+@using CitizenHackathon2025V5.Blazor.Client.Components
+@inherits OutZenPresentationPageBase
 
 <PageTitle>Presentation - OutZen</PageTitle>
 
-<button class="btn btn-success" @onclick="TestSignalR">
-    🔄 Test SignalR reception
-</button>
-
-<div class="page-list">
+<div class="page-list presentation-page">
     <div class="presentation-container">
-        <div class="hero-section">
-            <h1 class="scroll-reveal title">Welcome to OutZen</h1>
+
+        <section class="hero-section">
+            <h1 class="title">Welcome to OutZen</h1>
             <p class="lead">
                 Your smart companion to help you fully enjoy your sightseeing trips, stress-free.
             </p>
-        </div>
+        </section>
+        <h2>Discover how to use websockets with OutZen, Mistral and SignalR</h2>
+        <section class="presentation-toolbar">
+            <button class="btn btn-success" @onclick="TestTrafficSignalRReception">
+                🔄 Test SignalR Traffic
+            </button>
 
-        <section class="features">
+            <button class="btn btn-primary" @onclick="TestCrowdSignalRReception">
+                👥 Test SignalR Crowd
+            </button>
+
+            <button class="btn btn-warning" @onclick="TestWeatherSignalRReception">
+                ⛅ Test SignalR Weather
+            </button>
+
+            <button class="btn btn-secondary" @onclick="ResetPresentationSeeds">
+                ♻️ Reset demo markers
+            </button>
+        </section>
+
+        <section class="map-section">
+            <h2>Interactive map</h2>
+            <div class="map-shell">
+                <div id="@MapId" class="leaflet-host"></div>
+            </div>
+        </section>
+
+        <section class="simulator-section">
+            <h2>Crowd simulator</h2>
+            <input type="range" min="0" max="100" @bind="CrowdLevel" />
+            <p class="level-indicator" style="color:@LevelColor">
+                Affluence actuelle : @CrowdLevel%
+            </p>
+            <div class="bar-outer">
+                <div class="bar-inner" style="width:@($"{CrowdLevel}%"); background-color:@LevelColor;"></div>
+            </div>
+        </section>
+
+        <section class="features-section">
             <h2>What OutZen does</h2>
             <ul>
                 <li>💡 <strong>Real-time suggestions</strong> depending on your location and preferences.</li>
-                <li>🌦️ <strong>Weather Analysis</strong> to adapt your activities to the climate.</li>
+                <li>🌦️ <strong>Weather analysis</strong> to adapt your activities to the climate.</li>
                 <li>🚗 <strong>Traffic status</strong> to avoid traffic jams and optimize your journey.</li>
                 <li>👥 <strong>Crowd density</strong> analyzed to avoid overloaded places.</li>
             </ul>
         </section>
 
-        <section class="technos">
+        <section class="technos-section">
             <h2>Technologies used</h2>
             <p>
-                OutZen uses artificial intelligence connected to real-time weather, traffic, and crowd APIs to offer you seamless and enjoyable alternatives.
+                OutZen uses artificial intelligence connected to real-time weather, traffic, and crowd APIs to offer seamless and enjoyable alternatives.
             </p>
         </section>
 
-        <section class="scroll-reveal description">
+        <section class="description-section">
             <p>
                 OutZen is a smart app that guides you toward the best travel experience.
                 By analyzing travel times, traffic, and weather in real time, it offers optimized suggestions
@@ -44,18 +76,8 @@
             </p>
         </section>
 
-        <section class="scroll-reveal simulator">
-            <h2>Crowd simulator</h2>
-            <input type="range" min="0" max="100" @bind="CrowdLevel" />
-            <p class="level-indicator" style="color:@LevelColor">
-                Affluence actuelle : @CrowdLevel%
-            </p>
-            <div class="bar" style="width:@CrowdLevel%; background-color:@LevelColor;"></div>
-        </section>
-
-        <section class="scroll-reveal map-container">
-            <h2>Interactive map</h2>
-            <div id="leafletMap" class="map"></div>
+        <section class="feedback-section">
+            <FeedbackBoard CanModerate="@CanModerateComments" />
         </section>
 
         <section class="call-to-action">
@@ -66,65 +88,11 @@
     </div>
 </div>
 
-<MapSimulator />
+<MapSimulator ScopeKey="@ScopeKey" />
 
 <div class="earth-wrapper">
     <Globe />
 </div>
-
-@code {
-#nullable disable
-    private string _canvasId = $"rotatingEarth-{Guid.NewGuid():N}";
-    private string _speedId = $"speedRange-{Guid.NewGuid():N}";
-
-    private int CrowdLevel { get; set; } = 30;
-
-    private string LevelColor =>
-        CrowdLevel < 30 ? "green" :
-        CrowdLevel < 70 ? "orange" : "red";
-
-    protected override Task OnInitializedAsync() => Task.CompletedTask;
-
-    private void NavigateHome() => Navigation.NavigateTo("/");
-
-    private async Task ChangeTheme(ChangeEventArgs e)
-        => await JS.InvokeVoidAsync("setTheme", e.Value?.ToString());
-
-    private async Task TestSignalR()
-    {
-        var fakeData = new
-        {
-            latitude = 50.895,
-            longitude = 4.3415,
-            level = 2,
-            description = "🔧 Cork simulation",
-            timestamp = DateTime.Now
-        };
-
-        await JS.InvokeVoidAsync("trafficInterop.updateTrafficMarkers", new[] { fakeData });
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender) return;
-
-        // 1) Init OutZen front (Leaflet + scroll + multi-hub)
-        await JS.InvokeVoidAsync("outzen.initPresentation"); // see section 3
-    }
-
-    [JSInvokable]
-    public async Task OnCrowdInfoReceived(string dataJson)
-    {
-        // TODO: Deserialise & bind if you want to show something on the page
-        await Task.CompletedTask;
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        try { await JS.InvokeVoidAsync("disposeEarth", _canvasId); } catch { }
-    }
-}
-
 
 
 

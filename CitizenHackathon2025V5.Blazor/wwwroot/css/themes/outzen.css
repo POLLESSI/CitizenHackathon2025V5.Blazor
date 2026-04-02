@@ -87,6 +87,30 @@
 /* =========================================================
    GENERIC MARKER CONTAINERS
    ========================================================= */
+.leaflet-marker-icon.oz-marker {
+    background: transparent !important;
+    border: none !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.leaflet-marker-icon.oz-marker .oz-marker-inner {
+    width: 28px !important;
+    height: 28px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 50% !important;
+    font-size: 18px !important;
+    line-height: 1 !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    transform: none !important;
+    color: #fff !important;
+    background: rgba(220, 53, 69, 0.95) !important;
+    box-shadow: 0 0 0 2px #fff, 0 0 8px rgba(220,53,69,.6) !important;
+}
 
 .leaflet-marker-icon.oz-marker,
 .leaflet-marker-icon.oz-bundle-icon,

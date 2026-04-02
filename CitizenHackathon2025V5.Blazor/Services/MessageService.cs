@@ -24,6 +24,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             return await resp.Content.ReadFromJsonAsync<ClientMessageDTO>(cancellationToken: ct);
         }
+
+        public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)
+        {
+            var resp = await _http.DeleteAsync($"{BaseRoute}/{id}", ct);
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return false;
+
+            resp.EnsureSuccessStatusCode();
+            return true;
+        }
     }
 }
 

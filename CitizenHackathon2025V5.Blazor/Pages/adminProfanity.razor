@@ -1,0 +1,66 @@
+﻿@page "/admin/profanity"
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<h3>Profanity Dashboard</h3>
+
+<div class="card">
+    <button class="btn btn-primary" @onclick="LoadAsync">Refresh</button>
+</div>
+
+@if (_items.Count == 0)
+{
+    <p>No data.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Word</th>
+                <th>Lang</th>
+                <th>Weight</th>
+                <th>Regex</th>
+                <th>Active</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in _items)
+            {
+                <tr>
+                    <td>@item.Id</td>
+                    <td>@item.Word</td>
+                    <td>@item.LanguageCode</td>
+                    <td>@item.Weight</td>
+                    <td>@item.IsRegex</td>
+                    <td>@item.Active</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<ProfanityWordVm> _items = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _items = await Http.GetFromJsonAsync<List<ProfanityWordVm>>("api/Profanity") ?? new();
+    }
+
+    public sealed class ProfanityWordVm
+    {
+        public int Id { get; set; }
+        public string Word { get; set; } = "";
+        public string LanguageCode { get; set; } = "";
+        public int Weight { get; set; }
+        public bool IsRegex { get; set; }
+        public bool Active { get; set; }
+    }
+}

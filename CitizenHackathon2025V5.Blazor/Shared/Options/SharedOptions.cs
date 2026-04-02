@@ -9,10 +9,12 @@
     }
     public class SharedOptions : BaseOptions
     {
-        public new string TimeZone { get; set; } = "Europe/Brussels";
-        public new string LocationName { get; set; } = "Default Location";
-        public new int Hour { get; set; } = 0;
-        public new int Minute { get; set; } = 0;
+        // specific properties only
+
+        //public new string TimeZone { get; set; } = "Europe/Brussels";
+        //public new string LocationName { get; set; } = "Default Location";
+        //public new int Hour { get; set; } = 0;
+        //public new int Minute { get; set; } = 0;
 
         // Other features specific to SharedOptions...
     }

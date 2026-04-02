@@ -4,8 +4,15 @@
 
     console.log("[outzen-interop] loaded");
 
-    globalThis.OutZen = (typeof globalThis.OutZen === "object" && globalThis.OutZen) ? globalThis.OutZen : {};
-    globalThis.OutZenInterop = (typeof globalThis.OutZenInterop === "object" && globalThis.OutZenInterop) ? globalThis.OutZenInterop : {};
+    globalThis.OutZen =
+        (typeof globalThis.OutZen === "object" && globalThis.OutZen)
+            ? globalThis.OutZen
+            : {};
+
+    globalThis.OutZenInterop =
+        (typeof globalThis.OutZenInterop === "object" && globalThis.OutZenInterop)
+            ? globalThis.OutZenInterop
+            : {};
 
     const isDev =
         location.hostname === "localhost" ||
@@ -67,7 +74,80 @@
         console.log("[OutZen] ✅ interop ready:", Object.keys(globalThis.OutZenInterop));
         return true;
     };
+
+    // ---------------------------------------------------------------------
+    // Legacy lowercase alias expected by Presentation.razor
+    // ---------------------------------------------------------------------
+    globalThis.outzen = globalThis.outzen || {};
+
+    globalThis.outzen.initPresentation = async function () {
+        try {
+            await globalThis.OutZen.ensure(false);
+
+            const mapId = "leafletMap";
+            const scopeKey = "presentation";
+
+            const host = document.getElementById(mapId);
+            if (!host) {
+                console.warn("[outzen.initPresentation] map container not found:", mapId);
+                return false;
+            }
+
+            const currentMapId = globalThis.OutZenInterop.getCurrentMapId?.(scopeKey);
+            if (currentMapId && currentMapId !== mapId) {
+                try {
+                    globalThis.OutZenInterop.disposeOutZen?.({
+                        mapId: currentMapId,
+                        scopeKey,
+                        allowNoToken: true
+                    });
+                } catch { }
+            }
+
+            const boot = await globalThis.OutZenInterop.bootOutZen({
+                mapId,
+                scopeKey,
+                center: [50.8503, 4.3517],
+                zoom: 8,
+                enableChart: false,
+                force: true,
+                resetMarkers: true,
+                resetAll: true,
+                enableHybrid: true,
+                enableCluster: true,
+                hybridThreshold: 13
+            });
+
+            try {
+                globalThis.OutZenInterop.refreshMapSize?.(scopeKey);
+            } catch { }
+
+            console.log("[outzen.initPresentation] ok", boot);
+            return true;
+        } catch (e) {
+            console.error("[outzen.initPresentation] failed", e);
+            throw e;
+        }
+    };
+
+    globalThis.outzen.disposePresentation = function () {
+        try {
+            return globalThis.OutZenInterop.disposeOutZen?.({
+                mapId: "leafletMap",
+                scopeKey: "presentation",
+                allowNoToken: true
+            });
+        } catch (e) {
+            console.warn("[outzen.disposePresentation] failed", e);
+            return false;
+        }
+    };
+
+    // ---------------------------------------------------------------------
+    // Safe legacy helpers
+    // ---------------------------------------------------------------------
     window.OutZen = window.OutZen || {};
+
     window.OutZen.safeMakeDrawerDraggable = function (id) {
         try {
             if (typeof window.OutZen.makeDrawerDraggable === "function") {
@@ -100,6 +180,13 @@
                 window.OutZen.avoidOverlap(id);
             }
         } catch { }
+    };
+
+    window.outzenScrollToMap = function (id) {
+        const el = document.getElementById(id);
+        if (!el) return false;
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        return true;
     };
 })();
 

@@ -1,10 +1,10 @@
-﻿/* wwwroot/js/trafficInterop.js */
+﻿/* wwwroot/js/crowdInterop.js */
 (function () {
     "use strict";
 
     const DEFAULT_SCOPE = "presentation";
-    const DEFAULT_KIND = "traffic";
-    const DEFAULT_ICON = "🚗";
+    const DEFAULT_KIND = "crowd";
+    const DEFAULT_ICON = "👥";
 
     function toArray(value) {
         if (Array.isArray(value)) return value;
@@ -32,49 +32,42 @@
         return Math.max(0, Math.min(4, n));
     }
 
-    function normalizeTrafficItem(item, index = 0) {
+    function normalizeCrowdItem(item, index = 0) {
         if (!item || typeof item !== "object") return null;
 
         const lat = toNumber(pick(item,
             "lat", "Lat",
-            "latitude", "Latitude",
-            "LatitudeValue",
-            "y", "Y"));
+            "latitude", "Latitude"));
 
         const lng = toNumber(pick(item,
             "lng", "Lng",
             "lon", "Lon",
-            "longitude", "Longitude",
-            "LongitudeValue",
-            "x", "X"));
+            "longitude", "Longitude"));
 
         if (lat == null || lng == null) {
-            console.warn("[trafficInterop] skip item: invalid coords", item);
+            console.warn("[crowdInterop] skip item: invalid coords", item);
             return null;
         }
 
         const rawId = pick(item,
             "id", "Id",
-            "trafficConditionId", "TrafficConditionId",
-            "eventId", "EventId") ?? `traffic-${index}-${lat}-${lng}`;
+            "crowdInfoId", "CrowdInfoId") ?? `crowd-${index}-${lat}-${lng}`;
 
         const level = normalizeLevel(pick(item,
             "level", "Level",
-            "trafficLevel", "TrafficLevel",
-            "congestionLevel", "CongestionLevel"), 2);
+            "crowdLevel", "CrowdLevel"), 2);
 
         const title = String(pick(item,
             "title", "Title",
             "summary", "Summary",
-            "roadName", "RoadName") ?? `Traffic #${rawId}`);
+            "name", "Name") ?? `Crowd #${rawId}`);
 
         const description = String(pick(item,
             "description", "Description",
-            "message", "Message",
-            "status", "Status") ?? "Traffic update");
+            "message", "Message") ?? "Crowd update");
 
         return {
-            id: `traffic:${rawId}`,
+            id: `crowd:${rawId}`,
             lat,
             lng,
             level,
@@ -83,14 +76,14 @@
                 title,
                 description,
                 icon: DEFAULT_ICON,
-                isTraffic: true
+                isTraffic: false
             }
         };
     }
 
     async function ensureReady(scopeKey) {
         if (!globalThis.OutZen?.ensure) {
-            console.warn("[trafficInterop] OutZen.ensure missing");
+            console.warn("[crowdInterop] OutZen.ensure missing");
             return false;
         }
 
@@ -99,35 +92,35 @@
         const dump = globalThis.OutZenInterop?.dumpState?.(scopeKey);
         if (dump?.hasMap) return true;
 
-        console.warn("[trafficInterop] map not ready for scope", scopeKey, dump);
+        console.warn("[crowdInterop] map not ready for scope", scopeKey, dump);
         return false;
     }
 
-    async function clearTrafficMarkers(scopeKey) {
+    async function clearCrowdMarkers(scopeKey) {
         const interop = globalThis.OutZenInterop;
         if (!interop) return;
 
         try {
-            interop.pruneMarkersByPrefix?.("traffic:", scopeKey);
+            interop.pruneMarkersByPrefix?.("crowd:", scopeKey);
         } catch (e) {
-            console.warn("[trafficInterop] pruneMarkersByPrefix failed", e);
+            console.warn("[crowdInterop] pruneMarkersByPrefix failed", e);
         }
     }
 
-    async function fitTraffic(scopeKey) {
+    async function fitCrowd(scopeKey) {
         try {
             globalThis.OutZenInterop?.fitToAllMarkers?.(scopeKey, {
                 padding: [22, 22],
                 maxZoom: 16
             });
         } catch (e) {
-            console.warn("[trafficInterop] fitToAllMarkers failed", e);
+            console.warn("[crowdInterop] fitToAllMarkers failed", e);
         }
     }
 
-    async function updateTrafficMarkers(trafficData, scopeKey = DEFAULT_SCOPE, fit = true, clearPrevious = true) {
-        const items = toArray(trafficData);
-        console.log("[trafficInterop] updateTrafficMarkers", {
+    async function updateCrowdMarkers(crowdData, scopeKey = DEFAULT_SCOPE, fit = true, clearPrevious = true) {
+        const items = toArray(crowdData);
+        console.log("[crowdInterop] updateCrowdMarkers", {
             count: items.length,
             scopeKey,
             fit,
@@ -138,13 +131,13 @@
         if (!ready) return false;
 
         if (clearPrevious) {
-            await clearTrafficMarkers(scopeKey);
+            await clearCrowdMarkers(scopeKey);
         }
 
         let added = 0;
 
         for (let i = 0; i < items.length; i++) {
-            const normalized = normalizeTrafficItem(items[i], i);
+            const normalized = normalizeCrowdItem(items[i], i);
             if (!normalized) continue;
 
             try {
@@ -159,145 +152,23 @@
 
                 if (ok) added++;
             } catch (e) {
-                console.error("[trafficInterop] addOrUpdateCrowdMarker failed", e, normalized);
+                console.error("[crowdInterop] addOrUpdateCrowdMarker failed", e, normalized);
             }
         }
 
         if (fit && added > 0) {
-            await fitTraffic(scopeKey);
+            await fitCrowd(scopeKey);
         }
 
         try {
             globalThis.OutZenInterop?.refreshMapSize?.(scopeKey);
         } catch { }
 
-        console.log("[trafficInterop] done", { added, scopeKey });
+        console.log("[crowdInterop] done", { added, scopeKey });
         return added > 0;
     }
 
-    globalThis.trafficInterop = globalThis.trafficInterop || {};
-    globalThis.trafficInterop.updateTrafficMarkers = updateTrafficMarkers;
-    globalThis.trafficInterop.clearTrafficMarkers = clearTrafficMarkers;
+    globalThis.crowdInterop = globalThis.crowdInterop || {};
+    globalThis.crowdInterop.updateCrowdMarkers = updateCrowdMarkers;
+    globalThis.crowdInterop.clearCrowdMarkers = clearCrowdMarkers;
 })();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025.API. All rights reserved.

@@ -108,7 +108,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services.Interop
             => _js.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdCalendarMarker", id, lat, lng, level, info, scopeKey).AsTask();
 
         public Task FitToMarkersAsync(string scopeKey)
-            => _js.InvokeVoidAsync("OutZenInterop.fitToMarkers", scopeKey).AsTask();
+            => _js.InvokeVoidAsync("OutZenInterop.fitToAllMarkers", scopeKey).AsTask();
 
         public Task ClearAllOutZenLayersAsync(string scopeKey)
             => _js.InvokeVoidAsync("OutZenInterop.clearAllOutZenLayers", scopeKey).AsTask();
