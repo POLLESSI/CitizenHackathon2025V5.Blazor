@@ -20,9 +20,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             var payload = new { Content = content };
             var resp = await _http.PostAsJsonAsync(BaseRoute, payload, ct);
-            resp.EnsureSuccessStatusCode();
+            var body = await resp.Content.ReadAsStringAsync(ct);
 
-            return await resp.Content.ReadFromJsonAsync<ClientMessageDTO>(cancellationToken: ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                throw new HttpRequestException(
+                    $"POST {BaseRoute} failed. Status={(int)resp.StatusCode} {resp.ReasonPhrase}. Body={body}");
+            }
+
+            if (string.IsNullOrWhiteSpace(body))
+                return null;
+
+            return System.Text.Json.JsonSerializer.Deserialize<ClientMessageDTO>(
+                body,
+                new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
         }
 
         public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)

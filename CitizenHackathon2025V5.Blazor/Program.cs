@@ -138,6 +138,7 @@ builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<GptInteractionService>();
 builder.Services.AddScoped<MessageService>();
 builder.Services.AddScoped<PlaceService>();
+builder.Services.AddScoped<ProfanityAdminApiService>();
 builder.Services.AddScoped<SuggestionService>();
 builder.Services.AddScoped<SuggestionMapService>();
 builder.Services.AddScoped<TrafficConditionService>();

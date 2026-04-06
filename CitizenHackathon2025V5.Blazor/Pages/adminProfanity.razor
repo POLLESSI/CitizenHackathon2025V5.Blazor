@@ -1,66 +1,381 @@
 ﻿@page "/admin/profanity"
-@using System.Net.Http.Json
-@inject HttpClient Http
+@using CitizenHackathon2025V5.Blazor.Client.Models
+@using CitizenHackathon2025V5.Blazor.Client.Services
+@using Microsoft.AspNetCore.Components.Web
+@inject ProfanityAdminApiService ProfanityAdminService
 
-<h3>Profanity Dashboard</h3>
+<PageTitle>Admin Profanity</PageTitle>
 
-<div class="card">
-    <button class="btn btn-primary" @onclick="LoadAsync">Refresh</button>
+<div class="admin-profanity-page">
+    <section class="admin-card">
+        <div class="admin-card-header">
+            <div>
+                <h1>Profanity Dashboard</h1>
+                <p class="admin-subtitle">
+                    Manage forbidden words, languages, weights, regex rules and moderation behavior.
+                </p>
+            </div>
+
+            <div class="admin-header-actions">
+                <button class="btn btn-primary" @onclick="ReloadAsync" disabled="@_loading">
+                    @(_loading ? "Loading..." : "Refresh")
+                </button>
+            </div>
+        </div>
+
+        <div class="admin-filter-bar">
+            <div class="filter-item">
+                <label>Language</label>
+                <select class="oz-input" @bind="_languageCode" @bind:after="OnFilterChangedAsync">
+                    <option value="">All</option>
+                    <option value="fr">French</option>
+                    <option value="en">English</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div class="filter-item filter-item-search">
+                <label>Search</label>
+                <input class="oz-input"
+                       @bind="_search"
+                       @bind:event="oninput"
+                       @bind:after="OnFilterChangedAsync"
+                       placeholder="Search word / category / normalized word..." />
+            </div>
+
+            <div class="filter-item">
+                <label>Page size</label>
+                <select class="oz-input" @bind="_pageSize" @bind:after="OnPageSizeChangedAsync">
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+        </div>
+    </section>
+
+    <section class="admin-card">
+        <h2>Add forbidden word</h2>
+
+        <div class="admin-form-grid">
+            <div class="form-group">
+                <label>Word / Pattern</label>
+                <input class="oz-input" @bind="_create.Word" placeholder="Ex: idiot" />
+            </div>
+
+            <div class="form-group">
+                <label>Language</label>
+                <select class="oz-input" @bind="_create.LanguageCode">
+                    <option value="fr">fr</option>
+                    <option value="en">en</option>
+                    <option value="other">other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Weight</label>
+                <input class="oz-input" type="number" min="1" max="100" @bind="_create.Weight" />
+            </div>
+
+            <div class="form-group">
+                <label>Category</label>
+                <input class="oz-input" @bind="_create.Category" placeholder="insult / hate / sexual ..." />
+            </div>
+
+            <div class="form-group form-check">
+                <label>
+                    <input type="checkbox" @bind="_create.IsRegex" />
+                    Regex rule
+                </label>
+            </div>
+
+            <div class="form-group form-check">
+                <label>
+                    <input type="checkbox" @bind="_create.Active" />
+                    Active
+                </label>
+            </div>
+        </div>
+
+        <div class="admin-form-actions">
+            <button class="btn btn-success" @onclick="CreateAsync" disabled="@_saving">
+                @(_saving ? "Saving..." : "Add word")
+            </button>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(_success))
+        {
+            <div class="admin-msg admin-msg-success">@_success</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(_error))
+        {
+            <div class="admin-msg admin-msg-error">@_error</div>
+        }
+    </section>
+
+    <section class="admin-card">
+        <div class="table-header">
+            <h2>Forbidden words</h2>
+            <span class="table-stats">
+                @_totalCount item(s) • Page @_page / @(_totalPages == 0 ? 1 : _totalPages)
+            </span>
+        </div>
+
+        @if (_loading)
+        {
+            <div class="admin-empty">Loading...</div>
+        }
+        else if (_items.Count == 0)
+        {
+            <div class="admin-empty">No records found.</div>
+        }
+        else
+        {
+            <div class="admin-table-shell">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Id</th>
+                            <th>Word</th>
+                            <th>Lang</th>
+                            <th>Weight</th>
+                            <th>Regex</th>
+                            <th>Category</th>
+                            <th>Status</th>
+                            <th class="th-actions">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in _items)
+                        {
+                            <tr>
+                                <td>@item.Id</td>
+                                <td class="td-word">@item.Word</td>
+                                <td><span class="lang-badge">@item.LanguageCode</span></td>
+                                <td>@item.Weight</td>
+                                <td>@(item.IsRegex ? "Yes" : "No")</td>
+                                <td>@(string.IsNullOrWhiteSpace(item.Category) ? "-" : item.Category)</td>
+                                <td>
+                                    @if (item.Active)
+                                    {
+                                        <span class="status-pill status-pill-on">Active</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="status-pill status-pill-off">Inactive</span>
+                                    }
+                                </td>
+                                <td class="td-actions">
+                                    <button class="btn btn-warning btn-sm"
+                                            @onclick="() => ToggleAsync(item)"
+                                            disabled="@_busyIds.Contains(item.Id)">
+                                        @(item.Active ? "Disable" : "Enable")
+                                    </button>
+
+                                    <button class="btn btn-danger btn-sm"
+                                            @onclick="() => DeleteAsync(item.Id)"
+                                            disabled="@_busyIds.Contains(item.Id)">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination-bar">
+                <button class="btn btn-secondary btn-sm" @onclick="PrevPageAsync" disabled="@(_page <= 1 || _loading)">
+                    Previous
+                </button>
+
+                <span class="pagination-info">
+                    Page @_page / @(_totalPages == 0 ? 1 : _totalPages)
+                </span>
+
+                <button class="btn btn-secondary btn-sm" @onclick="NextPageAsync" disabled="@(_page >= _totalPages || _loading)">
+                    Next
+                </button>
+            </div>
+        }
+    </section>
 </div>
 
-@if (_items.Count == 0)
-{
-    <p>No data.</p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Id</th>
-                <th>Word</th>
-                <th>Lang</th>
-                <th>Weight</th>
-                <th>Regex</th>
-                <th>Active</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var item in _items)
-            {
-                <tr>
-                    <td>@item.Id</td>
-                    <td>@item.Word</td>
-                    <td>@item.LanguageCode</td>
-                    <td>@item.Weight</td>
-                    <td>@item.IsRegex</td>
-                    <td>@item.Active</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
-
 @code {
-    private List<ProfanityWordVm> _items = new();
+    private List<ProfanityWordModel> _items = new();
+    private HashSet<int> _busyIds = new();
+
+    private bool _loading;
+    private bool _saving;
+    private string? _success;
+    private string? _error;
+
+    private int _page = 1;
+    private int _pageSize = 20;
+    private int _totalCount;
+    private int _totalPages;
+
+    private string _languageCode = string.Empty;
+    private string _search = string.Empty;
+
+    private CreateProfanityWordModel _create = new()
+    {
+        LanguageCode = "fr",
+        Weight = 10,
+        Active = true
+    };
 
     protected override async Task OnInitializedAsync()
     {
         await LoadAsync();
     }
 
-    private async Task LoadAsync()
+    private async Task ReloadAsync()
     {
-        _items = await Http.GetFromJsonAsync<List<ProfanityWordVm>>("api/Profanity") ?? new();
+        _page = 1;
+        await LoadAsync();
     }
 
-    public sealed class ProfanityWordVm
+    private async Task OnFilterChangedAsync()
     {
-        public int Id { get; set; }
-        public string Word { get; set; } = "";
-        public string LanguageCode { get; set; } = "";
-        public int Weight { get; set; }
-        public bool IsRegex { get; set; }
-        public bool Active { get; set; }
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnPageSizeChangedAsync()
+    {
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task PrevPageAsync()
+    {
+        if (_page > 1)
+        {
+            _page--;
+            await LoadAsync();
+        }
+    }
+
+    private async Task NextPageAsync()
+    {
+        if (_page < _totalPages)
+        {
+            _page++;
+            await LoadAsync();
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _loading = true;
+            _error = null;
+
+            var result = await ProfanityAdminService.GetPagedAsync(
+                _page,
+                _pageSize,
+                _languageCode,
+                _search);
+
+            _items = result?.Items?.ToList() ?? new();
+            _totalCount = result?.TotalCount ?? 0;
+            _totalPages = result?.TotalPages ?? 0;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Loading failed: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        try
+        {
+            _saving = true;
+            _error = null;
+            _success = null;
+
+            if (string.IsNullOrWhiteSpace(_create.Word))
+            {
+                _error = "Word is required.";
+                return;
+            }
+
+            var currentLanguage = _create.LanguageCode;
+
+            var created = await ProfanityAdminService.CreateAsync(_create);
+
+            _create = new CreateProfanityWordModel
+            {
+                LanguageCode = currentLanguage,
+                Weight = 10,
+                Active = true
+            };
+
+            _success = $"Word '{created?.Word}' added successfully.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Create failed: {ex.Message}";
+        }
+        finally
+        {
+            _saving = false;
+        }
+    }
+
+    private async Task ToggleAsync(ProfanityWordModel item)
+    {
+        try
+        {
+            _busyIds.Add(item.Id);
+            _error = null;
+            _success = null;
+
+            await ProfanityAdminService.SetActiveAsync(item.Id, !item.Active);
+
+            item.Active = !item.Active;
+            _success = "Status updated successfully.";
+        }
+        catch (Exception ex)
+        {
+            _error = $"Status update failed: {ex.Message}";
+        }
+        finally
+        {
+            _busyIds.Remove(item.Id);
+        }
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        try
+        {
+            _busyIds.Add(id);
+            _error = null;
+            _success = null;
+
+            await ProfanityAdminService.DeleteAsync(id);
+
+            _success = "Word deleted successfully.";
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Delete failed: {ex.Message}";
+        }
+        finally
+        {
+            _busyIds.Remove(id);
+        }
     }
 }
