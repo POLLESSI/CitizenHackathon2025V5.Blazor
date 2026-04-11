@@ -18,7 +18,7 @@ static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
         .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
 static IAsyncPolicy<HttpResponseMessage> GetTimeoutPolicy() =>
-    Policy.TimeoutAsync<HttpResponseMessage>(300);
+    Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromMinutes(10));
 
 static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy() =>
     HttpPolicyExtensions
@@ -52,6 +52,7 @@ builder.Services.AddTransient<JwtAttachHandler>();
 builder.Services.AddHttpClient("ApiWithAuth", client =>
 {
     client.BaseAddress = new Uri(apiRestBase);
+    client.Timeout = TimeSpan.FromMinutes(10);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
     client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 })
@@ -64,6 +65,7 @@ builder.Services.AddHttpClient("ApiWithAuth", client =>
 builder.Services.AddHttpClient("ApiRootAuth", client =>
 {
     client.BaseAddress = new Uri(apiBaseUrl.EndsWith("/") ? apiBaseUrl : apiBaseUrl + "/");
+    client.Timeout = TimeSpan.FromMinutes(10);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
     client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 })
@@ -71,10 +73,11 @@ builder.Services.AddHttpClient("ApiRootAuth", client =>
 .AddPolicyHandler(GetTimeoutPolicy())
 .AddPolicyHandler(GetCircuitBreakerPolicy());
 
-// 3) Potential anonymous customer
+// 3) Potential anonymous client
 builder.Services.AddHttpClient("ApiAnonymous", client =>
 {
     client.BaseAddress = new Uri(apiRestBase);
+    client.Timeout = TimeSpan.FromMinutes(10);
     client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (CitizenHackathon2025V5.Blazor)");
     client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 })
@@ -150,7 +153,6 @@ builder.Services.AddScoped<WeatherHubClient>();
 builder.Services.AddScoped<WeatherForecastHubClient>();
 builder.Services.AddScoped<CrowdCalendarHubClient>();
 
-// To verify: if these services maintain user state, Scoped is preferable.
 builder.Services.AddScoped<TrafficServiceBlazor>();
 builder.Services.AddScoped<TrafficSignalRService>();
 

@@ -1,143 +1,417 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
-    public class GptInteractionService
+    public sealed class GptInteractionService
     {
 #nullable disable
         private readonly HttpClient _httpClient;
-        private readonly HttpClient _ollamaClient;
 
         private const string BaseRoute = "Gpt";
+        private const int MaxLoggedBodyLength = 1200;
 
-        public GptInteractionService(HttpClient httpClient, IHttpClientFactory httpClientFactory)
+        private static readonly JsonSerializerOptions JsonOptions = new()
         {
-            _httpClient = httpClient;
-            _ollamaClient = httpClientFactory.CreateClient("OllamaClient");
+            PropertyNameCaseInsensitive = true
+        };
+
+        public GptInteractionService(HttpClient httpClient)
+        {
+            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         }
 
         public async Task<List<ClientGptInteractionDTO>> GetAllInteractions(CancellationToken ct = default)
         {
+            var url = $"{BaseRoute}/all";
+
             try
             {
-                Console.WriteLine($"[GptInteractionService] BaseAddress = {_httpClient.BaseAddress}");
+                LogInfo($"[GetAllInteractions] GET {BuildAbsoluteUrl(url)}");
 
-                using var response = await _httpClient.GetAsync($"{BaseRoute}/all", ct);
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                using var response = await _httpClient.SendAsync(
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    ct);
+
+                LogInfo($"[GetAllInteractions] HTTP {(int)response.StatusCode} {response.StatusCode}");
 
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return new List<ClientGptInteractionDTO>();
 
                 response.EnsureSuccessStatusCode();
 
-                var list = await response.Content.ReadFromJsonAsync<List<ClientGptInteractionDTO>>(cancellationToken: ct);
+                var list = await response.Content.ReadFromJsonAsync<List<ClientGptInteractionDTO>>(JsonOptions, ct);
                 return list ?? new List<ClientGptInteractionDTO>();
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                LogWarn("[GetAllInteractions] Cancelled by caller.");
+                return new List<ClientGptInteractionDTO>();
+            }
+            catch (TaskCanceledException ex)
+            {
+                LogWarn($"[GetAllInteractions] Timed out or cancelled by HttpClient. {ex.Message}");
+                return new List<ClientGptInteractionDTO>();
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Unexpected error in GetAllInteractions: {ex.Message}");
+                LogError($"[GetAllInteractions] Unexpected error: {ex}");
                 return new List<ClientGptInteractionDTO>();
             }
         }
 
         public async Task<ClientGptInteractionDTO> GetByIdAsync(int id, CancellationToken ct = default)
         {
-            if (id <= 0) return null;
+            if (id <= 0)
+                return null;
+
+            var url = $"{BaseRoute}/{id}";
 
             try
             {
-                using var response = await _httpClient.GetAsync($"{BaseRoute}/{id}", ct);
+                LogInfo($"[GetByIdAsync] GET {BuildAbsoluteUrl(url)}");
+
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                using var response = await _httpClient.SendAsync(
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    ct);
+
+                LogInfo($"[GetByIdAsync] HTTP {(int)response.StatusCode} {response.StatusCode} for id={id}");
 
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return null;
 
                 response.EnsureSuccessStatusCode();
 
-                var item = await response.Content.ReadFromJsonAsync<ClientGptInteractionDTO>(cancellationToken: ct);
+                var item = await response.Content.ReadFromJsonAsync<ClientGptInteractionDTO>(JsonOptions, ct);
                 return item;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
+                LogWarn($"[GetByIdAsync] Cancelled by caller for id={id}.");
+                return null;
+            }
+            catch (TaskCanceledException ex)
+            {
+                LogWarn($"[GetByIdAsync] Timed out or cancelled by HttpClient for id={id}. {ex.Message}");
                 return null;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Unexpected error in GetByIdAsync({id}): {ex.Message}");
+                LogError($"[GetByIdAsync] Unexpected error for id={id}: {ex}");
                 return null;
             }
         }
 
-        public async Task<ClientGptInteractionDTO> AskGpt(ClientGptInteractionDTO prompt)
+        public async Task<ClientGptInteractionDTO> AskGpt(
+            ClientGptInteractionDTO prompt,
+            double? latitude = null,
+            double? longitude = null,
+            CancellationToken ct = default)
         {
+            if (prompt is null || string.IsNullOrWhiteSpace(prompt.Prompt))
+                return null;
+
+            var payload = new AskGptRequest
+            {
+                Prompt = prompt.Prompt.Trim(),
+                Latitude = latitude,
+                Longitude = longitude
+            };
+
+            var url = $"{BaseRoute}/ask-mistral";
+
             try
             {
-                var response = await _httpClient.PostAsJsonAsync($"{BaseRoute}/ask-mistral", new
-                {
-                    Prompt = prompt.Prompt,
-                    Latitude = 50.0,
-                    Longitude = 4.5
-                });
+                LogInfo($"[AskGpt] POST {BuildAbsoluteUrl(url)} | promptLength={payload.Prompt.Length} | lat={latitude?.ToString() ?? "null"} | lng={longitude?.ToString() ?? "null"}");
 
-                var raw = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"[AskGpt] Status={(int)response.StatusCode} Body={raw}");
+                using var response = await _httpClient.PostAsJsonAsync(url, payload, ct);
+                var raw = await response.Content.ReadAsStringAsync(ct);
+
+                LogInfo($"[AskGpt] HTTP {(int)response.StatusCode} {response.StatusCode} | body={TruncateForLog(raw)}");
 
                 response.EnsureSuccessStatusCode();
 
-                var result = JsonSerializer.Deserialize<ClientGptAnswerDTO>(raw, new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true
-                });
+                var interaction = TryParseAskGptResponse(raw, payload.Prompt);
 
-                return new ClientGptInteractionDTO
+                if (interaction is not null)
                 {
-                    Id = result?.Id ?? 0,
-                    Prompt = result?.Prompt ?? prompt.Prompt,
-                    Response = result?.Response ?? "No response from Mistral.",
-                    CreatedAt = result?.CreatedAt ?? DateTime.UtcNow,
-                    Active = true
-                };
+                    LogInfo($"[AskGpt] Parsed interaction successfully. id={interaction.Id}, hasResponse={!string.IsNullOrWhiteSpace(interaction.Response)}");
+                    return interaction;
+                }
+
+                throw new InvalidOperationException("Unexpected response format returned by api/Gpt/ask-mistral.");
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                LogWarn("[AskGpt] Cancelled by caller.");
+                throw;
+            }
+            catch (TaskCanceledException ex)
+            {
+                LogWarn($"[AskGpt] Timed out or cancelled by HttpClient. {ex.Message}");
+                throw;
+            }
+            catch (HttpRequestException ex)
+            {
+                LogError($"[AskGpt] HTTP error: {ex}");
+                throw;
+            }
+            catch (JsonException ex)
+            {
+                LogError($"[AskGpt] JSON parse error: {ex}");
+                throw;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"ERROR in AskGpt: {ex}");
+                LogError($"[AskGpt] Unexpected error: {ex}");
                 throw;
             }
         }
 
-        public async Task Delete(int id)
+        public async Task DeleteAsync(int id, CancellationToken ct = default)
         {
+            if (id <= 0)
+                return;
+
+            var url = $"{BaseRoute}/{id}";
+
             try
             {
-                var response = await _httpClient.DeleteAsync($"{BaseRoute}/{id}");
-                if (response.StatusCode == HttpStatusCode.NotFound) return;
+                LogInfo($"[DeleteAsync] DELETE {BuildAbsoluteUrl(url)}");
+
+                using var response = await _httpClient.DeleteAsync(url, ct);
+
+                LogInfo($"[DeleteAsync] HTTP {(int)response.StatusCode} {response.StatusCode} for id={id}");
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return;
+
                 response.EnsureSuccessStatusCode();
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                LogWarn($"[DeleteAsync] Cancelled by caller for id={id}.");
+                throw;
+            }
+            catch (TaskCanceledException ex)
+            {
+                LogWarn($"[DeleteAsync] Timed out or cancelled by HttpClient for id={id}. {ex.Message}");
+                throw;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Unexpected error in DeleteAsync: {ex.Message}");
+                LogError($"[DeleteAsync] Unexpected error for id={id}: {ex}");
                 throw;
             }
         }
 
-        public async Task ReplayInteraction(int id)
+        public async Task CancelGptRequestAsync(int interactionId, string requestId, CancellationToken ct = default)
         {
+            if (interactionId <= 0)
+                throw new ArgumentOutOfRangeException(nameof(interactionId));
+
+            var url = $"{BaseRoute}/cancel/{interactionId}";
+
+            if (!string.IsNullOrWhiteSpace(requestId))
+                url += $"?requestId={Uri.EscapeDataString(requestId)}";
+
             try
             {
-                var response = await _httpClient.PostAsJsonAsync($"{BaseRoute}/replay/{id}", new { });
-                if (response.StatusCode == HttpStatusCode.NotFound) return;
-                response.EnsureSuccessStatusCode();
+                LogInfo($"[CancelGptRequestAsync] POST {BuildAbsoluteUrl(url)}");
 
-                // The endpoint does NOT return IEnumerable<ClientGptInteractionDTO>
-                var raw = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"[ReplayInteraction] Response = {raw}");
+                using var response = await _httpClient.PostAsync(url, content: null, ct);
+                var raw = await response.Content.ReadAsStringAsync(ct);
+
+                LogInfo($"[CancelGptRequestAsync] HTTP {(int)response.StatusCode} {response.StatusCode} | body={TruncateForLog(raw)}");
+
+                response.EnsureSuccessStatusCode();
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                LogWarn($"[CancelGptRequestAsync] Cancelled by caller for interactionId={interactionId}.");
+                throw;
+            }
+            catch (TaskCanceledException ex)
+            {
+                LogWarn($"[CancelGptRequestAsync] Timed out or cancelled by HttpClient for interactionId={interactionId}. {ex.Message}");
+                throw;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Unexpected error in ReplayInteraction: {ex.Message}");
+                LogError($"[CancelGptRequestAsync] Unexpected error for interactionId={interactionId}: {ex}");
                 throw;
             }
+        }
+
+        public async Task ReplayInteractionAsync(int id, CancellationToken ct = default)
+        {
+            if (id <= 0)
+                return;
+
+            var url = $"{BaseRoute}/replay/{id}";
+
+            try
+            {
+                LogInfo($"[ReplayInteractionAsync] POST {BuildAbsoluteUrl(url)}");
+
+                using var response = await _httpClient.PostAsJsonAsync(url, new { }, ct);
+                var raw = await response.Content.ReadAsStringAsync(ct);
+
+                LogInfo($"[ReplayInteractionAsync] HTTP {(int)response.StatusCode} {response.StatusCode} | body={TruncateForLog(raw)}");
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return;
+
+                response.EnsureSuccessStatusCode();
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                LogWarn($"[ReplayInteractionAsync] Cancelled by caller for id={id}.");
+                throw;
+            }
+            catch (TaskCanceledException ex)
+            {
+                LogWarn($"[ReplayInteractionAsync] Timed out or cancelled by HttpClient for id={id}. {ex.Message}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                LogError($"[ReplayInteractionAsync] Unexpected error for id={id}: {ex}");
+                throw;
+            }
+        }
+
+        public Task Delete(int id) => DeleteAsync(id);
+
+        public Task ReplayInteraction(int id) => ReplayInteractionAsync(id);
+
+        private ClientGptInteractionDTO TryParseAskGptResponse(string raw, string fallbackPrompt)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return null;
+
+            // Case 1: final DTO directly returned by the API
+            try
+            {
+                var interaction = JsonSerializer.Deserialize<ClientGptInteractionDTO>(raw, JsonOptions);
+                if (interaction is not null && interaction.Id > 0)
+                {
+                    interaction.Active = true;
+                    interaction.Prompt ??= fallbackPrompt;
+                    interaction.Response ??= string.Empty;
+
+                    if (interaction.CreatedAt == default)
+                        interaction.CreatedAt = DateTime.UtcNow;
+
+                    return interaction;
+                }
+            }
+            catch
+            {
+                // Intentionally ignored: try next format
+            }
+
+            // Case 2: answer DTO
+            try
+            {
+                var answer = JsonSerializer.Deserialize<ClientGptAnswerDTO>(raw, JsonOptions);
+                if (answer is not null && (answer.Id ?? 0) > 0)
+                {
+                    return new ClientGptInteractionDTO
+                    {
+                        Id = answer.Id ?? 0,
+                        Prompt = string.IsNullOrWhiteSpace(answer.Prompt) ? fallbackPrompt : answer.Prompt,
+                        Response = answer.Response ?? string.Empty,
+                        CreatedAt = answer.CreatedAt.HasValue && answer.CreatedAt.Value != default
+                            ? answer.CreatedAt.Value
+                            : DateTime.UtcNow,
+                        Active = true
+                    };
+                }
+            }
+            catch
+            {
+                // Intentionally ignored: try next format
+            }
+
+            // Case 3: minimal transient payload { interactionId: ... }
+            try
+            {
+                using var jsonDoc = JsonDocument.Parse(raw);
+                var root = jsonDoc.RootElement;
+
+                if (root.ValueKind != JsonValueKind.Object)
+                    return null;
+
+                if (root.TryGetProperty("interactionId", out var interactionIdProp) &&
+                    interactionIdProp.TryGetInt32(out var interactionId) &&
+                    interactionId > 0)
+                {
+                    return new ClientGptInteractionDTO
+                    {
+                        Id = interactionId,
+                        Prompt = fallbackPrompt,
+                        Response = string.Empty,
+                        CreatedAt = DateTime.UtcNow,
+                        Active = true
+                    };
+                }
+            }
+            catch
+            {
+                // ignored
+            }
+
+            return null;
+        }
+
+        private string BuildAbsoluteUrl(string relativeOrAbsolute)
+        {
+            try
+            {
+                if (Uri.TryCreate(relativeOrAbsolute, UriKind.Absolute, out var absolute))
+                    return absolute.ToString();
+
+                if (_httpClient.BaseAddress is null)
+                    return relativeOrAbsolute;
+
+                return new Uri(_httpClient.BaseAddress, relativeOrAbsolute).ToString();
+            }
+            catch
+            {
+                return relativeOrAbsolute;
+            }
+        }
+
+        private static string TruncateForLog(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return "<empty>";
+
+            var sanitized = value.Replace(Environment.NewLine, " ").Replace("\n", " ").Replace("\r", " ").Trim();
+
+            if (sanitized.Length <= MaxLoggedBodyLength)
+                return sanitized;
+
+            return sanitized[..MaxLoggedBodyLength] + "... [truncated]";
+        }
+
+        private static void LogInfo(string message) => Console.WriteLine($"[GptInteractionService] {message}");
+        private static void LogWarn(string message) => Console.WriteLine($"[GptInteractionService][WARN] {message}");
+        private static void LogError(string message) => Console.Error.WriteLine($"[GptInteractionService][ERROR] {message}");
+
+        private sealed class AskGptRequest
+        {
+            public string Prompt { get; set; }
+            public double? Latitude { get; set; }
+            public double? Longitude { get; set; }
         }
     }
 }

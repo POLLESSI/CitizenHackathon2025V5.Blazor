@@ -383,7 +383,6 @@ HIGHLIGHT / PULSE
     max-height: 300px;
     overflow-y: auto;
     overflow-x: hidden;
-    /*padding-right: 0.25rem;*/
 }
 
 /* =========================================================
@@ -485,13 +484,6 @@ HIGHLIGHT / PULSE
 .gpt-composer-input::placeholder {
     color: rgba(255,255,255,.55);
 }
-
-/*.gpt-composer-actions {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-    flex-wrap: wrap;
-}*/
 
 .gpt-list-shell {
     height: 420px;
@@ -942,6 +934,275 @@ HIGHLIGHT / PULSE
     will-change: transform, filter, opacity, box-shadow;
 }
 
+/* ========================================
+   GPT OVERLAY / LOADER — PSEUDO 3D GLOBE
+   ======================================== */
+
+.oz-gpt-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(8, 12, 24, 0.62);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    pointer-events: auto;
+}
+
+.oz-gpt-overlay-card {
+    width: min(92vw, 420px);
+    padding: 1.2rem 1.1rem 1rem;
+    border-radius: 22px;
+    background: linear-gradient(180deg, rgba(19, 27, 46, 0.97), rgba(10, 16, 32, 0.97));
+    border: 1px solid rgba(255,255,255,0.09);
+    box-shadow: 0 18px 60px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.03) inset;
+    text-align: center;
+    overflow: hidden;
+}
+
+.oz-gpt-loader-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 0.95rem;
+    perspective: 1100px;
+    perspective-origin: 50% 50%;
+}
+
+.oz-gpt-loader-globe {
+    position: relative;
+    width: 132px;
+    height: 132px;
+    margin: 0 auto;
+    display: block;
+    transform-origin: 50% 50%;
+    will-change: transform;
+    backface-visibility: hidden;
+    transform-style: preserve-3d;
+    transform: rotateX(18deg) rotateZ(-8deg);
+    filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.36));
+    animation: oz-gpt-loader-spin 1.9s linear infinite !important;
+}
+
+/* La sphère visible */
+.oz-gpt-loader-globe-core {
+    position: absolute;
+    inset: 14px;
+    border-radius: 50%;
+    overflow: hidden;
+    transform-style: preserve-3d;
+    background: radial-gradient(circle at 32% 28%, rgba(255,255,255,0.34), transparent 24%), radial-gradient(circle at 38% 35%, rgba(156,218,255,0.18), transparent 34%), radial-gradient(circle at 55% 55%, rgba(53,131,235,0.95), rgba(16,43,95,0.98));
+    box-shadow: inset -18px -20px 30px rgba(0, 0, 0, 0.34), inset 10px 10px 20px rgba(255,255,255,0.05), inset 0 0 0 2px rgba(255,255,255,0.08), 0 0 26px rgba(62,155,255,0.24);
+}
+
+    /* Actual rotation of the "world" within */
+.oz-gpt-loader-globe-core::before {
+    content: "";
+    position: absolute;
+    inset: -8% -30%;
+    border-radius: 50%;
+    background: radial-gradient(circle at 18% 38%, rgba(106,221,126,0.92) 0 9%, transparent 10%), radial-gradient(circle at 26% 47%, rgba(106,221,126,0.92) 0 7%, transparent 8%), radial-gradient(circle at 37% 33%, rgba(106,221,126,0.88) 0 8%, transparent 9%), radial-gradient(circle at 44% 52%, rgba(106,221,126,0.92) 0 11%, transparent 12%), radial-gradient(circle at 57% 37%, rgba(106,221,126,0.88) 0 9%, transparent 10%), radial-gradient(circle at 66% 57%, rgba(106,221,126,0.90) 0 8%, transparent 9%), radial-gradient(circle at 76% 42%, rgba(106,221,126,0.88) 0 10%, transparent 11%);
+    opacity: 0.95;
+    transform: translateZ(1px);
+    animation: oz-gpt-world-spin 6s linear infinite;
+}
+
+    /* Ending shadow to enhance the spherical effect */
+.oz-gpt-loader-globe-core::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: linear-gradient(90deg, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0.12) 18%, rgba(255,255,255,0.06) 48%, rgba(0,0,0,0.18) 72%, rgba(0,0,0,0.46) 100%);
+    mix-blend-mode: soft-light;
+    pointer-events: none;
+}
+
+/* Highlight Belgium */
+.oz-gpt-loader-globe-continent {
+    position: absolute;
+    z-index: 3;
+    opacity: 0.95;
+    pointer-events: none;
+}
+
+.oz-gpt-loader-globe-continent--eu {
+    width: 36px;
+    height: 26px;
+    left: 43px;
+    top: 25px;
+    border-radius: 48% 52% 46% 54% / 40% 44% 56% 60%;
+    background: rgba(106, 221, 126, 0.92);
+    transform: rotate(-8deg) translateZ(2px);
+    filter: saturate(1.12);
+}
+
+.oz-gpt-loader-globe-continent--be {
+    width: 8px;
+    height: 8px;
+    left: 59px;
+    top: 34px;
+    border-radius: 50%;
+    background: #ffd54f;
+    box-shadow: 0 0 10px rgba(255, 213, 79, 0.75);
+    transform: translateZ(3px);
+}
+
+/* Atmospheric bands / meridians */
+.oz-gpt-loader-globe::before {
+    content: "";
+    position: absolute;
+    inset: 14px;
+    border-radius: 50%;
+    pointer-events: none;
+    background: repeating-linear-gradient( 90deg, rgba(255,255,255,0.00) 0px, rgba(255,255,255,0.00) 10px, rgba(255,255,255,0.07) 11px, rgba(255,255,255,0.00) 12px );
+    transform: translateZ(2px);
+    mix-blend-mode: screen;
+    opacity: 0.45;
+    animation: oz-gpt-world-spin 6s linear infinite;
+}
+
+/* Atmospheric halo */
+.oz-gpt-loader-globe::after {
+    content: "";
+    position: absolute;
+    inset: 8px;
+    border-radius: 50%;
+    pointer-events: none;
+    background: radial-gradient(circle, rgba(255,255,255,0) 62%, rgba(125, 205, 255, 0.18) 78%, rgba(125,205,255,0.06) 100%);
+    transform: translateZ(-1px) scale(1.02);
+}
+
+/* Orbital rings */
+.oz-gpt-loader-ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.16);
+    backface-visibility: hidden;
+    transform-style: preserve-3d;
+}
+
+.oz-gpt-loader-ring--1 {
+    transform: rotateX(72deg) translateZ(0);
+}
+
+.oz-gpt-loader-ring--2 {
+    transform: rotateY(72deg) translateZ(0);
+}
+
+.oz-gpt-loader-ring--3 {
+    transform: rotateZ(28deg) translateZ(0);
+}
+
+/* States */
+.oz-gpt-loader-globe--idle .oz-gpt-loader-globe-core::before,
+.oz-gpt-loader-globe--idle::before {
+    animation-duration: 6.4s;
+}
+
+.oz-gpt-loader-globe--sending .oz-gpt-loader-globe-core::before,
+.oz-gpt-loader-globe--sending::before {
+    animation-duration: 7.6s;
+}
+
+.oz-gpt-loader-globe--generating .oz-gpt-loader-globe-core::before,
+.oz-gpt-loader-globe--generating::before {
+    animation-duration: 2.6s;
+}
+
+.oz-gpt-loader-globe--idle {
+    animation: oz-gpt-loader-spin 2.1s linear infinite !important;
+}
+
+.oz-gpt-loader-globe--sending {
+    animation: oz-gpt-loader-spin 2.4s linear infinite !important;
+}
+
+.oz-gpt-loader-globe--generating {
+    animation: oz-gpt-loader-spin 1.55s linear infinite !important;
+}
+
+.oz-gpt-loader-globe--success {
+    animation: oz-gpt-loader-spin 1.85s linear infinite !important;
+}
+
+.oz-gpt-loader-globe--error {
+    animation: oz-gpt-loader-spin 2.05s linear infinite !important;
+}
+
+.oz-gpt-loader-globe--idle .oz-gpt-loader-globe-core::before,
+.oz-gpt-loader-globe--idle::before {
+    animation-duration: 6.2s;
+}
+
+.oz-gpt-loader-globe--sending .oz-gpt-loader-globe-core::before,
+.oz-gpt-loader-globe--sending::before {
+    animation-duration: 7.4s;
+}
+
+.oz-gpt-loader-globe--generating .oz-gpt-loader-globe-core::before,
+.oz-gpt-loader-globe--generating::before {
+    animation-duration: 2.5s;
+}
+
+.oz-gpt-loader-title {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: #f4f8ff;
+    letter-spacing: 0.01em;
+    margin-bottom: 0.55rem;
+}
+
+.oz-gpt-loader-state {
+    margin-bottom: 0.55rem;
+}
+
+.oz-gpt-loader-message {
+    font-size: 0.94rem;
+    line-height: 1.35;
+    color: rgba(255,255,255,0.88);
+    min-height: 1.3rem;
+}
+
+.oz-gpt-loader-elapsed {
+    margin-top: 0.65rem;
+    font-size: 0.82rem;
+    color: rgba(255,255,255,0.62);
+}
+
+.oz-gpt-loader-preview {
+    margin-top: 0.9rem;
+    text-align: left;
+    border-radius: 14px;
+    padding: 0.8rem;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.06);
+    max-height: 180px;
+    overflow: auto;
+}
+
+.oz-gpt-loader-preview-label {
+    margin-bottom: 0.4rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.65);
+}
+
+.oz-gpt-loader-preview-content {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: rgba(255,255,255,0.92);
+    font-size: 0.88rem;
+    line-height: 1.4;
+}
+
 /* =========================================================
    ANIMATIONS
    ========================================================= */
@@ -962,6 +1223,16 @@ HIGHLIGHT / PULSE
         max-height: 220px;
     }
 }
+@keyframes oz-gpt-world-spin {
+    0% {
+        transform: translateX(0) translateZ(1px);
+    }
+
+    100% {
+        transform: translateX(-22%) translateZ(1px);
+    }
+}
+
 @keyframes ozMarkerPulse {
     0% {
         transform: scale(1);
