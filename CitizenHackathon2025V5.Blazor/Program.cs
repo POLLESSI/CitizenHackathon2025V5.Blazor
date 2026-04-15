@@ -17,8 +17,8 @@ static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
         .HandleTransientHttpError()
         .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
-static IAsyncPolicy<HttpResponseMessage> GetTimeoutPolicy() =>
-    Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromMinutes(10));
+//static IAsyncPolicy<HttpResponseMessage> GetTimeoutPolicy() =>
+//    Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromMinutes(10));
 
 static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy() =>
     HttpPolicyExtensions
@@ -58,7 +58,6 @@ builder.Services.AddHttpClient("ApiWithAuth", client =>
 })
 .AddHttpMessageHandler<JwtAttachHandler>()
 .AddPolicyHandler(GetRetryPolicy())
-.AddPolicyHandler(GetTimeoutPolicy())
 .AddPolicyHandler(GetCircuitBreakerPolicy());
 
 // 2) Root API for auth/hub-token
@@ -70,7 +69,6 @@ builder.Services.AddHttpClient("ApiRootAuth", client =>
     client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 })
 .AddPolicyHandler(GetRetryPolicy())
-.AddPolicyHandler(GetTimeoutPolicy())
 .AddPolicyHandler(GetCircuitBreakerPolicy());
 
 // 3) Potential anonymous client
@@ -82,7 +80,6 @@ builder.Services.AddHttpClient("ApiAnonymous", client =>
     client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 })
 .AddPolicyHandler(GetRetryPolicy())
-.AddPolicyHandler(GetTimeoutPolicy())
 .AddPolicyHandler(GetCircuitBreakerPolicy());
 
 // Default HttpClient injected into legacy services

@@ -1,7 +1,6 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
 using System.Net;
 using System.Net.Http.Json;
-using System.Text;
 using System.Text.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
@@ -9,7 +8,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     public sealed class GptInteractionService
     {
 #nullable disable
-        private readonly HttpClient _httpClient;
+        private readonly HttpClient _httpClient; 
 
         private const string BaseRoute = "Gpt";
         private const int MaxLoggedBodyLength = 1200;
@@ -109,11 +108,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
         }
 
-        public async Task<ClientGptInteractionDTO> AskGpt(
-            ClientGptInteractionDTO prompt,
-            double? latitude = null,
-            double? longitude = null,
-            CancellationToken ct = default)
+        public async Task<ClientGptInteractionDTO> AskGpt(ClientGptInteractionDTO prompt, double? latitude = null, double? longitude = null, CancellationToken ct = default)
         {
             if (prompt is null || string.IsNullOrWhiteSpace(prompt.Prompt))
                 return null;
@@ -125,7 +120,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 Longitude = longitude
             };
 
-            var url = $"{BaseRoute}/ask-mistral";
+            var url = $"{BaseRoute}/ask-mistral-sync";
 
             try
             {
@@ -138,15 +133,22 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
                 response.EnsureSuccessStatusCode();
 
-                var interaction = TryParseAskGptResponse(raw, payload.Prompt);
+                var interaction = JsonSerializer.Deserialize<ClientGptInteractionDTO>(raw, JsonOptions);
 
-                if (interaction is not null)
+                if (interaction is not null && interaction.Id > 0)
                 {
-                    LogInfo($"[AskGpt] Parsed interaction successfully. id={interaction.Id}, hasResponse={!string.IsNullOrWhiteSpace(interaction.Response)}");
+                    interaction.Prompt ??= payload.Prompt;
+                    interaction.Response ??= string.Empty;
+                    interaction.Active = true;
+
+                    if (interaction.CreatedAt == default)
+                        interaction.CreatedAt = DateTime.UtcNow;
+
+                    LogInfo($"[AskGpt] Parsed sync interaction successfully. id={interaction.Id}, hasResponse={!string.IsNullOrWhiteSpace(interaction.Response)}");
                     return interaction;
                 }
 
-                throw new InvalidOperationException("Unexpected response format returned by api/Gpt/ask-mistral.");
+                throw new InvalidOperationException("Unexpected response format returned by api/Gpt/ask-mistral-sync.");
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -292,86 +294,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
         public Task ReplayInteraction(int id) => ReplayInteractionAsync(id);
 
-        private ClientGptInteractionDTO TryParseAskGptResponse(string raw, string fallbackPrompt)
-        {
-            if (string.IsNullOrWhiteSpace(raw))
-                return null;
-
-            // Case 1: final DTO directly returned by the API
-            try
-            {
-                var interaction = JsonSerializer.Deserialize<ClientGptInteractionDTO>(raw, JsonOptions);
-                if (interaction is not null && interaction.Id > 0)
-                {
-                    interaction.Active = true;
-                    interaction.Prompt ??= fallbackPrompt;
-                    interaction.Response ??= string.Empty;
-
-                    if (interaction.CreatedAt == default)
-                        interaction.CreatedAt = DateTime.UtcNow;
-
-                    return interaction;
-                }
-            }
-            catch
-            {
-                // Intentionally ignored: try next format
-            }
-
-            // Case 2: answer DTO
-            try
-            {
-                var answer = JsonSerializer.Deserialize<ClientGptAnswerDTO>(raw, JsonOptions);
-                if (answer is not null && (answer.Id ?? 0) > 0)
-                {
-                    return new ClientGptInteractionDTO
-                    {
-                        Id = answer.Id ?? 0,
-                        Prompt = string.IsNullOrWhiteSpace(answer.Prompt) ? fallbackPrompt : answer.Prompt,
-                        Response = answer.Response ?? string.Empty,
-                        CreatedAt = answer.CreatedAt.HasValue && answer.CreatedAt.Value != default
-                            ? answer.CreatedAt.Value
-                            : DateTime.UtcNow,
-                        Active = true
-                    };
-                }
-            }
-            catch
-            {
-                // Intentionally ignored: try next format
-            }
-
-            // Case 3: minimal transient payload { interactionId: ... }
-            try
-            {
-                using var jsonDoc = JsonDocument.Parse(raw);
-                var root = jsonDoc.RootElement;
-
-                if (root.ValueKind != JsonValueKind.Object)
-                    return null;
-
-                if (root.TryGetProperty("interactionId", out var interactionIdProp) &&
-                    interactionIdProp.TryGetInt32(out var interactionId) &&
-                    interactionId > 0)
-                {
-                    return new ClientGptInteractionDTO
-                    {
-                        Id = interactionId,
-                        Prompt = fallbackPrompt,
-                        Response = string.Empty,
-                        CreatedAt = DateTime.UtcNow,
-                        Active = true
-                    };
-                }
-            }
-            catch
-            {
-                // ignored
-            }
-
-            return null;
-        }
-
         private string BuildAbsoluteUrl(string relativeOrAbsolute)
         {
             try
@@ -415,7 +337,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         }
     }
 }
-
 
 
 

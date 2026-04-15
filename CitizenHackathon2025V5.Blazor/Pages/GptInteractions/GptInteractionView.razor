@@ -25,17 +25,10 @@
 
             <div class="gpt-composer-actions">
                 <button type="button"
-                        class="btn btn-primary"
                         @onclick="HandleAskGpt"
+                        class="btn btn-primary"
                         disabled="@(!CanSend)">
                     @GetSendButtonText()
-                </button>
-
-                <button type="button"
-                        class="btn btn-outline-warning"
-                        @onclick="HandleCancelGeneration"
-                        disabled="@(!CanCancel)">
-                    Cancel
                 </button>
 
                 <NavLink class="@AddChipCssClass"
@@ -107,13 +100,6 @@
                                 {
                                     <span class="gpt-date">@gp.CreatedAt.ToLocalTime().ToString("g")</span>
                                 }
-
-                                @if (_pendingInteractionId.HasValue && gp.Id == _pendingInteractionId.Value && IsAiBusy)
-                                {
-                                    <span class="badge @GetStatusBadgeCssClass()">
-                                        @GetStatusBadgeText()
-                                    </span>
-                                }
                             </div>
 
                             <div class="gpt-card-actions">
@@ -132,7 +118,7 @@
 
                         <div class="gpt-block">
                             <div class="gpt-block-label">Response</div>
-                            <pre class="gpt-pre gpt-pre--response">@(string.IsNullOrWhiteSpace(gp.Response) ? "— Empty response —" : gp.Response)</pre>
+                            <pre class="gpt-pre gpt-pre--response">@(string.IsNullOrWhiteSpace(gp.Response) ? "— Waiting for response —" : gp.Response)</pre>
                         </div>
                     </article>
                 }
@@ -174,8 +160,10 @@
             <div class="oz-gpt-loader-wrap">
                 <div class="oz-gpt-loader-globe @GetGlobeCssClass()">
                     <div class="oz-gpt-loader-globe-core">
+                        <div class="oz-gpt-loader-globe-shine"></div>
                         <div class="oz-gpt-loader-globe-continent oz-gpt-loader-globe-continent--eu"></div>
                         <div class="oz-gpt-loader-globe-continent oz-gpt-loader-globe-continent--be"></div>
+                        <div class="oz-gpt-loader-globe-shadow"></div>
                     </div>
 
                     <div class="oz-gpt-loader-ring oz-gpt-loader-ring--1"></div>
@@ -203,14 +191,6 @@
             {
                 <div class="oz-gpt-loader-elapsed">
                     Elapsed time: @_elapsedSeconds s
-                </div>
-            }
-
-            @if (_isStreaming && !string.IsNullOrWhiteSpace(_streamingPreview))
-            {
-                <div class="oz-gpt-loader-preview">
-                    <div class="oz-gpt-loader-preview-label">Live output</div>
-                    <pre class="oz-gpt-loader-preview-content">@_streamingPreview</pre>
                 </div>
             }
         </div>

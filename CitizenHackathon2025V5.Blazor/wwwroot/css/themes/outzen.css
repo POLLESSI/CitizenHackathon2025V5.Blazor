@@ -714,6 +714,70 @@ HIGHLIGHT / PULSE
     transform: scale(.98);
 }
 
+.gpt-composer-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.gpt-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: center;
+}
+
+.gpt-id {
+    font-weight: 700;
+    color: #9ecbff;
+}
+
+.gpt-date {
+    font-size: 0.9rem;
+    color: rgba(255,255,255,.78);
+}
+
+.gpt-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.gpt-block-label {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #ffffff;
+    opacity: 0.92;
+}
+
+.gpt-pre {
+    margin: 0;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.75rem 0.9rem;
+    border-radius: 12px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    color: #f8fbff;
+    font-size: 0.95rem;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+}
+
+.gpt-pre--prompt {
+    background: rgba(70, 110, 180, 0.16);
+    border: 1px solid rgba(110, 170, 255, 0.18);
+}
+
+.gpt-pre--response {
+    background: rgba(50, 160, 110, 0.16);
+    border: 1px solid rgba(110, 220, 170, 0.18);
+}
+
 .gpt-card--latest .gpt-pre,
 .gpt-card--compact .gpt-pre,
 .oz-scrollfill--gpt-history {
@@ -934,9 +998,10 @@ HIGHLIGHT / PULSE
     will-change: transform, filter, opacity, box-shadow;
 }
 
-/* ========================================
-   GPT OVERLAY / LOADER — PSEUDO 3D GLOBE
-   ======================================== */
+/* =========================================================
+   OZ GPT OVERLAY / 3D LOADER
+   Bloc unique, sans doublons
+   ========================================================= */
 
 .oz-gpt-overlay {
     position: fixed;
@@ -968,9 +1033,12 @@ HIGHLIGHT / PULSE
     align-items: center;
     justify-content: center;
     margin-bottom: 0.95rem;
-    perspective: 1100px;
-    perspective-origin: 50% 50%;
+    perspective: 900px;
 }
+
+/* =========================================================
+   GLOBE CONTAINER
+   ========================================================= */
 
 .oz-gpt-loader-globe {
     position: relative;
@@ -979,104 +1047,141 @@ HIGHLIGHT / PULSE
     margin: 0 auto;
     display: block;
     transform-origin: 50% 50%;
-    will-change: transform;
-    backface-visibility: hidden;
     transform-style: preserve-3d;
+    backface-visibility: hidden;
+    will-change: transform, filter;
     transform: rotateX(18deg) rotateZ(-8deg);
     filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.36));
-    animation: oz-gpt-loader-spin 1.9s linear infinite !important;
 }
 
-/* La sphère visible */
+/* Rotation principale un peu plus rapide */
+.oz-gpt-loader-globe--idle {
+    animation: oz-gpt-loader-orbit 2.05s linear infinite;
+}
+
+.oz-gpt-loader-globe--sending {
+    animation: oz-gpt-loader-orbit 2.3s linear infinite;
+}
+
+.oz-gpt-loader-globe--generating {
+    animation: oz-gpt-loader-orbit 1.45s linear infinite;
+    filter: drop-shadow(0 0 26px rgba(64, 170, 255, 0.42));
+}
+
+.oz-gpt-loader-globe--success {
+    animation: oz-gpt-loader-orbit 1.8s linear infinite;
+    filter: drop-shadow(0 0 24px rgba(46, 204, 113, 0.34));
+}
+
+.oz-gpt-loader-globe--error {
+    animation: oz-gpt-loader-orbit 2s linear infinite;
+    filter: drop-shadow(0 0 24px rgba(231, 76, 60, 0.34));
+}
+
+/* =========================================================
+   GLOBE CORE
+   ========================================================= */
+
 .oz-gpt-loader-globe-core {
     position: absolute;
-    inset: 14px;
+    inset: 16px;
     border-radius: 50%;
     overflow: hidden;
     transform-style: preserve-3d;
-    background: radial-gradient(circle at 32% 28%, rgba(255,255,255,0.34), transparent 24%), radial-gradient(circle at 38% 35%, rgba(156,218,255,0.18), transparent 34%), radial-gradient(circle at 55% 55%, rgba(53,131,235,0.95), rgba(16,43,95,0.98));
-    box-shadow: inset -18px -20px 30px rgba(0, 0, 0, 0.34), inset 10px 10px 20px rgba(255,255,255,0.05), inset 0 0 0 2px rgba(255,255,255,0.08), 0 0 26px rgba(62,155,255,0.24);
+    backface-visibility: hidden;
+    background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.30), transparent 28%), radial-gradient(circle at 58% 52%, rgba(47,120,220,0.96), rgba(15,38,86,0.99));
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08), inset -12px -18px 24px rgba(0,0,0,0.22), inset 10px 10px 20px rgba(255,255,255,0.05), 0 0 28px rgba(62,155,255,0.16);
 }
 
-    /* Actual rotation of the "world" within */
+.oz-gpt-loader-globe--success .oz-gpt-loader-globe-core {
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08), inset -12px -18px 24px rgba(0,0,0,0.22), inset 10px 10px 20px rgba(255,255,255,0.05), 0 0 28px rgba(46,204,113,0.18);
+}
+
+.oz-gpt-loader-globe--error .oz-gpt-loader-globe-core {
+    box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08), inset -12px -18px 24px rgba(0,0,0,0.22), inset 10px 10px 20px rgba(255,255,255,0.05), 0 0 28px rgba(231,76,60,0.18);
+}
+
+/* Bande pseudo-3D qui défile sur la sphère */
 .oz-gpt-loader-globe-core::before {
     content: "";
     position: absolute;
     inset: -8% -30%;
     border-radius: 50%;
-    background: radial-gradient(circle at 18% 38%, rgba(106,221,126,0.92) 0 9%, transparent 10%), radial-gradient(circle at 26% 47%, rgba(106,221,126,0.92) 0 7%, transparent 8%), radial-gradient(circle at 37% 33%, rgba(106,221,126,0.88) 0 8%, transparent 9%), radial-gradient(circle at 44% 52%, rgba(106,221,126,0.92) 0 11%, transparent 12%), radial-gradient(circle at 57% 37%, rgba(106,221,126,0.88) 0 9%, transparent 10%), radial-gradient(circle at 66% 57%, rgba(106,221,126,0.90) 0 8%, transparent 9%), radial-gradient(circle at 76% 42%, rgba(106,221,126,0.88) 0 10%, transparent 11%);
-    opacity: 0.95;
     transform: translateZ(1px);
-    animation: oz-gpt-world-spin 6s linear infinite;
+    background: repeating-linear-gradient( 90deg, rgba(255,255,255,0.00) 0 12px, rgba(255,255,255,0.05) 12px 15px, rgba(255,255,255,0.00) 15px 27px );
+    mix-blend-mode: screen;
+    opacity: 0.72;
+    animation-name: oz-gpt-loader-world-spin;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
 }
 
-    /* Ending shadow to enhance the spherical effect */
+.oz-gpt-loader-globe--idle .oz-gpt-loader-globe-core::before {
+    animation-duration: 6.1s;
+}
+
+.oz-gpt-loader-globe--sending .oz-gpt-loader-globe-core::before {
+    animation-duration: 7.2s;
+}
+
+.oz-gpt-loader-globe--generating .oz-gpt-loader-globe-core::before {
+    animation-duration: 2.45s;
+}
+
+.oz-gpt-loader-globe--success .oz-gpt-loader-globe-core::before {
+    animation-duration: 3.2s;
+}
+
+.oz-gpt-loader-globe--error .oz-gpt-loader-globe-core::before {
+    animation-duration: 3.4s;
+}
+
+/* Reflet */
 .oz-gpt-loader-globe-core::after {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    background: linear-gradient(90deg, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0.12) 18%, rgba(255,255,255,0.06) 48%, rgba(0,0,0,0.18) 72%, rgba(0,0,0,0.46) 100%);
-    mix-blend-mode: soft-light;
+    background: radial-gradient(circle at 32% 26%, rgba(255,255,255,0.25), transparent 24%), radial-gradient(circle at 68% 72%, rgba(0,0,0,0.15), transparent 34%);
     pointer-events: none;
 }
 
-/* Highlight Belgium */
+/* =========================================================
+   CONTINENTS
+   ========================================================= */
+
 .oz-gpt-loader-globe-continent {
     position: absolute;
-    z-index: 3;
-    opacity: 0.95;
-    pointer-events: none;
+    background: rgba(106, 221, 126, 0.94);
+    opacity: 0.96;
+    filter: saturate(1.08);
+    transform: translateZ(2px);
 }
 
 .oz-gpt-loader-globe-continent--eu {
-    width: 36px;
+    width: 35px;
     height: 26px;
     left: 43px;
-    top: 25px;
+    top: 24px;
     border-radius: 48% 52% 46% 54% / 40% 44% 56% 60%;
-    background: rgba(106, 221, 126, 0.92);
-    transform: rotate(-8deg) translateZ(2px);
-    filter: saturate(1.12);
+    transform: translateZ(2px) rotate(-8deg);
 }
 
 .oz-gpt-loader-globe-continent--be {
     width: 8px;
     height: 8px;
-    left: 59px;
-    top: 34px;
+    left: 58px;
+    top: 33px;
     border-radius: 50%;
     background: #ffd54f;
-    box-shadow: 0 0 10px rgba(255, 213, 79, 0.75);
+    box-shadow: 0 0 10px rgba(255,213,79,0.7);
     transform: translateZ(3px);
 }
 
-/* Atmospheric bands / meridians */
-.oz-gpt-loader-globe::before {
-    content: "";
-    position: absolute;
-    inset: 14px;
-    border-radius: 50%;
-    pointer-events: none;
-    background: repeating-linear-gradient( 90deg, rgba(255,255,255,0.00) 0px, rgba(255,255,255,0.00) 10px, rgba(255,255,255,0.07) 11px, rgba(255,255,255,0.00) 12px );
-    transform: translateZ(2px);
-    mix-blend-mode: screen;
-    opacity: 0.45;
-    animation: oz-gpt-world-spin 6s linear infinite;
-}
+/* =========================================================
+   RINGS
+   ========================================================= */
 
-/* Atmospheric halo */
-.oz-gpt-loader-globe::after {
-    content: "";
-    position: absolute;
-    inset: 8px;
-    border-radius: 50%;
-    pointer-events: none;
-    background: radial-gradient(circle, rgba(255,255,255,0) 62%, rgba(125, 205, 255, 0.18) 78%, rgba(125,205,255,0.06) 100%);
-    transform: translateZ(-1px) scale(1.02);
-}
-
-/* Orbital rings */
 .oz-gpt-loader-ring {
     position: absolute;
     inset: 0;
@@ -1087,67 +1192,20 @@ HIGHLIGHT / PULSE
 }
 
 .oz-gpt-loader-ring--1 {
-    transform: rotateX(72deg) translateZ(0);
+    transform: rotateX(72deg);
 }
 
 .oz-gpt-loader-ring--2 {
-    transform: rotateY(72deg) translateZ(0);
+    transform: rotateY(72deg);
 }
 
 .oz-gpt-loader-ring--3 {
-    transform: rotateZ(28deg) translateZ(0);
+    transform: rotateZ(28deg);
 }
 
-/* States */
-.oz-gpt-loader-globe--idle .oz-gpt-loader-globe-core::before,
-.oz-gpt-loader-globe--idle::before {
-    animation-duration: 6.4s;
-}
-
-.oz-gpt-loader-globe--sending .oz-gpt-loader-globe-core::before,
-.oz-gpt-loader-globe--sending::before {
-    animation-duration: 7.6s;
-}
-
-.oz-gpt-loader-globe--generating .oz-gpt-loader-globe-core::before,
-.oz-gpt-loader-globe--generating::before {
-    animation-duration: 2.6s;
-}
-
-.oz-gpt-loader-globe--idle {
-    animation: oz-gpt-loader-spin 2.1s linear infinite !important;
-}
-
-.oz-gpt-loader-globe--sending {
-    animation: oz-gpt-loader-spin 2.4s linear infinite !important;
-}
-
-.oz-gpt-loader-globe--generating {
-    animation: oz-gpt-loader-spin 1.55s linear infinite !important;
-}
-
-.oz-gpt-loader-globe--success {
-    animation: oz-gpt-loader-spin 1.85s linear infinite !important;
-}
-
-.oz-gpt-loader-globe--error {
-    animation: oz-gpt-loader-spin 2.05s linear infinite !important;
-}
-
-.oz-gpt-loader-globe--idle .oz-gpt-loader-globe-core::before,
-.oz-gpt-loader-globe--idle::before {
-    animation-duration: 6.2s;
-}
-
-.oz-gpt-loader-globe--sending .oz-gpt-loader-globe-core::before,
-.oz-gpt-loader-globe--sending::before {
-    animation-duration: 7.4s;
-}
-
-.oz-gpt-loader-globe--generating .oz-gpt-loader-globe-core::before,
-.oz-gpt-loader-globe--generating::before {
-    animation-duration: 2.5s;
-}
+/* =========================================================
+   TEXTS
+   ========================================================= */
 
 .oz-gpt-loader-title {
     font-size: 1.02rem;
@@ -1222,14 +1280,37 @@ HIGHLIGHT / PULSE
     .oz-scrollfill--gpt-history {
         max-height: 220px;
     }
+    .oz-gpt-overlay-card {
+        width: min(94vw, 380px);
+        padding: 1rem 0.95rem 0.9rem;
+    }
+
+    .oz-gpt-loader-globe {
+        width: 116px;
+        height: 116px;
+    }
+
+    .oz-gpt-loader-globe-core {
+        inset: 14px;
+    }
 }
-@keyframes oz-gpt-world-spin {
+@keyframes oz-gpt-loader-orbit {
     0% {
-        transform: translateX(0) translateZ(1px);
+        transform: rotateX(18deg) rotateZ(-8deg) rotateY(0deg);
     }
 
     100% {
-        transform: translateX(-22%) translateZ(1px);
+        transform: rotateX(18deg) rotateZ(-8deg) rotateY(360deg);
+    }
+}
+
+@keyframes oz-gpt-loader-world-spin {
+    0% {
+        transform: translateX(-14%) translateZ(1px);
+    }
+
+    100% {
+        transform: translateX(14%) translateZ(1px);
     }
 }
 
