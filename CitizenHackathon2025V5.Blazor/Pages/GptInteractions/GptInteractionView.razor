@@ -31,6 +31,13 @@
                     @GetSendButtonText()
                 </button>
 
+                <button type="button"
+                        class="btn btn-outline-secondary"
+                        @onclick="ToggleVoiceAsync"
+                        disabled="@(!CanUseVoice && !_isListening)">
+                    @VoiceButtonText
+                </button>
+
                 <NavLink class="@AddChipCssClass"
                          href="@AddChipHref"
                          @onclick="PreventAddNavigationWhenBusy">
@@ -43,6 +50,15 @@
                 <div class="gpt-status-row">
                     <span class="badge @GetStatusBadgeCssClass()">
                         @GetStatusBadgeText()
+                    </span>
+                </div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(VoiceStatusText))
+            {
+                <div class="gpt-status-row">
+                    <span class="badge bg-secondary">
+                        @VoiceStatusText
                     </span>
                 </div>
             }
@@ -196,7 +212,6 @@
         </div>
     </div>
 }
-
 
 
 
