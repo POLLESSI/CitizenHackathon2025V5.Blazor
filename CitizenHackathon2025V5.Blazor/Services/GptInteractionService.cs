@@ -8,7 +8,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     public sealed class GptInteractionService
     {
 #nullable disable
-        private readonly HttpClient _httpClient; 
+        private readonly HttpClient _httpClient;
 
         private const string BaseRoute = "Gpt";
         private const int MaxLoggedBodyLength = 1200;
@@ -88,8 +88,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
                 response.EnsureSuccessStatusCode();
 
-                var item = await response.Content.ReadFromJsonAsync<ClientGptInteractionDTO>(JsonOptions, ct);
-                return item;
+                return await response.Content.ReadFromJsonAsync<ClientGptInteractionDTO>(JsonOptions, ct);
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -108,14 +107,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
         }
 
-        public async Task<ClientGptInteractionDTO> AskGpt(ClientGptInteractionDTO prompt, double? latitude = null, double? longitude = null, CancellationToken ct = default)
+        public async Task<ClientGptInteractionDTO> AskGptSync(
+            string prompt,
+            double? latitude = null,
+            double? longitude = null,
+            CancellationToken ct = default)
         {
-            if (prompt is null || string.IsNullOrWhiteSpace(prompt.Prompt))
+            if (string.IsNullOrWhiteSpace(prompt))
                 return null;
 
             var payload = new AskGptRequest
             {
-                Prompt = prompt.Prompt.Trim(),
+                Prompt = prompt.Trim(),
                 Latitude = latitude,
                 Longitude = longitude
             };
@@ -124,12 +127,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             try
             {
-                LogInfo($"[AskGpt] POST {BuildAbsoluteUrl(url)} | promptLength={payload.Prompt.Length} | lat={latitude?.ToString() ?? "null"} | lng={longitude?.ToString() ?? "null"}");
+                LogInfo($"[AskGptSync] POST {BuildAbsoluteUrl(url)} | promptLength={payload.Prompt.Length} | lat={latitude?.ToString() ?? "null"} | lng={longitude?.ToString() ?? "null"}");
 
                 using var response = await _httpClient.PostAsJsonAsync(url, payload, ct);
                 var raw = await response.Content.ReadAsStringAsync(ct);
 
-                LogInfo($"[AskGpt] HTTP {(int)response.StatusCode} {response.StatusCode} | body={TruncateForLog(raw)}");
+                LogInfo($"[AskGptSync] HTTP {(int)response.StatusCode} {response.StatusCode} | body={TruncateForLog(raw)}");
 
                 response.EnsureSuccessStatusCode();
 
@@ -144,7 +147,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                     if (interaction.CreatedAt == default)
                         interaction.CreatedAt = DateTime.UtcNow;
 
-                    LogInfo($"[AskGpt] Parsed sync interaction successfully. id={interaction.Id}, hasResponse={!string.IsNullOrWhiteSpace(interaction.Response)}");
+                    LogInfo($"[AskGptSync] Parsed interaction successfully. id={interaction.Id}, hasResponse={!string.IsNullOrWhiteSpace(interaction.Response)}");
                     return interaction;
                 }
 
@@ -152,28 +155,134 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                LogWarn("[AskGpt] Cancelled by caller.");
+                LogWarn("[AskGptSync] Cancelled by caller.");
                 throw;
             }
             catch (TaskCanceledException ex)
             {
-                LogWarn($"[AskGpt] Timed out or cancelled by HttpClient. {ex.Message}");
+                LogWarn($"[AskGptSync] Timed out or cancelled by HttpClient. {ex.Message}");
                 throw;
             }
             catch (HttpRequestException ex)
             {
-                LogError($"[AskGpt] HTTP error: {ex}");
+                LogError($"[AskGptSync] HTTP error: {ex}");
                 throw;
             }
             catch (JsonException ex)
             {
-                LogError($"[AskGpt] JSON parse error: {ex}");
+                LogError($"[AskGptSync] JSON parse error: {ex}");
                 throw;
             }
             catch (Exception ex)
             {
-                LogError($"[AskGpt] Unexpected error: {ex}");
+                LogError($"[AskGptSync] Unexpected error: {ex}");
                 throw;
+            }
+        }
+
+        public async Task<ClientGptStartResponseDTO> StartGptAsync(
+            string prompt,
+            double? latitude = null,
+            double? longitude = null,
+            CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(prompt))
+                return null;
+
+            var payload = new AskGptRequest
+            {
+                Prompt = prompt.Trim(),
+                Latitude = latitude,
+                Longitude = longitude
+            };
+
+            var url = $"{BaseRoute}/ask-mistral";
+
+            try
+            {
+                LogInfo($"[StartGptAsync] POST {BuildAbsoluteUrl(url)} | promptLength={payload.Prompt.Length} | lat={latitude?.ToString() ?? "null"} | lng={longitude?.ToString() ?? "null"}");
+
+                using var response = await _httpClient.PostAsJsonAsync(url, payload, ct);
+                var raw = await response.Content.ReadAsStringAsync(ct);
+
+                LogInfo($"[StartGptAsync] HTTP {(int)response.StatusCode} {response.StatusCode} | body={TruncateForLog(raw)}");
+
+                response.EnsureSuccessStatusCode();
+
+                var started = JsonSerializer.Deserialize<ClientGptStartResponseDTO>(raw, JsonOptions);
+
+                if (started is not null && started.InteractionId > 0)
+                    return started;
+
+                throw new InvalidOperationException("Unexpected response format returned by api/Gpt/ask-mistral.");
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                LogWarn("[StartGptAsync] Cancelled by caller.");
+                throw;
+            }
+            catch (TaskCanceledException ex)
+            {
+                LogWarn($"[StartGptAsync] Timed out or cancelled by HttpClient. {ex.Message}");
+                throw;
+            }
+            catch (HttpRequestException ex)
+            {
+                LogError($"[StartGptAsync] HTTP error: {ex}");
+                throw;
+            }
+            catch (JsonException ex)
+            {
+                LogError($"[StartGptAsync] JSON parse error: {ex}");
+                throw;
+            }
+            catch (Exception ex)
+            {
+                LogError($"[StartGptAsync] Unexpected error: {ex}");
+                throw;
+            }
+        }
+
+        public async Task<ClientGptStatusResponseDTO> GetStatusAsync(int interactionId, CancellationToken ct = default)
+        {
+            if (interactionId <= 0)
+                return null;
+
+            var url = $"{BaseRoute}/status/{interactionId}";
+
+            try
+            {
+                LogInfo($"[GetStatusAsync] GET {BuildAbsoluteUrl(url)}");
+
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                using var response = await _httpClient.SendAsync(
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    ct);
+
+                LogInfo($"[GetStatusAsync] HTTP {(int)response.StatusCode} {response.StatusCode} for interactionId={interactionId}");
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return null;
+
+                response.EnsureSuccessStatusCode();
+
+                return await response.Content.ReadFromJsonAsync<ClientGptStatusResponseDTO>(JsonOptions, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                LogWarn($"[GetStatusAsync] Cancelled by caller for interactionId={interactionId}.");
+                return null;
+            }
+            catch (TaskCanceledException ex)
+            {
+                LogWarn($"[GetStatusAsync] Timed out or cancelled by HttpClient for interactionId={interactionId}. {ex.Message}");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                LogError($"[GetStatusAsync] Unexpected error for interactionId={interactionId}: {ex}");
+                return null;
             }
         }
 
@@ -291,7 +400,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         }
 
         public Task Delete(int id) => DeleteAsync(id);
-
         public Task ReplayInteraction(int id) => ReplayInteractionAsync(id);
 
         private string BuildAbsoluteUrl(string relativeOrAbsolute)
@@ -317,7 +425,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             if (string.IsNullOrWhiteSpace(value))
                 return "<empty>";
 
-            var sanitized = value.Replace(Environment.NewLine, " ").Replace("\n", " ").Replace("\r", " ").Trim();
+            var sanitized = value.Replace(Environment.NewLine, " ")
+                                 .Replace("\n", " ")
+                                 .Replace("\r", " ")
+                                 .Trim();
 
             if (sanitized.Length <= MaxLoggedBodyLength)
                 return sanitized;
@@ -331,9 +442,22 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
         private sealed class AskGptRequest
         {
-            public string Prompt { get; set; }
+            public string Prompt { get; set; } = string.Empty;
             public double? Latitude { get; set; }
             public double? Longitude { get; set; }
+        }
+
+        public sealed class ClientGptStatusResponseDTO
+        {
+            public int Id { get; set; }
+            public bool IsCompleted { get; set; }
+            public string Response { get; set; }
+            public DateTime CreatedAt { get; set; }
+
+            public string Message =>
+                IsCompleted
+                    ? "Generation completed."
+                    : "Generation still running.";
         }
     }
 }
