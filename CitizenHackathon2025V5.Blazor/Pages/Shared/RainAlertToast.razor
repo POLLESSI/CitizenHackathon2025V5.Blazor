@@ -25,16 +25,6 @@
     </div>
 }
 
-@code {
-    [Parameter] public RainAlertDTO? Alert { get; set; }
-    [Parameter] public EventCallback OnDismiss { get; set; }
-
-    private async Task DismissAsync()
-    {
-        if (OnDismiss.HasDelegate)
-            await OnDismiss.InvokeAsync();
-    }
-}
 
 
 

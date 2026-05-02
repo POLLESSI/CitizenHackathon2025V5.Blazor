@@ -10,7 +10,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Utils
         public static ClientWeatherForecastDTO Enrich(ClientWeatherForecastDTO dto)
         {
             // 1) Type from summary
-            var type = WeatherForecastSeverityHelper.ToEnum(dto.Summary ?? string.Empty); // ✅ remplace GetWeatherType
+            var type = WeatherForecastSeverityHelper.ToEnum(dto.Summary ?? string.Empty); // ✅ replaces GetWeatherType
 
             // 2) Purely UI
             dto.WeatherMain = type.ToString();

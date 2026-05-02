@@ -37,7 +37,21 @@
                         disabled="@(!CanUseVoice && !_isListening)">
                     @VoiceButtonText
                 </button>
-
+                <button type="button"
+                        class="btn btn-outline-info"
+                        @onclick="ToggleVoiceOutput">
+                    @(_voiceOutputEnabled ? "Voice reply ON" : "Voice reply OFF")
+                </button>
+                <button type="button"
+                        class="btn btn-outline-warning"
+                        @onclick="StopSpeakingAsync">
+                    Stop voice
+                </button>
+                <div class="gpt-status-row">
+                    <span class="badge bg-dark">
+                        VoiceSupported: @_voiceSupported | Listening: @_isListening
+                    </span>
+                </div>
                 <NavLink class="@AddChipCssClass"
                          href="@AddChipHref"
                          @onclick="PreventAddNavigationWhenBusy">
@@ -173,6 +187,10 @@
 {
     <div class="oz-gpt-overlay">
         <div class="oz-gpt-overlay-card">
+            <button class="btn btn-sm btn-danger"
+                    @onclick="CloseAiOverlay">
+                Close
+            </button>
             <div class="oz-gpt-loader-wrap">
                 <div class="oz-gpt-loader-globe @GetGlobeCssClass()">
                     <div class="oz-gpt-loader-globe-core">

@@ -1,0 +1,291 @@
+﻿.safety-title {
+    font-size: 1.6rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+}
+
+.alert-empty {
+    padding: 1rem;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.08);
+}
+
+.safety-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1rem;
+}
+
+.alert-card {
+    border-radius: 18px;
+    padding: 1rem;
+    border: 1px solid rgba(255,255,255,0.16);
+    background: rgba(20,20,25,0.92);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+}
+
+    .alert-card.critical {
+        border-color: rgba(255,70,70,0.95);
+    }
+
+    .alert-card.high {
+        border-color: rgba(255,140,0,0.95);
+    }
+
+    .alert-card.medium {
+        border-color: rgba(255,210,70,0.85);
+    }
+
+    .alert-card.low {
+        border-color: rgba(120,180,255,0.75);
+    }
+
+.alert-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 1.1rem;
+}
+
+.alert-icon {
+    font-size: 1.5rem;
+}
+
+.alert-message {
+    margin-top: 0.7rem;
+    line-height: 1.4;
+}
+
+.alert-meta {
+    margin-top: 0.8rem;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.4rem;
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.alert-tags {
+    margin-top: 0.8rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.tag {
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.12);
+    font-size: 0.8rem;
+}
+
+    .tag.warning {
+        background: rgba(255,180,0,0.22);
+    }
+
+    .tag.danger {
+        background: rgba(255,50,50,0.25);
+    }
+
+.alert-footer {
+    margin-top: 0.8rem;
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    opacity: 0.75;
+}
+
+.blink {
+    animation: alertBlink 1s infinite;
+}
+
+.blink-soft {
+    animation: alertBlinkSoft 1.8s infinite;
+}
+
+@keyframes alertBlink {
+    0% {
+        box-shadow: 0 0 0 rgba(255,0,0,0.2);
+    }
+
+    50% {
+        box-shadow: 0 0 28px rgba(255,0,0,0.8);
+    }
+
+    100% {
+        box-shadow: 0 0 0 rgba(255,0,0,0.2);
+    }
+}
+
+@keyframes alertBlinkSoft {
+    0% {
+        box-shadow: 0 0 0 rgba(255,150,0,0.15);
+    }
+
+    50% {
+        box-shadow: 0 0 22px rgba(255,150,0,0.55);
+    }
+
+    100% {
+        box-shadow: 0 0 0 rgba(255,150,0,0.15);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/

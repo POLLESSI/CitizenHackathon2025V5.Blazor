@@ -59,8 +59,7 @@
 
     <!-- 8. External Styles -->
     <link href="/CSS/external/blazored-toast.css" rel="stylesheet" />
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/open-iconic/1.1.1/font/css/open-iconic-bootstrap.min.css"
-          rel="stylesheet" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/open-iconic/1.1.1/font/css/open-iconic-bootstrap.min.css" rel="stylesheet" />
 
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
@@ -271,7 +270,8 @@
     <script src="/js/app/oz-draggable.js"></script>
     <script src="/js/outzen-interop.js?v=20260401-1"></script>
     <script src="/js/crowdbar.js" defer></script>
-    <script src="js/gpt-voice.js"></script>
+    <script src="/js/wasmCheck.js"></script>
+    <script src="js/gpt-voice.js?v=20260502-voice-test-1"></script>
     <!--<script src="/js/app/earthRotation-bridge.js"></script>-->
     <!-- Service Worker -->
     <script>
@@ -318,6 +318,39 @@
                 bg.style.display = 'block';
             }
         })();
+    </script>
+    <script>
+        window.checkWasmAccess = async function () {
+            const candidates = [
+                "/_framework/dotnet.native.wasm",
+                "/_framework/dotnet.wasm"
+            ];
+
+            for (const url of candidates) {
+                try {
+                    const response = await fetch(url, {
+                        method: "GET",
+                        cache: "no-store"
+                    });
+
+                    return {
+                        url: url,
+                        ok: response.ok,
+                        status: response.status,
+                        contentType: response.headers.get("content-type"),
+                        contentLength: response.headers.get("content-length")
+                    };
+                }
+                catch (e) {
+                    return {
+                        url: url,
+                        ok: false,
+                        status: 0,
+                        error: e?.message ?? String(e)
+                    };
+                }
+            }
+        };
     </script>
 
     <!-- Small helpers for Blazor -->

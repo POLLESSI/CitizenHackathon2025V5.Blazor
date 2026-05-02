@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.JSInterop;
+using Polly;
 using System.Collections.Concurrent;
 using System.Xml.Linq;
 
@@ -158,10 +159,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
                 Console.Error.WriteLine($"❌ clearAllOutZenLayers failed: {ex.Message}");
             }
 
-            foreach (var dto in _allAntennas)
+            foreach (var dto in _visibleAntennas)
             {
                 if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude)) continue;
                 if (dto.Latitude == 0 && dto.Longitude == 0) continue;
+                if (dto.Latitude is < -90 or > 90 || dto.Longitude is < -180 or > 180) continue;
 
                 await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateAntennaMarker", new
                 {
@@ -217,6 +219,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
 
                 _allAntennas = Antennas
                     .Where(a => a is not null)
+                    .Where(a => double.IsFinite(a.Latitude) && double.IsFinite(a.Longitude))
+                    .Where(a => a.Latitude is >= 49 and <= 51.8)
+                    .Where(a => a.Longitude is >= 2.5 and <= 6.5)
                     .OrderByDescending(a => a.Id)
                     .ToList();
 
@@ -274,20 +279,30 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
 
         private async Task JoinGroupsAsync(IEnumerable<int> antennaIds)
         {
-            if (_hub is null) return;
+            if (_hub is null || _hub.State != HubConnectionState.Connected)
+                return;
 
-            foreach (var id in antennaIds.Distinct())
+            var ids = antennaIds
+                .Distinct()
+                .Where(id => !_joinedAntennaGroups.Contains(id))
+                .Take(100)
+                .ToArray();
+
+            if (ids.Length == 0)
+                return;
+
+            try
             {
-                if (_joinedAntennaGroups.Contains(id)) continue;
-                try
-                {
-                    await _hub.InvokeAsync(CrowdInfoAntennaConnectionHubMethods.FromClient.JoinAntenna, id);
+                await _hub.InvokeAsync(
+                    CrowdInfoAntennaConnectionHubMethods.FromClient.JoinAntennas,
+                    ids);
+
+                foreach (var id in ids)
                     _joinedAntennaGroups.Add(id);
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"❌ JoinAntenna({id}) failed: {ex.Message}");
-                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"❌ JoinAntennas failed: {ex.Message}");
             }
         }
 
@@ -442,14 +457,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
                 // ⚠️ IMPORTANT: Call the actual JS API you have: addOrUpdateAntennaMarker(antenna, scopeKey)
                 // -> So send the antenna object and your scopeKey, not (id,lat,lng,level,...)
                 await MapInterop.EnsureAsync();
-                await MapInterop.UpsertCrowdMarkerAsync(
-                    id: ANPMarkerId(a.Id),
-                    lat: a.Latitude,
-                    lng: a.Longitude,
-                    level: level,
-                    info: new { title = a.Name, description = a.Description, kind = "antenna", icon = "📡👥" },
-                    scopeKey: ScopeKey
-                );
+                await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateAntennaMarker", new
+                {
+                    Id = a.Id,
+                    Latitude = a.Latitude,
+                    Longitude = a.Longitude,
+                    Name = a.Name,
+                    Description = a.Description,
+                    Level = level,
+                    Icon = "📡"
+                }, ScopeKey);
             }
             if (fit)
             {

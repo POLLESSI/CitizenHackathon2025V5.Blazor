@@ -2,6 +2,7 @@
 using CitizenHackathon2025.Contracts.Enums;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
@@ -11,6 +12,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
     public partial class GptInteractionView : IAsyncDisposable
     {
         [Inject] public GptInteractionService GptInteractionService { get; set; } = default!;
+        [Inject] public IGptClientOrchestrator GptClientOrchestrator { get; set; } = default!;
         [Inject] public IJSRuntime JS { get; set; } = default!;
 
         protected override string MapId => "leafletMap-gptinteractionview";
@@ -31,13 +33,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         private double? _gptLatitude;
         private double? _gptLongitude;
 
-        private int? _currentInteractionId;
-        private string? _currentRequestId;
-        private CancellationTokenSource? _currentPollingCts;
-
-        // false = mode sync direct
-        // true  = mode async + polling de secours
-        // Tu pourras plus tard remplacer le polling par SignalR streaming.
         private const bool PreferAsyncPipeline = true;
 
         public int SelectedId { get; set; }
@@ -47,6 +42,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         protected string NewPrompt { get; set; } = string.Empty;
         protected string _q = string.Empty;
         protected bool _onlyRecent;
+
+        private bool _autoSendVoicePrompt = true;
+        private bool _voiceAutoSendInProgress;
+        private string? _lastAutoSentVoicePrompt;
+
+        private bool _voiceOutputEnabled = true;
+        private int? _lastSpokenInteractionId;
 
         private bool _disposed;
         private bool _isSending;
@@ -78,8 +80,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         private bool IsAiBusy => _aiState == AiProcessingState.Generating;
 
-        private bool CanEditPrompt =>
-            !_disposed && !IsAiBusy && !_isSending;
+        private bool CanEditPrompt => !_disposed && !IsAiBusy && !_isSending;
 
         private bool CanSend =>
             !_disposed &&
@@ -97,8 +98,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             !_voiceSupported
                 ? "Micro unavailable"
                 : _isListening
-                    ? "Stop dictation"
-                    : "Start dictation";
+                    ? "Stop and send"
+                    : "Speak to Mistral";
 
         private string VoiceStatusText =>
             !_voiceSupported
@@ -115,7 +116,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             or AiProcessingState.Error;
 
         private bool ShowAiOverlay =>
-            _showAiOverlay || IsAiBusy || _aiState == AiProcessingState.Error;
+            _showAiOverlay || IsAiBusy;
 
         private string AddChipCssClass =>
             IsAiBusy ? "chip add-chip chip--disabled" : "chip add-chip";
@@ -124,6 +125,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             IsAiBusy ? null : "/gptinteractioncreate";
 
         private DateTime RecentCutoffUtc => DateTime.UtcNow.AddHours(-6);
+
+        private async Task CloseAiOverlay()
+        {
+            _showAiOverlay = false;
+
+            if (_aiState == AiProcessingState.Error)
+                _aiState = AiProcessingState.Idle;
+
+            _aiStatusMessage = null;
+
+            await InvokeAsync(StateHasChanged);
+        }
 
         private string GetSendButtonText() => _aiState switch
         {
@@ -162,8 +175,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             _dotNetRef = DotNetObjectReference.Create(this);
 
+            GptClientOrchestrator.InteractionUpdated += OnInteractionUpdatedAsync;
+            GptClientOrchestrator.StatusChanged += OnStatusChangedAsync;
+
             await LoadInteractionsAsync();
             await DetectVoiceSupportAsync();
+
+            try
+            {
+                await GptClientOrchestrator.EnsureHubAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[GPT VIEW] EnsureHubAsync failed: {ex}");
+                _aiStatusMessage = "SignalR GPT hub unavailable. Fallback mode only.";
+            }
         }
 
         private async Task LoadInteractionsAsync()
@@ -256,33 +282,42 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
                 _aiState = AiProcessingState.Generating;
                 _aiStatusMessage = PreferAsyncPipeline
-                    ? "Mistral request accepted. Waiting for completion..."
-                    : "Mistral is generating a response";
+                    ? "Submitting async GPT request..."
+                    : "Generating response...";
 
                 await StartElapsedTimerAsync();
                 await ShowOverlayAsync();
                 await InvokeAsync(StateHasChanged);
 
-                if (PreferAsyncPipeline)
+                var result = await GptClientOrchestrator.RunAsync(
+                    prompt,
+                    latitude: _gptLatitude,
+                    longitude: _gptLongitude,
+                    preferAsyncPipeline: PreferAsyncPipeline);
+
+                if (!result.Started)
+                    throw new InvalidOperationException("The GPT request could not be started.");
+
+                if (result.FinalInteraction is not null)
                 {
-                    await HandleAskGptAsyncPipeline(prompt);
+                    SelectedId = result.FinalInteraction.Id;
+                    NewPrompt = string.Empty;
                 }
-                else
+                else if (result.PendingInteraction is not null)
                 {
-                    await HandleAskGptSyncPipeline(prompt);
+                    SelectedId = result.PendingInteraction.Id;
+                    NewPrompt = string.Empty;
                 }
 
                 _aiState = AiProcessingState.Success;
-                _aiStatusMessage = "Response generated successfully";
+                _aiStatusMessage = result.StatusMessage ?? "Response generated successfully.";
                 await InvokeAsync(StateHasChanged);
 
                 await Task.Delay(600);
-
                 await StopElapsedTimerAsync();
 
                 _aiState = AiProcessingState.Idle;
                 _aiStatusMessage = null;
-
                 await InvokeAsync(StateHasChanged);
             }
             catch (OperationCanceledException)
@@ -293,7 +328,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
                 await Task.Delay(600);
                 await StopElapsedTimerAsync();
-
                 await InvokeAsync(StateHasChanged);
             }
             catch (Exception ex)
@@ -306,7 +340,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
                 await Task.Delay(900);
                 await StopElapsedTimerAsync();
-
                 await InvokeAsync(StateHasChanged);
             }
             finally
@@ -315,95 +348,30 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             }
         }
 
-        private async Task HandleAskGptSyncPipeline(string prompt)
+        private async Task OnInteractionUpdatedAsync(ClientGptInteractionDTO dto)
         {
-            var result = await GptInteractionService.AskGptSync(
-                prompt,
-                latitude: _gptLatitude,
-                longitude: _gptLongitude,
-                ct: CancellationToken.None);
+            UpsertInteraction(GptInteractions, dto);
+            UpsertInteraction(allGptInteractions, dto);
+            UpsertInteraction(visibleGptInteractions, dto);
 
-            if (result is null || result.Id <= 0)
-                throw new InvalidOperationException("The GPT response was empty or invalid.");
-
-            ApplyFinalInteraction(result);
-        }
-
-        private async Task HandleAskGptAsyncPipeline(string prompt)
-        {
-            await StopCurrentPollingAsync();
-
-            var started = await GptInteractionService.StartGptAsync(
-                prompt,
-                latitude: _gptLatitude,
-                longitude: _gptLongitude,
-                ct: CancellationToken.None);
-
-            if (started is null || !started.Accepted || started.InteractionId <= 0)
-                throw new InvalidOperationException("The async GPT request was not accepted by the API.");
-
-            _currentInteractionId = started.InteractionId;
-            _currentRequestId = started.RequestId;
-
-            _aiStatusMessage = string.IsNullOrWhiteSpace(started.Message)
-                ? "Request accepted. Waiting for result..."
-                : started.Message;
+            if (SelectedId == 0)
+                SelectedId = dto.Id;
 
             await InvokeAsync(StateHasChanged);
 
-            _currentPollingCts = new CancellationTokenSource();
-
-            var result = await PollUntilCompletedAsync(
-                started.InteractionId,
-                _currentPollingCts.Token);
-
-            if (result is null || result.Id <= 0)
-                throw new InvalidOperationException("The final GPT interaction could not be retrieved.");
-
-            ApplyFinalInteraction(result);
-        }
-
-        private async Task<ClientGptInteractionDTO?> PollUntilCompletedAsync(int interactionId, CancellationToken ct)
-        {
-            const int maxAttempts = 180; // ~ 3 minutes si intervalle 1s
-            const int delayMs = 1000;
-
-            for (var attempt = 1; attempt <= maxAttempts; attempt++)
+            if (!string.IsNullOrWhiteSpace(dto.Response) &&
+                !dto.Response.Contains("— Waiting", StringComparison.OrdinalIgnoreCase))
             {
-                ct.ThrowIfCancellationRequested();
-
-                var status = await GptInteractionService.GetStatusAsync(interactionId, ct);
-
-                if (status is not null)
-                {
-                    _aiStatusMessage = string.IsNullOrWhiteSpace(status.Message)
-                        ? $"Generation in progress... ({attempt})"
-                        : status.Message;
-
-                    await InvokeAsync(StateHasChanged);
-
-                    if (status.IsCompleted)
-                    {
-                        var finalItem = await GptInteractionService.GetByIdAsync(interactionId, ct);
-                        if (finalItem is not null)
-                            return finalItem;
-                    }
-                }
-
-                await Task.Delay(delayMs, ct);
+                await SpeakMistralResponseAsync(dto);
             }
-
-            throw new TimeoutException("The GPT response did not complete in time.");
         }
 
-        private void ApplyFinalInteraction(ClientGptInteractionDTO result)
+        private Task OnStatusChangedAsync(string? message)
         {
-            UpsertInteraction(GptInteractions, result);
-            UpsertInteraction(allGptInteractions, result);
-            UpsertInteraction(visibleGptInteractions, result);
+            if (!string.IsNullOrWhiteSpace(message))
+                _aiStatusMessage = message;
 
-            SelectedId = result.Id;
-            NewPrompt = string.Empty;
+            return InvokeAsync(StateHasChanged);
         }
 
         private async Task ToggleVoiceAsync()
@@ -430,7 +398,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 var result = await JS.InvokeAsync<VoiceStartResult>(
                     "gptVoice.start",
                     _dotNetRef,
-                    "fr-BE");
+                    "fr-FR");
+
+                Console.WriteLine($"[GPT VOICE] Start result: ok={result?.Ok}, error={result?.Error}");
 
                 if (result is null || !result.Ok)
                 {
@@ -445,7 +415,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 }
 
                 _isListening = true;
-                _aiStatusMessage = "Voice dictation started.";
+                _voiceInterimText = "Listening... speak clearly now.";
+                _aiStatusMessage = null;
                 await InvokeAsync(StateHasChanged);
             }
             catch (JSException ex)
@@ -455,6 +426,50 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 _aiStatusMessage = $"Voice error: {ex.Message}";
                 await InvokeAsync(StateHasChanged);
             }
+        }
+
+        private async Task SpeakMistralResponseAsync(ClientGptInteractionDTO dto)
+        {
+            if (_disposed || !_voiceOutputEnabled)
+                return;
+
+            if (dto.Id <= 0)
+                return;
+
+            if (_lastSpokenInteractionId == dto.Id)
+                return;
+
+            if (string.IsNullOrWhiteSpace(dto.Response))
+                return;
+
+            if (dto.Response.Contains("— Waiting", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            try
+            {
+                _lastSpokenInteractionId = dto.Id;
+
+                await JS.InvokeAsync<SpeechResult>(
+                    "gptVoice.speak",
+                    dto.Response,
+                    "fr-FR");
+            }
+            catch (JSException ex)
+            {
+                Console.Error.WriteLine($"[GPT VOICE] speak failed: {ex.Message}");
+            }
+        }
+
+        private sealed class SpeechResult
+        {
+            public bool Ok { get; set; }
+            public string? Error { get; set; }
+        }
+
+        private sealed class VoiceMicrophoneTestResult
+        {
+            public bool Ok { get; set; }
+            public string? Error { get; set; }
         }
 
         private async Task StopVoiceAsync()
@@ -472,6 +487,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             await InvokeAsync(StateHasChanged);
         }
 
+        private async Task StopSpeakingAsync()
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("gptVoice.stopSpeaking");
+            }
+            catch
+            {
+            }
+        }
+
         [JSInvokable]
         public async Task OnVoiceRecognitionResult(string finalText, string interimText)
         {
@@ -480,15 +506,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             if (!string.IsNullOrWhiteSpace(finalText))
             {
+                var clean = finalText.Trim();
+
                 if (string.IsNullOrWhiteSpace(NewPrompt))
-                    NewPrompt = finalText.Trim();
+                    NewPrompt = clean;
                 else
-                    NewPrompt = $"{NewPrompt.Trim()} {finalText.Trim()}".Trim();
+                    NewPrompt = $"{NewPrompt.Trim()} {clean}".Trim();
+
+                _voiceInterimText = "Voice captured. Sending...";
+            }
+            else
+            {
+                _voiceInterimText = interimText ?? string.Empty;
             }
 
-            _voiceInterimText = interimText ?? string.Empty;
-
             await InvokeAsync(StateHasChanged);
+
+            Console.WriteLine($"[GPT VOICE] final='{finalText}', interim='{interimText}'");
         }
 
         [JSInvokable]
@@ -497,14 +531,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             if (_disposed)
                 return;
 
-            _isListening = false;
-            _voiceInterimText = string.Empty;
-            _aiState = AiProcessingState.Error;
-            _aiStatusMessage = string.IsNullOrWhiteSpace(errorMessage)
-                ? "Voice recognition failed."
-                : errorMessage;
+            if (!string.IsNullOrWhiteSpace(errorMessage) &&
+                errorMessage.Contains("aborted", StringComparison.OrdinalIgnoreCase))
+            {
+                _isListening = false;
+                _voiceInterimText = "Dictation stopped.";
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
 
-            await InvokeAsync(StateHasChanged);
+            if (errorMessage.Contains("No speech", StringComparison.OrdinalIgnoreCase))
+            {
+                _isListening = false;
+                _voiceInterimText = errorMessage;
+                _aiStatusMessage = null;
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
         }
 
         [JSInvokable]
@@ -514,8 +557,53 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 return;
 
             _isListening = false;
-            _voiceInterimText = string.Empty;
+
+            var prompt = NewPrompt?.Trim();
+
+            if (string.IsNullOrWhiteSpace(prompt))
+            {
+                _voiceInterimText = "Dictation stopped. No final text received.";
+                await InvokeAsync(StateHasChanged);
+                Console.WriteLine("[GPT VOICE] stopped without final prompt");
+                return;
+            }
+
+            _voiceInterimText = "Dictation stopped. Sending prompt...";
             await InvokeAsync(StateHasChanged);
+
+            Console.WriteLine("[GPT VOICE] stopped");
+
+            if (!_autoSendVoicePrompt)
+                return;
+
+            if (_voiceAutoSendInProgress || _isSending || IsAiBusy)
+                return;
+
+            if (string.Equals(_lastAutoSentVoicePrompt, prompt, StringComparison.Ordinal))
+                return;
+
+            try
+            {
+                _voiceAutoSendInProgress = true;
+                _lastAutoSentVoicePrompt = prompt;
+
+                NewPrompt = NormalizeVoicePrompt(prompt);
+
+                await HandleAskGpt();
+            }
+            finally
+            {
+                _voiceAutoSendInProgress = false;
+            }
+        }
+
+        private static string NormalizeVoicePrompt(string prompt)
+        {
+            return prompt
+                .Replace("autour d'un ami", "autour de Namur", StringComparison.OrdinalIgnoreCase)
+                .Replace("autour de N'amur", "autour de Namur", StringComparison.OrdinalIgnoreCase)
+                .Replace("autour d Namur", "autour de Namur", StringComparison.OrdinalIgnoreCase)
+                .Trim();
         }
 
         private async Task ShowOverlayAsync()
@@ -593,27 +681,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 await HideOverlayAsync();
         }
 
-        private async Task StopCurrentPollingAsync()
-        {
-            try
-            {
-                _currentPollingCts?.Cancel();
-            }
-            catch
-            {
-            }
-
-            _currentPollingCts?.Dispose();
-            _currentPollingCts = null;
-
-            await Task.CompletedTask;
-        }
-
         private void ResetUiState()
         {
             _elapsedSeconds = 0;
-            _currentInteractionId = null;
-            _currentRequestId = null;
         }
 
         private static void UpsertInteraction(List<ClientGptInteractionDTO> list, ClientGptInteractionDTO dto)
@@ -628,13 +698,22 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         private void ToggleRecent() => _onlyRecent = !_onlyRecent;
 
+        private void ToggleVoiceOutput()
+        {
+            _voiceOutputEnabled = !_voiceOutputEnabled;
+        }
+
         private Task PreventAddNavigationWhenBusy(MouseEventArgs _) => Task.CompletedTask;
 
         protected override async Task OnBeforeDisposeAsync()
         {
             _disposed = true;
 
-            await StopCurrentPollingAsync();
+            GptClientOrchestrator.InteractionUpdated -= OnInteractionUpdatedAsync;
+            GptClientOrchestrator.StatusChanged -= OnStatusChangedAsync;
+
+            try { await GptClientOrchestrator.CancelCurrentAsync(); } catch { }
+
             await StopElapsedTimerAsync();
 
             if (_isListening)

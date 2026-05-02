@@ -1,5 +1,4 @@
-﻿// Pages/Index.razor.cs
-using CitizenHackathon2025.Blazor.DTOs;
+﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Blazor.DTOs.Security;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
@@ -18,10 +17,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 {
     public partial class Index : OutZenMapPageBase
     {
-    #nullable disable
-        // -----------------------------
-        // Inject
-        // -----------------------------
+#nullable disable
         [Inject] public MessageService MessageService { get; set; } = default!;
         [Inject] public IJSRuntime JS { get; set; } = default!;
         [Inject] public TrafficConditionService TrafficConditionService { get; set; } = default!;
@@ -33,14 +29,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         [Inject] public PlaceService PlaceService { get; set; } = default!;
         [Inject] public WeatherForecastService WeatherForecastService { get; set; } = default!;
         [Inject] public GptInteractionService GptInteractionService { get; set; } = default!;
-        //[Inject] public GptInteractionService GptService { get; set; } = default!;
+        [Inject] public IGptClientOrchestrator GptClientOrchestrator { get; set; } = default!;
         [Inject] public NavigationManager Navigation { get; set; } = default!;
         [Inject] public IHubUrlBuilder HubUrls { get; set; } = default!;
         [Inject] public IAuthService Auth { get; set; } = default!;
 
-        // -----------------------------
-        // Map settings (Base)
-        // -----------------------------
         protected override string ScopeKey => "home";
         protected override string MapId => "leafletMap-home";
 
@@ -50,9 +43,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         protected override int DefaultZoom => 12;
         protected override int HybridThreshold => 13;
 
-        // -----------------------------
-        // UI / Data
-        // -----------------------------
         public MessageFormModel Model { get; } = new();
         private bool _isSendingPrompt;
         protected bool IsSending { get; set; }
@@ -67,42 +57,33 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private List<ClientCrowdInfoCalendarDTO> _allCal = new();
         protected List<ClientGptInteractionDTO> GptInteractions { get; set; } = new();
 
-        // Antenna overlay
         private List<ClientCrowdInfoAntennaDTO> _allAntennas = new();
         private readonly ConcurrentDictionary<int, ClientAntennaCountsDTO> _countsByAntenna = new();
         private readonly ConcurrentQueue<(int AntennaId, ClientAntennaCountsDTO Counts)> _pendingCountsUntilMap = new();
 
-        // DotNetRef (map click callbacks)
         private DotNetObjectReference<Index> _dotNetRef;
-
-        // Hubs / timers
         private HubConnection _antennaHub;
-        private HubConnection _gptHub;
 
         private PeriodicTimer _timer;
         private bool _timerStarted;
+        private bool _disposed;
 
-        // GPT drawer minimal state (keep what you want)
         private long _lastToggleMs;
         private bool _dragWired;
         private bool drawerOpen;
-        private bool _historyCollapsed = true; // hidden by default to lighten the GPT drawer
+        private bool _historyCollapsed = true;
         private string _userPrompt = "";
+        private string _gptStatusMessage;
 
-        // -----------------------------
-        // GPT list (search + pagination)
-        // -----------------------------
         private string _q = "";
         private readonly List<ClientGptInteractionDTO> _all = new();
         private readonly List<ClientGptInteractionDTO> _visible = new();
         private int _currentIndex = 0;
         private const int PageSize = 20;
+        private const int MaxVisibleGptItems = 30;
         private int VisibleCount => _visible.Count;
         private bool CanLoadMore => _currentIndex < _all.Count;
 
-        // -----------------------------
-        // JSInvokable (map -> Blazor)
-        // -----------------------------
         [JSInvokable]
         public Task SelectSuggestionFromMap(int suggestionId)
         {
@@ -110,20 +91,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             return Task.CompletedTask;
         }
 
-        // -----------------------------
-        // Lifecycle
-        // -----------------------------
         protected override async Task OnInitializedAsync()
         {
-            // 1) kick async loads in parallel
+            GptClientOrchestrator.InteractionUpdated += OnGptInteractionUpdatedAsync;
+            GptClientOrchestrator.StatusChanged += OnGptStatusChangedAsync;
+
             var trafficTask = TrafficConditionService.GetLatestTrafficConditionAsync();
             var crowdTask = CrowdInfoService.GetLatestCrowdInfoNonNullAsync();
             var eventTask = EventService.GetLatestEventAsync();
             var suggestionTask = SuggestionService.GetLatestSuggestionAsync();
             var placeTask = PlaceService.GetLatestPlaceAsync();
             var weatherTask = WeatherForecastService.GetLatestWeatherForecastAsync();
-
-            // GPT interactions (not blocking the rest)
             Task<List<ClientGptInteractionDTO>> gptTask = SafeGetGptAsync();
 
             await Task.WhenAll(trafficTask, crowdTask, eventTask, suggestionTask, placeTask, weatherTask, gptTask);
@@ -135,14 +113,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             _places = (placeTask.Result ?? Enumerable.Empty<ClientPlaceDTO>()).ToList();
             _weather = (weatherTask.Result ?? Enumerable.Empty<ClientWeatherForecastDTO>()).ToList();
             GptInteractions = gptTask.Result ?? new();
-            // Populate drawer list
+
             _all.Clear();
-            _all.AddRange(GptInteractions.OrderByDescending(x => x.CreatedAt)); // optional
+            _all.AddRange(GptInteractions.OrderByDescending(x => x.CreatedAt));
             _visible.Clear();
             _currentIndex = 0;
             LoadMore();
 
-            // 2) coords filtering (Belgium bounds)
             static bool HasValidCoord(double lat, double lng)
                 => lat is >= 49.45 and <= 51.6 && lng is >= 2.3 and <= 6.6;
 
@@ -150,26 +127,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             _events = _events.Where(e => HasValidCoord(e.Latitude, e.Longitude)).ToList();
             _crowds = _crowds.Where(c => HasValidCoord(c.Latitude, c.Longitude)).ToList();
 
-            // 3) calendar list
             _allCal = (await CrowdInfoCalendarService.GetAllSafeAsync()).ToList();
 
-            // 4) antennas list (if you need it for overlay) – optional but useful
             await SafeLoadAntennasAsync();
-
-            // 5) start antenna hub (counts updates)
             await EnsureAntennaHubAsync();
 
-            // 6) periodic calendar refresh
+            try
+            {
+                await GptClientOrchestrator.EnsureHubAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[HOME GPT] EnsureHubAsync failed: {ex}");
+            }
+
             StartCalendarTimer();
 
-            // 7) Render + trigger boot/seed via base
             await InvokeAsync(StateHasChanged);
             await NotifyDataLoadedAsync(fit: true);
         }
 
-        // -----------------------------
-        // Base hooks
-        // -----------------------------
         protected override async Task SeedAsync(bool fit)
         {
             var payload = new
@@ -200,11 +177,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
         protected override async Task OnMapReadyAsync()
         {
-            // Map is booted here. Only hooks + flush pending.
             _dotNetRef ??= DotNetObjectReference.Create(this);
             try { await JS.InvokeVoidAsync("OutZenInterop.registerDotNetRef", ScopeKey, _dotNetRef); } catch { }
 
-            // Option: show all antennas as neutral markers first
             foreach (var a in _allAntennas)
             {
                 await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateAntennaMarker", new
@@ -217,32 +192,32 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 }, ScopeKey);
             }
 
-            // Flush pending antenna updates that arrived before map boot
             while (_pendingCountsUntilMap.TryDequeue(out var item))
             {
                 try { await ApplyAntennaCriticalOverlayAsync(item.AntennaId, item.Counts); } catch { }
             }
 
-            // optional: ensure hybrid refresh after container is stable
             try { await JS.InvokeVoidAsync("OutZenInterop.refreshHybridNow", ScopeKey); } catch { }
         }
 
         protected override async Task OnBeforeDisposeAsync()
         {
+            _disposed = true;
             _timerStarted = false;
-            try { _timer?.Dispose(); } catch { }
 
+            try { _timer?.Dispose(); } catch { }
             try { if (_antennaHub is not null) await _antennaHub.DisposeAsync(); } catch { }
-            try { if (_gptHub is not null) await _gptHub.DisposeAsync(); } catch { }
+
+            GptClientOrchestrator.InteractionUpdated -= OnGptInteractionUpdatedAsync;
+            GptClientOrchestrator.StatusChanged -= OnGptStatusChangedAsync;
+
+            try { await GptClientOrchestrator.CancelCurrentAsync(); } catch { }
 
             try { await JS.InvokeVoidAsync("OutZenInterop.unregisterDotNetRef", ScopeKey); } catch { }
             try { _dotNetRef?.Dispose(); } catch { }
             _dotNetRef = null;
         }
 
-        // -----------------------------
-        // Timer: calendar active markers
-        // -----------------------------
         private void StartCalendarTimer()
         {
             _timer ??= new PeriodicTimer(TimeSpan.FromSeconds(30));
@@ -269,9 +244,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             var activeIds = active.Select(x => $"cc:{x.Id}").ToList();
             await JS.InvokeVoidAsync("OutZenInterop.pruneCrowdCalendarMarkers", activeIds, ScopeKey);
         }
-        // -----------------------------
-        // SignalR: Antenna hub
-        // -----------------------------
+
         private async Task EnsureAntennaHubAsync()
         {
             if (_antennaHub is not null) return;
@@ -305,9 +278,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             await _antennaHub.StartAsync();
         }
 
-        // -----------------------------
-        // Overlay antenna critical only
-        // -----------------------------
         private async Task ApplyAntennaCriticalOverlayAsync(int antennaId, ClientAntennaCountsDTO counts)
         {
             var antenna = _allAntennas.FirstOrDefault(a => a.Id == antennaId);
@@ -368,88 +338,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             }
         }
 
-        // -----------------------------
-        // GPT Hub + prompt
-        // -----------------------------
-        private async Task EnsureGptHubAsync()
-        {
-            if (_gptHub is not null &&
-                _gptHub.State is HubConnectionState.Connected or HubConnectionState.Connecting or HubConnectionState.Reconnecting)
-            {
-                return;
-            }
-
-            var url = HubUrls.Build(HubPaths.GptInteraction);
-
-            Console.WriteLine($"[HOME GPT] Hub URL = {url}");
-
-            _gptHub = new HubConnectionBuilder()
-                .WithUrl(url, opt =>
-                {
-                    opt.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
-                    opt.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents;
-                })
-                .WithAutomaticReconnect()
-                .Build();
-
-            _gptHub.On<ClientGptInteractionDTO>("ReceiveGptResponse", async dto =>
-            {
-                if (dto is null) return;
-
-                var idxAll = _all.FindIndex(x => x.Id == dto.Id);
-                if (idxAll >= 0) _all[idxAll] = dto;
-                else _all.Insert(0, dto);
-
-                var idxVisible = _visible.FindIndex(x => x.Id == dto.Id);
-                if (idxVisible >= 0) _visible[idxVisible] = dto;
-                else _visible.Insert(0, dto);
-
-                GptInteractions = _all.OrderByDescending(x => x.CreatedAt).ToList();
-
-                await InvokeAsync(StateHasChanged);
-            });
-
-            await _gptHub.StartAsync();
-        }
-
         private async Task SendUserPromptAsync()
         {
             var prompt = _userPrompt?.Trim();
-            if (string.IsNullOrWhiteSpace(prompt) || _isSendingPrompt)
+            if (string.IsNullOrWhiteSpace(prompt) || _isSendingPrompt || _disposed)
                 return;
 
             _isSendingPrompt = true;
 
             try
             {
-                await EnsureGptHubAsync();
+                var result = await GptClientOrchestrator.RunAsync(
+                    prompt,
+                    latitude: DefaultCenter.lat,
+                    longitude: DefaultCenter.lng,
+                    preferAsyncPipeline: true);
 
-                var created = await GptInteractionService.AskGpt(new ClientGptInteractionDTO
-                {
-                    Prompt = prompt
-                });
-
-                Console.WriteLine($"[HOME GPT] created.Id={created?.Id}");
-                Console.WriteLine($"[HOME GPT] created.Prompt={created?.Prompt}");
-                Console.WriteLine($"[HOME GPT] created.Response={created?.Response}");
-
-                if (created is not null)
-                {
-                    var idxAll = _all.FindIndex(x => x.Id == created.Id);
-                    if (idxAll >= 0) _all[idxAll] = created;
-                    else _all.Insert(0, created);
-
-                    var idxVisible = _visible.FindIndex(x => x.Id == created.Id);
-                    if (idxVisible >= 0) _visible[idxVisible] = created;
-                    else _visible.Insert(0, created);
-
-                    GptInteractions = _all.OrderByDescending(x => x.CreatedAt).ToList();
-                }
-
-                if (_visible.Count > 30)
-                {
-                    _visible.RemoveRange(30, _visible.Count - 30);
-                }
+                Console.WriteLine($"[HOME GPT] Started={result.Started}, InteractionId={result.InteractionId}, RequestId={result.RequestId}");
 
                 _userPrompt = string.Empty;
                 await InvokeAsync(StateHasChanged);
@@ -463,6 +368,44 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 _isSendingPrompt = false;
             }
         }
+
+        private Task OnGptInteractionUpdatedAsync(ClientGptInteractionDTO dto)
+        {
+            ApplyOrInsertGptInteraction(dto);
+            return InvokeAsync(StateHasChanged);
+        }
+
+        private Task OnGptStatusChangedAsync(string message)
+        {
+            _gptStatusMessage = message;
+            return InvokeAsync(StateHasChanged);
+        }
+
+        private void ApplyOrInsertGptInteraction(ClientGptInteractionDTO dto)
+        {
+            if (dto is null || dto.Id <= 0)
+                return;
+
+            Upsert(_all, dto);
+            Upsert(_visible, dto);
+
+            GptInteractions = _all
+                .OrderByDescending(x => x.CreatedAt)
+                .ToList();
+
+            if (_visible.Count > MaxVisibleGptItems)
+                _visible.RemoveRange(MaxVisibleGptItems, _visible.Count - MaxVisibleGptItems);
+        }
+
+        private static void Upsert(List<ClientGptInteractionDTO> list, ClientGptInteractionDTO dto)
+        {
+            var idx = list.FindIndex(x => x.Id == dto.Id);
+            if (idx >= 0)
+                list[idx] = dto;
+            else
+                list.Insert(0, dto);
+        }
+
         private void LoadMore()
         {
             var next = _all.Skip(_currentIndex).Take(PageSize).ToList();
@@ -474,6 +417,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         {
             _historyCollapsed = !_historyCollapsed;
         }
+
         private IEnumerable<ClientGptInteractionDTO> FilterGpt(IEnumerable<ClientGptInteractionDTO> src)
         {
             var q = _q?.Trim();
@@ -488,17 +432,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         {
             try
             {
-                // You have @inject GptInteractionService GptService in the Razor.
-                // Two options :
-                // 1) Use your service injected into the code-behind (recommended) :
                 await GptInteractionService.ReplayInteraction(id);
-
-                // 2) If you absolutely want to use the Razor's GptService :
-                // => It also needs to be injected into the code-behind (see below).
             }
             catch
             {
-                // optional toast/log
             }
         }
 
@@ -515,11 +452,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             => await JS.InvokeVoidAsync("OutZen.scrollIntoViewById", "suggestions",
                 new { behavior = "smooth", block = "start" });
 
-        protected Task EnableSoundAsync()
-        {
-            // future JS hook or user settings
-            return Task.CompletedTask;
-        }
+        protected Task EnableSoundAsync() => Task.CompletedTask;
+
         private async Task ToggleDrawer()
         {
             var now = Environment.TickCount64;
@@ -531,9 +465,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             await InvokeAsync(StateHasChanged);
         }
 
-        // -----------------------------
-        // Messages
-        // -----------------------------
         public async Task SendMessageAsync()
         {
             if (IsSending) return;
@@ -552,9 +483,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             }
         }
 
-        // -----------------------------
-        // Calendar active helper
-        // -----------------------------
         private static bool IsNowActive(ClientCrowdInfoCalendarDTO x, DateTime utcNow)
         {
             if (!x.Active) return false;
@@ -563,6 +491,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             return x.DateUtc.Date == utcNow.Date;
         }
+
         private MarkupString FormatGptResponse(string text)
         {
             if (string.IsNullOrWhiteSpace(text))
@@ -583,9 +512,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             return (MarkupString)html;
         }
 
-        // -----------------------------
-        // Form model
-        // -----------------------------
         public sealed class MessageFormModel
         {
             [Required]

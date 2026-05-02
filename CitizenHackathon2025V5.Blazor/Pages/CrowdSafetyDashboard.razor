@@ -1,0 +1,185 @@
+﻿@* CrowdSafetyDashboard.razor *@
+@page "/crowd-safety"
+@attribute [Authorize(Roles = "Admin,LawEnforcement")]
+
+@using System.Net.Http.Json
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.SignalR.Client
+@using CitizenHackathon2025.Contracts.DTOs
+@using CitizenHackathon2025.Contracts.Hubs
+@using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces
+
+@inject IAuthService Auth
+@inject HttpClient Http
+
+@implements IAsyncDisposable
+
+<h3 class="safety-title">🔥 Crowd Safety Dashboard</h3>
+
+@if (_loadError is not null)
+{
+    <div class="alert alert-danger">
+        Erreur chargement alertes : @_loadError
+    </div>
+}
+else if (_alerts.Count == 0)
+{
+    <div class="alert-empty">
+        Aucune alerte active.
+    </div>
+}
+else
+{
+    <div class="safety-grid">
+        @foreach (var alert in _alerts.OrderByDescending(a => a.DetectedAtUtc))
+        {
+            <div class="@GetCardClass(alert)">
+                <div class="alert-header">
+                    <span class="alert-icon">@GetIcon(alert.Severity)</span>
+                    <strong>@alert.Title</strong>
+                </div>
+
+                <div class="alert-message">@alert.Message</div>
+
+                <div class="alert-meta">
+                    <span>Severity: @alert.Severity</span>
+                    <span>Unique: @alert.UniqueDevices</span>
+                    <span>Active: @alert.ActiveConnections</span>
+                    <span>Baseline: @(alert.BaselineConnections?.ToString() ?? "N/A")</span>
+                </div>
+
+                <div class="alert-footer">
+                    <span>@alert.DetectedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm:ss")</span>
+                    <span>@alert.Status</span>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@*  /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/ *@

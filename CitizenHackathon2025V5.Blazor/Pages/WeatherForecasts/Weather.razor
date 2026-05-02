@@ -23,14 +23,6 @@ else
     </ul>
 }
 
-@code {
-    private IReadOnlyList<ClientWeatherForecastDTO>? forecasts;
-
-    protected override async Task OnInitializedAsync()
-    {
-        forecasts = await WeatherSvc.GetHistoryAsync();
-    }
-}
 
 
 

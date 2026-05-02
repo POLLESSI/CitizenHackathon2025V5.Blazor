@@ -22,7 +22,7 @@
             .Build();
 
         _hubConnection.On<ClientCrowdInfoDTO>(CitizenHackathon2025.Blazor.DTOs.CrowdHubMethods.ReceiveCrowdUpdate, async crowd =>
-         {
+        {
             Console.WriteLine($"?? Update Crowd received: {crowd.LocationName} ({crowd.CrowdLevel})");
             await JS.InvokeVoidAsync("window.OutZenInterop.addOrUpdateCrowdMarker",
             crowd.Id.ToString(),
@@ -46,7 +46,6 @@
             await _hubConnection.InvokeAsync("RefreshCrowd", "manual-test");
         }
     }
-
 }
 
 

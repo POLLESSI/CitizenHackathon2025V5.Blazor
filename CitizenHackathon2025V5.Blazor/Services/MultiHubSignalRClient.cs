@@ -1,213 +1,378 @@
 ﻿using CitizenHackathon2025V5.Blazor.Client.SignalR;
+using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
 using System.Collections.Concurrent;
 
-public sealed class MultiHubSignalRClient : IMultiHubSignalRClient
+namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
-    private readonly string _baseUrl;                       // ex: https://localhost:7254
-    private Func<Task<string?>> _tokenProvider;             // JWT (mutable via ConfigureAccessTokenProvider)
-    private readonly ConcurrentDictionary<HubName, HubConnection> _connections = new();
-    private readonly ConcurrentDictionary<HubName, SemaphoreSlim> _locks = new();
-
-    public MultiHubSignalRClient(string baseUrl, Func<Task<string?>> tokenProvider)
+    public sealed class MultiHubSignalRClient : IMultiHubSignalRClient
     {
-        _baseUrl = (baseUrl ?? throw new ArgumentNullException(nameof(baseUrl))).TrimEnd('/');
-        _tokenProvider = tokenProvider ?? throw new ArgumentNullException(nameof(tokenProvider));
-    }
+        private readonly string _baseUrl;
+        private readonly ConcurrentDictionary<HubName, HubConnection> _connections = new();
+        private readonly SemaphoreSlim _gate = new(1, 1);
 
-    public void ConfigureAccessTokenProvider(Func<Task<string?>>? provider)
-    {
-        if (provider is null) throw new ArgumentNullException(nameof(provider));
-        _tokenProvider = provider;
-    }
+        private Func<Task<string?>>? _tokenProvider;
+        private bool _disposed;
 
-    public HubConnection GetConnection(HubName hub) => RequireConnection(hub);
-
-    public HubConnectionState GetState(HubName hub)
-        => _connections.TryGetValue(hub, out var conn) ? conn.State : HubConnectionState.Disconnected;
-
-    public bool IsConnected(HubName hub) => GetState(hub) == HubConnectionState.Connected;
-
-    public async Task<HubConnection> GetOrCreateAsync(HubName hub, CancellationToken ct = default)
-    {
-        await ConnectAsync(hub, ct);
-        return RequireConnection(hub);
-    }
-
-    public async Task ConnectAsync(HubName hub, CancellationToken ct = default)
-    {
-        var gate = _locks.GetOrAdd(hub, _ => new SemaphoreSlim(1, 1));
-        await gate.WaitAsync(ct).ConfigureAwait(false);
-
-        try
+        private static readonly TimeSpan[] ReconnectDelays =
         {
-            if (_connections.TryGetValue(hub, out var existing))
-            {
-                if (existing.State == HubConnectionState.Connected)
-                    return;
+            TimeSpan.Zero,
+            TimeSpan.FromSeconds(2),
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(10),
+            TimeSpan.FromSeconds(20)
+        };
 
-                if (existing.State == HubConnectionState.Disconnected)
-                {
-                    await existing.StartAsync(ct).ConfigureAwait(false);
-                }
+        public MultiHubSignalRClient(string baseUrl, Func<Task<string?>>? tokenProvider = null)
+        {
+            if (string.IsNullOrWhiteSpace(baseUrl))
+                throw new ArgumentException("Base URL cannot be null or empty.", nameof(baseUrl));
+
+            _baseUrl = NormalizeBaseUrl(baseUrl);
+            _tokenProvider = tokenProvider;
+        }
+
+        public void ConfigureAccessTokenProvider(Func<Task<string?>>? provider)
+        {
+            ThrowIfDisposed();
+            _tokenProvider = provider;
+        }
+
+        public async Task ConnectAsync(HubName hub, CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+
+            var connection = await GetOrCreateAsync(hub, ct);
+
+            if (connection.State is HubConnectionState.Connected
+                or HubConnectionState.Connecting
+                or HubConnectionState.Reconnecting)
+            {
                 return;
             }
 
-            var conn = BuildConnection(hub);
-            WireLifecycleLogs(hub, conn);
-
-            await conn.StartAsync(ct).ConfigureAwait(false);
-            _connections[hub] = conn;
-
-            Console.WriteLine($"[SignalR/Multi] CONNECTED -> {hub} (ConnId={conn.ConnectionId ?? "n/a"})");
-        }
-        finally
-        {
-            gate.Release();
-        }
-    }
-
-    public Task ConnectAsync(HubName[] hubs, CancellationToken ct = default)
-        => Task.WhenAll(hubs.Select(h => ConnectAsync(h, ct)));
-
-    public async Task EnsureConnectedAsync(HubName hub, int maxAttempts = 3, CancellationToken ct = default)
-    {
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            if (IsConnected(hub)) return;
-
+            await _gate.WaitAsync(ct);
             try
             {
-                await ConnectAsync(hub, ct).ConfigureAwait(false);
-                if (IsConnected(hub)) return;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[SignalR/Multi] EnsureConnected {hub} attempt {attempt} failed: {ex.Message}");
-            }
+                if (connection.State is HubConnectionState.Connected
+                    or HubConnectionState.Connecting
+                    or HubConnectionState.Reconnecting)
+                {
+                    return;
+                }
 
-            await Task.Delay(TimeSpan.FromSeconds(Math.Min(2 * attempt, 5)), ct).ConfigureAwait(false);
+                Console.WriteLine($"[SignalR/Multi] CONNECTING -> {hub}");
+                await connection.StartAsync(ct);
+                Console.WriteLine($"[SignalR/Multi] CONNECTED -> {hub} (ConnId={connection.ConnectionId ?? "<null>"})");
+            }
+            finally
+            {
+                _gate.Release();
+            }
         }
 
-        throw new InvalidOperationException($"Unable to (re)connect hub {hub}");
-    }
-
-    public async Task DisconnectAsync(HubName hub)
-    {
-        if (_connections.TryRemove(hub, out var conn))
+        public async Task DisconnectAsync(HubName hub)
         {
-            try { await conn.StopAsync().ConfigureAwait(false); } catch { }
-            try { await conn.DisposeAsync().ConfigureAwait(false); } catch { }
-            Console.WriteLine($"[SignalR/Multi] DISCONNECTED -> {hub}");
-        }
-    }
+            if (_disposed)
+                return;
 
-    public async Task DisconnectAllAsync()
-    {
-        var hubs = _connections.Keys.ToArray();
-        foreach (var hub in hubs)
-            await DisconnectAsync(hub).ConfigureAwait(false);
-    }
-
-    public Task<TResult> InvokeAsync<TResult>(HubName hub, string methodName, CancellationToken ct = default, params object?[] args)
-    {
-        var conn = RequireConnection(hub);
-        var payload = (args is { Length: > 0 }) ? args : Array.Empty<object?>();
-        return conn.InvokeCoreAsync<TResult>(methodName, payload, ct);
-    }
-
-    public Task SendAsync(HubName hub, string methodName, CancellationToken ct = default, params object?[] args)
-    {
-        var conn = RequireConnection(hub);
-        var payload = (args is { Length: > 0 }) ? args : Array.Empty<object?>();
-        return conn.SendAsync(methodName, payload, ct);
-    }
-
-    public IDisposable RegisterHandler<T>(HubName hub, string methodName, Action<T> handler)
-    {
-        var conn = RequireConnection(hub);
-        var sub = conn.On(methodName, handler);
-        Console.WriteLine($"[SignalR/Multi] Handler registered: {hub}.{methodName} ({typeof(T).Name})");
-        return sub;
-    }
-
-    public IDisposable RegisterHandler<T>(HubName hub, string methodName, Func<T, Task> handler)
-    {
-        var conn = RequireConnection(hub);
-        var sub = conn.On(methodName, handler);
-        Console.WriteLine($"[SignalR/Multi] Handler registered: {hub}.{methodName} async ({typeof(T).Name})");
-        return sub;
-    }
-
-    public IDisposable RegisterHandler(HubName hub, string methodName, Action handler)
-    {
-        var conn = RequireConnection(hub);
-        var sub = conn.On(methodName, handler);
-        Console.WriteLine($"[SignalR/Multi] Handler registered: {hub}.{methodName} (no payload)");
-        return sub;
-    }
-
-    public IDisposable RegisterHandler(HubName hub, string methodName, Func<Task> handler)
-    {
-        var conn = RequireConnection(hub);
-        var sub = conn.On(methodName, handler);
-        Console.WriteLine($"[SignalR/Multi] Handler registered: {hub}.{methodName} async (no payload)");
-        return sub;
-    }
-
-    // ---------------------------
-    // Internals
-    // ---------------------------
-
-    private HubConnection RequireConnection(HubName hub)
-    {
-        if (!_connections.TryGetValue(hub, out var conn))
-            throw new InvalidOperationException($"Hub {hub} not connected. Call ConnectAsync({hub}) first.");
-        return conn;
-    }
-
-    private HubConnection BuildConnection(HubName hub)
-    {
-        var url = HubRoutes.BuildUrl(_baseUrl, hub);
-
-        Func<Task<string?>> tokenFactory = async () => await _tokenProvider().ConfigureAwait(false);
-
-        var conn = new HubConnectionBuilder()
-            .WithUrl(url, options =>
+            if (_connections.TryGetValue(hub, out var connection))
             {
-                options.AccessTokenProvider = tokenFactory;
-            })
-            .WithAutomaticReconnect()
-            .Build();
+                try
+                {
+                    if (connection.State != HubConnectionState.Disconnected)
+                    {
+                        await connection.StopAsync();
+                    }
 
-        return conn;
-    }
+                    Console.WriteLine($"[SignalR/Multi] DISCONNECTED -> {hub}");
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[SignalR/Multi] Disconnect failed for {hub}: {ex}");
+                }
+            }
+        }
 
-    private static void WireLifecycleLogs(HubName hub, HubConnection conn)
-    {
-        conn.Closed += ex =>
+        public async Task DisconnectAllAsync()
         {
-            Console.WriteLine($"[SignalR/Multi] CLOSED ({hub}) - {ex?.Message}");
-            return Task.CompletedTask;
-        };
-        conn.Reconnecting += ex =>
-        {
-            Console.WriteLine($"[SignalR/Multi] RECONNECTING ({hub}) - {ex?.Message}");
-            return Task.CompletedTask;
-        };
-        conn.Reconnected += newId =>
-        {
-            Console.WriteLine($"[SignalR/Multi] RECONNECTED ({hub}) - ConnectionId={newId}");
-            return Task.CompletedTask;
-        };
-    }
+            if (_disposed)
+                return;
 
-    public async ValueTask DisposeAsync()
-    {
-        await DisconnectAllAsync().ConfigureAwait(false);
-        foreach (var gate in _locks.Values) gate.Dispose();
+            foreach (var hub in _connections.Keys)
+            {
+                await DisconnectAsync(hub);
+            }
+        }
+
+        public HubConnection GetConnection(HubName hub)
+        {
+            ThrowIfDisposed();
+
+            if (_connections.TryGetValue(hub, out var connection))
+                return connection;
+
+            throw new InvalidOperationException($"No SignalR connection exists for hub '{hub}'.");
+        }
+
+        public HubConnectionState GetState(HubName hub)
+        {
+            if (_disposed)
+                return HubConnectionState.Disconnected;
+
+            if (_connections.TryGetValue(hub, out var connection))
+                return connection.State;
+
+            return HubConnectionState.Disconnected;
+        }
+
+        public bool IsConnected(HubName hub)
+            => GetState(hub) == HubConnectionState.Connected;
+
+        public Task<HubConnection> GetOrCreateAsync(HubName hub, CancellationToken ct = default)
+        {
+            ThrowIfDisposed();
+
+            var connection = _connections.GetOrAdd(hub, BuildConnection);
+            return Task.FromResult(connection);
+        }
+
+        public Task<TResult> InvokeAsync<TResult>(
+            HubName hub,
+            string methodName,
+            CancellationToken ct = default,
+            params object?[] args)
+        {
+            ThrowIfDisposed();
+            return GetConnection(hub).InvokeCoreAsync<TResult>(methodName, args, ct);
+        }
+
+        public Task SendAsync(
+            HubName hub,
+            string methodName,
+            CancellationToken ct = default,
+            params object?[] args)
+        {
+            ThrowIfDisposed();
+            return GetConnection(hub).SendCoreAsync(methodName, args, ct);
+        }
+
+        public IDisposable RegisterHandler<T>(HubName hub, string methodName, Action<T> handler)
+        {
+            ThrowIfDisposed();
+
+            if (handler is null)
+                throw new ArgumentNullException(nameof(handler));
+
+            var connection = GetConnection(hub);
+
+            Console.WriteLine($"[SignalR/Multi] Handler registered: {hub}.{methodName} sync ({typeof(T).Name})");
+            return connection.On(methodName, handler);
+        }
+
+        public IDisposable RegisterHandler<T>(HubName hub, string methodName, Func<T, Task> handler)
+        {
+            ThrowIfDisposed();
+
+            if (handler is null)
+                throw new ArgumentNullException(nameof(handler));
+
+            var connection = GetConnection(hub);
+
+            Console.WriteLine($"[SignalR/Multi] Handler registered: {hub}.{methodName} async ({typeof(T).Name})");
+            return connection.On(methodName, handler);
+        }
+
+        public IDisposable RegisterHandler(HubName hub, string methodName, Action handler)
+        {
+            ThrowIfDisposed();
+
+            if (handler is null)
+                throw new ArgumentNullException(nameof(handler));
+
+            var connection = GetConnection(hub);
+
+            Console.WriteLine($"[SignalR/Multi] Handler registered: {hub}.{methodName} sync");
+            return connection.On(methodName, handler);
+        }
+
+        public IDisposable RegisterHandler(HubName hub, string methodName, Func<Task> handler)
+        {
+            ThrowIfDisposed();
+
+            if (handler is null)
+                throw new ArgumentNullException(nameof(handler));
+
+            var connection = GetConnection(hub);
+
+            Console.WriteLine($"[SignalR/Multi] Handler registered: {hub}.{methodName} async");
+            return connection.On(methodName, handler);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+
+            foreach (var kvp in _connections)
+            {
+                try
+                {
+                    await kvp.Value.DisposeAsync();
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[SignalR/Multi] Dispose failed for {kvp.Key}: {ex}");
+                }
+            }
+
+            _connections.Clear();
+            _gate.Dispose();
+        }
+
+        private HubConnection BuildConnection(HubName hub)
+        {
+            var url = BuildHubUrl(_baseUrl, hub);
+
+            Console.WriteLine($"[MultiHubSignalRClient] hub={hub} url={url}");
+
+            var builder = new HubConnectionBuilder()
+                .WithUrl(url, options =>
+                {
+                    options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents;
+
+                    options.AccessTokenProvider = async () =>
+                    {
+                        try
+                        {
+                            if (_tokenProvider is null)
+                                return string.Empty;
+
+                            var token = await _tokenProvider.Invoke();
+                            return token ?? string.Empty;
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.Error.WriteLine($"[SignalR/Multi] AccessTokenProvider failed for {hub}: {ex}");
+                            return string.Empty;
+                        }
+                    };
+                })
+                .WithAutomaticReconnect(ReconnectDelays);
+
+            var connection = builder.Build();
+
+            // Aligned with the API:
+            // API ClientTimeoutInterval = 90s
+            // API KeepAliveInterval   = 15s
+            //
+            // Client side:
+            // ServerTimeout must be > KeepAliveInterval server
+            // KeepAliveInterval client can remain at 15s
+            connection.ServerTimeout = TimeSpan.FromSeconds(90);
+            connection.KeepAliveInterval = TimeSpan.FromSeconds(15);
+
+            connection.Reconnecting += error =>
+            {
+                Console.WriteLine($"[SignalR/Multi] RECONNECTING ({hub}) - {error?.Message}");
+                return Task.CompletedTask;
+            };
+
+            connection.Reconnected += connectionId =>
+            {
+                Console.WriteLine($"[SignalR/Multi] RECONNECTED ({hub}) - ConnectionId={connectionId ?? "<null>"}");
+                return Task.CompletedTask;
+            };
+
+            connection.Closed += error =>
+            {
+                Console.WriteLine($"[SignalR/Multi] CLOSED ({hub}) - {error?.Message}");
+                return Task.CompletedTask;
+            };
+
+            return connection;
+        }
+
+        private static string NormalizeBaseUrl(string baseUrl)
+        {
+            var trimmed = baseUrl.Trim();
+
+            if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri))
+                throw new InvalidOperationException($"Invalid SignalR base URL: '{baseUrl}'.");
+
+            var authority = uri.GetLeftPart(UriPartial.Authority);
+            return authority.TrimEnd('/');
+        }
+
+        private static string BuildHubUrl(string baseUrl, HubName hub)
+        {
+            var path = HubRoutes.GetPath(hub);
+
+            if (string.IsNullOrWhiteSpace(path))
+                throw new InvalidOperationException($"No route is configured for hub '{hub}'.");
+
+            path = path.Trim();
+
+            if (Uri.TryCreate(path, UriKind.Absolute, out var absolute))
+                return absolute.ToString();
+
+            if (!path.StartsWith("/"))
+                path = "/" + path;
+
+            // If on the Contracts side the HubPath is equal to "gptHub",
+            // with MapGroup("/hubs"), we want /hubs/gptHub
+            if (!path.StartsWith("/hubs/", StringComparison.OrdinalIgnoreCase))
+                path = "/hubs" + path;
+
+            return $"{baseUrl.TrimEnd('/')}{path}";
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+                throw new ObjectDisposedException(nameof(MultiHubSignalRClient));
+        }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

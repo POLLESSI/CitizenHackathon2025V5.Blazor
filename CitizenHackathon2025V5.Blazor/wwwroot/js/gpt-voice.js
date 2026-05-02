@@ -17,7 +17,9 @@
         }
 
         const recognition = new SpeechRecognition();
-        recognition.lang = lang || "fr-BE";
+        /*recognition.lang = lang || "fr-BE";*/
+        recognition.lang = "fr-FR";
+        /*recognition.lang = "en-US";*/
         recognition.continuous = false;
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
@@ -39,9 +41,8 @@
             state.recognition.onresult = null;
             state.recognition.onerror = null;
             state.recognition.onend = null;
-            state.recognition.stop();
+            state.recognition.abort();
         } catch {
-            // ignore
         }
 
         state.recognition = null;
@@ -51,7 +52,6 @@
             try {
                 await state.dotNetRef.invokeMethodAsync("OnVoiceStopped");
             } catch {
-                // ignore
             }
         }
     }
@@ -65,11 +65,57 @@
             return state.isListening;
         },
 
+        async testMicrophone() {
+            try {
+                if (!navigator.mediaDevices?.getUserMedia) {
+                    return {
+                        ok: false,
+                        error: "navigator.mediaDevices.getUserMedia is unavailable."
+                    };
+                }
+
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                const tracks = stream.getAudioTracks().map(t => ({
+                    label: t.label,
+                    enabled: t.enabled,
+                    readyState: t.readyState
+                }));
+
+                stream.getTracks().forEach(t => t.stop());
+
+                console.log("[gptVoice] microphone test OK", tracks);
+
+                return {
+                    ok: true,
+                    error: null,
+                    tracks
+                };
+            } catch (e) {
+                console.error("[gptVoice] microphone test failed", e);
+
+                return {
+                    ok: false,
+                    error: e?.message || String(e),
+                    tracks: []
+                };
+            }
+        },
+
         async start(dotNetRef, lang) {
+            console.log("[gptVoice] start called", { lang });
+
             if (!ensureSupported()) {
                 return {
                     ok: false,
                     error: "Speech recognition is not supported by this browser."
+                };
+            }
+
+            if (!window.isSecureContext) {
+                return {
+                    ok: false,
+                    error: "Speech recognition requires HTTPS or localhost."
                 };
             }
 
@@ -80,103 +126,123 @@
                 };
             }
 
-            if (state.isListening) {
-                return {
-                    ok: true
-                };
+            // IMPORTANT: Properly terminate all old sessions
+            if (state.recognition) {
+                try {
+                    state.recognition.onresult = null;
+                    state.recognition.onerror = null;
+                    state.recognition.onend = null;
+                    state.recognition.abort();
+                } catch {
+                }
+
+                state.recognition = null;
+                state.isListening = false;
+
+                await new Promise(resolve => setTimeout(resolve, 250));
             }
 
             state.dotNetRef = dotNetRef;
             state.recognition = buildRecognition(lang);
 
-            if (!state.recognition) {
-                return {
-                    ok: false,
-                    error: "Speech recognition could not be initialized."
-                };
-            }
+            const recognition = state.recognition;
 
-            state.recognition.onresult = async (event) => {
-                try {
-                    let finalText = "";
-                    let interimText = "";
-
-                    for (let i = event.resultIndex; i < event.results.length; i++) {
-                        const result = event.results[i];
-                        const transcript = result?.[0]?.transcript ?? "";
-
-                        if (result.isFinal) {
-                            finalText += transcript;
-                        } else {
-                            interimText += transcript;
-                        }
-                    }
-
-                    if (state.dotNetRef) {
-                        await state.dotNetRef.invokeMethodAsync(
-                            "OnVoiceRecognitionResult",
-                            finalText || "",
-                            interimText || ""
-                        );
-                    }
-                } catch {
-                    // ignore
-                }
+            recognition.onstart = () => {
+                state.isListening = true;
+                console.log("[gptVoice] onstart");
             };
 
-            state.recognition.onerror = async (event) => {
-                state.isListening = false;
+            recognition.onaudiostart = () => {
+                console.log("[gptVoice] onaudiostart");
+            };
 
-                let message = "Voice recognition error.";
-                const code = event?.error || "";
+            recognition.onsoundstart = () => {
+                console.log("[gptVoice] onsoundstart");
+            };
 
-                switch (code) {
-                    case "not-allowed":
-                        message = "Microphone access was denied.";
-                        break;
-                    case "audio-capture":
-                        message = "No microphone was detected.";
-                        break;
-                    case "network":
-                        message = "A network error occurred during voice recognition.";
-                        break;
-                    case "no-speech":
-                        message = "No speech was detected.";
-                        break;
-                    case "aborted":
-                        message = "Voice recognition was cancelled.";
-                        break;
+            recognition.onspeechstart = () => {
+                console.log("[gptVoice] onspeechstart");
+            };
+
+            recognition.onresult = async (event) => {
+                let finalText = "";
+                let interimText = "";
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const result = event.results[i];
+                    const transcript = result?.[0]?.transcript ?? "";
+
+                    if (result.isFinal)
+                        finalText += transcript;
+                    else
+                        interimText += transcript;
                 }
+
+                console.log("[gptVoice] onresult", { finalText, interimText });
 
                 if (state.dotNetRef) {
-                    try {
-                        await state.dotNetRef.invokeMethodAsync("OnVoiceRecognitionError", message);
-                    } catch {
-                        // ignore
-                    }
+                    await state.dotNetRef.invokeMethodAsync(
+                        "OnVoiceRecognitionResult",
+                        finalText || "",
+                        interimText || ""
+                    );
                 }
             };
 
-            state.recognition.onend = async () => {
+            recognition.onerror = async (event) => {
+                const code = event?.error || "";
+                console.warn("[gptVoice] onerror", code, event);
+
+                state.isListening = false;
+
+                if (code === "aborted") {
+                    console.warn("[gptVoice] aborted ignored");
+                    return;
+                }
+
+                if (code === "no-speech") {
+                    if (state.dotNetRef) {
+                        await state.dotNetRef.invokeMethodAsync(
+                            "OnVoiceRecognitionError",
+                            "No speech detected. Click Start dictation and speak immediately."
+                        );
+                    }
+                    return;
+                }
+
+                let message = `Voice recognition error: ${code || "unknown"}`;
+
+                if (code === "not-allowed")
+                    message = "Microphone access was denied.";
+                else if (code === "audio-capture")
+                    message = "No microphone was detected.";
+                else if (code === "network")
+                    message = "A network error occurred during voice recognition.";
+
+                if (state.dotNetRef) {
+                    await state.dotNetRef.invokeMethodAsync("OnVoiceRecognitionError", message);
+                }
+            };
+
+            recognition.onend = async () => {
+                console.log("[gptVoice] onend");
+
                 state.recognition = null;
                 state.isListening = false;
 
+                if (state.suppressNextEnd) {
+                    state.suppressNextEnd = false;
+                    return;
+                }
+
                 if (state.dotNetRef) {
-                    try {
-                        await state.dotNetRef.invokeMethodAsync("OnVoiceStopped");
-                    } catch {
-                        // ignore
-                    }
+                    await state.dotNetRef.invokeMethodAsync("OnVoiceStopped");
                 }
             };
 
             try {
-                state.recognition.start();
-                state.isListening = true;
-
-                return {
-                    ok: true
-                };
+                recognition.start();
+                return { ok: true };
             } catch (error) {
                 state.recognition = null;
                 state.isListening = false;
@@ -184,6 +250,56 @@
                 return {
                     ok: false,
                     error: error?.message || "Failed to start voice recognition."
+                };
+            }
+        },
+
+        isSpeechSynthesisSupported() {
+            return "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+        },
+
+        stopSpeaking() {
+            if ("speechSynthesis" in window) {
+                window.speechSynthesis.cancel();
+            }
+
+            return { ok: true };
+        },
+
+        speak(text, lang) {
+            try {
+                if (!text || !text.trim()) {
+                    return { ok: false, error: "No text to speak." };
+                }
+
+                if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
+                    return {
+                        ok: false,
+                        error: "Speech synthesis is not supported by this browser."
+                    };
+                }
+
+                window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(text.trim());
+                utterance.lang = lang || "fr-FR";
+                utterance.rate = 1.0;
+                utterance.pitch = 1.0;
+                utterance.volume = 1.0;
+
+                const voices = window.speechSynthesis.getVoices();
+                utterance.voice =
+                    voices.find(v => v.lang === "fr-FR") ||
+                    voices.find(v => v.lang?.startsWith("fr")) ||
+                    null;
+
+                window.speechSynthesis.speak(utterance);
+
+                return { ok: true, error: null };
+            } catch (e) {
+                return {
+                    ok: false,
+                    error: e?.message || String(e)
                 };
             }
         },

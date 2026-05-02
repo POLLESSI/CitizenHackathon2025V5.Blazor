@@ -15,6 +15,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         public async Task<List<ClientCrowdInfoAntennaDTO>> GetAllAsync(CancellationToken ct = default)
             => await _http.GetFromJsonAsync<List<ClientCrowdInfoAntennaDTO>>("crowdinfoantenna", ct)
                ?? new();
+
+        public async Task<List<ClientCrowdInfoAntennaDTO>> GetByBoundsAsync(double minLat, double maxLat, double minLng, double maxLng, CancellationToken ct = default)
+        {
+            var url =
+                $"crowdinfoantenna/bounds?minLat={minLat.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
+                $"&maxLat={maxLat.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
+                $"&minLng={minLng.ToString(System.Globalization.CultureInfo.InvariantCulture)}" +
+                $"&maxLng={maxLng.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+
+            return await _http.GetFromJsonAsync<List<ClientCrowdInfoAntennaDTO>>(url, ct) ?? new();
+        }
     }
 }
 

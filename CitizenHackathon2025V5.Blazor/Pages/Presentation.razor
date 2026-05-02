@@ -1,9 +1,14 @@
 ﻿@page "/presentation"
+@using CitizenHackathon2025V5.Blazor.Client.Pages
 @using CitizenHackathon2025V5.Blazor.Client.Pages.Shared
 @using CitizenHackathon2025V5.Blazor.Client.Components
 @inherits OutZenPresentationPageBase
 
 <PageTitle>Presentation - OutZen</PageTitle>
+
+<section class="feedback-section">
+    <FeedbackBox CanModerate="@CanModerateComments" />
+</section>
 
 <div class="page-list presentation-page">
     <div class="presentation-container">
@@ -74,10 +79,6 @@
                 By analyzing travel times, traffic, and weather in real time, it offers optimized suggestions
                 to avoid crowds and make the most of your outing.
             </p>
-        </section>
-
-        <section class="feedback-section">
-            <FeedbackBoard CanModerate="@CanModerateComments" />
         </section>
 
         <section class="call-to-action">

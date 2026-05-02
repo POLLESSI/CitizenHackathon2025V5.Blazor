@@ -267,7 +267,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
                 response.EnsureSuccessStatusCode();
 
-                return await response.Content.ReadFromJsonAsync<ClientGptStatusResponseDTO>(JsonOptions, ct);
+                var status = await response.Content.ReadFromJsonAsync<ClientGptStatusResponseDTO>(JsonOptions, ct);
+                return status;
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -284,6 +285,43 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 LogError($"[GetStatusAsync] Unexpected error for interactionId={interactionId}: {ex}");
                 return null;
             }
+        }
+
+        public async Task<ClientGptInteractionDTO> WaitForCompletionAsync(int interactionId, TimeSpan? pollInterval = null, TimeSpan? timeout = null, CancellationToken ct = default)
+        {
+            if (interactionId <= 0)
+                return null;
+
+            var interval = pollInterval ?? TimeSpan.FromSeconds(1.5);
+            var maxDuration = timeout ?? TimeSpan.FromMinutes(3);
+
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(maxDuration);
+
+            var startedAt = DateTime.UtcNow;
+            var attempt = 0;
+
+            while (!timeoutCts.Token.IsCancellationRequested)
+            {
+                attempt++;
+
+                var status = await GetStatusAsync(interactionId, timeoutCts.Token);
+
+                if (status is not null && status.IsCompleted)
+                {
+                    LogInfo($"[WaitForCompletionAsync] Completed via status for interactionId={interactionId} after attempt={attempt}");
+
+                    var finalItem = await GetByIdAsync(interactionId, timeoutCts.Token);
+                    if (finalItem is not null)
+                        return finalItem;
+                }
+
+                await Task.Delay(interval, timeoutCts.Token);
+            }
+
+            LogWarn($"[WaitForCompletionAsync] Timeout for interactionId={interactionId}. Fallback final GetByIdAsync.");
+
+            return await GetByIdAsync(interactionId, CancellationToken.None);
         }
 
         public async Task DeleteAsync(int id, CancellationToken ct = default)
@@ -399,8 +437,27 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
         }
 
+
+
         public Task Delete(int id) => DeleteAsync(id);
         public Task ReplayInteraction(int id) => ReplayInteractionAsync(id);
+
+        private static bool LooksTerminal(ClientGptStatusResponseDTO status)
+        {
+            if (status is null)
+                return false;
+
+            if (status.IsCompleted)
+                return true;
+
+            if (!string.IsNullOrWhiteSpace(status.Response) &&
+                !string.Equals(status.Response.Trim(), "— Waiting for response —", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            return false;
+        }
 
         private string BuildAbsoluteUrl(string relativeOrAbsolute)
         {
@@ -454,10 +511,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             public string Response { get; set; }
             public DateTime CreatedAt { get; set; }
 
-            public string Message =>
-                IsCompleted
-                    ? "Generation completed."
-                    : "Generation still running.";
+            public string Status { get; set; }
+            public string Message { get; set; }
+
+            public bool IsTerminal =>
+                string.Equals(Status, "completed", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(Status, "failed", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(Status, "cancelled", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

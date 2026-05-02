@@ -136,6 +136,7 @@ builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.CrowdIn
 builder.Services.AddScoped<CrowdInfoService>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<GptInteractionService>();
+builder.Services.AddScoped<IGptClientOrchestrator, GptClientOrchestrator>();
 builder.Services.AddScoped<MessageService>();
 builder.Services.AddScoped<PlaceService>();
 builder.Services.AddScoped<ProfanityAdminApiService>();

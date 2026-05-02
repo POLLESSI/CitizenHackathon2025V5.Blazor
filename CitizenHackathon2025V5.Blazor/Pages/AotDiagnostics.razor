@@ -1,44 +1,92 @@
-@page "/aot-diagnostics"
+﻿@page "/aot-diagnostics"
+@using System.Net.Http.Json
+@using CitizenHackathon2025.Blazor.DTOs.Diagnostics
 @inject IJSRuntime JS
-@inject NavigationManager Navigation
 
-<h3>?? Diagnostic Blazor AOT</h3>
+<h3>🧪 Diagnostic Blazor AOT / WASM</h3>
 
-<p>Accessibility test of <code>dotnet.native.wasm</code> :</p>
-
-@if (CheckInProgress)
+@if (_loading)
 {
-    <p>? Verification in progress...</p>
+    <p><em>Analyse en cours...</em></p>
 }
-else if (!string.IsNullOrEmpty(StatusMessage))
+else if (_error is not null)
 {
-    <p><strong>@StatusMessage</strong></p>
+    <div class="alert alert-danger">@_error</div>
 }
+else if (_report is not null)
+{
+    <div class="diag-grid">
+        <div class="diag-card">
+            <h4>WASM runtime</h4>
+            <p><strong>URL :</strong> @_report.Wasm?.Url</p>
+            <p><strong>Status :</strong> @_report.Wasm?.Status</p>
+            <p><strong>OK :</strong> @_report.Wasm?.Ok</p>
+            <p><strong>Content-Type :</strong> @_report.Wasm?.ContentType</p>
+            <p><strong>Size :</strong> @FormatBytes(_report.Wasm?.SizeBytes)</p>
+        </div>
+
+        <div class="diag-card">
+            <h4>Chargement global</h4>
+            <p><strong>Total resources :</strong> @_report.Resources.Count</p>
+            <p><strong>Total size :</strong> @FormatBytes(_report.TotalBytes)</p>
+            <p><strong>WASM + DLL :</strong> @FormatBytes(_report.FrameworkBytes)</p>
+            <p><strong>JS :</strong> @FormatBytes(_report.JavaScriptBytes)</p>
+            <p><strong>CSS :</strong> @FormatBytes(_report.CssBytes)</p>
+        </div>
+
+        <div class="diag-card">
+            <h4>SignalR</h4>
+            <p><strong>SignalR scripts :</strong> @_report.SignalRScriptCount</p>
+            <p><strong>SignalR connections estimées :</strong> @_report.SignalRConnectionCount</p>
+        </div>
+
+        <div class="diag-card">
+            <h4>Leaflet / OutZen</h4>
+            <p><strong>Leaflet chargé :</strong> @_report.HasLeaflet</p>
+            <p><strong>MarkerCluster chargé :</strong> @_report.HasMarkerCluster</p>
+            <p><strong>OutZen interop :</strong> @_report.HasOutZenInterop</p>
+        </div>
+    </div>
+
+    <h4>Top ressources lourdes</h4>
+
+    <table class="table table-sm table-striped">
+        <thead>
+            <tr>
+                <th>Type</th>
+                <th>Nom</th>
+                <th>Taille</th>
+                <th>Durée</th>
+                <th>Cache</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var r in _report.Resources
+                    .OrderByDescending(x => x.TransferSize)
+                    .Take(30))
+            {
+                <tr>
+                    <td>@r.Type</td>
+                    <td>@ShortName(r.Name)</td>
+                    <td>@FormatBytes(r.TransferSize)</td>
+                    <td>@($"{r.DurationMs:0.0} ms")</td>
+                    <td>@r.CacheMode</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<button class="btn btn-primary" @onclick="RunAsync">Relancer diagnostic</button>
 
 <Globe />
 
 @code {
-    private bool CheckInProgress = true;
-    private string? StatusMessage;
-
-    protected override async Task OnInitializedAsync()
-    {
-        try
-        {
-            var baseUri = Navigation.BaseUri.TrimEnd('/');
-            var ok = await JS.InvokeAsync<bool>("checkWasmAccess", $"{baseUri}/_framework/dotnet.native.wasm");
-            StatusMessage = ok
-                ? "? The dotnet.native.wasm file is accessible from the browser."
-                : "? The dotnet.native.wasm file was not found or was inaccessible.";
-        }
-        catch (Exception ex)
-        {
-            StatusMessage = $"? JS error: {ex.Message}";
-        }
-
-        CheckInProgress = false;
-    }
+    
 }
+
+
+
 
 
 
