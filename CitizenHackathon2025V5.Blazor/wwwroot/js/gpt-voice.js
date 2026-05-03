@@ -273,34 +273,55 @@
                 }
 
                 if (!("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
-                    return {
-                        ok: false,
-                        error: "Speech synthesis is not supported by this browser."
-                    };
+                    return { ok: false, error: "Speech synthesis is not supported." };
                 }
 
                 window.speechSynthesis.cancel();
 
-                const utterance = new SpeechSynthesisUtterance(text.trim());
-                utterance.lang = lang || "fr-FR";
-                utterance.rate = 1.0;
-                utterance.pitch = 1.0;
-                utterance.volume = 1.0;
+                const parts = text
+                    .trim()
+                    .replace(/\s+/g, " ")
+                    .match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
 
-                const voices = window.speechSynthesis.getVoices();
-                utterance.voice =
-                    voices.find(v => v.lang === "fr-FR") ||
-                    voices.find(v => v.lang?.startsWith("fr")) ||
-                    null;
+                let index = 0;
 
-                window.speechSynthesis.speak(utterance);
+                const speakNext = () => {
+                    if (index >= parts.length) {
+                        console.log("[gptVoice] speech synthesis completed");
+                        return;
+                    }
+
+                    const utterance = new SpeechSynthesisUtterance(parts[index].trim());
+                    utterance.lang = lang || "fr-FR";
+                    utterance.rate = 0.95;
+                    utterance.pitch = 1.0;
+                    utterance.volume = 1.0;
+
+                    const voices = window.speechSynthesis.getVoices();
+                    utterance.voice =
+                        voices.find(v => v.lang === "fr-FR") ||
+                        voices.find(v => v.lang?.startsWith("fr")) ||
+                        null;
+
+                    utterance.onend = () => {
+                        index++;
+                        setTimeout(speakNext, 120);
+                    };
+
+                    utterance.onerror = e => {
+                        console.warn("[gptVoice] speech synthesis error", e);
+                        index++;
+                        setTimeout(speakNext, 120);
+                    };
+
+                    window.speechSynthesis.speak(utterance);
+                };
+
+                speakNext();
 
                 return { ok: true, error: null };
             } catch (e) {
-                return {
-                    ok: false,
-                    error: e?.message || String(e)
-                };
+                return { ok: false, error: e?.message || String(e) };
             }
         },
 

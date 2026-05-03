@@ -298,20 +298,30 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 if (!result.Started)
                     throw new InvalidOperationException("The GPT request could not be started.");
 
+                ClientGptInteractionDTO? finalToSpeak = null;
+
                 if (result.FinalInteraction is not null)
                 {
                     SelectedId = result.FinalInteraction.Id;
                     NewPrompt = string.Empty;
+                    finalToSpeak = result.FinalInteraction;
                 }
                 else if (result.PendingInteraction is not null)
                 {
                     SelectedId = result.PendingInteraction.Id;
                     NewPrompt = string.Empty;
+
+                    await Task.Delay(300);
+
+                    finalToSpeak = await GptInteractionService.GetByIdAsync(result.PendingInteraction.Id);
                 }
 
                 _aiState = AiProcessingState.Success;
                 _aiStatusMessage = result.StatusMessage ?? "Response generated successfully.";
                 await InvokeAsync(StateHasChanged);
+
+                if (finalToSpeak is not null)
+                    await TrySpeakCompletedInteractionAsync(finalToSpeak);
 
                 await Task.Delay(600);
                 await StopElapsedTimerAsync();
@@ -358,12 +368,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 SelectedId = dto.Id;
 
             await InvokeAsync(StateHasChanged);
-
-            if (!string.IsNullOrWhiteSpace(dto.Response) &&
-                !dto.Response.Contains("— Waiting", StringComparison.OrdinalIgnoreCase))
-            {
-                await SpeakMistralResponseAsync(dto);
-            }
         }
 
         private Task OnStatusChangedAsync(string? message)
@@ -427,37 +431,30 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 await InvokeAsync(StateHasChanged);
             }
         }
-
-        private async Task SpeakMistralResponseAsync(ClientGptInteractionDTO dto)
+        private async Task TrySpeakCompletedInteractionAsync(ClientGptInteractionDTO? dto)
         {
-            if (_disposed || !_voiceOutputEnabled)
+            Console.WriteLine($"[GPT VOICE] TrySpeak dto={dto?.Id}, enabled={_voiceOutputEnabled}, responseLen={dto?.Response?.Length}");
+
+            if (dto is null || !_voiceOutputEnabled)
                 return;
 
-            if (dto.Id <= 0)
-                return;
-
-            if (_lastSpokenInteractionId == dto.Id)
+            if (dto.Id <= 0 || _lastSpokenInteractionId == dto.Id)
                 return;
 
             if (string.IsNullOrWhiteSpace(dto.Response))
                 return;
 
-            if (dto.Response.Contains("— Waiting", StringComparison.OrdinalIgnoreCase))
+            if (dto.Response.Contains("Waiting", StringComparison.OrdinalIgnoreCase))
                 return;
 
-            try
-            {
-                _lastSpokenInteractionId = dto.Id;
+            _lastSpokenInteractionId = dto.Id;
 
-                await JS.InvokeAsync<SpeechResult>(
-                    "gptVoice.speak",
-                    dto.Response,
-                    "fr-FR");
-            }
-            catch (JSException ex)
-            {
-                Console.Error.WriteLine($"[GPT VOICE] speak failed: {ex.Message}");
-            }
+            var speech = await JS.InvokeAsync<SpeechResult>(
+                "gptVoice.speak",
+                dto.Response,
+                "fr-FR");
+
+            Console.WriteLine($"[GPT VOICE] speak result ok={speech?.Ok}, error={speech?.Error}");
         }
 
         private sealed class SpeechResult
