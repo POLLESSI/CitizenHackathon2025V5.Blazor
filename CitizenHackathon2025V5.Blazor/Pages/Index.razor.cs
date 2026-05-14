@@ -72,8 +72,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private bool _dragWired;
         private bool drawerOpen;
         private bool _historyCollapsed = true;
+        private bool _criticalAlertSending;
+        private int? _selectedPlaceId = 1;
+        private string _selectedPlaceName = "Maison de famille";
         private string _userPrompt = "";
         private string _gptStatusMessage;
+        private string _criticalAlertStatus;
 
         private string _q = "";
         private readonly List<ClientGptInteractionDTO> _all = new();
@@ -172,6 +176,46 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 try { await JS.InvokeVoidAsync("OutZenInterop.fitToBundles", ScopeKey, new { maxZoom = 16 }); } catch { }
                 try { await JS.InvokeVoidAsync("OutZenInterop.activateHybridAndZoom", ScopeKey, HybridThreshold); } catch { }
                 try { await JS.InvokeVoidAsync("OutZenInterop.refreshHybridNow", ScopeKey); } catch { }
+            }
+        }
+
+        private async Task SendCriticalCrowdAlertAsync()
+        {
+            if (_selectedPlaceId is null or <= 0)
+            {
+                ToastService.ShowWarning("No place selected.");
+                return;
+            }
+
+            _criticalAlertSending = true;
+
+            try
+            {
+                var result = await CriticalAlertService.SendCriticalAlertAsync(
+                     _selectedPlaceId.Value,
+                     $"Manual critical alert for {_selectedPlaceName}");
+
+                if (result.Ok)
+                {
+                    ToastService.ShowError(
+                        $"CRITICAL CROWD ALERT sent for {_selectedPlaceName}.",
+                        settings =>
+                        {
+                            settings.Timeout = 0; // remains displayed until manually closed
+                            settings.ShowProgressBar = true;
+                        });
+
+                    _criticalAlertStatus = $"Critical alert active for {_selectedPlaceName}";
+                }
+                else
+                {
+                    Console.Error.WriteLine(result.Error);
+                    ToastService.ShowWarning("Alert could not be sent. Check browser/API console.");
+                }
+            }
+            finally
+            {
+                _criticalAlertSending = false;
             }
         }
 

@@ -1906,10 +1906,156 @@ function makeBadgeIcon(totalCount, severity = 1, b = null) {
     });
 }
 
+function fmtDate(v) {
+    if (!v) return "—";
+    try {
+        const d = new Date(v);
+        if (Number.isNaN(d.getTime())) return String(v);
+        return d.toLocaleString("fr-BE", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit"
+        });
+    } catch {
+        return String(v);
+    }
+}
+
+function fmtTime(v) {
+    if (!v) return "—";
+    try {
+        const d = new Date(v);
+        if (Number.isNaN(d.getTime())) return String(v);
+        return d.toLocaleTimeString("fr-BE", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit"
+        });
+    } catch {
+        return String(v);
+    }
+}
+
+function firstSingleBundleItem(b) {
+    const groups = [
+        ["place", b?.places],
+        ["weather", b?.weather],
+        ["event", b?.events],
+        ["crowd", b?.crowds],
+        ["traffic", b?.traffic],
+        ["suggestion", b?.suggestions],
+        ["gpt", b?.gpt]
+    ];
+
+    const found = groups
+        .filter(([, arr]) => Array.isArray(arr) && arr.length > 0);
+
+    if (found.length !== 1) return null;
+    if (found[0][1].length !== 1) return null;
+
+    return {
+        kind: found[0][0],
+        item: found[0][1][0]
+    };
+}
+
+function buildSingleBundlePopupHtml(kind, item, s) {
+    const esc = s.utils.escapeHtml;
+
+    if (kind === "place") {
+        const name = item?.Name ?? item?.name ?? "Place";
+        const type = item?.Type ?? item?.type ?? "—";
+        const indoor = item?.Indoor ?? item?.indoor ?? item?.IsIndoor ?? item?.isIndoor;
+        const capacity = item?.Capacity ?? item?.capacity ?? item?.MaxCapacity ?? item?.maxCapacity;
+        const tag = item?.Tag ?? item?.tag ?? item?.Tags ?? item?.tags ?? "—";
+
+        return `
+        <div class="oz-bundle-popup oz-bundle-popup--single">
+            <div class="oz-bundle-title">${esc(name)}</div>
+            <div class="oz-bundle-sub">
+                ${esc(type)} ${indoor === true ? "(indoor)" : indoor === false ? "(outdoor)" : ""}
+                ${capacity != null ? ` • Cap: ${esc(capacity)}` : ""}
+                ${tag ? ` • Tag: ${esc(tag)}` : ""}
+            </div>
+        </div>`.trim();
+    }
+
+    if (kind === "weather") {
+        const title = item?.Summary ?? item?.summary ?? item?.WeatherType ?? item?.weatherType ?? "Generated";
+        const temp = item?.TemperatureC ?? item?.temperatureC ?? "—";
+        const hum = item?.Humidity ?? item?.humidity ?? "—";
+        const wind = item?.WindSpeedKmh ?? item?.windSpeedKmh ?? item?.WindSeedKmh ?? item?.windSeedKmh ?? "—";
+        const rain = item?.RainfallMm ?? item?.rainfallMm ?? "—";
+        const date = item?.DateWeather ?? item?.dateWeather ?? item?.CreatedAt ?? item?.createdAt;
+
+        return `
+        <div class="oz-bundle-popup oz-bundle-popup--single">
+            <div class="oz-bundle-title">${esc(title)}</div>
+            <div class="oz-bundle-sub">
+                Temp: ${esc(temp)}°C • Hum: ${esc(hum)}% • Vent: ${esc(wind)} km/h • Pluie: ${esc(rain)} mm
+            </div>
+            <div class="oz-bundle-coords">Maj ${esc(fmtTime(date))}</div>
+        </div>`.trim();
+    }
+
+    if (kind === "event") {
+        const name = item?.Name ?? item?.name ?? item?.Title ?? item?.title ?? "Local Event";
+        const date = item?.DateEvent ?? item?.dateEvent ?? item?.StartDate ?? item?.startDate;
+        const expectedCrowd = item?.ExpectedCrowd ?? item?.expectedCrowd ?? "—";
+        const isOutdoor = item?.IsOutdoor ?? item?.isOutdoor;
+
+        return `
+        <div class="oz-bundle-popup oz-bundle-popup--single">
+            <div class="oz-bundle-title">${esc(name)}</div>
+            <div class="oz-bundle-sub">
+                ${esc(fmtDate(date))} • ExpectedCrowd: ${esc(expectedCrowd)}
+                ${isOutdoor === true ? " • Outdoor" : isOutdoor === false ? " • Indoor" : ""}
+            </div>
+        </div>`.trim();
+    }
+
+    if (kind === "crowd") {
+        const location = item?.LocationName ?? item?.locationName ?? item?.Name ?? item?.name ?? "Crowd info";
+        const timestamp = item?.Timestamp ?? item?.timestamp ?? item?.CreatedAt ?? item?.createdAt;
+        const level = item?.CrowdLevel ?? item?.crowdLevel ?? item?.Level ?? item?.level ?? "—";
+
+        return `
+        <div class="oz-bundle-popup oz-bundle-popup--single">
+            <div class="oz-bundle-title">${esc(location)}</div>
+            <div class="oz-bundle-sub">CrowdLevel: ${esc(level)}</div>
+            <div class="oz-bundle-coords">Maj ${esc(fmtTime(timestamp))}</div>
+        </div>`.trim();
+    }
+
+    if (kind === "traffic") {
+        const incident = item?.IncidentType ?? item?.incidentType ?? item?.Description ?? item?.description ?? "Traffic condition";
+        const location = item?.Location ?? item?.location ?? item?.RoadName ?? item?.roadName ?? "—";
+        const congestion = item?.CongestionLevel ?? item?.congestionLevel ?? item?.TrafficLevel ?? item?.trafficLevel ?? "—";
+        const date = item?.DateCondition ?? item?.dateCondition ?? item?.Timestamp ?? item?.timestamp;
+
+        return `
+        <div class="oz-bundle-popup oz-bundle-popup--single">
+            <div class="oz-bundle-title">${esc(incident)}</div>
+            <div class="oz-bundle-sub">
+                ${esc(congestion)} • ${esc(location)} • ${esc(fmtDate(date))}
+            </div>
+        </div>`.trim();
+    }
+
+    return null;
+}
 function bundlePopupHtml(b, s) {
+    const single = firstSingleBundleItem(b);
+
+    if (single) {
+        const html = buildSingleBundlePopupHtml(single.kind, single.item, s);
+        if (html) return html;
+    }
+
     const esc = s.utils.escapeHtml;
     const total = bundleTotal(b);
-
     const breakdown = (k) => (b?.[k]?.length ?? 0);
 
     return `
@@ -1932,10 +2078,8 @@ function bundlePopupHtml(b, s) {
           <div class="oz-row"><span class="oz-k">GPT</span><span class="oz-v">${esc(breakdown("gpt"))}</span></div>
         </div>
       </div>
-    </div>
-  `.trim();
+    </div>`.trim();
 }
-
 function computeBundles(payload, tolMeters) {
     const buckets = new Map();
     const norm = payload;

@@ -1,4 +1,4 @@
-@page "/gptinteractionview"
+﻿@page "/gptinteractionview"
 @namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 @using CitizenHackathon2025.Blazor.DTOs
 @inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
@@ -47,6 +47,36 @@
                         @onclick="StopSpeakingAsync">
                     Stop voice
                 </button>
+                <select class="input-compact"
+                        @bind="_selectedVoiceLang"
+                        @bind:after="ApplyVoiceOptionsAsync">
+                    <option value="fr-FR">Français</option>
+                    <option value="fr-BE">Français Belgique</option>
+                    <option value="en-US">English US</option>
+                    <option value="en-GB">English UK</option>
+                    <option value="nl-NL">Nederlands</option>
+                    <option value="de-DE">Deutsch</option>
+                    <option value="it-IT">Italiano</option>
+                    <option value="es-ES">Español</option>
+                    <option value="ru-RU">Русский</option>
+                    <option value="zh-CN">中文</option>
+                    <option value="ja-JP">日本語</option>
+                    <option value="wa-central">Wallon central experimental</option>
+                </select>
+
+                <select class="input-compact"
+                        @bind="_selectedVoiceName"
+                        @bind:after="ApplyVoiceOptionsAsync">
+                    <option value="">Voix automatique</option>
+
+                    @foreach (var voice in _availableVoices.Where(v =>
+                                        v.Lang?.StartsWith(_selectedVoiceLang.Split('-')[0], StringComparison.OrdinalIgnoreCase) == true))
+                    {
+                        <option value="@voice.Name">
+                            @voice.Name (@voice.Lang)
+                        </option>
+                    }
+                </select>
                 <div class="gpt-status-row">
                     <span class="badge bg-dark">
                         VoiceSupported: @_voiceSupported | Listening: @_isListening
@@ -90,7 +120,7 @@
 
                 @if (!string.IsNullOrWhiteSpace(_q))
                 {
-                    <span class="badge badge-info">�@_q�</span>
+                    <span class="badge badge-info">“@_q”</span>
                 }
             </div>
 
@@ -143,12 +173,12 @@
 
                         <div class="gpt-block">
                             <div class="gpt-block-label">Prompt</div>
-                            <pre class="gpt-pre gpt-pre--prompt">@(string.IsNullOrWhiteSpace(gp.Prompt) ? "� Empty prompt �" : gp.Prompt)</pre>
+                            <pre class="gpt-pre gpt-pre--prompt">@(string.IsNullOrWhiteSpace(gp.Prompt) ? "— Empty prompt —" : gp.Prompt)</pre>
                         </div>
 
                         <div class="gpt-block">
                             <div class="gpt-block-label">Response</div>
-                            <pre class="gpt-pre gpt-pre--response">@(string.IsNullOrWhiteSpace(gp.Response) ? "� Waiting for response �" : gp.Response)</pre>
+                            <pre class="gpt-pre gpt-pre--response">@(string.IsNullOrWhiteSpace(gp.Response) ? "— Waiting for response —" : gp.Response)</pre>
                         </div>
                     </article>
                 }

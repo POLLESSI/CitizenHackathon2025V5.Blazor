@@ -13,8 +13,12 @@ using Polly.Extensions.Http;
 using System.Net.Http;
 
 static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
-    HttpPolicyExtensions
-        .HandleTransientHttpError()
+    Policy<HttpResponseMessage>
+        .Handle<HttpRequestException>()
+        .OrResult(r =>
+            r.RequestMessage?.Method == HttpMethod.Get &&
+            ((int)r.StatusCode >= 500 ||
+             r.StatusCode == System.Net.HttpStatusCode.RequestTimeout))
         .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)));
 
 //static IAsyncPolicy<HttpResponseMessage> GetTimeoutPolicy() =>
@@ -130,6 +134,7 @@ builder.Services.AddBlazoredToast();
 // ===============================
 builder.Services.AddScoped<AntennaService>();
 builder.Services.AddScoped<AntennaCrowdService>();
+builder.Services.AddScoped<CrowdCriticalAlertClientService>();
 builder.Services.AddScoped<ICrowdInfoAntennaService, CrowdInfoAntennaService>();
 
 builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService>();

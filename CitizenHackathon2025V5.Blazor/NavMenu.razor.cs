@@ -64,11 +64,11 @@ namespace CitizenHackathon2025V5.Blazor.Client
             new MenuItem("Places", "/placeview", "📍"),
             new MenuItem("Traffic", "/trafficconditionview", "🚦"),
             new MenuItem("Weather", "/weatherforecastview", "🌤"),
-            new MenuItem("GDPR", "/privacy", "🔐"),
-            new MenuItem("Help", "/help", "❓"),
-            new MenuItem("Comments", "/messageview", "💬"),
             new MenuItem("Historic Suggestions", "/suggestionview", "💡"),
             new MenuItem("Historic GPT Interactions", "/gptinteractionview", "🤖"),
+            new MenuItem("Comments", "/messageview", "💬"),
+            new MenuItem("GDPR", "/privacy", "🔐"),
+            new MenuItem("Help", "/help", "❓"),
         };
         //protected override void OnInitialized() =>
         //    NavManager.LocationChanged += (_, _) => InvokeAsync(StateHasChanged);

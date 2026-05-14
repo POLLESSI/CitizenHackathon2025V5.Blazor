@@ -107,11 +107,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
         }
 
-        public async Task<ClientGptInteractionDTO> AskGptSync(
-            string prompt,
-            double? latitude = null,
-            double? longitude = null,
-            CancellationToken ct = default)
+        public async Task<ClientGptInteractionDTO> AskGptSync(string prompt, double? latitude = null, double? longitude = null, string languageCode = "fr-FR", CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(prompt))
                 return null;
@@ -120,7 +116,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             {
                 Prompt = prompt.Trim(),
                 Latitude = latitude,
-                Longitude = longitude
+                Longitude = longitude,
+                LanguageCode = languageCode
             };
 
             var url = $"{BaseRoute}/ask-mistral-sync";
@@ -184,6 +181,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             string prompt,
             double? latitude = null,
             double? longitude = null,
+            string languageCode = "fr-FR",
             CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(prompt))
@@ -193,7 +191,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             {
                 Prompt = prompt.Trim(),
                 Latitude = latitude,
-                Longitude = longitude
+                Longitude = longitude,
+                LanguageCode = languageCode
             };
 
             var url = $"{BaseRoute}/ask-mistral";
@@ -502,6 +501,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             public string Prompt { get; set; } = string.Empty;
             public double? Latitude { get; set; }
             public double? Longitude { get; set; }
+            public string LanguageCode { get; set; } = "fr-FR";
         }
 
         public sealed class ClientGptStatusResponseDTO

@@ -136,6 +136,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             {
                 await MapInterop.RefreshSizeAsync(ScopeKey);
                 await MapInterop.FitToDetailsAsync(ScopeKey);
+                await JS.InvokeVoidAsync("OutZenInterop.forceDetailsMode", ScopeKey);
             }
 
             Console.WriteLine($"[Traffic] SeedAsync: booted={IsMapBooted} count={TrafficConditions.Count}");

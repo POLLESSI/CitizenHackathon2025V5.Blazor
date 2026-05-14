@@ -8,7 +8,12 @@
     const state = {
         recognition: null,
         isListening: false,
-        dotNetRef: null
+        dotNetRef: null,
+        selectedVoiceName: null,
+        selectedLang: "fr-FR",
+        rate: 0.95,
+        pitch: 1.0,
+        volume: 1.0
     };
 
     function buildRecognition(lang) {
@@ -18,7 +23,7 @@
 
         const recognition = new SpeechRecognition();
         /*recognition.lang = lang || "fr-BE";*/
-        recognition.lang = "fr-FR";
+        recognition.lang = lang || "fr-FR";
         /*recognition.lang = "en-US";*/
         recognition.continuous = false;
         recognition.interimResults = true;
@@ -254,6 +259,16 @@
             }
         },
 
+        setVoiceOptions(options) {
+            state.selectedVoiceName = options?.voiceName || null;
+            state.selectedLang = options?.lang || "fr-FR";
+            state.rate = Number(options?.rate ?? 0.95);
+            state.pitch = Number(options?.pitch ?? 1.0);
+            state.volume = Number(options?.volume ?? 1.0);
+
+            return { ok: true };
+        },
+
         isSpeechSynthesisSupported() {
             return "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
         },
@@ -293,14 +308,21 @@
 
                     const utterance = new SpeechSynthesisUtterance(parts[index].trim());
                     utterance.lang = lang || "fr-FR";
-                    utterance.rate = 0.95;
-                    utterance.pitch = 1.0;
-                    utterance.volume = 1.0;
+                    utterance.rate = state.rate ?? 0.95;
+                    utterance.pitch = state.pitch ?? 1.0;
+                    utterance.volume = state.volume ?? 1.0;
 
                     const voices = window.speechSynthesis.getVoices();
+
+                    const selectedVoiceName = state.selectedVoiceName;
+                    const selectedLang = lang || state.selectedLang || "fr-FR";
+
+                    utterance.lang = selectedLang;
+
                     utterance.voice =
-                        voices.find(v => v.lang === "fr-FR") ||
-                        voices.find(v => v.lang?.startsWith("fr")) ||
+                        voices.find(v => v.name === selectedVoiceName) ||
+                        voices.find(v => v.lang === selectedLang) ||
+                        voices.find(v => v.lang?.startsWith(selectedLang.split("-")[0])) ||
                         null;
 
                     utterance.onend = () => {
@@ -322,6 +344,65 @@
                 return { ok: true, error: null };
             } catch (e) {
                 return { ok: false, error: e?.message || String(e) };
+            }
+        },
+
+        getVoices() {
+            if (!("speechSynthesis" in window)) {
+                return [];
+            }
+
+            const voices = window.speechSynthesis.getVoices();
+
+            return voices.map(v => ({
+                name: v.name,
+                lang: v.lang,
+                localService: v.localService,
+                default: v.default,
+                voiceURI: v.voiceURI
+            }));
+        },
+
+        loadVoices() {
+            return new Promise(resolve => {
+                if (!("speechSynthesis" in window)) {
+                    resolve([]);
+                    return;
+                }
+
+                let voices = window.speechSynthesis.getVoices();
+
+                if (voices.length > 0) {
+                    resolve(window.gptVoice.getVoices());
+                    return;
+                }
+
+                window.speechSynthesis.onvoiceschanged = () => {
+                    resolve(window.gptVoice.getVoices());
+                };
+
+                setTimeout(() => {
+                    resolve(window.gptVoice.getVoices());
+                }, 500);
+            });
+        },
+
+        saveVoiceOptions(options) {
+            localStorage.setItem("outzen.voice.options", JSON.stringify(options || {}));
+            this.setVoiceOptions(options);
+            return { ok: true };
+        },
+
+        loadVoiceOptionsFromStorage() {
+            try {
+                const raw = localStorage.getItem("outzen.voice.options");
+                if (!raw) return null;
+
+                const options = JSON.parse(raw);
+                this.setVoiceOptions(options);
+                return options;
+            } catch {
+                return null;
             }
         },
 

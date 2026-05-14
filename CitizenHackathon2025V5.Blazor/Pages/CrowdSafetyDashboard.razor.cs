@@ -51,7 +51,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             }
             catch (Exception ex)
             {
-                _loadError = $"Connexion SignalR impossible : {ex.Message}";
+                _loadError = $"SignalR connection not possible : {ex.Message}";
             }
         }
 

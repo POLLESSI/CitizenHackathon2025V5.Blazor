@@ -33,6 +33,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         private double? _gptLatitude;
         private double? _gptLongitude;
 
+        private List<BrowserVoiceDTO> _availableVoices = new();
+        private string _selectedVoiceLang = "fr-FR";
+        private string? _selectedVoiceName;
+        private string _speechRecognitionLang = "fr-FR";
+        private string _mistralResponseLang = "fr-FR";
+        private string _ttsLang = "fr-FR";
+
+        private double _voiceRate = 0.95;
+        private double _voicePitch = 1.0;
+        private double _voiceVolume = 1.0;
+
         private const bool PreferAsyncPipeline = true;
 
         public int SelectedId { get; set; }
@@ -180,6 +191,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             await LoadInteractionsAsync();
             await DetectVoiceSupportAsync();
+            await LoadBrowserVoicesAsync();
 
             try
             {
@@ -192,6 +204,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             }
         }
 
+        private async Task LoadBrowserVoicesAsync()
+        {
+            try
+            {
+                var voices = await JS.InvokeAsync<BrowserVoiceDTO[]>("gptVoice.loadVoices");
+                _availableVoices = voices?
+                    .Where(v => !string.IsNullOrWhiteSpace(v.Lang))
+                    .OrderBy(v => v.Lang)
+                    .ThenBy(v => v.Name)
+                    .ToList() ?? new();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[GPT VOICE] LoadBrowserVoicesAsync failed: {ex.Message}");
+                _availableVoices = new();
+            }
+        }
         private async Task LoadInteractionsAsync()
         {
             var fetched = await GptInteractionService.GetAllInteractions();
@@ -205,6 +234,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             LoadMoreItems();
 
             await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task ApplyVoiceOptionsAsync()
+        {
+            _speechRecognitionLang = _selectedVoiceLang == "wa-central"
+    ? "fr-BE"
+    : _selectedVoiceLang;
+
+            _mistralResponseLang = _selectedVoiceLang;
+
+            _ttsLang = _selectedVoiceLang == "wa-central" ? "fr-BE" : _selectedVoiceLang;
+
+            await JS.InvokeVoidAsync("gptVoice.saveVoiceOptions", new
+            {
+                voiceName = _selectedVoiceName,
+                lang = _selectedVoiceLang,
+                rate = _voiceRate,
+                pitch = _voicePitch,
+                volume = _voiceVolume
+            });
         }
 
         private async Task DetectVoiceSupportAsync()
@@ -271,9 +320,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             if (_disposed || _isSending || IsAiBusy)
                 return;
 
-            var prompt = NewPrompt?.Trim();
-            if (string.IsNullOrWhiteSpace(prompt))
+            var rawPrompt = NewPrompt?.Trim();
+            if (string.IsNullOrWhiteSpace(rawPrompt))
                 return;
+
+            var prompt = rawPrompt;
+            var languageCode = _selectedVoiceLang;
 
             try
             {
@@ -293,6 +345,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                     prompt,
                     latitude: _gptLatitude,
                     longitude: _gptLongitude,
+                    languageCode: _selectedVoiceLang,
                     preferAsyncPipeline: PreferAsyncPipeline);
 
                 if (!result.Started)
@@ -311,9 +364,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                     SelectedId = result.PendingInteraction.Id;
                     NewPrompt = string.Empty;
 
-                    await Task.Delay(300);
+                    //await Task.Delay(300);
 
-                    finalToSpeak = await GptInteractionService.GetByIdAsync(result.PendingInteraction.Id);
+                    //finalToSpeak = await GptInteractionService.GetByIdAsync(result.PendingInteraction.Id);
                 }
 
                 _aiState = AiProcessingState.Success;
@@ -368,6 +421,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 SelectedId = dto.Id;
 
             await InvokeAsync(StateHasChanged);
+
+            if (!_isSending &&
+                _voiceOutputEnabled &&
+                dto.Id > 0 &&
+                dto.Id != _lastSpokenInteractionId &&
+                !string.IsNullOrWhiteSpace(dto.Response) &&
+                !dto.Response.Contains("Waiting", StringComparison.OrdinalIgnoreCase))
+            {
+                await TrySpeakCompletedInteractionAsync(dto);
+            }
+        }
+
+        private string ResolveTtsLang()
+        {
+            return _mistralResponseLang switch
+            {
+                "wa-central" => "fr-FR",
+                "fr-BE" => "fr-FR",
+                _ => _ttsLang
+            };
         }
 
         private Task OnStatusChangedAsync(string? message)
@@ -402,7 +475,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 var result = await JS.InvokeAsync<VoiceStartResult>(
                     "gptVoice.start",
                     _dotNetRef,
-                    "fr-FR");
+                     _speechRecognitionLang);
 
                 Console.WriteLine($"[GPT VOICE] Start result: ok={result?.Ok}, error={result?.Error}");
 
@@ -431,11 +504,33 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 await InvokeAsync(StateHasChanged);
             }
         }
+
+        private string BuildPromptWithResponseLanguage(string prompt)
+        {
+            var languageInstruction = _mistralResponseLang switch
+            {
+                "fr-FR" or "fr-BE" => "Réponds en français.",
+                "en-US" or "en-GB" => "Answer in English.",
+                "nl-NL" => "Antwoord in het Nederlands.",
+                "de-DE" => "Antworte auf Deutsch.",
+                "it-IT" => "Rispondi in italiano.",
+                "es-ES" => "Responde en español.",
+                "ru-RU" => "Отвечай на русском языке.",
+                "zh-CN" => "请用中文回答。",
+                "ja-JP" => "日本語で答えてください。",
+                _ => "Réponds en français."
+            };
+
+            return $"{languageInstruction}\n\nQuestion utilisateur : {prompt}";
+        }
         private async Task TrySpeakCompletedInteractionAsync(ClientGptInteractionDTO? dto)
         {
             Console.WriteLine($"[GPT VOICE] TrySpeak dto={dto?.Id}, enabled={_voiceOutputEnabled}, responseLen={dto?.Response?.Length}");
 
-            if (dto is null || !_voiceOutputEnabled)
+            if (dto is null)
+                return;
+
+            if (_disposed || !_voiceOutputEnabled)
                 return;
 
             if (dto.Id <= 0 || _lastSpokenInteractionId == dto.Id)
@@ -449,13 +544,42 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             _lastSpokenInteractionId = dto.Id;
 
-            var speech = await JS.InvokeAsync<SpeechResult>(
-                "gptVoice.speak",
-                dto.Response,
-                "fr-FR");
+            var speech = await JS.InvokeAsync<SpeechResult>("gptVoice.speak", dto.Response, ResolveTtsLang());
 
             Console.WriteLine($"[GPT VOICE] speak result ok={speech?.Ok}, error={speech?.Error}");
         }
+
+        private static readonly IReadOnlyList<VoiceLanguageOption> VoiceLanguages =
+        [
+            new("fr-FR", "Français"),
+            new("en-US", "English"),
+            new("nl-NL", "Nederlands"),
+            new("de-DE", "Deutsch"),
+            new("it-IT", "Italiano"),
+            new("es-ES", "Español"),
+            new("ru-RU", "Русский"),
+            new("zh-CN", "中文"),
+            new("ja-JP", "日本語"),
+            new("wa-central", "Experimental Wallon Central")
+        ];
+
+        private sealed record VoiceLanguageOption(string Code, string Label);
+
+        private sealed record VoicePreset(
+            string Code,
+            string Label,
+            string Lang,
+            double Rate,
+            double Pitch,
+            double Volume
+        );
+
+        private static readonly IReadOnlyList<VoicePreset> VoicePresets =
+        [
+            new("jp-samurai", "Samouraï japonais grave", "ja-JP", 0.78, 0.55, 1.0),
+            new("jp-calm", "Japonais calme", "ja-JP", 0.90, 0.85, 1.0),
+            new("jp-neutral", "Japonais neutre", "ja-JP", 0.95, 1.0, 1.0)
+        ];
 
         private sealed class SpeechResult
         {
@@ -730,6 +854,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         {
             public bool Ok { get; set; }
             public string? Error { get; set; }
+        }
+
+        private sealed class BrowserVoiceDTO
+        {
+            public string? Name { get; set; }
+            public string? Lang { get; set; }
+            public string? VoiceURI { get; set; }
+            public bool LocalService { get; set; }
+            public bool Default { get; set; }
         }
     }
 }

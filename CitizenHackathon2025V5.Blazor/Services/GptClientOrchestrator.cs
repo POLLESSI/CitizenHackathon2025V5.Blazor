@@ -70,12 +70,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
         }
 
-        public async Task<GptRunResult> RunAsync(
-            string prompt,
-            double? latitude = null,
-            double? longitude = null,
-            bool preferAsyncPipeline = true,
-            CancellationToken ct = default)
+        public async Task<GptRunResult> RunAsync(string prompt, double? latitude = null, double? longitude = null, string languageCode = "fr-FR", bool preferAsyncPipeline = true, CancellationToken ct = default)
         {
             ThrowIfDisposed();
 
@@ -90,7 +85,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             if (!preferAsyncPipeline)
             {
-                var syncFinal = await _gptService.AskGptSync(prompt, latitude, longitude, ct);
+                var syncFinal = await _gptService.AskGptSync(prompt, latitude, longitude, languageCode, ct);
                 if (syncFinal is null || syncFinal.Id <= 0)
                 {
                     return new GptRunResult
@@ -117,7 +112,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             await EnsureHubAsync(ct);
 
-            var started = await StartAsync(prompt, latitude, longitude, ct);
+            var started = await StartAsync(prompt, latitude, longitude, languageCode, ct);
             if (started is null || started.InteractionId <= 0)
             {
                 return new GptRunResult
@@ -141,7 +136,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 finalInteraction = await WaitForCompletionAsync(
                     started.InteractionId,
                     started.RequestId,
-                    timeout: TimeSpan.FromMinutes(3),
+                    timeout: TimeSpan.FromMinutes(6),
                     ct: ct);
             }
             catch (TimeoutException ex)
@@ -163,11 +158,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             };
         }
 
-        public async Task<ClientGptStartResponseDTO?> StartAsync(
-            string prompt,
-            double? latitude = null,
-            double? longitude = null,
-            CancellationToken ct = default)
+        public async Task<ClientGptStartResponseDTO?> StartAsync(string prompt, double? latitude = null, double? longitude = null, string languageCode = "fr-FR", CancellationToken ct = default)
         {
             ThrowIfDisposed();
 
@@ -176,11 +167,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             await EnsureHubAsync(ct);
 
-            var started = await _gptService.StartGptAsync(
-                prompt: prompt,
-                latitude: latitude,
-                longitude: longitude,
-                ct: ct);
+            var started = await _gptService.StartGptAsync(prompt: prompt, latitude: latitude, longitude: longitude, languageCode: languageCode, ct: ct);
 
             if (started is null || started.InteractionId <= 0)
                 return null;
@@ -266,6 +253,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 {
                     CompleteInteraction(fallback);
                     return fallback;
+                }
+
+                if (_live.TryGetValue(interactionId, out var live) &&
+                    live.Interaction is not null &&
+                    !string.IsNullOrWhiteSpace(live.Interaction.Response))
+                {
+                    live.IsCompleted = true;
+                    return CloneInteraction(live.Interaction);
                 }
 
                 throw new TimeoutException($"GPT completion timeout for interaction {interactionId}.");
@@ -454,6 +449,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             live.Interaction.Response = live.ResponseBuffer.ToString();
 
             await RaiseInteractionUpdatedAsync(CloneInteraction(live.Interaction));
+
+            if (dto.IsFinal)
+            {
+                live.IsCompleted = true;
+
+                var final = CloneInteraction(live.Interaction);
+
+                if (_completionWaiters.TryGetValue(dto.InteractionId, out var waiter))
+                    waiter.TrySetResult(final);
+
+                await RaiseStatusChangedAsync("Generation completed.");
+            }
         }
 
         private async Task HandleStatusAsync(ClientGptResponseStatusDTO dto)
@@ -540,9 +547,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                     {
                         if (live.IsCompleted)
                             return;
-
-                        if (live.HasReceivedHubEvent)
-                            return; 
                     }
 
                     var status = await _gptService.GetStatusAsync(interactionId, ct);

@@ -6,10 +6,37 @@
 @using Microsoft.JSInterop
 @inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
 @inject Blazored.Toast.Services.IToastService ToastService
+@inject CrowdCriticalAlertClientService CriticalAlertService
 
 <PageTitle>OutZen - Home</PageTitle>
 
 <div class="home-page">
+    <div class="critical-alert-panel">
+        <button type="button"
+                class="outzen-emergency-stop-button"
+                disabled="@_criticalAlertSending"
+                @onclick="SendCriticalCrowdAlertAsync">
+            @if (_criticalAlertSending)
+            {
+                <span>Sending...</span>
+            }
+            else
+            {
+                <span>🚨<br />FULL<br />ALERT</span>
+            }
+        </button>
+
+        @if (!string.IsNullOrWhiteSpace(_criticalAlertStatus))
+        {
+            <div class="critical-alert-status">
+                @_criticalAlertStatus
+            </div>
+        }
+
+        <div class="critical-alert-place">
+            Place: @_selectedPlaceName
+        </div>
+    </div>
     @* <div id="@MapId" style="height: 72vh;"></div> *@
     <!-- Summary map -->
     <div class="oz-page oz-page--home">
