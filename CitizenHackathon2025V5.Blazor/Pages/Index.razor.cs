@@ -6,12 +6,13 @@ using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.AspNetCore.Components;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using System.Collections.Concurrent;
 using System.ComponentModel.DataAnnotations;
+using System.Text.RegularExpressions;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages
 {
@@ -42,6 +43,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         protected override bool EnableWeatherLegend => true;
         protected override int DefaultZoom => 12;
         protected override int HybridThreshold => 13;
+        protected override bool ForceBootOnFirstRender => false;
+        protected override bool ResetMarkersOnBoot => false;
 
         public MessageFormModel Model { get; } = new();
         private bool _isSendingPrompt;
@@ -171,9 +174,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             await JS.InvokeVoidAsync("OutZenInterop.upsertCrowdCalendarMarkers", todayCalendar, ScopeKey);
 
+            Console.WriteLine($"[HOME][Calendar] Seeded calendar markers: {todayCalendar.Count}");
+
             if (fit)
             {
-                try { await JS.InvokeVoidAsync("OutZenInterop.fitToBundles", ScopeKey, new { maxZoom = 16 }); } catch { }
+                //try { await JS.InvokeVoidAsync("OutZenInterop.fitToBundles", ScopeKey, new { maxZoom = 16 }); } catch { }
+                try { await JS.InvokeVoidAsync("OutZenInterop.fitToMarkers", ScopeKey, new { maxZoom = 16 }); } catch { }
                 try { await JS.InvokeVoidAsync("OutZenInterop.activateHybridAndZoom", ScopeKey, HybridThreshold); } catch { }
                 try { await JS.InvokeVoidAsync("OutZenInterop.refreshHybridNow", ScopeKey); } catch { }
             }
@@ -278,48 +284,89 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
         private async Task RefreshCalendarMarkersNowAsync()
         {
-            if (!IsMapBooted) return;
+            if (!IsMapBooted)
+                return;
 
             var nowUtc = DateTime.UtcNow;
-            var active = _allCal.Where(x => IsNowActive(x, nowUtc)).ToList();
+            var active = _allCal
+                .Where(x => IsNowActive(x, nowUtc))
+                .ToList();
+
+            if (active.Count == 0)
+            {
+                Console.WriteLine("[HOME][Calendar] No active calendar markers. Skip prune.");
+                return;
+            }
 
             await JS.InvokeVoidAsync("OutZenInterop.upsertCrowdCalendarMarkers", active, ScopeKey);
 
-            var activeIds = active.Select(x => $"cc:{x.Id}").ToList();
-            await JS.InvokeVoidAsync("OutZenInterop.pruneCrowdCalendarMarkers", activeIds, ScopeKey);
+            var activeIds = active
+                .Select(x => $"cc:{x.Id}")
+                .ToList();
+
+            if (activeIds.Count > 0)
+            {
+                await JS.InvokeVoidAsync("OutZenInterop.pruneCrowdCalendarMarkers", activeIds, ScopeKey);
+            }
         }
 
         private async Task EnsureAntennaHubAsync()
         {
-            if (_antennaHub is not null) return;
-
-            var hubUrl = HubUrls.Build(HubPaths.AntennaConnection);
-
-            _antennaHub = new HubConnectionBuilder()
-                .WithUrl(hubUrl, options =>
+            try
+            {
+                if (_antennaHub is not null &&
+                    _antennaHub.State == HubConnectionState.Connected)
                 {
-                    options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
-                    options.Transports = HttpTransportType.WebSockets | HttpTransportType.ServerSentEvents;
-                })
-                .WithAutomaticReconnect()
-                .Build();
+                    return;
+                }
 
-            _antennaHub.On<ClientAntennaCountsUpdateDTO>(
-                CrowdInfoAntennaConnectionHubMethods.ToClient.AntennaCountsUpdated,
-                async msg =>
+                var token = await Auth.GetAccessTokenAsync();
+
+                if (string.IsNullOrWhiteSpace(token))
                 {
-                    _countsByAntenna[msg.AntennaId] = msg.Counts;
+                    Console.Error.WriteLine("[HOME] Antenna hub skipped: no JWT token.");
+                    return;
+                }
 
-                    if (!IsMapBooted)
+                _antennaHub = new HubConnectionBuilder()
+                    .WithUrl(
+                        HubUrls.Build(CrowdInfoAntennaConnectionHubMethods.HubPath),
+                        options =>
+                        {
+                            options.Transports =
+                                HttpTransportType.WebSockets |
+                                HttpTransportType.ServerSentEvents;
+
+                            options.AccessTokenProvider = () =>
+                            {
+                                return Task.FromResult<string>(token);
+                            };
+                        })
+                    .WithAutomaticReconnect()
+                    .Build();
+
+                _antennaHub.On<ClientAntennaCountsUpdateDTO>(
+                    CrowdInfoAntennaConnectionHubMethods.ToClient.AntennaCountsUpdated,
+                    async msg =>
                     {
-                        _pendingCountsUntilMap.Enqueue((msg.AntennaId, msg.Counts));
-                        return;
-                    }
+                        _countsByAntenna[msg.AntennaId] = msg.Counts;
 
-                    await ApplyAntennaCriticalOverlayAsync(msg.AntennaId, msg.Counts);
-                });
+                        if (!IsMapBooted)
+                        {
+                            _pendingCountsUntilMap.Enqueue((msg.AntennaId, msg.Counts));
+                            return;
+                        }
 
-            await _antennaHub.StartAsync();
+                        await ApplyAntennaCriticalOverlayAsync(msg.AntennaId, msg.Counts);
+                    });
+
+                await _antennaHub.StartAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(
+                    $"[HOME] Antenna hub unavailable. Map rendering continues without realtime antenna updates. {ex}");
+            }
         }
 
         private async Task ApplyAntennaCriticalOverlayAsync(int antennaId, ClientAntennaCountsDTO counts)
@@ -533,7 +580,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             if (!double.IsFinite(x.Latitude) || !double.IsFinite(x.Longitude)) return false;
             if (x.Latitude == 0 && x.Longitude == 0) return false;
 
-            return x.DateUtc.Date == utcNow.Date;
+            var belgiumTz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Brussels");
+            var localToday = TimeZoneInfo.ConvertTimeFromUtc(utcNow, belgiumTz).Date;
+
+            return x.DateUtc.Date == localToday;
         }
 
         private MarkupString FormatGptResponse(string text)

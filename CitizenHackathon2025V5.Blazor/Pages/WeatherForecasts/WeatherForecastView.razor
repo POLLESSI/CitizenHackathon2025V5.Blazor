@@ -3,6 +3,7 @@
 @using CitizenHackathon2025.Blazor.DTOs
 @using CitizenHackathon2025V5.Blazor.Client.Constants
 @using CitizenHackathon2025.Contracts.DTOs;
+@using CitizenHackathon2025V5.Blazor.Client.Services.Extensions
 @inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
 
 @inject IJSRuntime js
@@ -82,9 +83,14 @@
                             <td>•</td>
                             <td>@we.TemperatureC</td>
                             @* <td>@we.TemperatureF</td> *@
-                            <td>@we.Summary</td>
+                            <td><strong>@we.Summary</strong></td>
                             <td>
-                            <button class="btn btn-sm wx-chip @GetWeatherCss(@we.IsSevere) btn-glow"
+                                <span class="badge badge-info ms-2">
+                                    @we.Provider.ToDisplayLabel()
+                                </span>
+                            </td>
+                            <td>
+                            <button class="btn btn-sm wx-chip @GetWeatherCss(we.IsSevere) btn-glow"
                                 title="See details"
                                 @onclick="() => ClickInfo(we.Id)">
                                     Weather 

@@ -5,6 +5,8 @@ using CitizenHackathon2025V5.Blazor.Client.Services;
 using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.JSInterop;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
@@ -238,9 +240,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         private async Task ApplyVoiceOptionsAsync()
         {
-            _speechRecognitionLang = _selectedVoiceLang == "wa-central"
-    ? "fr-BE"
-    : _selectedVoiceLang;
+            _speechRecognitionLang = _selectedVoiceLang == "wa-central" ? "fr-BE" : _selectedVoiceLang;
 
             _mistralResponseLang = _selectedVoiceLang;
 
@@ -341,11 +341,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 await ShowOverlayAsync();
                 await InvokeAsync(StateHasChanged);
 
+                var effectiveLatitude = _gptLatitude;
+                var effectiveLongitude = _gptLongitude;
+
+                if (TryExtractCoordinatesFromPrompt(rawPrompt, out var parsedLat, out var parsedLng))
+                {
+                    effectiveLatitude = parsedLat;
+                    effectiveLongitude = parsedLng;
+
+                    Console.WriteLine(
+                        $"[GPT VIEW] Coordinates extracted from prompt: lat={effectiveLatitude}, lng={effectiveLongitude}");
+                }
+
                 var result = await GptClientOrchestrator.RunAsync(
                     prompt,
-                    latitude: _gptLatitude,
-                    longitude: _gptLongitude,
-                    languageCode: _selectedVoiceLang,
+                    latitude: effectiveLatitude,
+                    longitude: effectiveLongitude,
+                    languageCode: _mistralResponseLang,
                     preferAsyncPipeline: PreferAsyncPipeline);
 
                 if (!result.Started)
@@ -525,26 +537,38 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         }
         private async Task TrySpeakCompletedInteractionAsync(ClientGptInteractionDTO? dto)
         {
-            Console.WriteLine($"[GPT VOICE] TrySpeak dto={dto?.Id}, enabled={_voiceOutputEnabled}, responseLen={dto?.Response?.Length}");
-
             if (dto is null)
                 return;
+
+            Console.WriteLine($"[GPT VOICE] TrySpeak dto={dto.Id}, enabled={_voiceOutputEnabled}, responseLen={dto.Response?.Length ?? 0}");
 
             if (_disposed || !_voiceOutputEnabled)
                 return;
 
-            if (dto.Id <= 0 || _lastSpokenInteractionId == dto.Id)
+            if (dto.Id <= 0)
                 return;
 
-            if (string.IsNullOrWhiteSpace(dto.Response))
+            if (_lastSpokenInteractionId == dto.Id)
+            {
+                Console.WriteLine($"[GPT VOICE] Skip speak: already spoken dto={dto.Id}");
                 return;
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.Response))
+            {
+                Console.WriteLine($"[GPT VOICE] Skip speak: empty response for dto={dto.Id}");
+                return;
+            }
 
             if (dto.Response.Contains("Waiting", StringComparison.OrdinalIgnoreCase))
                 return;
 
             _lastSpokenInteractionId = dto.Id;
 
-            var speech = await JS.InvokeAsync<SpeechResult>("gptVoice.speak", dto.Response, ResolveTtsLang());
+            var speech = await JS.InvokeAsync<SpeechResult>(
+                "gptVoice.speak",
+                dto.Response,
+                ResolveTtsLang());
 
             Console.WriteLine($"[GPT VOICE] speak result ok={speech?.Ok}, error={speech?.Error}");
         }
@@ -580,6 +604,36 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             new("jp-calm", "Japonais calme", "ja-JP", 0.90, 0.85, 1.0),
             new("jp-neutral", "Japonais neutre", "ja-JP", 0.95, 1.0, 1.0)
         ];
+
+        private static bool TryExtractCoordinatesFromPrompt(string? prompt, out double latitude, out double longitude)
+        {
+            latitude = default;
+            longitude = default;
+
+            if (string.IsNullOrWhiteSpace(prompt))
+                return false;
+
+            // Match: (50.434780,5.876832) ou 50.434780, 5.876832
+            var match = Regex.Match(
+                prompt,
+                @"(?<lat>[+-]?\d{1,2}(?:[.,]\d+)?)\s*[,;]\s*(?<lng>[+-]?\d{1,3}(?:[.,]\d+)?)",
+                RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+            if (!match.Success)
+                return false;
+
+            var latText = match.Groups["lat"].Value.Replace(',', '.');
+            var lngText = match.Groups["lng"].Value.Replace(',', '.');
+
+            if (!double.TryParse(latText, NumberStyles.Float, CultureInfo.InvariantCulture, out latitude))
+                return false;
+
+            if (!double.TryParse(lngText, NumberStyles.Float, CultureInfo.InvariantCulture, out longitude))
+                return false;
+
+            return latitude is >= -90 and <= 90 &&
+                   longitude is >= -180 and <= 180;
+        }
 
         private sealed class SpeechResult
         {

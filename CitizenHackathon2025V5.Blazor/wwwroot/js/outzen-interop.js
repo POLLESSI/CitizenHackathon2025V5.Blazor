@@ -188,6 +188,17 @@
         el.scrollIntoView({ behavior: "smooth", block: "center" });
         return true;
     };
+
+    window.OutZenInterop.setTrafficOverview = function (scopeKey) {
+        const state =
+            window.OutZen?.getState?.(scopeKey)
+            || window[`__OutZenSingleton__${scopeKey}`];
+
+        const map = state?.map;
+        if (!map) return;
+
+        map.setView([50.45, 4.75], 8);
+    };
 })();
 
 

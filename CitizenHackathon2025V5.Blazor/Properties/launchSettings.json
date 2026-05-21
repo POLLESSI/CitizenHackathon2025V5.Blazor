@@ -33,6 +33,11 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
+    },
+    "environmentVariables": {
+      "commandName": "",
+      "ASPNETCORE_ENVIRONMENT": "Development",
+      "ASPNETCORE_HOSTINGSTARTUPASSEMBLIES": ""
     }
   }
 }

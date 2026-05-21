@@ -16,7 +16,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 {
     public partial class CrowdInfoCalendarView
     {
-#nullable disable
+    #nullable disable
         [Inject] public CrowdInfoCalendarService CrowdInfoCalendarService { get; set; } = default!;
         [Inject] public NavigationManager Navigation { get; set; } = default!;
         [Inject] public IJSRuntime JS { get; set; } = default!;
@@ -26,14 +26,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
         protected override string ScopeKey => "crowdinfocalendarview";
         protected override string MapId => "leafletMap-crowdinfocalendarview";
-        protected override bool ClearAllOnMapReady => true;
+        protected override bool ClearAllOnMapReady => false;
         protected override OutZenMarkerPolicy MarkerPolicy => OutZenMarkerPolicy.OnlyPrefix;
         protected override string AllowedMarkerPrefix => "cc:";
 
         protected override (double lat, double lng) DefaultCenter => (50.89, 4.34);
         protected override int DefaultZoom => 14;
-        protected override bool ForceBootOnFirstRender => true;
-        protected override bool ResetMarkersOnBoot => true;
+        protected override bool ForceBootOnFirstRender => false;
+        protected override bool ResetMarkersOnBoot => false;
 
         private HubConnection _hub;
 

@@ -14,7 +14,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            // n’écrase pas un header déjà présent
+            // does not overwrite an existing header
             if (request.Headers.Authorization is null)
             {
                 var token = await _auth.GetAccessTokenAsync();

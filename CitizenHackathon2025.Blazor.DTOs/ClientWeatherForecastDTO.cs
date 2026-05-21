@@ -15,6 +15,7 @@ namespace CitizenHackathon2025.Blazor.DTOs
         public int Humidity { get; set; }
         public double WindSpeedKmh { get; set; }
         public WeatherType WeatherType { get; set; }
+        public WeatherProvider Provider { get; set; }
 
         public bool IsSevere { get; set; }
 

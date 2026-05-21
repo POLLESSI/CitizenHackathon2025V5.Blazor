@@ -16,7 +16,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 {
     public partial class TrafficConditionView 
     {
-#nullable disable
+    #nullable disable
         [Inject] public TrafficConditionService TrafficConditionService { get; set; }
         [Inject] public NavigationManager Navigation { get; set; }
         [Inject] public IJSRuntime JS { get; set; }
@@ -44,7 +44,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         protected override string MapId => "leafletMap-trafficconditionview";
 
         protected override (double lat, double lng) DefaultCenter => (50.89, 4.34);
-        protected override int DefaultZoom => 14;
+        protected override int DefaultZoom => 8;
         protected override OutZenMarkerPolicy MarkerPolicy => OutZenMarkerPolicy.OnlyPrefix;
         protected override string AllowedMarkerPrefix => "traffic:";
         protected override bool ClearAllOnMapReady => true;
@@ -96,18 +96,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             try
             {
                 await hubConnection.StartAsync();
-                await LoadLatestAsync();
-
-                await InvokeAsync(StateHasChanged);
-
-                // IMPORTANT: triggers the seed when the map is ready
-                await NotifyDataLoadedAsync(fit: true);
                 Console.WriteLine($"✅ [TrafficConditionView] Connected: {url}");
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"❌ [TrafficConditionView] hub start failed: {ex.Message}");
+                Console.Error.WriteLine($"⚠️ [TrafficConditionView] hub start skipped/failed: {ex.Message}");
             }
+
+            // IMPORTANT: REST + Map must NOT depend on SignalR
+            await LoadLatestAsync();
+            await InvokeAsync(StateHasChanged);
+            await NotifyDataLoadedAsync(fit: true);
         }
         private async Task LoadLatestAsync()
         {
@@ -126,8 +125,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         {
             if (_disposed) return;
 
-            // Clear TRAFFIC (pas crowd)
-            await MapInterop.ClearTrafficMarkersAsync(ScopeKey);
+            // Clear TRAFFIC (not crowd)
+            //await MapInterop.ClearTrafficMarkersAsync(ScopeKey);
+            await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
 
             foreach (var tc in TrafficConditions)
                 await ApplySingleTrafficMarkerAsync(tc);
@@ -135,8 +135,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             if (fit && TrafficConditions.Count > 0)
             {
                 await MapInterop.RefreshSizeAsync(ScopeKey);
-                await MapInterop.FitToDetailsAsync(ScopeKey);
-                await JS.InvokeVoidAsync("OutZenInterop.forceDetailsMode", ScopeKey);
+
+                await JS.InvokeVoidAsync(
+                    "OutZenInterop.setTrafficOverview",
+                    ScopeKey
+                );
             }
 
             Console.WriteLine($"[Traffic] SeedAsync: booted={IsMapBooted} count={TrafficConditions.Count}");
@@ -187,7 +190,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 
                 if (IsMapBooted)
                 {
-                    try { await MapInterop.RemoveTrafficMarkerAsync(TrMarkerId(id), ScopeKey); } catch { }
+                    //try { await MapInterop.RemoveTrafficMarkerAsync(TrMarkerId(id), ScopeKey); } catch { }
+                    try { await MapInterop.RemoveCrowdMarkerAsync(TrMarkerId(id), ScopeKey); } catch { }
                 }
 
                 await InvokeAsync(StateHasChanged);
@@ -262,7 +266,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             try
             {
                 await MapInterop.RefreshSizeAsync(ScopeKey);
-                await MapInterop.FitToDetailsAsync(ScopeKey);
+                await JS.InvokeVoidAsync("OutZenInterop.setTrafficOverview", ScopeKey);
             }
             catch { }
         }

@@ -547,6 +547,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                     {
                         if (live.IsCompleted)
                             return;
+
+                        if (live.HasReceivedHubEvent)
+                        {
+                            Console.WriteLine($"[GptClientOrchestrator] PollFallback stopped: SignalR active for interactionId={interactionId}");
+                            return;
+                        }
                     }
 
                     var status = await _gptService.GetStatusAsync(interactionId, ct);

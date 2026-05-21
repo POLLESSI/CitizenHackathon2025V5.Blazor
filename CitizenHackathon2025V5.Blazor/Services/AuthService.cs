@@ -28,24 +28,30 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         public async Task<bool> LoginAsync(string email, string password)
         {
             var payload = new { email, password };
-            var response = await _httpClient.PostAsJsonAsync("auth/login", payload);
 
-            if (!response.IsSuccessStatusCode) return false;
+            var response = await _httpClient.PostAsJsonAsync("api/Auth/login", payload);
 
-            // Here we assume that the API returns { accessToken, refreshToken }
+            if (!response.IsSuccessStatusCode)
+                return false;
+
             var json = await response.Content.ReadAsStringAsync();
+
             var loginResult = JsonSerializer.Deserialize<LoginResponse>(json, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             });
 
-            if (loginResult is null) return false;
+            if (loginResult is null || string.IsNullOrWhiteSpace(loginResult.AccessToken))
+                return false;
 
-            // Client-side storage
             await _js.InvokeVoidAsync("localStorage.setItem", JwtTokenKey, loginResult.AccessToken);
             await _js.InvokeVoidAsync("localStorage.setItem", RefreshTokenKey, loginResult.RefreshToken);
 
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", loginResult.AccessToken);
+            _httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", loginResult.AccessToken);
+
+            if (_provider is SimpleAuthStateProvider simpleProvider)
+                simpleProvider.NotifyUserAuthentication(loginResult.AccessToken);
 
             return true;
         }
@@ -66,6 +72,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             await _js.InvokeVoidAsync("localStorage.removeItem", RefreshTokenKey);
 
             _httpClient.DefaultRequestHeaders.Authorization = null;
+
+            if (_provider is SimpleAuthStateProvider simpleProvider)
+                simpleProvider.NotifyUserLogout();
         }
 
         // ?? Retrieve the JWT token in memory
