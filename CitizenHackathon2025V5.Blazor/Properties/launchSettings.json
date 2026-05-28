@@ -13,7 +13,10 @@
       "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
       "applicationUrl": "http://localhost:7101",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_BROWSER_REFRESH_ENABLED": "false",
+        "DOTNET_WATCH_SUPPRESS_BROWSER_REFRESH": "true",
+        "ASPNETCORE_HOSTINGSTARTUPASSEMBLIES": ""
       }
     },
     "https": {
@@ -23,7 +26,10 @@
       "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
       "applicationUrl": "https://localhost:7101;http://localhost:5118",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_BROWSER_REFRESH_ENABLED": "false",
+        "DOTNET_WATCH_SUPPRESS_BROWSER_REFRESH": "true",
+        "ASPNETCORE_HOSTINGSTARTUPASSEMBLIES": ""
       }
     },
     "IIS Express": {
@@ -31,13 +37,11 @@
       "launchBrowser": true,
       "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_BROWSER_REFRESH_ENABLED": "false",
+        "DOTNET_WATCH_SUPPRESS_BROWSER_REFRESH": "true",
+        "ASPNETCORE_HOSTINGSTARTUPASSEMBLIES": ""
       }
-    },
-    "environmentVariables": {
-      "commandName": "",
-      "ASPNETCORE_ENVIRONMENT": "Development",
-      "ASPNETCORE_HOSTINGSTARTUPASSEMBLIES": ""
     }
   }
 }

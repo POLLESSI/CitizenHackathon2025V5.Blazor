@@ -470,28 +470,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             _currentRainAlert = null;
             return Task.CompletedTask;
         }
-
-        // ----------------------------
-        // Generate
-        // ----------------------------
-        private async Task GenerateOne()
-        {
-            var dto = await WeatherForecastService.GenerateNewForecastAsync();
-            if (dto is null) return;
-
-            allWeatherForecasts.Insert(0, dto);
-            visibleWeatherForecasts.Insert(0, dto);
-            WeatherForecastLists.Insert(0, dto);
-
-            if (IsMapBooted)
-            {
-                await ApplySingleWeatherMarkerAsync(dto);
-                await UpdateChartAsync();
-            }
-
-            StateHasChanged();
-        }
-
         private static string GetWeatherCss(bool isSevere)
             => isSevere ? "severe--true" : "severe--false";
 

@@ -1262,6 +1262,26 @@ HIGHLIGHT / PULSE
 }
 
 /* =========================================================
+   HOME MAP — height 10 cm
+   ========================================================= */
+
+.oz-page--home .homeMapCard {
+    width: 100%;
+    height: clamp(10cm, 52vh, 720px) !important;
+    min-height: 10cm !important;
+}
+
+    .oz-page--home .homeMapCard > .oz-map,
+    #leafletMap-home {
+        width: 100% !important;
+        height: 10cm !important;
+        min-height: 10cm !important;
+        display: block !important;
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+/* =========================================================
    ANIMATIONS
    ========================================================= */
 @media (max-width: 768px) {

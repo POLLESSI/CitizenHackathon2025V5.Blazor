@@ -64,8 +64,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         private int? _lastSpokenInteractionId;
 
         private bool _disposed;
+        private bool _renderQueued;
+        private bool _handlersRegistered;
         private bool _isSending;
         private bool _showAiOverlay;
+        private DateTime _lastRenderUtc = DateTime.MinValue;
 
         private DateTime? _overlayShownAtUtc;
         private static readonly TimeSpan MinOverlayDuration = TimeSpan.FromSeconds(2);
@@ -139,6 +142,28 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         private DateTime RecentCutoffUtc => DateTime.UtcNow.AddHours(-6);
 
+        private async Task SafeRenderAsync(int minDelayMs = 100)
+        {
+            if (_disposed) return;
+            if (_renderQueued) return;
+
+            var elapsed = DateTime.UtcNow - _lastRenderUtc;
+            if (elapsed.TotalMilliseconds < minDelayMs)
+                return;
+
+            _renderQueued = true;
+
+            try
+            {
+                _lastRenderUtc = DateTime.UtcNow;
+                await InvokeAsync(StateHasChanged);
+            }
+            finally
+            {
+                _renderQueued = false;
+            }
+        }
+
         private async Task CloseAiOverlay()
         {
             _showAiOverlay = false;
@@ -188,8 +213,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             _dotNetRef = DotNetObjectReference.Create(this);
 
-            GptClientOrchestrator.InteractionUpdated += OnInteractionUpdatedAsync;
-            GptClientOrchestrator.StatusChanged += OnStatusChangedAsync;
+            //GptClientOrchestrator.InteractionUpdated += OnInteractionUpdatedAsync;
+            //GptClientOrchestrator.StatusChanged += OnStatusChangedAsync;
+            RegisterHandlersOnce();
 
             await LoadInteractionsAsync();
             await DetectVoiceSupportAsync();
@@ -383,7 +409,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
                 _aiState = AiProcessingState.Success;
                 _aiStatusMessage = result.StatusMessage ?? "Response generated successfully.";
-                await InvokeAsync(StateHasChanged);
+                await SafeRenderAsync();
 
                 if (finalToSpeak is not null)
                     await TrySpeakCompletedInteractionAsync(finalToSpeak);
@@ -393,29 +419,29 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
                 _aiState = AiProcessingState.Idle;
                 _aiStatusMessage = null;
-                await InvokeAsync(StateHasChanged);
+                await SafeRenderAsync();
             }
             catch (OperationCanceledException)
             {
                 _aiState = AiProcessingState.Error;
                 _aiStatusMessage = "Generation cancelled.";
-                await InvokeAsync(StateHasChanged);
+                await SafeRenderAsync();
 
                 await Task.Delay(600);
                 await StopElapsedTimerAsync();
-                await InvokeAsync(StateHasChanged);
+                await SafeRenderAsync();
             }
             catch (Exception ex)
             {
                 _aiState = AiProcessingState.Error;
                 _aiStatusMessage = $"Error: {ex.Message}";
-                await InvokeAsync(StateHasChanged);
+                await SafeRenderAsync();
 
                 Console.Error.WriteLine($"[GPT] HandleAskGpt failed: {ex}");
 
                 await Task.Delay(900);
                 await StopElapsedTimerAsync();
-                await InvokeAsync(StateHasChanged);
+                await SafeRenderAsync();
             }
             finally
             {
@@ -432,7 +458,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             if (SelectedId == 0)
                 SelectedId = dto.Id;
 
-            await InvokeAsync(StateHasChanged);
+            await SafeRenderAsync();
 
             if (!_isSending &&
                 _voiceOutputEnabled &&
@@ -460,7 +486,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             if (!string.IsNullOrWhiteSpace(message))
                 _aiStatusMessage = message;
 
-            return InvokeAsync(StateHasChanged);
+            return SafeRenderAsync();
         }
 
         private async Task ToggleVoiceAsync()
@@ -695,7 +721,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 _voiceInterimText = interimText ?? string.Empty;
             }
 
-            await InvokeAsync(StateHasChanged);
+            await SafeRenderAsync();
 
             Console.WriteLine($"[GPT VOICE] final='{finalText}', interim='{interimText}'");
         }
@@ -711,7 +737,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             {
                 _isListening = false;
                 _voiceInterimText = "Dictation stopped.";
-                await InvokeAsync(StateHasChanged);
+                await SafeRenderAsync();
                 return;
             }
 
@@ -720,7 +746,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 _isListening = false;
                 _voiceInterimText = errorMessage;
                 _aiStatusMessage = null;
-                await InvokeAsync(StateHasChanged);
+                await SafeRenderAsync();
                 return;
             }
         }
@@ -738,13 +764,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             if (string.IsNullOrWhiteSpace(prompt))
             {
                 _voiceInterimText = "Dictation stopped. No final text received.";
-                await InvokeAsync(StateHasChanged);
+                await SafeRenderAsync();
                 Console.WriteLine("[GPT VOICE] stopped without final prompt");
                 return;
             }
 
             _voiceInterimText = "Dictation stopped. Sending prompt...";
-            await InvokeAsync(StateHasChanged);
+            await SafeRenderAsync();
 
             Console.WriteLine("[GPT VOICE] stopped");
 
@@ -824,7 +850,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                            await _elapsedTimer.WaitForNextTickAsync(_elapsedTimerCts.Token))
                     {
                         _elapsedSeconds++;
-                        await InvokeAsync(StateHasChanged);
+                        await SafeRenderAsync(500);
                     }
                 }
                 catch (OperationCanceledException)
@@ -859,6 +885,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         private void ResetUiState()
         {
             _elapsedSeconds = 0;
+        }
+
+        private void RegisterHandlersOnce()
+        {
+            if (_handlersRegistered)
+                return;
+
+            _handlersRegistered = true;
+
+            GptClientOrchestrator.InteractionUpdated += OnInteractionUpdatedAsync;
+            GptClientOrchestrator.StatusChanged += OnStatusChangedAsync;
         }
 
         private static void UpsertInteraction(List<ClientGptInteractionDTO> list, ClientGptInteractionDTO dto)

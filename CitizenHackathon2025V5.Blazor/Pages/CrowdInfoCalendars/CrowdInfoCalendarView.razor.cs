@@ -154,10 +154,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
                 },
                 scopeKey: ScopeKey
             );
-
-            Console.WriteLine($"[CIC] upsert {CICMarkerId(dto.Id)} ll={dto.Latitude},{dto.Longitude} lvl={lvl}");
         }
-
         private async Task LoadAllAsync()
         {
             var fetched = (await CrowdInfoCalendarService.GetAllSafeAsync())?.ToList()
@@ -284,38 +281,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
                 await FitThrottledAsync();
         }
 
-        private async Task ApplySingleMarkerUpdateAsync(ClientCrowdInfoCalendarDTO dto, bool alreadyBooted = false)
-        {
-            if (!alreadyBooted && !IsMapBooted) return;
-
-            if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude)) return;
-            if (dto.Latitude == 0 && dto.Longitude == 0) return;
-
-            var lvl = Math.Clamp(dto.ExpectedLevel.GetValueOrDefault(), 1, SharedConstants.MaxCrowdLevel);
-
-            static string FmtTs(TimeSpan? ts) => ts is null ? "—" : ts.Value.ToString(@"hh\:mm\:ss");
-
-            await JS.InvokeVoidAsync(
-                "OutZenInterop.addOrUpdateCrowdCalendarMarker",
-                CICMarkerId(dto.Id),
-                dto.Latitude,
-                dto.Longitude,
-                lvl,
-                new
-                {
-                    eventname = dto.EventName,
-                    description =
-                        $"Start Local Time {FmtTs(dto.StartLocalTime)}, " +
-                        $"End Local Time {FmtTs(dto.EndLocalTime)}, " +
-                        $"LeadHours {dto.LeadHours}, Confidence {dto.Confidence} %",
-                    messagetemplate = dto.MessageTemplate?.ToString(),
-                    active = dto.Active,
-                    icon = "🥁🎉"
-                },
-                ScopeKey
-            );
-        }
-
+        
         private async Task HandleScroll()
         {
             var scrollTop = await JS.InvokeAsync<int>("getScrollTop", TableScrollRef);

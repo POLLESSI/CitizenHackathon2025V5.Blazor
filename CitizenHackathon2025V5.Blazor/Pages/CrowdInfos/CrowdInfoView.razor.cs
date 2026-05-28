@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
 using System.Collections.Concurrent;
+using static DevExpress.Data.Helpers.ExpressiveSortInfo;
 using CrowdHub = CitizenHackathon2025.Contracts.Hubs.CrowdHubMethods;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
@@ -287,13 +288,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
         {
             if (_disposed) return;
             if (!alreadyBooted && !IsMapBooted) return;
+            if (dto is null) return;
 
             if (!double.IsFinite(dto.Latitude) || !double.IsFinite(dto.Longitude)) return;
             if (dto.Latitude == 0 && dto.Longitude == 0) return;
 
             var lvl = Math.Clamp(dto.CrowdLevel, 1, SharedConstants.MaxCrowdLevel);
 
-            await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdMarker",
+            await JS.InvokeVoidAsync(
+                "OutZenInterop.addOrUpdateCrowdMarker",
                 CIMarkerId(dto.Id),
                 dto.Latitude,
                 dto.Longitude,
@@ -302,11 +305,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
                 {
                     kind = "crowd",
                     title = dto.LocationName ?? "Crowd Info",
-                    description = $"Maj {dto.Timestamp:HH:mm:ss}",
+                    description = $"CrowdLevel: {dto.CrowdLevel} • Maj {dto.Timestamp:HH:mm:ss}",
                     crowdlevel = dto.CrowdLevel,
-                    icon = "👥"
+                    icon = lvl >= 4 ? "🚨" : "👥"
                 },
-                ScopeKey);
+                ScopeKey
+            );
         }
 
         // ----------------------------

@@ -2,86 +2,85 @@
     position: fixed !important;
     right: 32px !important;
     bottom: 150px !important;
-    z-index: 99999 !important;
+    z-index: 2147483000 !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
     gap: 12px !important;
+    pointer-events: auto !important;
 }
 
-.outzen-emergency-stop-button {
-    width: 180px !important;
-    height: 180px !important;
-    min-width: 180px !important;
-    min-height: 180px !important;
-    max-width: 180px !important;
-    max-height: 180px !important;
+.outzen-alert-button {
+    width: 142px !important;
+    height: 142px !important;
+    min-width: 142px !important;
+    min-height: 142px !important;
     border-radius: 50% !important;
-    border: none !important;
+    border: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
     position: relative !important;
-    overflow: hidden !important;
-    background: radial-gradient(circle at 30% 22%, rgba(255,255,255,.75) 0%, rgba(255,255,255,.22) 14%, transparent 30%), radial-gradient(circle at 50% 58%, #ff1c1c 0%, #d60000 42%, #8c0000 74%, #380000 100%) !important;
-    box-shadow: 0 0 0 8px #8b0000, 0 0 0 14px #e00000, 0 0 0 19px #550000, 0 14px 26px rgba(0,0,0,.55), inset 0 12px 20px rgba(255,255,255,.38), inset 0 -20px 30px rgba(0,0,0,.60) !important;
-    color: #fff200 !important;
-    font-family: Arial, Helvetica, sans-serif !important;
-    font-size: 1.18rem !important;
-    font-weight: 900 !important;
-    line-height: 1.05 !important;
-    text-align: center !important;
-    text-transform: uppercase !important;
+    display: grid !important;
+    place-items: center !important;
+    overflow: visible !important;
     cursor: pointer !important;
-    user-select: none !important;
+    isolation: isolate !important;
+    background: radial-gradient(circle at 35% 22%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.35) 13%, transparent 28%), radial-gradient(circle at 50% 54%, #ff2b2b 0%, #d80000 42%, #8d0000 72%, #3a0000 100%) !important;
+    box-shadow: 0 0 0 10px #242424, 0 0 0 16px #777, 0 0 0 19px #111, 0 12px 24px rgba(0,0,0,.55), inset 0 12px 18px rgba(255,255,255,.38), inset 0 -18px 28px rgba(0,0,0,.65) !important;
     transition: transform .08s ease, filter .12s ease, box-shadow .08s ease !important;
 }
 
-.outzen-emergency-stop-button::before {
-    content: "" !important;
-    position: absolute !important;
-    inset: 14px !important;
-    border-radius: 50% !important;
-    border: 3px solid rgba(255,255,255,.23) !important;
-    box-shadow: inset 0 5px 9px rgba(255,255,255,.25), inset 0 -10px 16px rgba(0,0,0,.38) !important;
-    pointer-events: none !important;
-}
+    .outzen-alert-button::before {
+        content: "" !important;
+        position: absolute !important;
+        inset: -19px !important;
+        border-radius: 50% !important;
+        z-index: -1 !important;
+        background: radial-gradient(circle at 30% 22%, #f4f4f4 0%, #a9a9a9 24%, #444 58%, #141414 100%) !important;
+        box-shadow: inset 0 3px 7px rgba(255,255,255,.75), inset 0 -8px 18px rgba(0,0,0,.75), 0 10px 22px rgba(0,0,0,.55) !important;
+    }
 
-.outzen-emergency-stop-button::after {
-    content: "" !important;
-    position: absolute !important;
-    top: 18px !important;
-    left: 32px !important;
-    width: 78px !important;
-    height: 30px !important;
-    border-radius: 50% !important;
-    background: rgba(255,255,255,.33) !important;
-    filter: blur(1px) !important;
-    transform: rotate(-18deg) !important;
-    pointer-events: none !important;
-}
+    .outzen-alert-button::after {
+        content: "" !important;
+        position: absolute !important;
+        top: 18px !important;
+        left: 30px !important;
+        width: 72px !important;
+        height: 28px !important;
+        border-radius: 50% !important;
+        background: rgba(255,255,255,.34) !important;
+        filter: blur(1px) !important;
+        transform: rotate(-18deg) !important;
+        pointer-events: none !important;
+    }
 
-.outzen-emergency-stop-button span {
+.outzen-alert-label {
     position: relative !important;
     z-index: 2 !important;
-    text-shadow: 0 2px 2px rgba(0,0,0,.8), 0 0 8px rgba(255,0,0,.75) !important;
+    color: #ffffff !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 1.75rem !important;
+    font-weight: 500 !important;
+    letter-spacing: .08em !important;
+    line-height: 1 !important;
+    text-transform: uppercase !important;
+    text-shadow: 0 2px 3px rgba(0,0,0,.65), 0 0 10px rgba(255,255,255,.35) !important;
 }
 
-.outzen-emergency-stop-button:hover {
-    filter: brightness(1.1) saturate(1.1) !important;
+.outzen-alert-button:hover {
+    filter: brightness(1.12) saturate(1.08) !important;
 }
 
-.outzen-emergency-stop-button:active {
-    transform: translateY(6px) scale(.965) !important;
-    box-shadow: 0 0 0 8px #740000, 0 0 0 14px #b80000, 0 0 0 19px #3a0000, 0 5px 10px rgba(0,0,0,.6), inset 0 4px 10px rgba(0,0,0,.48), inset 0 -8px 16px rgba(0,0,0,.58) !important;
+.outzen-alert-button:active {
+    transform: translateY(6px) scale(.96) !important;
+    box-shadow: 0 0 0 10px #1b1b1b, 0 0 0 16px #5d5d5d, 0 0 0 19px #080808, 0 5px 12px rgba(0,0,0,.65), inset 0 5px 12px rgba(0,0,0,.55), inset 0 -8px 18px rgba(0,0,0,.62) !important;
 }
 
-.outzen-emergency-stop-button:disabled {
-    opacity: .7 !important;
+.outzen-alert-button:disabled {
+    opacity: .72 !important;
     cursor: wait !important;
     transform: none !important;
+    filter: grayscale(.15) brightness(.85) !important;
 }
 
 .critical-alert-place,
@@ -94,6 +93,52 @@
     font-size: .9rem !important;
     box-shadow: 0 8px 22px rgba(0,0,0,.35) !important;
 }
+
+.outzen-alert-zone {
+    position: fixed !important;
+    right: 42px !important;
+    bottom: 185px !important;
+    z-index: 2147483647 !important;
+    width: 150px !important;
+    height: 150px !important;
+    pointer-events: auto !important;
+}
+
+    .outzen-alert-zone .outzen-alert-button {
+        all: unset !important;
+        box-sizing: border-box !important;
+        width: 120px !important;
+        height: 120px !important;
+        min-width: 120px !important;
+        min-height: 120px !important;
+        max-width: 120px !important;
+        max-height: 120px !important;
+        display: grid !important;
+        place-items: center !important;
+        border-radius: 50% !important;
+        cursor: pointer !important;
+        position: relative !important;
+        background: radial-gradient(circle at 35% 24%, rgba(255,255,255,.9), rgba(255,255,255,.25) 18%, transparent 32%), radial-gradient(circle at 50% 55%, #ff2828 0%, #d60000 46%, #790000 78%, #260000 100%) !important;
+        box-shadow: 0 0 0 10px #1a1a1a, 0 0 0 17px #9b9b9b, 0 0 0 21px #242424, 0 14px 28px rgba(0,0,0,.6), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 24px rgba(0,0,0,.65) !important;
+    }
+
+        .outzen-alert-zone .outzen-alert-button span {
+            color: white !important;
+            font-size: 1.55rem !important;
+            font-weight: 600 !important;
+            letter-spacing: .08em !important;
+            font-family: Arial, Helvetica, sans-serif !important;
+            text-shadow: 0 2px 4px rgba(0,0,0,.75) !important;
+        }
+
+        .outzen-alert-zone .outzen-alert-button:hover {
+            filter: brightness(1.1) !important;
+        }
+
+        .outzen-alert-zone .outzen-alert-button:active {
+            transform: translateY(5px) scale(.96) !important;
+        }
+
 
 
 

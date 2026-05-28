@@ -130,21 +130,34 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             if (!resp.IsSuccessStatusCode) return null;
             return await resp.Content.ReadFromJsonAsync<ClientWeatherForecastDTO>();
         }
-        public async Task<ClientWeatherForecastDTO?> GenerateNewForecastAsync(CancellationToken ct = default)
-        {
-            try
-            {
-                // POST /api/WeatherForecast/generate
-                var resp = await _http.PostAsync("WeatherForecast/generate", content: null, ct);
-                resp.EnsureSuccessStatusCode();
+        //public async Task<ClientWeatherForecastDTO?> GenerateNewForecastAsync(CancellationToken ct = default)
+        //{
+        //    try
+        //    {
+        //        // POST /api/WeatherForecast/generate
+        //        var resp = await _http.PostAsync("WeatherForecast/generate", content: null, ct);
+        //        resp.EnsureSuccessStatusCode();
 
-                return await resp.Content.ReadFromJsonAsync<ClientWeatherForecastDTO>(cancellationToken: ct);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Unexpected error in GenerateNewForecastAsync: {ex.Message}");
-                return null;
-            }
+        //        return await resp.Content.ReadFromJsonAsync<ClientWeatherForecastDTO>(cancellationToken: ct);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Console.Error.WriteLine($"Unexpected error in GenerateNewForecastAsync: {ex.Message}");
+        //        return null;
+        //    }
+        //}
+
+        public async Task<ClientWeatherForecastDTO?> PullCurrentLocationAsync(decimal lat, decimal lon, CancellationToken ct = default)
+        {
+            using var resp = await _http.PostAsync(
+                $"WeatherForecast/pull-current-location?lat={lat}&lon={lon}",
+                content: null,
+                ct);
+
+            resp.EnsureSuccessStatusCode();
+
+            var result = await resp.Content.ReadFromJsonAsync<WeatherPullResponse>(cancellationToken: ct);
+            return result?.Forecast;
         }
         public async Task<ClientWeatherForecastDTO?> UpdateAsync(ClientWeatherForecastDTO dto, CancellationToken ct = default)
         {
@@ -165,6 +178,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             var updated = await resp.Content.ReadFromJsonAsync<ClientWeatherForecastDTO>(cancellationToken: ct);
             return updated is null ? null : WeatherForecastUiEnricher.Enrich(updated);
+        }
+        private sealed class WeatherPullResponse
+        {
+            public bool Success { get; set; }
+            public string? Source { get; set; }
+            public ClientWeatherForecastDTO? Forecast { get; set; }
+            public int AlertsUpserted { get; set; }
         }
     }
 }

@@ -12,19 +12,14 @@
 
 <div class="home-page">
     <div class="critical-alert-panel">
-        <button type="button"
-                class="outzen-emergency-stop-button"
-                disabled="@_criticalAlertSending"
-                @onclick="SendCriticalCrowdAlertAsync">
-            @if (_criticalAlertSending)
-            {
-                <span>Sending...</span>
-            }
-            else
-            {
-                <span>🚨<br />FULL<br />ALERT</span>
-            }
-        </button>
+        <div class="outzen-alert-zone">
+            <button type="button"
+                    class="outzen-alert-button"
+                    disabled="@_criticalAlertSending"
+                    @onclick="SendCriticalCrowdAlertAsync">
+                <span>@(_criticalAlertSending ? "..." : "ALERT")</span>
+            </button>
+        </div>
 
         @if (!string.IsNullOrWhiteSpace(_criticalAlertStatus))
         {

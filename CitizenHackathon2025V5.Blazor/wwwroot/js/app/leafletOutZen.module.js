@@ -1627,7 +1627,9 @@ export function addOrUpdateDetailMarkers(payload, scopeKey = null) {
     };
 
     push(norm.events, "event");
-    push(norm.places, "place");
+    if (k !== "home") {
+        push(norm.places, "place");
+    }
     push(norm.crowds, "crowd");
     push(norm.traffic, "traffic");
     push(norm.weather, "weather");
@@ -2042,6 +2044,41 @@ function buildSingleBundlePopupHtml(kind, item, s) {
                 ${esc(congestion)} • ${esc(location)} • ${esc(fmtDate(date))}
             </div>
         </div>`.trim();
+    }
+
+    if (kind === "suggestion") {
+        const title =
+            item?.Title ??
+            item?.title ??
+            item?.SuggestedAlternatives ??
+            item?.suggestedAlternatives ??
+            item?.LocationLabel ??
+            item?.locationLabel ??
+            "Suggestion";
+
+        const original =
+            item?.OriginalPlace ??
+            item?.originalPlace ??
+            "—";
+
+        const reason =
+            item?.Reason ??
+            item?.reason ??
+            "—";
+
+        const distance =
+            item?.DistanceKm ??
+            item?.distanceKm ??
+            null;
+
+        return `
+    <div class="oz-bundle-popup oz-bundle-popup--single">
+        <div class="oz-bundle-title">${esc(title)}</div>
+        <div class="oz-bundle-sub">
+            From: ${esc(original)} • Reason: ${esc(reason)}
+            ${distance != null ? ` • Distance: ${esc(distance)} km` : ""}
+        </div>
+    </div>`.trim();
     }
 
     return null;
