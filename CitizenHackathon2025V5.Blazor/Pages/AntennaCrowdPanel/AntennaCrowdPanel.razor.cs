@@ -377,6 +377,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
                     await InvokeAsync(StateHasChanged);
                 });
 
+            _hub.On<ClientFullAlertDTO>(
+                "FullAlertDeclared",
+                async alert =>
+                {
+                    await JS.InvokeVoidAsync(
+                        "OutZenInterop.addOrUpdateFullAlertMarker",
+                        alert,
+                        ScopeKey);
+                });
+
             await _hub.StartAsync();
             Console.WriteLine($"✅ Connected to {hubUrl}");
 

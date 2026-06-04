@@ -18,7 +18,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 {
     public partial class Index : OutZenMapPageBase
     {
-#nullable disable
+    #nullable disable
         [Inject] public MessageService MessageService { get; set; } = default!;
         [Inject] public IJSRuntime JS { get; set; } = default!;
         [Inject] public TrafficConditionService TrafficConditionService { get; set; } = default!;
@@ -70,24 +70,32 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private PeriodicTimer _timer;
         private bool _timerStarted;
         private bool _disposed;
-
-        private long _lastToggleMs;
         private bool _dragWired;
         private bool drawerOpen;
         private bool _historyCollapsed = true;
         private bool _criticalAlertSending;
-        private int? _selectedPlaceId = 1;
-        private string _selectedPlaceName = "Maison de famille";
+        private bool CanLoadMore => _currentIndex < _all.Count;
+
+        private int _currentIndex = 0;
+        private int VisibleCount => _visible.Count;
+        private int? _selectedPlaceId;
+        private long _lastToggleMs;
+        private double _selectedLatitude;
+        private double _selectedLongitude;
+
+        private string _selectedPlaceName = "Current location";
         private string _userPrompt = "";
         private string _gptStatusMessage;
         private string _criticalAlertStatus;
-
         private string _q = "";
-        private int _currentIndex = 0;
+       
         private const int PageSize = 20;
         private const int MaxVisibleGptItems = 30;
-        private int VisibleCount => _visible.Count;
-        private bool CanLoadMore => _currentIndex < _all.Count;
+
+        private const double DevFallbackLatitude = 50.380000;
+        private const double DevFallbackLongitude = 4.682000;
+        private const string DevFallbackPlaceName = "Bambois";
+
         private readonly List<ClientGptInteractionDTO> _all = new();
         private readonly List<ClientGptInteractionDTO> _visible = new();
         private readonly SemaphoreSlim _homeRefreshLock = new(1, 1);
@@ -133,7 +141,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             _places = _places.Where(p => HasValidCoord(p.Latitude, p.Longitude)).ToList();
             _events = _events.Where(e => HasValidCoord(e.Latitude, e.Longitude)).ToList();
-            _crowds = _crowds.Where(c => HasValidCoord(c.Latitude, c.Longitude)).ToList();
+            _crowds = _crowds.Where(c => HasValidCoord(c.Latitude, c.Longitude)).Where(c => !IsStaleManualCriticalAlert(c)).ToList();
+
+            await ResolveNearestPlaceFromUserLocationAsync();
 
             _allCal = (await CrowdInfoCalendarService.GetAllSafeAsync()).ToList();
 
@@ -188,9 +198,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
         private async Task SendCriticalCrowdAlertAsync()
         {
+            await ResolveNearestPlaceFromUserLocationAsync();
             if (_selectedPlaceId is null or <= 0)
             {
-                ToastService.ShowWarning("No place selected.");
+                await ResolveNearestPlaceFromUserLocationAsync();
+            }
+
+            if (_selectedPlaceId is null or <= 0)
+            {
+                ToastService.ShowWarning("No nearby place could be resolved from your location.");
                 return;
             }
 
@@ -198,6 +214,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             try
             {
+                Console.WriteLine($"[ALERT] Selected={_selectedPlaceName} ({_selectedPlaceId})");
+
                 var result = await CriticalAlertService.SendCriticalAlertAsync(
                      _selectedPlaceId.Value,
                      $"Manual critical alert for {_selectedPlaceName}");
@@ -213,8 +231,30 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                         });
 
                     _criticalAlertStatus = $"Critical alert active for {_selectedPlaceName}";
+
+                    var declaredAtUtc = DateTime.UtcNow;
+                    var expiresAtUtc = declaredAtUtc.AddMinutes(5);
+
+                    await JS.InvokeVoidAsync(
+                        "OutZenInterop.addOrUpdateFullAlertMarker",
+                        new
+                        {
+                            PlaceId = _selectedPlaceId.Value,
+                            PlaceName = _selectedPlaceName,
+                            Latitude = _selectedLatitude,
+                            Longitude = _selectedLongitude,
+                            DeclaredAtUtc = declaredAtUtc,
+                            ExpiresAtUtc = expiresAtUtc,
+                            kind = "crowd",
+                            title = "🚨 FULL ALERT",
+                            description = $"Critical crowd alert declared at {_selectedPlaceName}",
+                            icon = "🚨"
+                        },
+                        ScopeKey);
+
                     await RefreshHomeDataAsync(fit: false);
                 }
+
                 else
                 {
                     Console.Error.WriteLine(result.Error);
@@ -257,6 +297,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 _traffic = trafficTask.Result ?? new();
                 _crowds = (crowdTask.Result ?? new())
                     .Where(c => HasValidCoord(c.Latitude, c.Longitude))
+                    .Where(c => !IsStaleManualCriticalAlert(c))
                     .ToList();
 
                 _events = (eventTask.Result ?? Enumerable.Empty<ClientEventDTO>())
@@ -649,6 +690,116 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             }
         }
 
+        private async Task ResolveNearestPlaceFromUserLocationAsync()
+        {
+            try
+            {
+                if (_places.Count == 0)
+                {
+                    _selectedPlaceId = null;
+                    _selectedPlaceName = "No place available";
+                    return;
+                }
+
+                var pos = await JS.InvokeAsync<ClientUserPositionDto>(
+                    "outzenLocation.getCurrentPosition");
+                Console.WriteLine($"[GPS] {pos.Latitude}, {pos.Longitude}");
+
+                Console.WriteLine($"[HOME] GPS resolved: {pos.Latitude}, {pos.Longitude}");
+
+                var nearestPlaces = _places
+                    .Where(p =>
+                        double.IsFinite(p.Latitude) &&
+                        double.IsFinite(p.Longitude) &&
+                        p.Latitude != 0 &&
+                        p.Longitude != 0)
+                    .Select(p => new
+                    {
+                        Place = p,
+                        Distance = GetDistanceKm(
+                            pos.Latitude,
+                            pos.Longitude,
+                            p.Latitude,
+                            p.Longitude)
+                    })
+                    .OrderBy(x => x.Distance)
+                    .Take(10)
+                    .ToList();
+                //.OrderBy(p =>
+                //    GetDistanceKm(
+                //        pos.Latitude,
+                //        pos.Longitude,
+                //        p.Latitude,
+                //        p.Longitude))
+                //.FirstOrDefault();
+                foreach (var p in nearestPlaces)
+                {
+                    Console.WriteLine(
+                        $"[DIST] {p.Place.Name} => {p.Distance:F2} km");
+                }
+
+                var nearest = nearestPlaces.FirstOrDefault();
+
+                if (nearest is null)
+                {
+                    _selectedPlaceId = null;
+                    _selectedPlaceName = "No nearby place found";
+                    return;
+                }
+
+                _selectedPlaceId = nearest.Place.Id;
+                _selectedPlaceName = nearest.Place.Name ?? $"Place #{nearest.Place.Id}";
+
+                _selectedLatitude = nearest.Place.Latitude;
+                _selectedLongitude = nearest.Place.Longitude;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[HOME] Geolocation failed: {ex.Message}");
+
+                _selectedPlaceId = null;
+                _selectedPlaceName = "Location unavailable";
+
+                ToastService.ShowWarning("Unable to get your current location.");
+                var nearest = _places
+                    .OrderBy(p =>
+                        GetDistanceKm(
+                            DevFallbackLatitude,
+                            DevFallbackLongitude,
+                            p.Latitude,
+                            p.Longitude))
+                    .FirstOrDefault();
+
+                            if (nearest != null)
+                            {
+                                _selectedPlaceId = nearest.Id;
+                                _selectedPlaceName = nearest.Name;
+                                _selectedLatitude = nearest.Latitude;
+                                _selectedLongitude = nearest.Longitude;
+                }
+            }
+        }
+        private static double GetDistanceKm(double lat1, double lon1, double lat2, double lon2)
+        {
+            const double earthRadiusKm = 6371.0;
+
+            static double ToRad(double degrees) => degrees * Math.PI / 180.0;
+
+            var dLat = ToRad(lat2 - lat1);
+            var dLon = ToRad(lon2 - lon1);
+
+            var a =
+                Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(ToRad(lat1)) *
+                Math.Cos(ToRad(lat2)) *
+                Math.Sin(dLon / 2) *
+                Math.Sin(dLon / 2);
+
+            var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+
+            return earthRadiusKm * c;
+        }
+
         private static bool IsNowActive(ClientCrowdInfoCalendarDTO x, DateTime utcNow)
         {
             if (!x.Active) return false;
@@ -661,6 +812,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             return x.DateUtc.Date == localToday;
         }
 
+        private static bool IsStaleManualCriticalAlert(ClientCrowdInfoDTO c)
+        {
+            var nowUtc = DateTime.UtcNow;
+
+            var timestampUtc = c.Timestamp.Kind == DateTimeKind.Utc
+                ? c.Timestamp
+                : c.Timestamp.ToUniversalTime();
+
+            var isOldCriticalCrowd =
+                c.CrowdLevel >= 4 &&
+                timestampUtc < nowUtc.AddMinutes(-5);
+
+            return isOldCriticalCrowd;
+        }
         private MarkupString FormatGptResponse(string text)
         {
             if (string.IsNullOrWhiteSpace(text))

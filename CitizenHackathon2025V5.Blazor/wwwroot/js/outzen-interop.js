@@ -18,7 +18,7 @@
         location.hostname === "localhost" ||
         location.hostname === "127.0.0.1";
 
-    const BUILD = globalThis.__ozBuild || "20260318-calendar-fix-2";
+    const BUILD = globalThis.__ozBuild || "20260603-full-alert-marker-1";
 
     const url = isDev
         ? `/js/app/leafletOutZen.module.js?v=${encodeURIComponent(BUILD)}&t=${Date.now()}`
@@ -199,6 +199,36 @@
 
         map.setView([50.45, 4.75], 8);
     };
+
+    globalThis.outzenLocation = {
+        getCurrentPosition: function () {
+            return new Promise(function (resolve, reject) {
+                if (!navigator.geolocation) {
+                    reject("Geolocation is not supported by this browser.");
+                    return;
+                }
+
+                navigator.geolocation.getCurrentPosition(
+                    function (position) {
+                        resolve({
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        });
+                    },
+                    function (error) {
+                        reject(error.message);
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 10000,
+                        maximumAge: 30000
+                    }
+                );
+            });
+        }
+    };
+
+    console.log("[outzen-location] registered", !!globalThis.outzenLocation);
 })();
 
 

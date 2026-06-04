@@ -957,6 +957,80 @@ export function addOrUpdateWeatherMarkers(items, scopeKey = null) {
     return true;
 }
 
+export function addOrUpdateFullAlertMarker(alert, scopeKey = "home") {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { k, s, L } = ready;
+
+    const ll = pickLatLng(alert);
+    if (!ll) return false;
+
+    const placeId = alert.PlaceId ?? alert.placeId ?? "unknown";
+    const key = `full-alert:${placeId}`;
+
+    const title = alert.PlaceName ?? alert.placeName ?? "FULL ALERT";
+    const declaredAtUtc = alert.DeclaredAtUtc ?? alert.declaredAtUtc ?? new Date().toISOString();
+    const expiresAtUtc = alert.ExpiresAtUtc ?? alert.expiresAtUtc;
+
+    const popupHtml = buildPopupHtml({
+        title: "🚨 FULL ALERT",
+        description: `${title} • declared at ${fmtTime(declaredAtUtc)} • expires at ${fmtTime(expiresAtUtc)}`
+    }, s);
+
+    const icon = L.divIcon({
+        className: "oz-full-alert-marker",
+        html: `
+        <div class="oz-full-alert-ring">
+            <div class="oz-full-alert-core">
+                <div class="oz-full-alert-title">FULL</div>
+                <div class="oz-full-alert-title">ALERT</div>
+            </div>
+        </div>
+    `.trim(),
+        iconSize: [86, 86],
+        iconAnchor: [43, 43],
+        popupAnchor: [0, -46]
+    });
+
+    let marker = s.markers.get(key);
+
+    if (marker) {
+        try { marker.setLatLng([ll.lat, ll.lng]); } catch { }
+        try { marker.setIcon(icon); } catch { }
+        try {
+            if (marker.getPopup()) marker.setPopupContent(popupHtml);
+            else safeBindPopup(marker, popupHtml);
+        } catch { }
+    } else {
+        marker = L.marker([ll.lat, ll.lng], {
+            icon,
+            title: "FULL ALERT",
+            riseOnHover: true,
+            zIndexOffset: 50000,
+            __ozNoCluster: true
+        });
+
+        safeBindPopup(marker, popupHtml);
+        addLayerSmart(marker, s);
+        s.markers.set(key, marker);
+    }
+
+    const expiresMs = expiresAtUtc
+        ? new Date(expiresAtUtc).getTime()
+        : Date.now() + 5 * 60 * 1000;
+
+    const delay = Math.max(1000, expiresMs - Date.now());
+
+    clearTimeout(marker.__ozFullAlertTimer);
+
+    marker.__ozFullAlertTimer = setTimeout(() => {
+        try { removeCrowdMarker(key, k); } catch { }
+    }, delay);
+
+    return true;
+}
+
 /* ---------------------------------------------------------
    Calendar markers (NO cluster)
 --------------------------------------------------------- */

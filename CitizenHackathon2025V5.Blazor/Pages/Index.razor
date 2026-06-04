@@ -12,24 +12,35 @@
 
 <div class="home-page">
     <div class="critical-alert-panel">
-        <div class="outzen-alert-zone">
-            <button type="button"
-                    class="outzen-alert-button"
-                    disabled="@_criticalAlertSending"
-                    @onclick="SendCriticalCrowdAlertAsync">
-                <span>@(_criticalAlertSending ? "..." : "ALERT")</span>
-            </button>
-        </div>
+        <button type="button"
+                class="outzen-alert-button"
+                disabled="@_criticalAlertSending"
+                @onclick="SendCriticalCrowdAlertAsync">
+            <span class="outzen-alert-label" style="text-align: center;">
+                @if (_criticalAlertSending)
+                {
+                    <text>...</text>
+                }
+                else
+                {
+                    <text> FULL<br />ALERT</text>
+                }
+            </span>
+        </button>
 
-        @if (!string.IsNullOrWhiteSpace(_criticalAlertStatus))
-        {
-            <div class="critical-alert-status">
-                @_criticalAlertStatus
+        <div class="critical-alert-infos">
+
+            @if (!string.IsNullOrWhiteSpace(_criticalAlertStatus))
+            {
+                <div class="critical-alert-status">
+                    @_criticalAlertStatus
+                </div>
+            }
+
+            <div class="critical-alert-place">
+                Place: @_selectedPlaceName
             </div>
-        }
 
-        <div class="critical-alert-place">
-            Place: @_selectedPlaceName
         </div>
     </div>
     @* <div id="@MapId" style="height: 72vh;"></div> *@

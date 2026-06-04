@@ -30,29 +30,29 @@
     transition: transform .08s ease, filter .12s ease, box-shadow .08s ease !important;
 }
 
-    .outzen-alert-button::before {
-        content: "" !important;
-        position: absolute !important;
-        inset: -19px !important;
-        border-radius: 50% !important;
-        z-index: -1 !important;
-        background: radial-gradient(circle at 30% 22%, #f4f4f4 0%, #a9a9a9 24%, #444 58%, #141414 100%) !important;
-        box-shadow: inset 0 3px 7px rgba(255,255,255,.75), inset 0 -8px 18px rgba(0,0,0,.75), 0 10px 22px rgba(0,0,0,.55) !important;
-    }
+.outzen-alert-button::before {
+    content: "" !important;
+    position: absolute !important;
+    inset: -19px !important;
+    border-radius: 50% !important;
+    z-index: -1 !important;
+    background: radial-gradient(circle at 30% 22%, #f4f4f4 0%, #a9a9a9 24%, #444 58%, #141414 100%) !important;
+    box-shadow: inset 0 3px 7px rgba(255,255,255,.75), inset 0 -8px 18px rgba(0,0,0,.75), 0 10px 22px rgba(0,0,0,.55) !important;
+}
 
-    .outzen-alert-button::after {
-        content: "" !important;
-        position: absolute !important;
-        top: 18px !important;
-        left: 30px !important;
-        width: 72px !important;
-        height: 28px !important;
-        border-radius: 50% !important;
-        background: rgba(255,255,255,.34) !important;
-        filter: blur(1px) !important;
-        transform: rotate(-18deg) !important;
-        pointer-events: none !important;
-    }
+.outzen-alert-button::after {
+    content: "" !important;
+    position: absolute !important;
+    top: 18px !important;
+    left: 30px !important;
+    width: 72px !important;
+    height: 28px !important;
+    border-radius: 50% !important;
+    background: rgba(255,255,255,.34) !important;
+    filter: blur(1px) !important;
+    transform: rotate(-18deg) !important;
+    pointer-events: none !important;
+}
 
 .outzen-alert-label {
     position: relative !important;
@@ -104,40 +104,68 @@
     pointer-events: auto !important;
 }
 
-    .outzen-alert-zone .outzen-alert-button {
-        all: unset !important;
-        box-sizing: border-box !important;
-        width: 120px !important;
-        height: 120px !important;
-        min-width: 120px !important;
-        min-height: 120px !important;
-        max-width: 120px !important;
-        max-height: 120px !important;
-        display: grid !important;
-        place-items: center !important;
-        border-radius: 50% !important;
-        cursor: pointer !important;
-        position: relative !important;
-        background: radial-gradient(circle at 35% 24%, rgba(255,255,255,.9), rgba(255,255,255,.25) 18%, transparent 32%), radial-gradient(circle at 50% 55%, #ff2828 0%, #d60000 46%, #790000 78%, #260000 100%) !important;
-        box-shadow: 0 0 0 10px #1a1a1a, 0 0 0 17px #9b9b9b, 0 0 0 21px #242424, 0 14px 28px rgba(0,0,0,.6), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 24px rgba(0,0,0,.65) !important;
-    }
+.outzen-alert-zone .outzen-alert-button {
+    all: unset !important;
+    box-sizing: border-box !important;
+    width: 120px !important;
+    height: 120px !important;
+    min-width: 120px !important;
+    min-height: 120px !important;
+    max-width: 120px !important;
+    max-height: 120px !important;
+    display: grid !important;
+    place-items: center !important;
+    border-radius: 50% !important;
+    cursor: pointer !important;
+    position: relative !important;
+    background: radial-gradient(circle at 35% 24%, rgba(255,255,255,.9), rgba(255,255,255,.25) 18%, transparent 32%), radial-gradient(circle at 50% 55%, #ff2828 0%, #d60000 46%, #790000 78%, #260000 100%) !important;
+    box-shadow: 0 0 0 10px #1a1a1a, 0 0 0 17px #9b9b9b, 0 0 0 21px #242424, 0 14px 28px rgba(0,0,0,.6), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 24px rgba(0,0,0,.65) !important;
+}
 
-        .outzen-alert-zone .outzen-alert-button span {
-            color: white !important;
-            font-size: 1.55rem !important;
-            font-weight: 600 !important;
-            letter-spacing: .08em !important;
-            font-family: Arial, Helvetica, sans-serif !important;
-            text-shadow: 0 2px 4px rgba(0,0,0,.75) !important;
-        }
+.outzen-alert-zone .outzen-alert-button span {
+    color: white !important;
+    font-size: 1.55rem !important;
+    font-weight: 600 !important;
+    letter-spacing: .08em !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    text-shadow: 0 2px 4px rgba(0,0,0,.75) !important;
+}
 
-        .outzen-alert-zone .outzen-alert-button:hover {
-            filter: brightness(1.1) !important;
-        }
+.outzen-alert-zone .outzen-alert-button:hover {
+    filter: brightness(1.1) !important;
+}
 
-        .outzen-alert-zone .outzen-alert-button:active {
-            transform: translateY(5px) scale(.96) !important;
-        }
+.outzen-alert-zone .outzen-alert-button:active {
+    transform: translateY(5px) scale(.96) !important;
+}
+
+.critical-alert-panel .outzen-alert-button {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+}
+
+.critical-alert-panel .outzen-alert-button .outzen-alert-label {
+    position: relative !important;
+    z-index: 5 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+    color: #fff !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 1.55rem !important;
+    font-weight: 800 !important;
+    line-height: 1.05 !important;
+    letter-spacing: .07em !important;
+    text-align: center !important;
+    text-transform: uppercase !important;
+    text-shadow: 0 2px 4px rgba(0,0,0,.75) !important;
+    pointer-events: none !important;
+}
 
 
 
