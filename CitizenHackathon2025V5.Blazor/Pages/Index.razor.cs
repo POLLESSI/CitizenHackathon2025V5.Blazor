@@ -226,7 +226,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                         $"CRITICAL CROWD ALERT sent for {_selectedPlaceName}.",
                         settings =>
                         {
-                            settings.Timeout = 0; // remains displayed until manually closed
+                            settings.Timeout = 0;
                             settings.ShowProgressBar = true;
                         });
 
@@ -248,6 +248,55 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                             kind = "crowd",
                             title = "🚨 FULL ALERT",
                             description = $"Critical crowd alert declared at {_selectedPlaceName}",
+                            icon = "🚨"
+                        },
+                        ScopeKey);
+
+                    await RefreshHomeDataAsync(fit: false);
+                }
+
+                if (!result.Ok)
+                {
+                    Console.Error.WriteLine(result.Error);
+                    ToastService.ShowWarning("Alert could not be sent. Check browser/API console.");
+                    return;
+                }
+
+                if (result.Status == "Pending")
+                {
+                    _criticalAlertStatus =
+                        $"Signalement reçu pour {_selectedPlaceName}. Confirmation {result.ConfirmationCount}/{result.RequiredCount}.";
+                    ToastService.ShowInfo(_criticalAlertStatus);
+                    return;
+                }
+
+                if (result.Status == "Confirmed")
+                {
+                    ToastService.ShowError(
+                        $"CRITICAL CROWD ALERT confirmed for {_selectedPlaceName}.",
+                        settings =>
+                        {
+                            settings.Timeout = 0;
+                            settings.ShowProgressBar = true;
+                        });
+
+                    _criticalAlertStatus = $"Critical alert confirmed for {_selectedPlaceName}";
+
+                    var declaredAtUtc = DateTime.UtcNow;
+
+                    await JS.InvokeVoidAsync(
+                        "OutZenInterop.addOrUpdateFullAlertMarker",
+                        new
+                        {
+                            PlaceId = _selectedPlaceId.Value,
+                            PlaceName = _selectedPlaceName,
+                            Latitude = _selectedLatitude,
+                            Longitude = _selectedLongitude,
+                            DeclaredAtUtc = declaredAtUtc,
+                            ExpiresAtUtc = result.ExpiresAtUtc ?? declaredAtUtc.AddMinutes(5),
+                            kind = "crowd",
+                            title = "🚨 FULL ALERT",
+                            description = $"Confirmed critical crowd alert at {_selectedPlaceName}",
                             icon = "🚨"
                         },
                         ScopeKey);

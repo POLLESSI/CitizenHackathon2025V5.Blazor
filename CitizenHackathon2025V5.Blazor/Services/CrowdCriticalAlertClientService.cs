@@ -12,7 +12,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             _http = http;
         }
 
-        public async Task<(bool Ok, string? Error)> SendCriticalAlertAsync(int placeId, string? reason = null, CancellationToken ct = default)
+        public async Task<ManualCriticalAlertResultDTO> SendCriticalAlertAsync(
+    int placeId,
+    string? reason = null,
+    CancellationToken ct = default)
         {
             var payload = new ManualCrowdCriticalAlertRequest
             {
@@ -28,9 +31,27 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             var body = await response.Content.ReadAsStringAsync(ct);
 
-            return response.IsSuccessStatusCode
-                ? (true, null)
-                : (false, $"HTTP {(int)response.StatusCode}: {body}");
+            if (!response.IsSuccessStatusCode)
+            {
+                return new ManualCriticalAlertResultDTO
+                {
+                    Ok = false,
+                    Error = $"HTTP {(int)response.StatusCode}: {body}",
+                    Status = "Error"
+                };
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<ManualCriticalAlertResultDTO>(
+                cancellationToken: ct);
+
+            return result ?? new ManualCriticalAlertResultDTO
+            {
+                Ok = true,
+                Status = "Confirmed",
+                ConfirmationCount = 1,
+                RequiredCount = 1,
+                ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5)
+            };
         }
     }
 }
