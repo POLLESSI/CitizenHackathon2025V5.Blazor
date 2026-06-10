@@ -11,36 +11,51 @@
 <PageTitle>OutZen - Home</PageTitle>
 
 <div class="home-page">
-    <div class="critical-alert-panel">
-        <button type="button"
-                class="outzen-alert-button"
-                disabled="@_criticalAlertSending"
-                @onclick="SendCriticalCrowdAlertAsync">
-            <span class="outzen-alert-label" style="text-align: center;">
-                @if (_criticalAlertSending)
-                {
-                    <text>...</text>
-                }
-                else
-                {
-                    <text> FULL<br />ALERT</text>
-                }
-            </span>
-        </button>
+    <div class="critical-alert-panel alert-cluster">
+
+        <div class="alert-cluster-row">
+            <button type="button"
+                    class="outzen-alert-button outzen-alert-button--crowd"
+                    disabled="@_criticalAlertSending"
+                    @onclick="SendCriticalCrowdAlertAsync">
+                <span class="outzen-alert-label">FULL<br />ALERT</span>
+            </button>
+
+            <button type="button"
+                    class="outzen-alert-button outzen-alert-button--weather"
+                    disabled="@_criticalWeatherAlertSending"
+                    @onclick="SendCriticalWeatherAlertAsync">
+                <span class="outzen-alert-label">CRITICAL<br />WEATHER</span>
+            </button>
+        </div>
+
+        <div class="alert-cluster-row alert-cluster-row--bottom">
+            <button type="button"
+                    class="outzen-alert-button outzen-alert-button--traffic"
+                    disabled="@_criticalTrafficSending"
+                    @onclick="SendCriticalTrafficAlertAsync">
+                <span class="outzen-alert-label outzen-alert-label--traffic">
+                    CRITICAL<br />TRAFFIC<br />CONGESTION
+                </span>
+            </button>
+        </div>
 
         <div class="critical-alert-infos">
-
             @if (!string.IsNullOrWhiteSpace(_criticalAlertStatus))
             {
-                <div class="critical-alert-status">
-                    @_criticalAlertStatus
+                <div class="critical-alert-status">@_criticalAlertStatus</div>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_criticalWeatherAlertStatus))
+            {
+                <div class="critical-alert-status critical-alert-status--weather">
+                    @_criticalWeatherAlertStatus
                 </div>
             }
 
             <div class="critical-alert-place">
                 Place: @_selectedPlaceName
             </div>
-
         </div>
     </div>
     @* <div id="@MapId" style="height: 72vh;"></div> *@

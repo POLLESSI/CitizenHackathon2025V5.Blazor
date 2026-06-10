@@ -1,5 +1,6 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Blazor.DTOs.Security;
+using CitizenHackathon2025.Contracts.Enums;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
@@ -31,6 +32,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         [Inject] public WeatherForecastService WeatherForecastService { get; set; } = default!;
         [Inject] public GptInteractionService GptInteractionService { get; set; } = default!;
         [Inject] public IGptClientOrchestrator GptClientOrchestrator { get; set; } = default!;
+        [Inject] public IWeatherCriticalAlertClientService WeatherCriticalAlertService { get; set; } = default!;
         [Inject] public NavigationManager Navigation { get; set; } = default!;
         [Inject] public IHubUrlBuilder HubUrls { get; set; } = default!;
         [Inject] public IAuthService Auth { get; set; } = default!;
@@ -74,6 +76,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private bool drawerOpen;
         private bool _historyCollapsed = true;
         private bool _criticalAlertSending;
+        private bool _criticalWeatherAlertSending;
+        private string _criticalWeatherAlertStatus;
+        private bool _criticalTrafficSending;
+        private string _criticalTrafficStatus;
         private bool CanLoadMore => _currentIndex < _all.Count;
 
         private int _currentIndex = 0;
@@ -235,8 +241,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                     var declaredAtUtc = DateTime.UtcNow;
                     var expiresAtUtc = declaredAtUtc.AddMinutes(5);
 
-                    await JS.InvokeVoidAsync(
-                        "OutZenInterop.addOrUpdateFullAlertMarker",
+                    await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateFullAlertMarker",
                         new
                         {
                             PlaceId = _selectedPlaceId.Value,
@@ -316,6 +321,87 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             }
         }
 
+        private async Task SendCriticalWeatherAlertAsync()
+        {
+            try
+            {
+                _criticalWeatherAlertSending = true;
+
+                await ResolveNearestPlaceFromUserLocationAsync();
+
+                if (_selectedLatitude == 0 || _selectedLongitude == 0)
+                {
+                    ToastService.ShowWarning("Unable to resolve location for weather alert.");
+                    return;
+                }
+
+                var result = await WeatherCriticalAlertService.SendCriticalWeatherAlertAsync(
+                    latitude: (decimal)_selectedLatitude,
+                    longitude: (decimal)_selectedLongitude,
+                    weatherType: WeatherType.Thunderstorm,
+                    description: $"Manual critical weather alert near {_selectedPlaceName}");
+
+                if (result.Ok)
+                {
+                    _criticalWeatherAlertStatus = $"Critical weather alert confirmed for {_selectedPlaceName}";
+
+                    ToastService.ShowWarning("⛈️ CRITICAL WEATHER ALERT SENT");
+
+                    var declaredAtUtc = DateTime.UtcNow;
+
+                    var expiresAtUtc = result.ExpiresAtUtc ?? declaredAtUtc.AddMinutes(5);
+
+                    await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateWeatherAlertMarker",
+                        new
+                        {
+                            PlaceId = _selectedPlaceId.Value,
+                            PlaceName = _selectedPlaceName,
+                            Latitude = _selectedLatitude,
+                            Longitude = _selectedLongitude,
+                            DeclaredAtUtc = declaredAtUtc,
+                            ExpiresAtUtc = expiresAtUtc,
+                            kind = "weather",
+                            title = "⚠️ WEATHER ALERT",
+                            description = $"Critical weather alert declared at {_selectedPlaceName}",
+                            icon = "⛈️"
+                        },
+                        ScopeKey);
+                }
+                else
+                {
+                    _criticalWeatherAlertStatus = result.Error ?? "Unknown weather alert error.";
+
+                    ToastService.ShowError(_criticalWeatherAlertStatus);
+                }
+            }
+            catch (Exception ex)
+            {
+                _criticalWeatherAlertStatus = ex.Message;
+
+                ToastService.ShowError(ex.Message);
+            }
+            finally
+            {
+                _criticalWeatherAlertSending = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+
+        private async Task SendCriticalTrafficAlertAsync()
+        {
+            _criticalTrafficSending = true;
+
+            try
+            {
+                ToastService.ShowWarning("🚗 Critical traffic congestion alert not implemented yet.");
+                await Task.CompletedTask;
+            }
+            finally
+            {
+                _criticalTrafficSending = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
         private async Task RefreshHomeDataAsync(bool fit = false)
         {
             if (_disposed) return;

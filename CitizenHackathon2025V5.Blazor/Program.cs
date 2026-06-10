@@ -150,6 +150,7 @@ builder.Services.AddScoped<ICrowdInfoAntennaService, CrowdInfoAntennaService>();
 
 builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService>();
 builder.Services.AddScoped<CrowdInfoService>();
+builder.Services.AddScoped<CrowdCalendarHubClient>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<GptInteractionService>();
 builder.Services.AddScoped<IGptClientOrchestrator, GptClientOrchestrator>();
@@ -161,14 +162,17 @@ builder.Services.AddScoped<SuggestionMapService>();
 builder.Services.AddScoped<TrafficConditionService>();
 builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.UserService>();
 builder.Services.AddScoped<TrafficStateService>();
+builder.Services.AddScoped<TrafficServiceBlazor>();
+builder.Services.AddScoped<TrafficSignalRService>();
+
+builder.Services.AddScoped<IWeatherCriticalAlertClientService, WeatherCriticalAlertClientService>();
 builder.Services.AddScoped<WeatherForecastService>();
 
 builder.Services.AddScoped<WeatherHubClient>();
 builder.Services.AddScoped<WeatherForecastHubClient>();
-builder.Services.AddScoped<CrowdCalendarHubClient>();
 
-builder.Services.AddScoped<TrafficServiceBlazor>();
-builder.Services.AddScoped<TrafficSignalRService>();
+
+
 
 Console.WriteLine("✅ PROGRAM CLIENT V5 - cleaned and loaded");
 

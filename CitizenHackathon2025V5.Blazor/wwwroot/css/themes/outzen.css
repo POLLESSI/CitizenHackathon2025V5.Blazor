@@ -210,7 +210,7 @@ LEVEL COLORS
     outline: 2px solid rgba(255,255,255,.35);
 }
 
-/* CrowdInfoView crowd markers: force visible */
+    /* CrowdInfoView crowd markers: visible force */
 .leaflet-marker-icon.oz-marker.oz-scope--crowdinfoview,
 .leaflet-marker-icon.oz-marker.oz-scope--crowdinfoview .oz-marker-inner {
     opacity: 1 !important;
@@ -526,7 +526,7 @@ HIGHLIGHT / PULSE
 
 /* =========================================================
    HOME GPT DRAWER
-   Dernière réponse + historique scrollable
+   Last reply + scrollable history
    ========================================================= */
 
 .gpt-latest-shell {
@@ -1066,7 +1066,7 @@ HIGHLIGHT / PULSE
 
 /* =========================================================
    OZ GPT OVERLAY / 3D LOADER
-   Bloc unique, sans doublons
+   Single block, no duplicates
    ========================================================= */
 
 .oz-gpt-overlay {
@@ -1120,7 +1120,7 @@ HIGHLIGHT / PULSE
     filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.36));
 }
 
-/* Rotation principale un peu plus rapide */
+/* Main rotation slightly faster */
 .oz-gpt-loader-globe--idle {
     animation: oz-gpt-loader-orbit 2.05s linear infinite;
 }
@@ -1167,7 +1167,7 @@ HIGHLIGHT / PULSE
     box-shadow: inset 0 0 0 2px rgba(255,255,255,0.08), inset -12px -18px 24px rgba(0,0,0,0.22), inset 10px 10px 20px rgba(255,255,255,0.05), 0 0 28px rgba(231,76,60,0.18);
 }
 
-/* Bande pseudo-3D qui défile sur la sphère */
+/* A pseudo-3D strip scrolls across the sphere */
 .oz-gpt-loader-globe-core::before {
     content: "";
     position: absolute;
@@ -1358,23 +1358,6 @@ HIGHLIGHT / PULSE
     gap: 14px !important;
 }
 
-.critical-alert-panel .outzen-alert-button {
-    all: unset !important;
-    box-sizing: border-box !important;
-    width: 120px !important;
-    height: 120px !important;
-    min-width: 120px !important;
-    min-height: 120px !important;
-    max-width: 120px !important;
-    max-height: 120px !important;
-    border-radius: 50% !important;
-    display: grid !important;
-    place-items: center !important;
-    cursor: pointer !important;
-    background: radial-gradient(circle at 35% 24%, #ff8a8a 0%, #ff2020 22%, #d00000 48%, #650000 100%) !important;
-    box-shadow: 0 0 0 10px #1c1c1c, 0 0 0 18px #a7a7a7, 0 0 0 22px #222, 0 14px 30px rgba(0,0,0,.65), inset 0 12px 20px rgba(255,255,255,.38), inset 0 -20px 28px rgba(0,0,0,.68) !important;
-}
-
 .critical-alert-panel .outzen-alert-button span {
     color: #fff !important;
     font-family: Arial, Helvetica, sans-serif !important;
@@ -1382,6 +1365,210 @@ HIGHLIGHT / PULSE
     font-weight: 700 !important;
     letter-spacing: .08em !important;
     text-shadow: 0 2px 4px rgba(0,0,0,.75) !important;
+}
+
+.outzen-weather-alert-button {
+    background: radial-gradient(circle at 35% 22%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.35) 13%, transparent 28%), radial-gradient(circle at 50% 54%, #43fff4 0%, #00d8d8 42%, #007c88 72%, #00343d 100%) !important;
+    box-shadow: 0 0 0 10px #06363b, 0 0 0 16px #00f5ff, 0 0 0 19px #02191d, 0 0 32px rgba(0,255,255,.9), 0 0 70px rgba(0,255,255,.45), 0 12px 24px rgba(0,0,0,.55), inset 0 12px 18px rgba(255,255,255,.38), inset 0 -18px 28px rgba(0,0,0,.65) !important;
+}
+
+.outzen-weather-alert-button::before {
+    background: radial-gradient(circle at 30% 22%, #eaffff 0%, #00eaff 24%, #006a75 58%, #011417 100%) !important;
+}
+
+.outzen-weather-alert-button .outzen-alert-label {
+    font-size: 1.15rem !important;
+    color: #001b1d !important;
+    text-shadow: 0 1px 2px rgba(255,255,255,.75), 0 0 8px rgba(0,255,255,.9) !important;
+}
+
+/* =========================================================
+   OUTZEN ALERT CLUSTER
+   Smartphone camera style: 2 top buttons + 1 centered bottom
+   ========================================================= */
+
+.critical-alert-panel.alert-cluster {
+    position: fixed !important;
+    right: 34px !important;
+    top: 135px !important;
+    bottom: auto !important;
+    z-index: 2147483000 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 10px !important;
+    pointer-events: auto !important;
+}
+
+.alert-cluster-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 14px !important;
+}
+
+.alert-cluster-row--bottom {
+    margin-top: -16px !important;
+}
+
+/* =========================================================
+   BASE ROUND PHYSICAL BUTTON
+   ========================================================= */
+
+.outzen-alert-button {
+    width: 132px !important;
+    height: 132px !important;
+    min-width: 132px !important;
+    min-height: 132px !important;
+    position: relative !important;
+    display: grid !important;
+    place-items: center !important;
+    border: 0 !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    cursor: pointer !important;
+    overflow: visible !important;
+    isolation: isolate !important;
+    background: radial-gradient(circle at 35% 22%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.35) 14%, transparent 30%), radial-gradient(circle at 50% 56%, #ff2b2b 0%, #d70000 42%, #850000 72%, #260000 100%) !important;
+    box-shadow: 0 0 0 9px #161616, 0 0 0 15px #9d9d9d, 0 0 0 19px #202020, 0 12px 26px rgba(0,0,0,.62), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 26px rgba(0,0,0,.72) !important;
+    transition: transform .1s ease, filter .15s ease, box-shadow .15s ease !important;
+}
+
+/* Metallic outer lens */
+.outzen-alert-button::before {
+    content: "" !important;
+    position: absolute !important;
+    inset: -18px !important;
+    z-index: -1 !important;
+    border-radius: 50% !important;
+    background: radial-gradient(circle at 30% 22%, #f2f2f2 0%, #9b9b9b 22%, #3b3b3b 58%, #080808 100%) !important;
+    box-shadow: inset 0 4px 8px rgba(255,255,255,.70), inset 0 -10px 20px rgba(0,0,0,.82), 0 10px 24px rgba(0,0,0,.58) !important;
+}
+
+/* glossy reflection */
+.outzen-alert-button::after {
+    content: "" !important;
+    position: absolute !important;
+    top: 18px !important;
+    left: 28px !important;
+    width: 68px !important;
+    height: 28px !important;
+    border-radius: 50% !important;
+    background: rgba(255,255,255,.35) !important;
+    filter: blur(1px) !important;
+    transform: rotate(-18deg) !important;
+    pointer-events: none !important;
+}
+
+.outzen-alert-label {
+    position: relative !important;
+    z-index: 2 !important;
+    color: #ffffff !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 1.42rem !important;
+    font-weight: 900 !important;
+    line-height: 1.04 !important;
+    letter-spacing: .06em !important;
+    text-align: center !important;
+    text-transform: uppercase !important;
+    text-shadow: 0 3px 4px rgba(0,0,0,.85), 0 0 10px rgba(255,255,255,.35) !important;
+}
+
+.outzen-alert-label--traffic {
+    font-size: 1.02rem !important;
+    line-height: 1.05 !important;
+}
+
+/* =========================================================
+   COLORS
+   ========================================================= */
+
+/* Crowd / FULL ALERT - red */
+.outzen-alert-button--crowd {
+    background: radial-gradient(circle at 35% 22%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.35) 14%, transparent 30%), radial-gradient(circle at 50% 56%, #ff4a4a 0%, #d90000 42%, #7e0000 72%, #210000 100%) !important;
+    box-shadow: 0 0 0 9px #170404, 0 0 0 15px #b6b6b6, 0 0 0 19px #202020, 0 0 22px rgba(255,0,0,.75), 0 0 52px rgba(255,0,0,.35), 0 12px 26px rgba(0,0,0,.62), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 26px rgba(0,0,0,.72) !important;
+}
+
+/* Weather - turquoise / cyan */
+.outzen-alert-button--weather {
+    background: radial-gradient(circle at 35% 22%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.38) 14%, transparent 30%), radial-gradient(circle at 50% 56%, #63fff8 0%, #00d6d6 42%, #00727d 72%, #00272d 100%) !important;
+    box-shadow: 0 0 0 9px #03191c, 0 0 0 15px #c8ffff, 0 0 0 19px #073035, 0 0 24px rgba(0,255,255,.88), 0 0 58px rgba(0,255,255,.45), 0 12px 26px rgba(0,0,0,.62), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 26px rgba(0,0,0,.72) !important;
+}
+
+/* Traffic - orange / amber */
+.outzen-alert-button--traffic {
+    background: radial-gradient(circle at 35% 22%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.36) 14%, transparent 30%), radial-gradient(circle at 50% 56%, #ffc44a 0%, #ff9800 42%, #a34f00 72%, #351700 100%) !important;
+    box-shadow: 0 0 0 9px #1d1002, 0 0 0 15px #ffd38a, 0 0 0 19px #2b1601, 0 0 24px rgba(255,152,0,.88), 0 0 58px rgba(255,152,0,.48), 0 12px 26px rgba(0,0,0,.62), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 26px rgba(0,0,0,.72) !important;
+}
+
+/* =========================================================
+   INTERACTIONS
+   ========================================================= */
+
+.outzen-alert-button:hover {
+    filter: brightness(1.12) saturate(1.12) !important;
+    transform: translateY(-2px) scale(1.025) !important;
+}
+
+.outzen-alert-button:active {
+    transform: translateY(5px) scale(.955) !important;
+    filter: brightness(.95) !important;
+}
+
+.outzen-alert-button:disabled {
+    opacity: .66 !important;
+    cursor: wait !important;
+    transform: none !important;
+    filter: grayscale(.25) brightness(.82) !important;
+}
+
+/* =========================================================
+   INFO PILLS
+   ========================================================= */
+
+.critical-alert-infos {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-top: 2px !important;
+}
+
+.critical-alert-place,
+.critical-alert-status {
+    padding: 8px 14px !important;
+    border-radius: 999px !important;
+    background: rgba(15,15,15,.88) !important;
+    color: #fff !important;
+    font-weight: 800 !important;
+    font-size: .9rem !important;
+    box-shadow: 0 8px 22px rgba(0,0,0,.35) !important;
+}
+
+.critical-alert-status--weather {
+    background: rgba(0, 130, 140, .92) !important;
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+
+@media (max-width: 900px) {
+    .critical-alert-panel.alert-cluster {
+        right: 18px !important;
+        top: 120px !important;
+        transform: scale(.86);
+        transform-origin: top right;
+    }
+}
+
+@media (max-width: 640px) {
+    .critical-alert-panel.alert-cluster {
+        right: 12px !important;
+        top: 110px !important;
+        transform: scale(.74);
+    }
 }
 
 /* =========================================================
@@ -1544,7 +1731,60 @@ HIGHLIGHT / PULSE
     }
 }
 
+/* =========================================================
+   FINAL OVERRIDE — ALERT BUTTON COLORS
+   ========================================================= */
 
+/* FULL ALERT — red */
+.critical-alert-panel.alert-cluster .outzen-alert-button.outzen-alert-button--crowd {
+    background: radial-gradient(circle at 35% 22%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.35) 14%, transparent 30%), radial-gradient(circle at 50% 56%, #ff4a4a 0%, #d90000 42%, #7e0000 72%, #210000 100%) !important;
+    box-shadow: 0 0 0 9px #170404, 0 0 0 15px #b6b6b6, 0 0 0 19px #202020, 0 0 22px rgba(255,0,0,.75), 0 0 52px rgba(255,0,0,.35), 0 12px 26px rgba(0,0,0,.62), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 26px rgba(0,0,0,.72) !important;
+}
+
+/* CRITICAL WEATHER — turquoise */
+.critical-alert-panel.alert-cluster .outzen-alert-button.outzen-alert-button--weather {
+    background: radial-gradient(circle at 35% 22%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.38) 14%, transparent 30%), radial-gradient(circle at 50% 56%, #63fff8 0%, #00d6d6 42%, #00727d 72%, #00272d 100%) !important;
+    box-shadow: 0 0 0 9px #03191c, 0 0 0 15px #c8ffff, 0 0 0 19px #073035, 0 0 24px rgba(0,255,255,.88), 0 0 58px rgba(0,255,255,.45), 0 12px 26px rgba(0,0,0,.62), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 26px rgba(0,0,0,.72) !important;
+}
+
+/* CRITICAL TRAFFIC CONGESTION — orange */
+.critical-alert-panel.alert-cluster .outzen-alert-button.outzen-alert-button--traffic {
+    background: radial-gradient(circle at 35% 22%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.36) 14%, transparent 30%), radial-gradient(circle at 50% 56%, #ffc44a 0%, #ff9800 42%, #a34f00 72%, #351700 100%) !important;
+    box-shadow: 0 0 0 9px #1d1002, 0 0 0 15px #ffd38a, 0 0 0 19px #2b1601, 0 0 24px rgba(255,152,0,.88), 0 0 58px rgba(255,152,0,.48), 0 12px 26px rgba(0,0,0,.62), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 26px rgba(0,0,0,.72) !important;
+}
+
+/* =========================================================
+   FIX FINAL — OUTZEN ALERT BUTTONS COLORS
+   ========================================================= */
+
+.critical-alert-panel.alert-cluster .outzen-alert-button::before {
+    display: none !important;
+    content: none !important;
+}
+
+.critical-alert-panel.alert-cluster .outzen-alert-button {
+    border-radius: 50% !important;
+    border: 6px solid #1b1b1b !important;
+    color: #fff !important;
+    box-shadow: 0 0 0 6px rgba(190,190,190,.95), 0 0 0 11px rgba(20,20,20,.95), 0 14px 28px rgba(0,0,0,.65), inset 0 12px 18px rgba(255,255,255,.35), inset 0 -18px 28px rgba(0,0,0,.75) !important;
+}
+
+/* FULL ALERT — rouge */
+.critical-alert-panel.alert-cluster .outzen-alert-button--crowd {
+    background: radial-gradient(circle at 35% 22%, #ffb1b1 0%, #ff3030 26%, #c40000 55%, #3a0000 100%) !important;
+}
+
+/* CRITICAL WEATHER — turquoise */
+.critical-alert-panel.alert-cluster .outzen-alert-button--weather {
+    background: radial-gradient(circle at 35% 22%, #dfffff 0%, #42fff4 26%, #00aeb8 55%, #002f36 100%) !important;
+    box-shadow: 0 0 0 6px rgba(190,255,255,.95), 0 0 0 11px rgba(0,50,55,.95), 0 0 32px rgba(0,255,255,.75), 0 14px 28px rgba(0,0,0,.65), inset 0 12px 18px rgba(255,255,255,.35), inset 0 -18px 28px rgba(0,0,0,.75) !important;
+}
+
+/* CRITICAL TRAFFIC — orange */
+.critical-alert-panel.alert-cluster .outzen-alert-button--traffic {
+    background: radial-gradient(circle at 35% 22%, #fff0c2 0%, #ffc044 26%, #ff8c00 55%, #3b1600 100%) !important;
+    box-shadow: 0 0 0 6px rgba(255,215,145,.95), 0 0 0 11px rgba(45,20,0,.95), 0 0 32px rgba(255,145,0,.75), 0 14px 28px rgba(0,0,0,.65), inset 0 12px 18px rgba(255,255,255,.35), inset 0 -18px 28px rgba(0,0,0,.75) !important;
+}
 
 
 
