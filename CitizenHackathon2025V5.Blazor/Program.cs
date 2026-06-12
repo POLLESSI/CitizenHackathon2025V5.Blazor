@@ -162,6 +162,7 @@ builder.Services.AddScoped<SuggestionMapService>();
 builder.Services.AddScoped<TrafficConditionService>();
 builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.UserService>();
 builder.Services.AddScoped<TrafficStateService>();
+builder.Services.AddScoped<ITrafficCriticalAlertClientService, TrafficCriticalAlertClientService>();
 builder.Services.AddScoped<TrafficServiceBlazor>();
 builder.Services.AddScoped<TrafficSignalRService>();
 

@@ -130,23 +130,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             if (!resp.IsSuccessStatusCode) return null;
             return await resp.Content.ReadFromJsonAsync<ClientWeatherForecastDTO>();
         }
-        //public async Task<ClientWeatherForecastDTO?> GenerateNewForecastAsync(CancellationToken ct = default)
-        //{
-        //    try
-        //    {
-        //        // POST /api/WeatherForecast/generate
-        //        var resp = await _http.PostAsync("WeatherForecast/generate", content: null, ct);
-        //        resp.EnsureSuccessStatusCode();
-
-        //        return await resp.Content.ReadFromJsonAsync<ClientWeatherForecastDTO>(cancellationToken: ct);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Console.Error.WriteLine($"Unexpected error in GenerateNewForecastAsync: {ex.Message}");
-        //        return null;
-        //    }
-        //}
-
         public async Task<ClientWeatherForecastDTO?> PullCurrentLocationAsync(decimal lat, decimal lon, CancellationToken ct = default)
         {
             using var resp = await _http.PostAsync(

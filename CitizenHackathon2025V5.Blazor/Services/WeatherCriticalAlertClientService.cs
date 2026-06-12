@@ -1,6 +1,5 @@
 ﻿using CitizenHackathon2025.Contracts.Enums;
 using CitizenHackathon2025.Contracts.DTOs;
-using CitizenHackathon2025.Contracts.Enums;
 using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using System.Net.Http.Json;
 

@@ -32,6 +32,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         [Inject] public WeatherForecastService WeatherForecastService { get; set; } = default!;
         [Inject] public GptInteractionService GptInteractionService { get; set; } = default!;
         [Inject] public IGptClientOrchestrator GptClientOrchestrator { get; set; } = default!;
+        [Inject] public ITrafficCriticalAlertClientService TrafficCriticalAlertService { get; set; } = default!;
         [Inject] public IWeatherCriticalAlertClientService WeatherCriticalAlertService { get; set; } = default!;
         [Inject] public NavigationManager Navigation { get; set; } = default!;
         [Inject] public IHubUrlBuilder HubUrls { get; set; } = default!;
@@ -171,6 +172,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             await NotifyDataLoadedAsync(fit: true);
         }
 
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            await base.OnAfterRenderAsync(firstRender);
+
+            if (firstRender)
+            {
+                await JS.InvokeVoidAsync("OutZenInterop.makeAlertClusterDraggable");
+            }
+        }
         protected override async Task SeedAsync(bool fit)
         {
             var payload = new
@@ -393,8 +403,66 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             try
             {
-                ToastService.ShowWarning("🚗 Critical traffic congestion alert not implemented yet.");
-                await Task.CompletedTask;
+                await ResolveNearestPlaceFromUserLocationAsync();
+
+                if (_selectedLatitude == 0 || _selectedLongitude == 0)
+                {
+                    _criticalTrafficStatus = "Unable to resolve GPS location for traffic alert.";
+                    ToastService.ShowWarning(_criticalTrafficStatus);
+                    return;
+                }
+
+                var placeId = _selectedPlaceId ?? 0;
+                var placeName = string.IsNullOrWhiteSpace(_selectedPlaceName)
+                    ? "Current location"
+                    : _selectedPlaceName;
+
+                var result = await TrafficCriticalAlertService.SendCriticalTrafficAlertAsync(
+                    latitude: (decimal)_selectedLatitude,
+                    longitude: (decimal)_selectedLongitude,
+                    trafficLevel: CitizenHackathon2025.Contracts.Enums.TrafficLevel.Jammed,
+                    description: $"Manual critical traffic congestion alert near {placeName}");
+
+                if (!result.Ok)
+                {
+                    _criticalTrafficStatus = result.Error ?? "Unknown traffic alert error.";
+                    ToastService.ShowError(_criticalTrafficStatus);
+                    return;
+                }
+
+                var declaredAtUtc = DateTime.UtcNow;
+                var expiresAtUtc = result.ExpiresAtUtc ?? declaredAtUtc.AddMinutes(5);
+
+                _criticalTrafficStatus = $"Critical traffic congestion confirmed for {placeName}";
+
+                ToastService.ShowWarning(
+                    $"🚗 CRITICAL TRAFFIC CONGESTION confirmed for {placeName}.",
+                    settings =>
+                    {
+                        settings.Timeout = 0;
+                        settings.ShowProgressBar = true;
+                    });
+
+                await JS.InvokeVoidAsync(
+                    "OutZenInterop.addOrUpdateTrafficAlertMarker",
+                    new
+                    {
+                        PlaceId = placeId,
+                        PlaceName = placeName,
+                        Latitude = _selectedLatitude,
+                        Longitude = _selectedLongitude,
+                        DeclaredAtUtc = declaredAtUtc,
+                        ExpiresAtUtc = expiresAtUtc,
+                        kind = "traffic",
+                        title = "🚗 CRITICAL TRAFFIC",
+                        description = $"Critical traffic congestion declared near {placeName}",
+                        icon = "🚗",
+                        severity = "Jammed",
+                        trafficLevel = "Jammed"
+                    },
+                    ScopeKey);
+
+                await RefreshHomeDataAsync(fit: false);
             }
             finally
             {

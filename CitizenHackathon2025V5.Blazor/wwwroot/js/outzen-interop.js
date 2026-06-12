@@ -229,6 +229,132 @@
     };
 
     console.log("[outzen-location] registered", !!globalThis.outzenLocation);
+
+    globalThis.OutZenInterop.makeAlertClusterDraggable = function () {
+        const panel = document.querySelector(".critical-alert-panel.alert-cluster");
+
+        if (!panel) {
+            console.warn("[OutZen] alert cluster not found");
+            return false;
+        }
+
+        if (panel.dataset.draggable === "true") {
+            return true;
+        }
+
+        panel.dataset.draggable = "true";
+
+        const lockSize = () => {
+            panel.style.removeProperty("width");
+            panel.style.removeProperty("min-width");
+            panel.style.removeProperty("max-width");
+            panel.style.setProperty("height", "auto", "important");
+        };
+
+        const setPosition = (left, top) => {
+            panel.style.setProperty("left", `${left}px`, "important");
+            panel.style.setProperty("top", `${top}px`, "important");
+            panel.style.setProperty("right", "auto", "important");
+            panel.style.setProperty("bottom", "auto", "important");
+            lockSize();
+        };
+
+        lockSize();
+
+        panel.addEventListener("dblclick", function () {
+            panel.classList.toggle("is-expanded");
+        });
+
+        const saved = localStorage.getItem("outzen.alertCluster.position");
+
+        if (saved) {
+            try {
+                const pos = JSON.parse(saved);
+
+                if (Number.isFinite(pos.left) && Number.isFinite(pos.top)) {
+                    setPosition(pos.left, pos.top);
+                }
+            } catch {
+                localStorage.removeItem("outzen.alertCluster.position");
+            }
+        }
+
+        let dragging = false;
+        let startX = 0;
+        let startY = 0;
+        let startLeft = 0;
+        let startTop = 0;
+
+        panel.addEventListener("pointerdown", function (e) {
+            if (e.target.closest("button")) {
+                return;
+            }
+
+            dragging = true;
+
+            const rect = panel.getBoundingClientRect();
+
+            startX = e.clientX;
+            startY = e.clientY;
+            startLeft = rect.left;
+            startTop = rect.top;
+
+            panel.classList.add("is-dragging");
+            panel.setPointerCapture(e.pointerId);
+
+            e.preventDefault();
+        });
+
+        panel.addEventListener("pointermove", function (e) {
+            if (!dragging) {
+                return;
+            }
+
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            const rect = panel.getBoundingClientRect();
+            const margin = 8;
+
+            const nextLeft = Math.min(
+                Math.max(startLeft + dx, margin),
+                window.innerWidth - rect.width - margin
+            );
+
+            const nextTop = Math.min(
+                Math.max(startTop + dy, margin),
+                window.innerHeight - rect.height - margin
+            );
+
+            setPosition(nextLeft, nextTop);
+        });
+
+        panel.addEventListener("pointerup", function (e) {
+            if (!dragging) {
+                return;
+            }
+
+            dragging = false;
+            panel.classList.remove("is-dragging");
+
+            try {
+                panel.releasePointerCapture(e.pointerId);
+            } catch { }
+
+            const rect = panel.getBoundingClientRect();
+
+            localStorage.setItem("outzen.alertCluster.position", JSON.stringify({
+                left: rect.left,
+                top: rect.top
+            }));
+        });
+
+        console.log("[OutZen] alert cluster draggable enabled");
+
+        return true;
+    };
+    window.OutZenInterop = window.OutZenInterop || {};
+
 })();
 
 
