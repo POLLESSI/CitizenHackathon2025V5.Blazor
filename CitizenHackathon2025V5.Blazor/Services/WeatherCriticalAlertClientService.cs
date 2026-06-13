@@ -8,17 +8,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
     public sealed class WeatherCriticalAlertClientService : IWeatherCriticalAlertClientService
     {
         private readonly HttpClient _http;
+        private readonly IDeviceIdentityService _deviceIdentity;
 
-        public WeatherCriticalAlertClientService(HttpClient http)
+        public WeatherCriticalAlertClientService(HttpClient http, IDeviceIdentityService deviceIdentity)
         {
             _http = http;
+            _deviceIdentity = deviceIdentity;
         }
 
-        public async Task<WeatherAlertResultDTO> SendCriticalWeatherAlertAsync(
-            decimal latitude,
-            decimal longitude,
-            WeatherType weatherType,
-            string description)
+        public async Task<WeatherAlertResultDTO> SendCriticalWeatherAlertAsync(decimal latitude, decimal longitude, WeatherType weatherType, string description)
         {
             var payload = new ManualWeatherAlertDTO
             {
@@ -26,7 +24,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 Longitude = longitude,
                 WeatherType = weatherType,
                 Severity = SeverityLevel.Critical,
-                Description = description
+                Description = description,
+                DeviceId = await _deviceIdentity.GetDeviceIdAsync()
             };
 
             var response = await _http.PostAsJsonAsync(

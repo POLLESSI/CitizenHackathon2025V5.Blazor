@@ -1,0 +1,118 @@
+﻿using CitizenHackathon2025.Contracts.DTOs;
+using CitizenHackathon2025.Contracts.Enums;
+
+namespace CitizenHackathon2025V5.Blazor.Client.Services.Interfaces
+{
+    public interface IDisasterCriticalAlertClientService
+    {
+        Task<DisasterAlertResultDTO> SendCriticalDisasterAlertAsync(
+            decimal latitude,
+            decimal longitude,
+            string? placeName,
+            DisasterType disasterType,
+            string description,
+            CancellationToken ct = default);
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025.API. All rights reserved.

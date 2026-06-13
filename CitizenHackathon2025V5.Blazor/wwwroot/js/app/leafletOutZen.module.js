@@ -1181,6 +1181,78 @@ export function addOrUpdateTrafficAlertMarker(alert, scopeKey = "home") {
     console.log("[TRAFFIC ALERT]", { declaredAtUtc, expiresAtUtc, expiresMs, delay });
 }
 
+export function addOrUpdateDisasterAlertMarker(alert, scopeKey = "home") {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { k, s, L } = ready;
+    const ll = pickLatLng(alert);
+    if (!ll) return false;
+
+    const key = `disaster-alert:${alert.PlaceName ?? alert.placeName ?? "gps"}`;
+
+    const placeName = alert.PlaceName ?? alert.placeName ?? "Current location";
+    const declaredAtUtc = alert.DeclaredAtUtc ?? alert.declaredAtUtc ?? new Date().toISOString();
+    const expiresAtUtc = alert.ExpiresAtUtc ?? alert.expiresAtUtc;
+
+    const popupHtml = buildPopupHtml({
+        title: "🚨 DISASTER ALERT",
+        description: `${placeName} • simulation emergency escalation • ${fmtTime(declaredAtUtc)}`
+    }, s);
+
+    const icon = L.divIcon({
+        className: "oz-disaster-alert-marker",
+        html: `
+            <div class="oz-disaster-alert-ring">
+                <div class="oz-disaster-alert-core">
+                    <div class="oz-disaster-alert-icon">🚨</div>
+                    <div class="oz-disaster-alert-title">DISASTER</div>
+                </div>
+            </div>
+        `.trim(),
+        iconSize: [96, 96],
+        iconAnchor: [48, 48],
+        popupAnchor: [0, -52]
+    });
+
+    let marker = s.markers.get(key);
+
+    if (marker) {
+        try { marker.setLatLng([ll.lat, ll.lng]); } catch { }
+        try { marker.setIcon(icon); } catch { }
+        try {
+            if (marker.getPopup()) marker.setPopupContent(popupHtml);
+            else safeBindPopup(marker, popupHtml);
+        } catch { }
+    } else {
+        marker = L.marker([ll.lat, ll.lng], {
+            icon,
+            title: "DISASTER ALERT",
+            riseOnHover: true,
+            zIndexOffset: 60000,
+            __ozNoCluster: true
+        });
+
+        safeBindPopup(marker, popupHtml);
+        addLayerSmart(marker, s);
+        s.markers.set(key, marker);
+    }
+
+    const expiresMs = expiresAtUtc
+        ? new Date(expiresAtUtc).getTime()
+        : Date.now() + 10 * 60 * 1000;
+
+    const delay = Math.max(10 * 60 * 1000, expiresMs - Date.now());
+
+    clearTimeout(marker.__ozDisasterAlertTimer);
+
+    marker.__ozDisasterAlertTimer = setTimeout(() => {
+        try { removeCrowdMarker(key, k); } catch { }
+    }, delay);
+
+    return true;
+}
+
 /* ---------------------------------------------------------
    Calendar markers (NO cluster)
 --------------------------------------------------------- */

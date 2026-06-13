@@ -1,40 +1,44 @@
 ﻿using CitizenHackathon2025.Contracts.DTOs;
 using CitizenHackathon2025.Contracts.Enums;
 using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
+using CitizenHackathon2025V5.Blazor.Client.Utils;
+using Microsoft.JSInterop;
 using System.Net.Http.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
-    public sealed class TrafficCriticalAlertClientService : ITrafficCriticalAlertClientService
+    public sealed class DisasterCriticalAlertClientService : IDisasterCriticalAlertClientService
     {
         private readonly HttpClient _http;
         private readonly IDeviceIdentityService _deviceIdentity;
 
-        public TrafficCriticalAlertClientService(HttpClient http, IDeviceIdentityService deviceIdentity)
+        public DisasterCriticalAlertClientService(HttpClient http, IDeviceIdentityService deviceIdentity)
         {
             _http = http;
             _deviceIdentity = deviceIdentity;
         }
 
-        public async Task<TrafficAlertResultDTO> SendCriticalTrafficAlertAsync(
+        public async Task<DisasterAlertResultDTO> SendCriticalDisasterAlertAsync(
             decimal latitude,
             decimal longitude,
-            TrafficLevel trafficLevel,
+            string? placeName,
+            DisasterType disasterType,
             string description,
             CancellationToken ct = default)
         {
-            var payload = new ManualTrafficAlertDTO
+            var payload = new ManualDisasterAlertDTO
             {
                 Latitude = latitude,
                 Longitude = longitude,
-                TrafficLevel = trafficLevel,
-                IncidentType = "Critical congestion",
+                PlaceName = placeName,
+                DisasterType = disasterType,
+                Severity = 4,
                 Description = description,
                 DeviceId = await _deviceIdentity.GetDeviceIdAsync()
             };
 
             using var response = await _http.PostAsJsonAsync(
-                "TrafficCondition/manual-critical-alert",
+                "DisasterAlert/manual-critical-alert",
                 payload,
                 ct);
 
@@ -42,7 +46,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             if (!response.IsSuccessStatusCode)
             {
-                return new TrafficAlertResultDTO
+                return new DisasterAlertResultDTO
                 {
                     Ok = false,
                     Status = "Error",
@@ -50,12 +54,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 };
             }
 
-            return await response.Content.ReadFromJsonAsync<TrafficAlertResultDTO>(cancellationToken: ct)
-                   ?? new TrafficAlertResultDTO
+            return await response.Content.ReadFromJsonAsync<DisasterAlertResultDTO>(cancellationToken: ct)
+                   ?? new DisasterAlertResultDTO
                    {
-                       Ok = true,
-                       Status = "Confirmed",
-                       ExpiresAtUtc = DateTime.UtcNow.AddMinutes(5)
+                       Ok = false,
+                       Status = "Error",
+                       Error = "Empty response."
                    };
         }
     }
@@ -162,42 +166,4 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025.API. All rights reserved.
+// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.

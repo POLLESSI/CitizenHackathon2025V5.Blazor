@@ -26,6 +26,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         [Inject] public CrowdInfoService CrowdInfoService { get; set; } = default!;
         [Inject] public CrowdInfoCalendarService CrowdInfoCalendarService { get; set; } = default!;
         [Inject] public ICrowdInfoAntennaService CrowdInfoAntennaService { get; set; } = default!;
+        [Inject] public IDisasterCriticalAlertClientService DisasterCriticalAlertService { get; set; } = default!;
+
         [Inject] public EventService EventService { get; set; } = default!;
         [Inject] public SuggestionService SuggestionService { get; set; } = default!;
         [Inject] public PlaceService PlaceService { get; set; } = default!;
@@ -48,6 +50,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         protected override int HybridThreshold => 13;
         protected override bool ForceBootOnFirstRender => false;
         protected override bool ResetMarkersOnBoot => false;
+        private bool _criticalDisasterSending;
+        private string _criticalDisasterStatus;
 
         public MessageFormModel Model { get; } = new();
         private bool _isSendingPrompt;
@@ -467,6 +471,75 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             finally
             {
                 _criticalTrafficSending = false;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+
+        private async Task SendCriticalDisasterAlertAsync()
+        {
+            _criticalDisasterSending = true;
+
+            try
+            {
+                await ResolveNearestPlaceFromUserLocationAsync();
+
+                var placeName = string.IsNullOrWhiteSpace(_selectedPlaceName)
+                    ? "Current location"
+                    : _selectedPlaceName;
+
+                var result = await DisasterCriticalAlertService.SendCriticalDisasterAlertAsync(
+                    latitude: (decimal)_selectedLatitude,
+                    longitude: (decimal)_selectedLongitude,
+                    placeName: placeName,
+                    disasterType: DisasterType.MassCasualty,
+                    description: $"Manual disaster alert near {placeName}");
+
+                if (!result.Ok)
+                {
+                    _criticalDisasterStatus = result.Error ?? "Disaster alert failed.";
+                    ToastService.ShowError(_criticalDisasterStatus);
+                    return;
+                }
+
+                if (result.Status == "Pending")
+                {
+                    _criticalDisasterStatus =
+                        $"Disaster alert pending: {result.ConfirmationCount}/{result.RequiredCount} confirmations.";
+
+                    ToastService.ShowWarning(_criticalDisasterStatus);
+                    return;
+                }
+
+                _criticalDisasterStatus =
+                    $"DISASTER ALERT confirmed for {placeName}. Emergency escalation simulated.";
+
+                ToastService.ShowError(
+                    $"🚨 DISASTER ALERT confirmed for {placeName}. Simulation: emergency escalation request created.",
+                    settings =>
+                    {
+                        settings.Timeout = 0;
+                        settings.ShowProgressBar = true;
+                    });
+
+                await JS.InvokeVoidAsync(
+                    "OutZenInterop.addOrUpdateDisasterAlertMarker",
+                    new
+                    {
+                        PlaceName = placeName,
+                        Latitude = _selectedLatitude,
+                        Longitude = _selectedLongitude,
+                        DeclaredAtUtc = DateTime.UtcNow,
+                        ExpiresAtUtc = result.ExpiresAtUtc ?? DateTime.UtcNow.AddMinutes(10),
+                        title = "🚨 DISASTER ALERT",
+                        description = "Simulation only - pending operator review for emergency escalation.",
+                        icon = "🚨",
+                        severity = "Critical"
+                    },
+                    ScopeKey);
+            }
+            finally
+            {
+                _criticalDisasterSending = false;
                 await InvokeAsync(StateHasChanged);
             }
         }

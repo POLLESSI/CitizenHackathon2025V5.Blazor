@@ -200,6 +200,21 @@
         map.setView([50.45, 4.75], 8);
     };
 
+    window.OutZenDevice = {
+
+        getOrCreateDeviceId: () => {
+
+            let id = localStorage.getItem("outzen.device.id");
+
+            if (!id) {
+                id = crypto.randomUUID();
+                localStorage.setItem("outzen.device.id", id);
+            }
+
+            return id;
+        }
+    };
+
     globalThis.outzenLocation = {
         getCurrentPosition: function () {
             return new Promise(function (resolve, reject) {
