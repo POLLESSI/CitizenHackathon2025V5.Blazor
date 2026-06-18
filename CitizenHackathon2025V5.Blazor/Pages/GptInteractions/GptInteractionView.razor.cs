@@ -163,7 +163,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 _renderQueued = false;
             }
         }
-
         private async Task CloseAiOverlay()
         {
             _showAiOverlay = false;
@@ -933,12 +932,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             _dotNetRef?.Dispose();
             _dotNetRef = null;
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            if (!_disposed)
-                await OnBeforeDisposeAsync();
         }
 
         private sealed class VoiceStartResult
