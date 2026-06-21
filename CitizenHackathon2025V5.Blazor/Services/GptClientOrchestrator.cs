@@ -70,7 +70,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
         }
 
-        public async Task<GptRunResult> RunAsync(string prompt, double? latitude = null, double? longitude = null, string languageCode = "fr-FR", bool preferAsyncPipeline = true, CancellationToken ct = default)
+        public async Task<GptRunResult> RunAsync(string prompt, double? latitude = null, double? longitude = null, string languageCode = "fr-FR", CancellationToken ct = default)
         {
             ThrowIfDisposed();
 
@@ -83,32 +83,32 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 };
             }
 
-            if (!preferAsyncPipeline)
-            {
-                var syncFinal = await _gptService.AskGptSync(prompt, latitude, longitude, languageCode, ct);
-                if (syncFinal is null || syncFinal.Id <= 0)
-                {
-                    return new GptRunResult
-                    {
-                        Started = false,
-                        StatusMessage = "The synchronous GPT request failed."
-                    };
-                }
+            //if (!preferAsyncPipeline)
+            //{
+            //    var syncFinal = await _gptService.AskGptSync(prompt, latitude, longitude, languageCode, ct);
+            //    if (syncFinal is null || syncFinal.Id <= 0)
+            //    {
+            //        return new GptRunResult
+            //        {
+            //            Started = false,
+            //            StatusMessage = "The synchronous GPT request failed."
+            //        };
+            //    }
 
-                _currentInteractionId = syncFinal.Id;
-                _currentRequestId = null;
+            //    _currentInteractionId = syncFinal.Id;
+            //    _currentRequestId = null;
 
-                await RaiseInteractionUpdatedAsync(syncFinal);
-                await RaiseStatusChangedAsync("Generation completed.");
+            //    await RaiseInteractionUpdatedAsync(syncFinal);
+            //    await RaiseStatusChangedAsync("Generation completed.");
 
-                return new GptRunResult
-                {
-                    Started = true,
-                    InteractionId = syncFinal.Id,
-                    FinalInteraction = syncFinal,
-                    StatusMessage = "Generation completed."
-                };
-            }
+            //    return new GptRunResult
+            //    {
+            //        Started = true,
+            //        InteractionId = syncFinal.Id,
+            //        FinalInteraction = syncFinal,
+            //        StatusMessage = "Generation completed."
+            //    };
+            //}
 
             await EnsureHubAsync(ct);
 
@@ -494,11 +494,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
         private async Task HandleCompletedAsync(ClientGptInteractionCompletedDTO dto)
         {
+            Console.WriteLine($"[GPT CLIENT] COMPLETED {dto.Id}");
             Console.WriteLine($"[GptClientOrchestrator] COMPLETED received -> InteractionId={dto.Id}");
+
             var live = _live.GetOrAdd(dto.Id, _ => new LiveInteractionState(dto.Id));
             live.HasReceivedHubEvent = true;
 
             var completed = MapCompletedDto(dto);
+
             await CompleteInteractionAsync(completed);
         }
 
@@ -548,9 +551,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                         if (live.IsCompleted)
                             return;
 
-                        if (live.HasReceivedHubEvent)
+                        if (live.IsCompleted)
                         {
-                            Console.WriteLine($"[GptClientOrchestrator] PollFallback stopped: SignalR active for interactionId={interactionId}");
                             return;
                         }
                     }

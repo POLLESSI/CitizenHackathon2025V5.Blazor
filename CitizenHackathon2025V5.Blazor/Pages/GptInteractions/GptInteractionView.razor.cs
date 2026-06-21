@@ -5,9 +5,10 @@ using CitizenHackathon2025V5.Blazor.Client.Services;
 using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.JSInterop;
+using Microsoft.VisualBasic;
 using System.Globalization;
 using System.Text.RegularExpressions;
-using Microsoft.JSInterop;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 {
@@ -26,6 +27,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         public List<ClientGptInteractionDTO> GptInteractions { get; set; } = new();
 
+        private List<ClientGptInteractionDTO> _interactions = [];
         private readonly List<ClientGptInteractionDTO> allGptInteractions = new();
         protected readonly List<ClientGptInteractionDTO> visibleGptInteractions = new();
 
@@ -358,9 +360,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 ResetUiState();
 
                 _aiState = AiProcessingState.Generating;
-                _aiStatusMessage = PreferAsyncPipeline
-                    ? "Submitting async GPT request..."
-                    : "Generating response...";
+                _aiStatusMessage = PreferAsyncPipeline ? "Submitting async GPT request..." : "Generating response...";
 
                 await StartElapsedTimerAsync();
                 await ShowOverlayAsync();
@@ -378,12 +378,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                         $"[GPT VIEW] Coordinates extracted from prompt: lat={effectiveLatitude}, lng={effectiveLongitude}");
                 }
 
-                var result = await GptClientOrchestrator.RunAsync(
-                    prompt,
-                    latitude: effectiveLatitude,
-                    longitude: effectiveLongitude,
-                    languageCode: _mistralResponseLang,
-                    preferAsyncPipeline: PreferAsyncPipeline);
+                var result = await GptClientOrchestrator.RunAsync(prompt, latitude: effectiveLatitude, longitude: effectiveLongitude, languageCode: _mistralResponseLang, ct: CancellationToken.None);
+
+                _ = Task.Run(async () =>
+                {
+                    await Task.Delay(5000);
+
+                    var latest =
+                        await GptInteractionService.GetAllInteractions();
+
+                    await InvokeAsync(() =>
+                    {
+                        _interactions = latest.ToList();
+                        StateHasChanged();
+                    });
+                });
 
                 if (!result.Started)
                     throw new InvalidOperationException("The GPT request could not be started.");

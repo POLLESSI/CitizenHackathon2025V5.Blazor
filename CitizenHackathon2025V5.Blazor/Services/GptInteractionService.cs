@@ -1,4 +1,5 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
+using Microsoft.AspNetCore.Components.WebAssembly.Http;
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -107,82 +108,85 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
         }
 
-        public async Task<ClientGptInteractionDTO> AskGptSync(string prompt, double? latitude = null, double? longitude = null, string languageCode = "fr-FR", CancellationToken ct = default)
-        {
-            if (string.IsNullOrWhiteSpace(prompt))
-                return null;
+        //public async Task<ClientGptInteractionDTO> AskGptSync(string prompt, double? latitude = null, double? longitude = null, string languageCode = "fr-FR", CancellationToken ct = default)
+        //{
+        //    if (string.IsNullOrWhiteSpace(prompt))
+        //        return null;
 
-            var payload = new AskGptRequest
-            {
-                Prompt = prompt.Trim(),
-                Latitude = latitude,
-                Longitude = longitude,
-                LanguageCode = languageCode
-            };
+        //    var payload = new AskGptRequest
+        //    {
+        //        Prompt = prompt.Trim(),
+        //        Latitude = latitude,
+        //        Longitude = longitude,
+        //        LanguageCode = languageCode
+        //    };
 
-            var url = $"{BaseRoute}/ask-mistral-sync";
+        //    var url = $"{BaseRoute}/ask-mistral-sync";
 
-            try
-            {
-                LogInfo($"[AskGptSync] POST {BuildAbsoluteUrl(url)} | promptLength={payload.Prompt.Length} | lat={latitude?.ToString() ?? "null"} | lng={longitude?.ToString() ?? "null"}");
+        //    try
+        //    {
+        //        LogInfo($"[AskGptSync] POST {BuildAbsoluteUrl(url)} | promptLength={payload.Prompt.Length} | lat={latitude?.ToString() ?? "null"} | lng={longitude?.ToString() ?? "null"}");
 
-                using var response = await _httpClient.PostAsJsonAsync(url, payload, ct);
-                var raw = await response.Content.ReadAsStringAsync(ct);
+        //        using var request = new HttpRequestMessage(HttpMethod.Post, url)
+        //        {
+        //            Content = JsonContent.Create(payload)
+        //        };
 
-                LogInfo($"[AskGptSync] HTTP {(int)response.StatusCode} {response.StatusCode} | body={TruncateForLog(raw)}");
+        //        request.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
 
-                response.EnsureSuccessStatusCode();
+        //        using var response = await _httpClient.SendAsync(request, ct);
 
-                var interaction = JsonSerializer.Deserialize<ClientGptInteractionDTO>(raw, JsonOptions);
+        //        var raw = await response.Content.ReadAsStringAsync(ct);
 
-                if (interaction is not null && interaction.Id > 0)
-                {
-                    interaction.Prompt ??= payload.Prompt;
-                    interaction.Response ??= string.Empty;
-                    interaction.Active = true;
+        //        LogInfo($"[AskGptSync] HTTP {(int)response.StatusCode} {response.StatusCode} | body={TruncateForLog(raw)}");
 
-                    if (interaction.CreatedAt == default)
-                        interaction.CreatedAt = DateTime.UtcNow;
+        //        response.EnsureSuccessStatusCode();
 
-                    LogInfo($"[AskGptSync] Parsed interaction successfully. id={interaction.Id}, hasResponse={!string.IsNullOrWhiteSpace(interaction.Response)}");
-                    return interaction;
-                }
+        //        var interaction = JsonSerializer.Deserialize<ClientGptInteractionDTO>(raw, JsonOptions);
 
-                throw new InvalidOperationException("Unexpected response format returned by api/Gpt/ask-mistral-sync.");
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                LogWarn("[AskGptSync] Cancelled by caller.");
-                throw;
-            }
-            catch (TaskCanceledException ex)
-            {
-                LogWarn($"[AskGptSync] Timed out or cancelled by HttpClient. {ex.Message}");
-                throw;
-            }
-            catch (HttpRequestException ex)
-            {
-                LogError($"[AskGptSync] HTTP error: {ex}");
-                throw;
-            }
-            catch (JsonException ex)
-            {
-                LogError($"[AskGptSync] JSON parse error: {ex}");
-                throw;
-            }
-            catch (Exception ex)
-            {
-                LogError($"[AskGptSync] Unexpected error: {ex}");
-                throw;
-            }
-        }
+        //        if (interaction is not null && interaction.Id > 0)
+        //        {
+        //            interaction.Prompt ??= payload.Prompt;
+        //            interaction.Response ??= string.Empty;
+        //            interaction.Active = true;
 
-        public async Task<ClientGptStartResponseDTO> StartGptAsync(
-            string prompt,
-            double? latitude = null,
-            double? longitude = null,
-            string languageCode = "fr-FR",
-            CancellationToken ct = default)
+        //            if (interaction.CreatedAt == default)
+        //                interaction.CreatedAt = DateTime.UtcNow;
+
+        //            LogInfo($"[AskGptSync] Parsed interaction successfully. id={interaction.Id}, hasResponse={!string.IsNullOrWhiteSpace(interaction.Response)}");
+        //            return interaction;
+        //        }
+
+        //        throw new InvalidOperationException("Unexpected response format returned by api/Gpt/ask-mistral-sync.");
+        //    }
+        //    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        //    {
+        //        LogWarn("[AskGptSync] Cancelled by caller.");
+        //        throw;
+        //    }
+        //    catch (TaskCanceledException ex)
+        //    {
+        //        LogWarn($"[AskGptSync] Timed out or cancelled by HttpClient. {ex.Message}");
+        //        throw;
+        //    }
+        //    catch (HttpRequestException ex)
+        //    {
+        //        LogError($"[AskGptSync] HTTP error: {ex}");
+        //        throw;
+        //    }
+        //    catch (JsonException ex)
+        //    {
+        //        LogError($"[AskGptSync] JSON parse error: {ex}");
+        //        throw;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        LogError($"[AskGptSync] Unexpected error: {ex}");
+        //        throw;
+        //    }
+        //}
+
+        public async Task<ClientGptStartResponseDTO> StartGptAsync(string prompt, double? latitude = null, double? longitude = null, string languageCode = "fr-FR", CancellationToken ct = default)
         {
             if (string.IsNullOrWhiteSpace(prompt))
                 return null;
@@ -201,7 +205,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             {
                 LogInfo($"[StartGptAsync] POST {BuildAbsoluteUrl(url)} | promptLength={payload.Prompt.Length} | lat={latitude?.ToString() ?? "null"} | lng={longitude?.ToString() ?? "null"}");
 
-                using var response = await _httpClient.PostAsJsonAsync(url, payload, ct);
+                using var request = new HttpRequestMessage(HttpMethod.Post, url)
+                {
+                    Content = JsonContent.Create(payload)
+                };
+
+                request.SetBrowserRequestCredentials(BrowserRequestCredentials.Include);
+
+                using var response = await _httpClient.SendAsync(request, ct);
+
                 var raw = await response.Content.ReadAsStringAsync(ct);
 
                 LogInfo($"[StartGptAsync] HTTP {(int)response.StatusCode} {response.StatusCode} | body={TruncateForLog(raw)}");

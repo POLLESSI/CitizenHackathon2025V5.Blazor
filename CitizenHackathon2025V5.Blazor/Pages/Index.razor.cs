@@ -833,7 +833,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                     prompt,
                     latitude: DefaultCenter.lat,
                     longitude: DefaultCenter.lng,
-                    preferAsyncPipeline: true);
+                    languageCode: "fr-FR");
 
                 Console.WriteLine($"[HOME GPT] Started={result.Started}, InteractionId={result.InteractionId}, RequestId={result.RequestId}");
 
