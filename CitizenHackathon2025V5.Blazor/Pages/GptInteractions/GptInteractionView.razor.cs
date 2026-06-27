@@ -468,7 +468,43 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             if (SelectedId == 0)
                 SelectedId = dto.Id;
 
-            await SafeRenderAsync(500);
+            await SafeRenderAsync(700);
+
+            if (!CanSpeakFinalResponse(dto))
+                return;
+
+            await Task.Delay(300);
+
+            if (_disposed)
+                return;
+
+            await TrySpeakCompletedInteractionAsync(dto);
+        }
+
+        private bool CanSpeakFinalResponse(ClientGptInteractionDTO dto)
+        {
+            if (!_voiceOutputEnabled)
+                return false;
+
+            if (dto.Id <= 0)
+                return false;
+
+            if (_lastSpokenInteractionId == dto.Id)
+                return false;
+
+            if (string.IsNullOrWhiteSpace(dto.Response))
+                return false;
+
+            if (dto.Response.Contains("Waiting", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (dto.Response.Contains("Generating", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (dto.Response.StartsWith("GPT request failed", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return true;
         }
 
         private string ResolveTtsLang()
