@@ -24,6 +24,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         private int? _currentInteractionId;
         private string? _currentRequestId;
 
+        public GptClientOrchestrator(GptInteractionService gptService, IMultiHubSignalRClient multiHub)
+        {
+            _gptService = gptService;
+            _multiHub = multiHub;
+        }
+
         public event Func<ClientGptInteractionDTO, Task>? InteractionUpdated;
         public event Func<string, Task>? StatusChanged;
 
@@ -31,14 +37,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
         public bool IsHubConnected => _multiHub.IsConnected(HubName.Gpt);
         public bool HasReceivedHubEvent { get; set; }
-
-        public GptClientOrchestrator(
-            GptInteractionService gptService,
-            IMultiHubSignalRClient multiHub)
-        {
-            _gptService = gptService ?? throw new ArgumentNullException(nameof(gptService));
-            _multiHub = multiHub ?? throw new ArgumentNullException(nameof(multiHub));
-        }
 
         public async Task EnsureHubAsync(CancellationToken ct = default)
         {
@@ -139,10 +137,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                     timeout: TimeSpan.FromMinutes(6),
                     ct: ct);
             }
-            catch (TimeoutException ex)
+            catch (TimeoutException)
             {
-                await RaiseStatusChangedAsync(ex.Message);
-                throw;
+                await RaiseStatusChangedAsync(
+                    "Generation still running...");
+
+                return new GptRunResult
+                {
+                    Started = true,
+                    InteractionId = started.InteractionId,
+                    RequestId = started.RequestId,
+                    PendingInteraction = pending,
+                    FinalInteraction = null,
+                    StatusMessage =
+                        "Generation still running..."
+                };
             }
 
             return new GptRunResult
@@ -479,7 +488,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 Message = dto.Message
             };
 
-            await RaiseStatusChangedAsync(dto.Message ?? dto.Status ?? "GPT status updated.");
+            if (live.LastStatus?.Status != dto.Status)
+            {
+                await RaiseStatusChangedAsync(dto.Message ?? dto.Status ?? "GPT status updated.");
+            }
 
             if (dto.IsTerminal &&
                 !string.Equals(dto.Status, "completed", StringComparison.OrdinalIgnoreCase) &&
@@ -551,10 +563,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                         if (live.IsCompleted)
                             return;
 
-                        if (live.IsCompleted)
-                        {
-                            return;
-                        }
                     }
 
                     var status = await _gptService.GetStatusAsync(interactionId, ct);
@@ -582,6 +590,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                     }
 
                     await Task.Delay(pollingIntervalMs, ct);
+
+                    if (status is not null)
+                    {
+                        Console.WriteLine($"[GPT-POLL] {interactionId} {status.Status} {DateTime.Now}");
+                    }
                 }
                 catch (OperationCanceledException)
                 {
