@@ -14,6 +14,24 @@
         <div class="left">
             <input class="input-compact" placeholder="Search incident..."
                    @bind="_q" @bind:event="oninput" />
+
+            <div class="traffic-filter-grid">
+                <input class="input-compact"
+                       placeholder="Congestion level"
+                       @bind="filterCongestionLevel" />
+
+                <input class="input-compact"
+                       placeholder="Incident type"
+                       @bind="filterIncidentType" />
+
+                <input class="input-compact"
+                       placeholder="Location / Road"
+                       @bind="filterLocation" />
+
+                <button class="chip" @onclick="Load">Search</button>
+                <button class="chip" @onclick="LoadAll">Load All</button>
+            </div>
+
             @if (!string.IsNullOrWhiteSpace(_q))
             {
                 <span class="badge badge-info">“@_q”</span>

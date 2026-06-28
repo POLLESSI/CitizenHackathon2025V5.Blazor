@@ -73,12 +73,78 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 return null;
             }
         }
+
+        public async Task<List<ClientPlaceDTO>> GetByNameAsync(string name, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return new();
+
+            try
+            {
+                var url =
+                    $"Place/by-name" +
+                    $"?name={Uri.EscapeDataString(name.Trim())}";
+
+                using var response = await _httpClient.GetAsync(url, ct);
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return new();
+
+                response.EnsureSuccessStatusCode();
+
+                return await response.Content.ReadFromJsonAsync<List<ClientPlaceDTO>>(
+                           cancellationToken: ct)
+                       ?? new();
+            }
+            catch (OperationCanceledException)
+            {
+                return new();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"GetByNameAsync failed: {ex.Message}");
+                return new();
+            }
+        }
+
+        public async Task<List<ClientPlaceDTO>> GetByTypeAsync(string type, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(type))
+                return new();
+
+            try
+            {
+                var url =
+                    $"Place/by-type" +
+                    $"?type={Uri.EscapeDataString(type.Trim())}";
+
+                using var response = await _httpClient.GetAsync(url, ct);
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return new();
+
+                response.EnsureSuccessStatusCode();
+
+                return await response.Content.ReadFromJsonAsync<List<ClientPlaceDTO>>(
+                           cancellationToken: ct)
+                       ?? new();
+            }
+            catch (OperationCanceledException)
+            {
+                return new();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"GetByTypeAsync failed: {ex.Message}");
+                return new();
+            }
+        }
         public async Task<ClientPlaceDTO> SavePlaceAsync(ClientPlaceDTO @place)
         {
             try
             {
                 if (@place is null) throw new ArgumentNullException(nameof(@place));
-                var response = await _httpClient.PostAsJsonAsync("Place", @place);
+                var response = await _httpClient.PostAsJsonAsync("Place/save", @place);
                 response.EnsureSuccessStatusCode();
 
                 return await response.Content.ReadFromJsonAsync<ClientPlaceDTO>();

@@ -1,5 +1,6 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Contracts.DTOs;
+using CitizenHackathon2025.Contracts.Enums;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
@@ -55,6 +56,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         private ElementReference ScrollContainerRef;
         private string _q = string.Empty;
         private bool _onlyRecent;
+        private decimal? filterLatitude;
+        private decimal? filterLongitude;
+        private decimal filterDelta = 0.05m;
+
+        private WeatherType? filterWeatherType = null;
+        private WeatherProvider? filterProvider = null;
+        private string severeFilter = "";
+
         public int SelectedId { get; set; }
 
         // ===== State =====
@@ -78,16 +87,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         protected override async Task OnInitializedAsync()
         {
             // REST initial
-            var fetched = await WeatherForecastService.GetAllAsync() ?? new List<ClientWeatherForecastDTO>();
-
-            WeatherForecastLists = fetched;
-            allWeatherForecasts = fetched;
-
-            visibleWeatherForecasts.Clear();
-            currentIndex = 0;
-            LoadMoreItems();
-
-            _dataLoaded = true;
+            await LoadAsync(resetFilters: false, fitMap: false);
 
             // SignalR
             var url = HubUrls.Build(WeatherForecastHubMethods.HubPath);
@@ -152,17 +152,69 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             await InvokeAsync(StateHasChanged);
             await NotifyDataLoadedAsync(fit: true);
         }
-
-        private async Task LoadAllAsync()
+        private async Task LoadAsync(bool resetFilters = false, bool fitMap = true)
         {
-            var fetched = await WeatherForecastService.GetAllAsync() ?? new List<ClientWeatherForecastDTO>();
+            if (resetFilters)
+                ResetFilters();
 
+            var fetched = await FetchWeatherAsync();
+
+            ApplyWeatherData(fetched);
+
+            if (IsMapBooted)
+            {
+                await ReseedWeatherMarkersAsync(fit: fitMap);
+                await UpdateChartAsync();
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task<List<ClientWeatherForecastDTO>> FetchWeatherAsync()
+        {
+            if (filterLatitude.HasValue && filterLongitude.HasValue)
+            {
+                return await WeatherForecastService.GetByLocationAsync(
+                    filterLatitude.Value,
+                    filterLongitude.Value,
+                    filterDelta);
+            }
+
+            if (filterWeatherType.HasValue)
+            {
+                return await WeatherForecastService.GetByWeatherTypeAsync(
+                    filterWeatherType.Value);
+            }
+
+            if (filterProvider.HasValue)
+            {
+                return await WeatherForecastService.GetByProviderAsync(
+                    filterProvider.Value);
+            }
+
+            if (!string.IsNullOrWhiteSpace(severeFilter))
+            {
+                var isSevere = severeFilter.Equals(
+                    "true",
+                    StringComparison.OrdinalIgnoreCase);
+
+                return await WeatherForecastService.GetByIsSevereAsync(isSevere);
+            }
+
+            return await WeatherForecastService.GetAllAsync()
+                   ?? new List<ClientWeatherForecastDTO>();
+        }
+        private void ApplyWeatherData(List<ClientWeatherForecastDTO> fetched)
+        {
             WeatherForecastLists = fetched;
             allWeatherForecasts = fetched;
 
             visibleWeatherForecasts.Clear();
             currentIndex = 0;
+
             LoadMoreItems();
+
+            _dataLoaded = true;
         }
 
         private async Task StartSignalRAsync()
@@ -225,6 +277,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             {
                 Console.Error.WriteLine($"❌ [WF] hub start failed: {ex.Message}");
             }
+        }
+
+        private void ResetFilters()
+        {
+            filterLatitude = null;
+            filterLongitude = null;
+            filterDelta = 0.05m;
+
+            filterWeatherType = null;
+            filterProvider = null;
+            severeFilter = "";
+
+            _q = "";
+            _onlyRecent = false;
         }
 
         protected override async Task SeedAsync(bool fit)
@@ -364,6 +430,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             //visibleGptInteractions.AddRange(filtered.Take(PageSize));
             //currentIndex = visibleGptInteractions.Count;
         }
+
+        private Task Load()
+            => LoadAsync(resetFilters: false, fitMap: true);
+
+        private Task LoadAll()
+            => LoadAsync(resetFilters: true, fitMap: true);
 
         private Task OnQueryChanged(ChangeEventArgs _)
         {

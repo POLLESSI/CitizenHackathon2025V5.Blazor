@@ -61,6 +61,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
         private const int PageSize = 20;
 
         private string _q = string.Empty;
+        private string filterName = "";
+        private DateTime? filterDateEvent = null;
         private bool _onlyRecent;
 
         public HubConnection hubConnection { get; set; }
@@ -68,17 +70,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
         protected override async Task OnInitializedAsync()
         {
             // REST
-            var fetched = (await EventService.GetLatestEventAsync())
-                .Where(e => e != null)
-                .Select(e => e!)
-                .ToList();
-
-            Events = fetched;
-            allEvents = fetched;
-
-            visibleEvents.Clear();
-            currentIndex = 0;
-            LoadMoreItems();
+            await LoadAsync(resetFilters: false, fitMap: false);
 
             // SignalR
             var url = HubUrls.Build(EventHubMethods.HubPath);
@@ -156,6 +148,58 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
 
             return (lat, lng);
         }
+
+        private async Task LoadAsync(bool resetFilters = false, bool fitMap = true)
+        {
+            if (resetFilters)
+                ResetFilters();
+
+            var fetched = await FetchEventsAsync();
+
+            ApplyEventData(fetched);
+
+            if (IsMapBooted)
+                await SyncMapMarkersAsync(fit: fitMap);
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task<List<ClientEventDTO>> FetchEventsAsync()
+        {
+            if (!string.IsNullOrWhiteSpace(filterName))
+            {
+                return await EventService.GetByNameAsync(
+                    filterName.Trim());
+            }
+
+            if (filterDateEvent.HasValue)
+            {
+                return await EventService.GetByDateEventAsync(
+                    filterDateEvent.Value);
+            }
+
+            return await EventService.GetLatestEventAsync();
+        }
+
+        private void ResetFilters()
+        {
+            filterName = "";
+            filterDateEvent = null;
+            _q = "";
+            _onlyRecent = false;
+            BestMatchId = null;
+        }
+
+        private void ApplyEventData(List<ClientEventDTO> fetched)
+        {
+            Events = fetched;
+            allEvents = fetched;
+
+            visibleEvents.Clear();
+            currentIndex = 0;
+
+            LoadMoreItems();
+        }
         private async Task ApplySingleEventMarkerAsync(ClientEventDTO dto)
         {
             if (_disposed) return;
@@ -193,6 +237,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
             }
             catch { }
         }
+
+        private Task Load()
+            => LoadAsync(resetFilters: false, fitMap: true);
+
+        private Task LoadAll()
+            => LoadAsync(resetFilters: true, fitMap: true);
+
         private void RegisterHubHandlers()
         {
             if (hubConnection is null) return;

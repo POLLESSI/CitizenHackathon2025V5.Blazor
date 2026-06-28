@@ -4,6 +4,7 @@
 @using CitizenHackathon2025V5.Blazor.Client.Constants
 @using CitizenHackathon2025.Contracts.DTOs;
 @using CitizenHackathon2025V5.Blazor.Client.Services.Extensions
+@using CitizenHackathon2025.Contracts.Enums
 @inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
 
 @inject IJSRuntime js
@@ -32,6 +33,50 @@
                 Add
             </NavLink>
         </div>
+    </div>
+    <div class="weather-filter-grid">
+        <input class="input-compact"
+               type="number"
+               step="0.000001"
+               placeholder="Latitude"
+               @bind="filterLatitude" />
+
+        <input class="input-compact"
+               type="number"
+               step="0.000001"
+               placeholder="Longitude"
+               @bind="filterLongitude" />
+
+        <input class="input-compact"
+               type="number"
+               step="0.01"
+               placeholder="Delta"
+               @bind="filterDelta" />
+
+        <select class="input-compact" @bind="filterWeatherType">
+            <option value="">WeatherType:any</option>
+            @foreach (WeatherType wt in Enum.GetValues<WeatherType>())
+            {
+                <option value="@wt">@wt</option>
+            }
+        </select>
+
+        <select class="input-compact" @bind="filterProvider">
+            <option value="">Provider:any</option>
+            @foreach (WeatherProvider p in Enum.GetValues<WeatherProvider>())
+            {
+                <option value="@p">@p</option>
+            }
+        </select>
+
+        <select class="input-compact" @bind="severeFilter">
+            <option value="">Severe:any</option>
+            <option value="true">Severe:true</option>
+            <option value="false">Severe:false</option>
+        </select>
+
+        <button class="chip" @onclick="Load">Search</button>
+        <button class="chip" @onclick="LoadAll">Load All</button>
     </div>
     <div class="oz-map-shell">
         <div id="@MapId" class="leaflet-host"></div>

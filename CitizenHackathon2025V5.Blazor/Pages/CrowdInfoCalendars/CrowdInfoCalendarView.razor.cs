@@ -44,6 +44,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
         private long _lastFitTicks;
         private static string CICMarkerId(int id) => $"cc:{id}";
         private string activeFilter = "";
+        private string eventName = "";
 
         private List<ClientCrowdInfoCalendarDTO> allCrowdInfoCalendars;
 
@@ -338,12 +339,34 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
                 _ => null
             };
 
-            var fetched = (await CrowdInfoCalendarService.GetAllSafeAsync())?.ToList() ?? new();
+            List<ClientCrowdInfoCalendarDTO> fetched;
+
+            if (!string.IsNullOrWhiteSpace(eventName))
+            {
+                fetched = await CrowdInfoCalendarService.GetByEventNameAsync(
+                    eventName.Trim(),
+                    active ?? true);
+            }
+            else if (placeId.HasValue && placeId.Value > 0)
+            {
+                fetched = await CrowdInfoCalendarService.GetByPlaceIdAsync(
+                    placeId.Value,
+                    active ?? true);
+            }
+            else if (!string.IsNullOrWhiteSpace(region))
+            {
+                fetched = await CrowdInfoCalendarService.GetByRegionCodeAsync(
+                    region.Trim(),
+                    active ?? true);
+            }
+            else
+            {
+                fetched = await CrowdInfoCalendarService.GetAllSafeAsync()
+                          ?? new List<ClientCrowdInfoCalendarDTO>();
+            }
 
             fetched = fetched
                 .Where(x => x.DateUtc.Date >= from.Date && x.DateUtc.Date <= to.Date)
-                .Where(x => string.IsNullOrWhiteSpace(region) || string.Equals(x.RegionCode, region, StringComparison.OrdinalIgnoreCase))
-                .Where(x => !placeId.HasValue || x.PlaceId == placeId.Value)
                 .Where(x => active is null || x.Active == active.Value)
                 .ToList();
 
@@ -355,7 +378,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             _currentIndex = 0;
             LoadMoreItems();
 
-            if (IsMapBooted) await SyncMapMarkersAsync(fit: true);
+            if (IsMapBooted)
+                await SyncMapMarkersAsync(fit: true);
 
             await InvokeAsync(StateHasChanged);
         }

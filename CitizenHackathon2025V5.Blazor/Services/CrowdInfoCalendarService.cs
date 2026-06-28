@@ -139,6 +139,48 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             return new HttpRequestException(
                 $"CrowdCalendar {action} failed: {(int)res.StatusCode} {res.ReasonPhrase}. Body: {body}");
         }
+
+        public async Task<List<ClientCrowdInfoCalendarDTO>> GetByEventNameAsync(string eventName, bool active = true, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(eventName))
+                return new List<ClientCrowdInfoCalendarDTO>();
+
+            var url =
+                $"{BaseRoute}/by-eventname" +
+                $"?eventName={Uri.EscapeDataString(eventName.Trim())}" +
+                $"&active={(active ? "true" : "false")}";
+
+            return await _httpClient.GetFromJsonAsync<List<ClientCrowdInfoCalendarDTO>>(url, _json, ct)
+                   ?? new List<ClientCrowdInfoCalendarDTO>();
+        }
+
+        public async Task<List<ClientCrowdInfoCalendarDTO>> GetByPlaceIdAsync(int placeId, bool active = true, CancellationToken ct = default)
+        {
+            if (placeId <= 0)
+                return new List<ClientCrowdInfoCalendarDTO>();
+
+            var url =
+                $"{BaseRoute}/by-place-id" +
+                $"?placeId={placeId}" +
+                $"&active={(active ? "true" : "false")}";
+
+            return await _httpClient.GetFromJsonAsync<List<ClientCrowdInfoCalendarDTO>>(url, _json, ct)
+                   ?? new List<ClientCrowdInfoCalendarDTO>();
+        }
+
+        public async Task<List<ClientCrowdInfoCalendarDTO>> GetByRegionCodeAsync(string regionCode, bool active = true, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(regionCode))
+                return new List<ClientCrowdInfoCalendarDTO>();
+
+            var url =
+                $"{BaseRoute}/by-regioncode" +
+                $"?regionCode={Uri.EscapeDataString(regionCode.Trim())}" +
+                $"&active={(active ? "true" : "false")}";
+
+            return await _httpClient.GetFromJsonAsync<List<ClientCrowdInfoCalendarDTO>>(url, _json, ct)
+                   ?? new List<ClientCrowdInfoCalendarDTO>();
+        }
     }
 }
 

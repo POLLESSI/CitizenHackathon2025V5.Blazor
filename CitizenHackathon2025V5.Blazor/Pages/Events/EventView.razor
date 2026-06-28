@@ -19,6 +19,13 @@
                    value="@_q"
                    @oninput="OnSearchInput" />
 
+            <input class="input-compact"
+                   placeholder="Event name"
+                   @bind="filterName" />
+
+            <InputDate @bind-Value="filterDateEvent"
+                       class="input-compact" />
+
             @if (!string.IsNullOrWhiteSpace(_q))
             {
                 <span class="badge badge-info">“@_q”</span>
@@ -27,9 +34,8 @@
 
         <div class="right">
             <button class="chip @(_onlyRecent ? "active" : null)" @onclick="ToggleRecent">Recents</button>
-        </div>
-
-        <div>
+            <button class="chip" @onclick="Load">Search</button>
+            <button class="chip" @onclick="LoadAll">Load All</button>
             <NavLink class="chip add-chip" href="/eventcreate">Add</NavLink>
         </div>
     </div>

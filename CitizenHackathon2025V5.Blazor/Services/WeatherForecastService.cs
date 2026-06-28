@@ -123,6 +123,82 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
         }
 
+        public async Task<List<ClientWeatherForecastDTO>> GetByLocationAsync(decimal latitude, decimal longitude, decimal delta = 0.05m, CancellationToken ct = default)
+        {
+            try
+            {
+                var url =
+                    $"WeatherForecast/by-location" +
+                    $"?latitude={latitude}" +
+                    $"&longitude={longitude}" +
+                    $"&delta={delta}";
+
+                var list = await _http.GetFromJsonAsync<List<ClientWeatherForecastDTO>>(url, ct)
+                           ?? new List<ClientWeatherForecastDTO>();
+
+                return list.Select(WeatherForecastUiEnricher.Enrich).ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[WF] GetByLocationAsync failed: {ex.Message}");
+                return new List<ClientWeatherForecastDTO>();
+            }
+        }
+
+        public async Task<List<ClientWeatherForecastDTO>> GetByWeatherTypeAsync(WeatherType weatherType, CancellationToken ct = default)
+        {
+            try
+            {
+                var url = $"WeatherForecast/by-weathertype?weatherType={weatherType}";
+
+                var list = await _http.GetFromJsonAsync<List<ClientWeatherForecastDTO>>(url, ct)
+                           ?? new List<ClientWeatherForecastDTO>();
+
+                return list.Select(WeatherForecastUiEnricher.Enrich).ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[WF] GetByWeatherTypeAsync failed: {ex.Message}");
+                return new List<ClientWeatherForecastDTO>();
+            }
+        }
+
+        public async Task<List<ClientWeatherForecastDTO>> GetByProviderAsync(WeatherProvider provider, CancellationToken ct = default)
+        {
+            try
+            {
+                var url = $"WeatherForecast/by-provider?provider={provider}";
+
+                var list = await _http.GetFromJsonAsync<List<ClientWeatherForecastDTO>>(url, ct)
+                           ?? new List<ClientWeatherForecastDTO>();
+
+                return list.Select(WeatherForecastUiEnricher.Enrich).ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[WF] GetByProviderAsync failed: {ex.Message}");
+                return new List<ClientWeatherForecastDTO>();
+            }
+        }
+
+        public async Task<List<ClientWeatherForecastDTO>> GetByIsSevereAsync(bool isSevere, CancellationToken ct = default)
+        {
+            try
+            {
+                var url = $"WeatherForecast/by-issevere?isSevere={isSevere.ToString().ToLowerInvariant()}";
+
+                var list = await _http.GetFromJsonAsync<List<ClientWeatherForecastDTO>>(url, ct)
+                           ?? new List<ClientWeatherForecastDTO>();
+
+                return list.Select(WeatherForecastUiEnricher.Enrich).ToList();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[WF] GetByIsSevereAsync failed: {ex.Message}");
+                return new List<ClientWeatherForecastDTO>();
+            }
+        }
+
         // (optional) if you add an [HttpPost] without a specific route on the API side
         public async Task<ClientWeatherForecastDTO?> SaveWeatherForecastAsync(ClientWeatherForecastDTO dto)
         {

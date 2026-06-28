@@ -15,11 +15,12 @@
     </div>
 </div>
 
-<div class="mb-3 grid" style="grid-template-columns: repeat(6, minmax(180px, 1fr)); gap: 8px;">
+<div class="mb-3 grid" style="grid-template-columns: repeat(7, minmax(180px, 1fr)); gap: 8px;">
     <InputDate @bind-Value="from" class="form-control" />
     <InputDate @bind-Value="to" class="form-control" />
     <input class="form-control" placeholder="Region (ex: BE-WLX-NAM)" @bind="region" />
     <input class="form-control" type="number" placeholder="PlaceId" @bind="placeId" />
+    <input class="form-control" placeholder="Event name" @bind="eventName" />
     <select class="form-select" @bind="activeFilter">
         <option value="">active:any</option>
         <option value="true">active:true</option>

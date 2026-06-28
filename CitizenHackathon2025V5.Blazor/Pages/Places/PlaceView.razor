@@ -17,6 +17,15 @@
         <div class="left">
             <input class="input-compact" placeholder="Search..."
                    @bind="_q" @bind:event="oninput" />
+
+            <input class="input-compact"
+                   placeholder="Name"
+                   @bind="filterName" />
+
+            <input class="input-compact"
+                   placeholder="Type"
+                   @bind="filterType" />
+
             @if (!string.IsNullOrWhiteSpace(_q))
             {
                 <span class="badge badge-info">“@_q”</span>
@@ -28,8 +37,8 @@
                     @onclick="ToggleRecent">
                 Recent
             </button>
-        </div>
-        <div>
+            <button class="chip" @onclick="Load">Search</button>
+            <button class="chip" @onclick="LoadAll">Load All</button>
             <NavLink class="chip add-chip" href="/placecreate">
                 Add
             </NavLink>

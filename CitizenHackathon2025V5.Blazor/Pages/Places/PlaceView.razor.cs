@@ -78,10 +78,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
                 if (_qBacking == value) return;
                 _qBacking = value;
 
-                // fire-and-forget contrôlé (debounced)
+                // controlled fire-and-forget(debounced)
                 _ = DebouncedHighlightAsync();
             }
         }
+        private string filterName = "";
+        private string filterType = "";
         private bool _onlyRecent; // placeholder if you filter by date
         private CancellationTokenSource _searchCts;
 
@@ -97,15 +99,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
             // 1) REST initial
             try
             {
-                var fetched = (await PlaceService.GetLatestPlaceAsync()).ToList();
-                Places = fetched;
-                allPlaces = fetched;
-                visiblePlaces.Clear();
-                currentIndex = 0;
-                LoadMoreItems();
-
-                _dataLoaded = true;
-                await InvokeAsync(StateHasChanged);
+                await LoadAsync(resetFilters: false, fitMap: false);
 
                 await NotifyDataLoadedAsync(fit: true);
 
@@ -269,6 +263,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         private Task EnsureOutZenAsync()
             => JS.InvokeVoidAsync("OutZen.ensure").AsTask();
 
+        private Task Load()
+            => LoadAsync(resetFilters: false, fitMap: true);
+
+        private Task LoadAll()
+            => LoadAsync(resetFilters: true, fitMap: true);
+
         private async Task DebouncedHighlightAsync()
         {
             if (!_dataLoaded) return;
@@ -310,6 +310,60 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
             {
                 Console.Error.WriteLine($"[PlaceView] HandleScroll error: {ex.Message}");
             }
+        }
+
+        private async Task LoadAsync(bool resetFilters = false, bool fitMap = true)
+        {
+            if (resetFilters)
+                ResetFilters();
+
+            var fetched = await FetchPlacesAsync();
+
+            ApplyPlaceData(fetched);
+
+            if (IsMapBooted)
+                await ReseedPlaceMarkersAsync(fit: fitMap);
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task<List<ClientPlaceDTO>> FetchPlacesAsync()
+        {
+            if (!string.IsNullOrWhiteSpace(filterName))
+            {
+                return await PlaceService.GetByNameAsync(
+                    filterName.Trim());
+            }
+
+            if (!string.IsNullOrWhiteSpace(filterType))
+            {
+                return await PlaceService.GetByTypeAsync(
+                    filterType.Trim());
+            }
+
+            return await PlaceService.GetLatestPlaceAsync();
+        }
+
+        private void ApplyPlaceData(List<ClientPlaceDTO> fetched)
+        {
+            Places = fetched;
+            allPlaces = fetched;
+
+            visiblePlaces.Clear();
+            currentIndex = 0;
+
+            LoadMoreItems();
+
+            _dataLoaded = true;
+        }
+
+        private void ResetFilters()
+        {
+            filterName = "";
+            filterType = "";
+            _q = "";
+            _onlyRecent = false;
+            BestMatchId = null;
         }
 
         private IEnumerable<ClientPlaceDTO> FilterPlace(IEnumerable<ClientPlaceDTO> source)

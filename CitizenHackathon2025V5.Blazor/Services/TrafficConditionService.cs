@@ -128,6 +128,68 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
         }
 
+        public async Task<List<ClientTrafficConditionDTO>> GetByCongestionLevelAsync(string congestionLevel, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(congestionLevel))
+                return new();
+
+            try
+            {
+                var url =
+                    $"TrafficCondition/by-congestionlevel" +
+                    $"?congestionLevel={Uri.EscapeDataString(congestionLevel.Trim())}";
+
+                var list = await _httpClient.GetFromJsonAsync<List<ClientTrafficConditionDTO>>(url, ct);
+                return list?.ToNonNullList() ?? new();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"GetByCongestionLevelAsync failed: {ex.Message}");
+                return new();
+            }
+        }
+
+        public async Task<List<ClientTrafficConditionDTO>> GetByIncidentTypeAsync(string incidentType, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(incidentType))
+                return new();
+
+            try
+            {
+                var url =
+                    $"TrafficCondition/by-incidenttype" +
+                    $"?incidentType={Uri.EscapeDataString(incidentType.Trim())}";
+
+                var list = await _httpClient.GetFromJsonAsync<List<ClientTrafficConditionDTO>>(url, ct);
+                return list?.ToNonNullList() ?? new();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"GetByIncidentTypeAsync failed: {ex.Message}");
+                return new();
+            }
+        }
+
+        public async Task<List<ClientTrafficConditionDTO>> GetByLocationAsync(string location, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(location))
+                return new();
+
+            try
+            {
+                var url =
+                    $"TrafficCondition/by-location" +
+                    $"?location={Uri.EscapeDataString(location.Trim())}";
+
+                var list = await _httpClient.GetFromJsonAsync<List<ClientTrafficConditionDTO>>(url, ct);
+                return list?.ToNonNullList() ?? new();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"GetByLocationAsync failed: {ex.Message}");
+                return new();
+            }
+        }
         private sealed class ArchiveResult
         {
             public int ArchivedCount { get; set; }

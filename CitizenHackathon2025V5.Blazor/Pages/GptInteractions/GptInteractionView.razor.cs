@@ -635,10 +635,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             _lastSpokenInteractionId = dto.Id;
 
-            var speech = await JS.InvokeAsync<SpeechResult>(
-                "gptVoice.speak",
-                dto.Response,
-                ResolveTtsLang());
+            var speech = await JS.InvokeAsync<SpeechResult>("gptVoice.speak", dto.Response, ResolveTtsLang());
 
             Console.WriteLine($"[GPT VOICE] speak result ok={speech?.Ok}, error={speech?.Error}");
         }

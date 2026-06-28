@@ -36,6 +36,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         // ===== UI state =====
         private ElementReference ScrollContainerRef;
         private string _q = string.Empty;
+        private string filterCongestionLevel = "";
+        private string filterIncidentType = "";
+        private string filterLocation = "";
         private bool _onlyRecent;
         public int SelectedId { get; set; }
 
@@ -70,15 +73,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         protected override async Task OnInitializedAsync()
         {
             // 1) REST
-            var fetched = (await TrafficConditionService.GetLatestTrafficConditionAsync())?.ToList() ?? new();
-            TrafficConditions = fetched;
-
-            allTrafficConditions.Clear();
-            allTrafficConditions.AddRange(fetched);
-
-            visibleTrafficConditions.Clear();
-            currentIndex = 0;
-            LoadMoreItems();
+            await LoadAsync(resetFilters: false, fitMap: false);
 
             // 2) SignalR
             var url = HubUrls.Build(TrafficConditionHubMethods.HubPath); // ex: /hubs/trafficHub
@@ -104,14 +99,55 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             }
 
             // IMPORTANT: REST + Map must NOT depend on SignalR
-            await LoadLatestAsync();
+            await LoadAsync();
             await InvokeAsync(StateHasChanged);
             await NotifyDataLoadedAsync(fit: true);
         }
-        private async Task LoadLatestAsync()
+        private async Task LoadAsync(bool resetFilters = false, bool fitMap = true)
         {
-            var fetched = (await TrafficConditionService.GetLatestTrafficConditionAsync())?.ToList() ?? new();
+            if (resetFilters)
+                ResetFilters();
 
+            var fetched = await FetchTrafficAsync();
+
+            ApplyTrafficData(fetched);
+
+            if (IsMapBooted)
+                await ReseedTrafficMarkersAsync(fit: fitMap);
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task<List<ClientTrafficConditionDTO>> FetchTrafficAsync()
+        {
+            if (!string.IsNullOrWhiteSpace(filterCongestionLevel))
+            {
+                return await TrafficConditionService.GetByCongestionLevelAsync(
+                    filterCongestionLevel.Trim());
+            }
+
+            if (!string.IsNullOrWhiteSpace(filterIncidentType))
+            {
+                return await TrafficConditionService.GetByIncidentTypeAsync(
+                    filterIncidentType.Trim());
+            }
+
+            if (!string.IsNullOrWhiteSpace(filterLocation))
+            {
+                return await TrafficConditionService.GetByLocationAsync(
+                    filterLocation.Trim());
+            }
+
+            return await TrafficConditionService.GetLatestTrafficConditionAsync();
+        }
+
+        private Task Load()
+            => LoadAsync(resetFilters: false, fitMap: true);
+
+        private Task LoadAll()
+            => LoadAsync(resetFilters: true, fitMap: true);
+        private void ApplyTrafficData(List<ClientTrafficConditionDTO> fetched)
+        {
             TrafficConditions = fetched;
 
             allTrafficConditions.Clear();
@@ -119,7 +155,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 
             visibleTrafficConditions.Clear();
             currentIndex = 0;
+
             LoadMoreItems();
+        }
+
+        private void ResetFilters()
+        {
+            filterCongestionLevel = "";
+            filterIncidentType = "";
+            filterLocation = "";
+            _q = "";
+            _onlyRecent = false;
         }
         protected override async Task SeedAsync(bool fit)
         {
@@ -159,20 +205,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 
                 try
                 {
-                    var latest = (await TrafficConditionService.GetLatestTrafficConditionAsync())?.ToList() ?? new();
-
-                    TrafficConditions = latest;
-                    allTrafficConditions.Clear();
-                    allTrafficConditions.AddRange(latest);
-
-                    visibleTrafficConditions.Clear();
-                    currentIndex = 0;
-                    LoadMoreItems();
-
-                    if (IsMapBooted)
-                        await ReseedTrafficMarkersAsync(fit: false);
-
-                    await InvokeAsync(StateHasChanged);
+                    await LoadAsync(resetFilters: false, fitMap: false);
                 }
                 catch (Exception ex)
                 {

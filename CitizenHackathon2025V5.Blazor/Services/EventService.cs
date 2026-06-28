@@ -49,7 +49,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             try
             {
                 if (@event is null) throw new ArgumentNullException(nameof(@event));
-                var resp = await _httpClient.PostAsJsonAsync("Event", @event);
+                var resp = await _httpClient.PostAsJsonAsync("Event/save", @event);
                 resp.EnsureSuccessStatusCode();
                 return await resp.Content.ReadFromJsonAsync<ClientEventDTO>();
             }
@@ -111,6 +111,72 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 return null;
             }
             
+        }
+
+        public async Task<List<ClientEventDTO>> GetByNameAsync(string name, CancellationToken ct = default)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return new();
+
+            try
+            {
+                var url =
+                    $"Event/by-name" +
+                    $"?name={Uri.EscapeDataString(name.Trim())}";
+
+                using var response = await _httpClient.GetAsync(url, ct);
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return new();
+
+                response.EnsureSuccessStatusCode();
+
+                return await response.Content.ReadFromJsonAsync<List<ClientEventDTO>>(
+                           cancellationToken: ct)
+                       ?? new();
+            }
+            catch (OperationCanceledException)
+            {
+                return new();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"GetByNameAsync failed: {ex.Message}");
+                return new();
+            }
+        }
+
+        public async Task<List<ClientEventDTO>> GetByDateEventAsync(DateTime dateEvent, CancellationToken ct = default)
+        {
+            if (dateEvent == default)
+                return new();
+
+            try
+            {
+                var url =
+                    $"Event/date-event" +
+                    $"?dateEvent={Uri.EscapeDataString(dateEvent.ToString("yyyy-MM-dd"))}";
+
+                using var response = await _httpClient.GetAsync(url, ct);
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return new();
+
+                response.EnsureSuccessStatusCode();
+
+                return await response.Content.ReadFromJsonAsync<List<ClientEventDTO>>(
+                           cancellationToken: ct)
+                       ?? new();
+            }
+            catch (OperationCanceledException)
+            {
+                return new();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"GetByDateEventAsync failed: {ex.Message}");
+                return new();
+            }
         }
         public async Task<int> ArchivePastEventsAsync()
         {
