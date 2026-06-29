@@ -24,6 +24,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         private int? _currentInteractionId;
         private string? _currentRequestId;
 
+        private const bool EnableVerboseGptPollingLogs = false;
+
         public GptClientOrchestrator(GptInteractionService gptService, IMultiHubSignalRClient multiHub)
         {
             _gptService = gptService;
@@ -474,7 +476,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
         private async Task HandleStatusAsync(ClientGptResponseStatusDTO dto)
         {
-            Console.WriteLine($"[GptClientOrchestrator] STATUS received -> InteractionId={dto.InteractionId}, Status={dto.Status}, IsTerminal={dto.IsTerminal}");
+            if (EnableVerboseGptPollingLogs || dto.IsTerminal)
+            {
+                Console.WriteLine(
+                    $"[GptClientOrchestrator] STATUS received -> InteractionId={dto.InteractionId}, Status={dto.Status}, IsTerminal={dto.IsTerminal}");
+            }
+
             var live = _live.GetOrAdd(dto.InteractionId, _ => new LiveInteractionState(dto.InteractionId));
             live.HasReceivedHubEvent = true;
             live.RequestId ??= dto.RequestId;
@@ -591,9 +598,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
                     await Task.Delay(pollingIntervalMs, ct);
 
-                    if (status is not null)
+                    if (EnableVerboseGptPollingLogs)
                     {
-                        Console.WriteLine($"[GPT-POLL] {interactionId} {status.Status} {DateTime.Now}");
+                        Console.WriteLine($"[GPT-POLL] {interactionId} {status.Status} {DateTime.Now:HH:mm:ss}");
                     }
                 }
                 catch (OperationCanceledException)

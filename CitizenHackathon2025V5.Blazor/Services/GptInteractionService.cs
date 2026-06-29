@@ -8,7 +8,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 {
     public sealed class GptInteractionService
     {
-#nullable disable
+    #nullable disable
         private readonly HttpClient _httpClient;
 
         private const string BaseRoute = "Gpt";
@@ -259,41 +259,30 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             if (interactionId <= 0)
                 return null;
 
-            var url = $"{BaseRoute}/status/{interactionId}";
-
             try
             {
-                LogInfo($"[GetStatusAsync] GET {BuildAbsoluteUrl(url)}");
-
-                using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                using var response = await _httpClient.SendAsync(
-                    request,
-                    HttpCompletionOption.ResponseHeadersRead,
+                using var response = await _httpClient.GetAsync(
+                    $"{BaseRoute}/status/{interactionId}",
                     ct);
-
-                LogInfo($"[GetStatusAsync] HTTP {(int)response.StatusCode} {response.StatusCode} for interactionId={interactionId}");
 
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     return null;
 
                 response.EnsureSuccessStatusCode();
 
-                var status = await response.Content.ReadFromJsonAsync<ClientGptStatusResponseDTO>(JsonOptions, ct);
-                return status;
+                return await response.Content.ReadFromJsonAsync<ClientGptStatusResponseDTO>(
+                    JsonOptions,
+                    ct);
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
-                LogWarn($"[GetStatusAsync] Cancelled by caller for interactionId={interactionId}.");
-                return null;
-            }
-            catch (TaskCanceledException ex)
-            {
-                LogWarn($"[GetStatusAsync] Timed out or cancelled by HttpClient for interactionId={interactionId}. {ex.Message}");
                 return null;
             }
             catch (Exception ex)
             {
-                LogError($"[GetStatusAsync] Unexpected error for interactionId={interactionId}: {ex}");
+                Console.Error.WriteLine(
+                    $"[GptInteractionService] GetStatusAsync failed for id={interactionId}: {ex.Message}");
+
                 return null;
             }
         }
