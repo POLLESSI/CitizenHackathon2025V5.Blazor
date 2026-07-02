@@ -24,7 +24,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         private int? _currentInteractionId;
         private string? _currentRequestId;
 
-        private const bool EnableVerboseGptPollingLogs = false;
+        private static readonly bool EnableVerboseGptPollingLogs = false;
+        private const int PollingIntervalMs = 5000;
 
         public GptClientOrchestrator(GptInteractionService gptService, IMultiHubSignalRClient multiHub)
         {
@@ -471,6 +472,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                     waiter.TrySetResult(final);
 
                 await RaiseStatusChangedAsync("Generation completed.");
+                return;
             }
         }
 
@@ -522,6 +524,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             var completed = MapCompletedDto(dto);
 
             await CompleteInteractionAsync(completed);
+            Console.WriteLine($"[VOICE] COMPLETED ResponseLength={dto.Response?.Length}");
         }
 
         private async Task CompleteInteractionAsync(ClientGptInteractionDTO dto)
@@ -540,6 +543,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             if (_completionWaiters.TryGetValue(dto.Id, out var waiter))
                 waiter.TrySetResult(CloneInteraction(dto));
+
+            Console.WriteLine($"[VOICE] CompleteInteractionAsync {dto.Response?.Length}");
         }
 
         private void CompleteInteraction(ClientGptInteractionDTO dto)
@@ -557,19 +562,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
         private async Task PollFallbackAsync(int interactionId, string? requestId, CancellationToken ct)
         {
-            const int pollingIntervalMs = 3000;
-
             await Task.Delay(4000, ct);
 
             while (!ct.IsCancellationRequested)
             {
                 try
                 {
-                    if (_live.TryGetValue(interactionId, out var live))
+                    if (_live.TryGetValue(interactionId, out var currentLive) &&
+                currentLive.IsCompleted)
                     {
-                        if (live.IsCompleted)
-                            return;
-
+                        return;
                     }
 
                     var status = await _gptService.GetStatusAsync(interactionId, ct);
@@ -596,12 +598,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                         }
                     }
 
-                    await Task.Delay(pollingIntervalMs, ct);
-
                     if (EnableVerboseGptPollingLogs)
                     {
-                        Console.WriteLine($"[GPT-POLL] {interactionId} {status.Status} {DateTime.Now:HH:mm:ss}");
+                        Console.WriteLine($"[GPT-POLL] {interactionId} {status?.Status ?? "unknown"} {DateTime.Now:HH:mm:ss}");
                     }
+
+                    await Task.Delay(PollingIntervalMs, ct);
                 }
                 catch (OperationCanceledException)
                 {
@@ -613,7 +615,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
                     try
                     {
-                        await Task.Delay(pollingIntervalMs, ct);
+                        await Task.Delay(PollingIntervalMs, ct);
                     }
                     catch
                     {

@@ -419,6 +419,105 @@ HIGHLIGHT / PULSE
 }
 
 /* =========================================================
+   ANTENNA ALERT CIRCLES
+   ========================================================= */
+
+.leaflet-pane.ozAntennaAlertPane {
+    z-index: 9000 !important;
+    pointer-events: auto !important;
+}
+
+.leaflet-marker-icon.oz-antenna-alert-marker {
+    background: transparent !important;
+    border: none !important;
+    overflow: visible !important;
+    z-index: 999999 !important;
+    pointer-events: auto !important;
+}
+
+.oz-antenna-alert-ring {
+    position: relative;
+    width: var(--oz-ant-alert-size, 72px);
+    height: var(--oz-ant-alert-size, 72px);
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    transform: translateZ(0);
+}
+
+    .oz-antenna-alert-ring::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 999px;
+        background: rgba(255, 0, 64, 0.10);
+        border: 3px solid rgba(255, 0, 64, 0.95);
+        box-shadow: 0 0 0 2px rgba(255,255,255,0.75), 0 0 14px rgba(255, 0, 64, 0.70), 0 0 28px rgba(255, 0, 64, 0.32);
+        animation: ozAntennaAlertBlink 0.85s ease-in-out infinite;
+    }
+
+.oz-antenna-alert-pulse {
+    position: absolute;
+    inset: -10px;
+    border-radius: 999px;
+    border: 2px solid rgba(255, 0, 64, 0.55);
+    animation: ozAntennaAlertPulse 1.25s ease-out infinite;
+}
+
+.oz-antenna-alert-core {
+    position: relative;
+    z-index: 2;
+    min-width: 42px;
+    min-height: 42px;
+    padding: 6px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    background: rgba(150, 0, 32, 0.96);
+    border: 2px solid rgba(255,255,255,0.92);
+    box-shadow: 0 8px 22px rgba(0,0,0,0.55);
+    color: white;
+    text-align: center;
+    font-weight: 900;
+}
+
+.oz-antenna-alert-count {
+    font-size: 13px;
+    line-height: 1;
+}
+
+.oz-antenna-alert-label {
+    margin-top: 2px;
+    font-size: 8px;
+    line-height: 1;
+    letter-spacing: 0.08em;
+}
+
+@keyframes ozAntennaAlertBlink {
+    0%, 100% {
+        opacity: 1;
+        filter: saturate(1.4) brightness(1.1);
+    }
+
+    50% {
+        opacity: 0.45;
+        filter: saturate(2) brightness(1.6);
+    }
+}
+
+@keyframes ozAntennaAlertPulse {
+    0% {
+        transform: scale(0.75);
+        opacity: 0.75;
+    }
+
+    100% {
+        transform: scale(1.25);
+        opacity: 0;
+    }
+}
+
+/* =========================================================
    POPUPS
    ========================================================= */
 

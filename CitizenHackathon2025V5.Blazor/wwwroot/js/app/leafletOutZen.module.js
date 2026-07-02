@@ -576,6 +576,8 @@ export async function bootOutZen({
 
     ensureCustomPane(map, "ozCalendarPane", 5000);
 
+    ensureCustomPane(map, "ozAntennaAlertPane", 9000);
+
     // Base tile
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap contributors",
@@ -1529,6 +1531,126 @@ export function addOrUpdateAntennaMarker(antenna, scopeKey = null) {
     s.antennaMarkers.set(key, m);
 
     applyWarningStateToMarker(m, { warn, isCalendar: false });
+    return true;
+}
+
+function computeAntennaAlertSize(activeConnections) {
+    const n = Number(activeConnections) || 0;
+
+    if (n >= 1000) return 96;
+    if (n >= 750) return 86;
+    if (n >= 500) return 76;
+    if (n >= 250) return 66;
+    if (n >= 100) return 56;
+
+    return 46;
+}
+
+export function addOrUpdateAntennaAlertCircle(alert, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { k, s, L } = ready;
+
+    if (!alert) return false;
+
+    const ll = pickLatLng(alert);
+    if (!ll) return false;
+
+    const antennaId = alert.AntennaId ?? alert.antennaId ?? alert.Id ?? alert.id;
+    if (antennaId == null) return false;
+
+    s.antennaAlertMarkers ??= new Map();
+
+    const key = `antenna-alert:${antennaId}`;
+
+    const active =
+        Number(alert.ActiveConnections ?? alert.activeConnections ?? 0);
+
+    const unique =
+        Number(alert.UniqueDevices ?? alert.uniqueDevices ?? 0);
+
+    const severity =
+        Number(alert.Severity ?? alert.severity ?? 4);
+
+    const size = computeAntennaAlertSize(active);
+
+    const title =
+        alert.Title ?? alert.title ?? "Alerte antenne";
+
+    const message =
+        alert.Message ?? alert.message ?? "Concentration critique détectée.";
+
+    const popupHtml = buildPopupHtml({
+        title,
+        description:
+            `${message}<br>` +
+            `Connexions actives : ${active}<br>` +
+            `Devices uniques : ${unique}<br>` +
+            `Sévérité : ${severity}`
+    }, s);
+
+    const icon = L.divIcon({
+        className: "oz-antenna-alert-marker",
+        html: `
+            <div class="oz-antenna-alert-ring" style="--oz-ant-alert-size:${size}px">
+                <div class="oz-antenna-alert-pulse"></div>
+                <div class="oz-antenna-alert-core">
+                    <div class="oz-antenna-alert-count">${active}</div>
+                    <div class="oz-antenna-alert-label">ALERT</div>
+                </div>
+            </div>
+        `.trim(),
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+        popupAnchor: [0, -(size / 2)]
+    });
+
+    let marker = s.antennaAlertMarkers.get(key);
+
+    if (marker) {
+        try { marker.setLatLng([ll.lat, ll.lng]); } catch { }
+        try { marker.setIcon(icon); } catch { }
+        try {
+            if (marker.getPopup()) marker.setPopupContent(popupHtml);
+            else safeBindPopup(marker, popupHtml);
+        } catch { }
+    } else {
+        marker = L.marker([ll.lat, ll.lng], {
+            icon,
+            title,
+            pane: "ozAntennaAlertPane",
+            riseOnHover: true,
+            zIndexOffset: 100000,
+            __ozNoCluster: true
+        });
+
+        safeBindPopup(marker, popupHtml);
+
+        marker.addTo(s.map);
+        s.antennaAlertMarkers.set(key, marker);
+    }
+
+    return true;
+}
+
+export function removeAntennaAlertCircle(antennaId, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+    if (!ready) return false;
+
+    const { s } = ready;
+
+    const key = String(antennaId).startsWith("antenna-alert:")
+        ? String(antennaId)
+        : `antenna-alert:${antennaId}`;
+
+    const marker = s.antennaAlertMarkers?.get(key);
+    if (!marker) return true;
+
+    try { s.map.removeLayer(marker); } catch { }
+
+    s.antennaAlertMarkers.delete(key);
+
     return true;
 }
 

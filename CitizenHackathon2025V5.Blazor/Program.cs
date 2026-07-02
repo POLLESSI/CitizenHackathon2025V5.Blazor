@@ -151,6 +151,7 @@ builder.Services.AddScoped<ICrowdInfoAntennaService, CrowdInfoAntennaService>();
 builder.Services.AddScoped<CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService>();
 builder.Services.AddScoped<CrowdInfoService>();
 builder.Services.AddScoped<CrowdCalendarHubClient>();
+builder.Services.AddScoped<CrowdSafetyAlertClientService>();
 builder.Services.AddScoped<IDisasterCriticalAlertClientService, DisasterCriticalAlertClientService>();
 builder.Services.AddScoped<IDeviceIdentityService,DeviceIdentityService>();
 builder.Services.AddScoped<EventService>();

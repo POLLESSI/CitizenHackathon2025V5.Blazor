@@ -26,6 +26,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         [Inject] public CrowdInfoService CrowdInfoService { get; set; } = default!;
         [Inject] public CrowdInfoCalendarService CrowdInfoCalendarService { get; set; } = default!;
         [Inject] public ICrowdInfoAntennaService CrowdInfoAntennaService { get; set; } = default!;
+        [Inject] public CrowdSafetyAlertClientService CrowdSafetyAlertService { get; set; } = default!;
         [Inject] public IDisasterCriticalAlertClientService DisasterCriticalAlertService { get; set; } = default!;
 
         [Inject] public EventService EventService { get; set; } = default!;
@@ -160,6 +161,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             await SafeLoadAntennasAsync();
             await EnsureAntennaHubAsync();
+            await LoadLatestCrowdSafetyAlertsAsync();
 
             try
             {
@@ -588,6 +590,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
                 await SeedAsync(fit);
 
+                await LoadLatestCrowdSafetyAlertsAsync();
+
                 try { await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey); } catch { }
                 try { await JS.InvokeVoidAsync("OutZenInterop.refreshHybridNow", ScopeKey); } catch { }
 
@@ -624,6 +628,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             {
                 try { await ApplyAntennaCriticalOverlayAsync(item.AntennaId, item.Counts); } catch { }
             }
+
+            await LoadLatestCrowdSafetyAlertsAsync();
+
             try { await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey); } catch { }
 
             try { await JS.InvokeVoidAsync("OutZenInterop.refreshHybridNow", ScopeKey); } catch { }
@@ -748,11 +755,41 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                     });
 
                 await _antennaHub.StartAsync();
+
+                await JoinCriticalAntennaGroupsAsync();
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine(
                     $"[HOME] Antenna hub unavailable. Map rendering continues without realtime antenna updates. {ex}");
+            }
+        }
+
+        private async Task JoinCriticalAntennaGroupsAsync()
+        {
+            if (_antennaHub is null || _antennaHub.State != HubConnectionState.Connected)
+                return;
+
+            var ids = _allAntennas
+                .Select(a => a.Id)
+                .Distinct()
+                .Take(100)
+                .ToArray();
+
+            if (ids.Length == 0)
+                return;
+
+            try
+            {
+                await _antennaHub.InvokeAsync(
+                    CrowdInfoAntennaConnectionHubMethods.FromClient.JoinAntennas,
+                    ids);
+
+                Console.WriteLine($"[HOME][AntennaHub] Joined {ids.Length} antenna groups.");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[HOME][AntennaHub] JoinAntennas failed: {ex.Message}");
             }
         }
 
@@ -766,20 +803,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             if (level == (int)CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Critical)
             {
-                await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateAntennaMarker", new
+                await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateAntennaAlertCircle", new
                 {
-                    Id = antennaId,
+                    AntennaId = antennaId,
                     Latitude = antenna.Latitude,
                     Longitude = antenna.Longitude,
-                    Name = antenna.Name,
-                    Level = level,
-                    Icon = "🚨",
-                    Description = $"{counts.ActiveConnections} connexions • {counts.UniqueDevices} devices • CRITICAL"
-                }, ScopeKey);
+                    Title = "Concentration critique détectée",
+                    Message = $"Concentration critique détectée près de {antenna.Name}.",
+                    Severity = 4,
+                    ActiveConnections = counts.ActiveConnections,
+                    UniqueDevices = counts.UniqueDevices,
+                    Status = "Realtime"
+                }
+                , ScopeKey);
             }
             else
             {
-                await JS.InvokeVoidAsync("OutZenInterop.removeAntennaMarker", key, ScopeKey);
+                await JS.InvokeVoidAsync(
+                    "OutZenInterop.removeAntennaAlertCircle",
+                    antennaId,
+                    ScopeKey);
             }
         }
 
@@ -1054,6 +1097,84 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                                 _selectedLongitude = nearest.Longitude;
                 }
             }
+        }
+
+        private async Task LoadLatestCrowdSafetyAlertsAsync()
+        {
+            if (_disposed)
+                return;
+
+            if (!IsMapBooted)
+                return;
+
+            try
+            {
+                var alerts = await CrowdSafetyAlertService.GetLatestAsync(50);
+
+                var activeCriticalAlerts = alerts
+                    .Where(a => a.Active)
+                    .Where(a => a.Status == "PendingValidation" || a.Status == "Validated")
+                    .Where(a => a.Severity >= 3)
+                    .ToList();
+
+                foreach (var alert in activeCriticalAlerts)
+                {
+                    await ApplyCrowdSafetyAlertMarkerAsync(alert);
+                }
+
+                Console.WriteLine($"[HOME][CrowdSafety] Loaded {activeCriticalAlerts.Count} active safety alerts.");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[HOME][CrowdSafety] LoadLatestCrowdSafetyAlertsAsync failed: {ex}");
+            }
+        }
+
+        private async Task ApplyCrowdSafetyAlertMarkerAsync(ClientCrowdSafetyAlertDTO alert)
+        {
+            if (_disposed)
+                return;
+
+            if (!IsMapBooted)
+                return;
+
+            var lat = (double)alert.Latitude;
+            var lng = (double)alert.Longitude;
+
+            if (!double.IsFinite(lat) || !double.IsFinite(lng))
+                return;
+
+            if (lat is < 49.45 or > 51.6 || lng is < 2.3 or > 6.6)
+                return;
+
+            var icon = alert.Severity switch
+            {
+                >= 4 => "🚨",
+                3 => "⚠️",
+                _ => "📡"
+            };
+
+            var description =
+                $"{alert.Message}<br/>" +
+                $"Active connections : {alert.ActiveConnections}<br/>" +
+                $"Unique devices : {alert.UniqueDevices}<br/>" +
+                $"Status : {alert.Status}";
+
+            await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateAntennaAlertCircle",
+
+                new
+                {
+                    AntennaId = alert.AntennaId,
+                    Latitude = lat,
+                    Longitude = lng,
+                    Title = alert.Title,
+                    Message = alert.Message,
+                    Severity = alert.Severity,
+                    ActiveConnections = alert.ActiveConnections,
+                    UniqueDevices = alert.UniqueDevices,
+                    Status = alert.Status
+                },
+                ScopeKey);
         }
         private static double GetDistanceKm(double lat1, double lon1, double lat2, double lon2)
         {

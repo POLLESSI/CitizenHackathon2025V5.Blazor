@@ -478,7 +478,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             if (_disposed)
                 return;
 
-            await TrySpeakCompletedInteractionAsync(dto);
+            if (dto.Id == _activeGptInteractionId && IsFinalUsableResponse(dto.Response ?? string.Empty))
+            {
+                await TrySpeakCompletedInteractionAsync(dto);
+            }
         }
 
         private bool CanSpeakFinalResponse(ClientGptInteractionDTO dto)
@@ -615,7 +618,25 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             if (_disposed || !_voiceOutputEnabled)
                 return;
 
-            if (dto.Id <= 0)
+            if (dto is null || dto.Id <= 0)
+                return;
+
+            var response = dto.Response?.Trim();
+
+            if (string.IsNullOrWhiteSpace(response))
+                return;
+
+            var parts = Regex.Split(response, @"(?<=[.!?])\s+")
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+
+            if (response.Length < 80)
+            {
+                Console.WriteLine($"[GPT VOICE] Skip speak: response too short / probably chunk. id={dto.Id}, len={response.Length}");
+                return;
+            }
+
+            if (!IsFinalUsableResponse(response))
                 return;
 
             if (_lastSpokenInteractionId == dto.Id)
@@ -635,9 +656,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             _lastSpokenInteractionId = dto.Id;
 
-            var speech = await JS.InvokeAsync<SpeechResult>("gptVoice.speak", dto.Response, ResolveTtsLang());
+            foreach (var part in parts)
+            {
+                Console.WriteLine($"[GPT VOICE] Speak part len={part.Length}");
 
-            Console.WriteLine($"[GPT VOICE] speak result ok={speech?.Ok}, error={speech?.Error}");
+                var speech = await JS.InvokeAsync<SpeechResult>(
+                    "gptVoice.speak",
+                    part,
+                    ResolveTtsLang());
+
+                Console.WriteLine($"[GPT VOICE] speak result ok={speech?.Ok}, error={speech?.Error}");
+
+                if (speech is null || !speech.Ok)
+                    break;
+            }
         }
 
         private static readonly IReadOnlyList<VoiceLanguageOption> VoiceLanguages =
@@ -700,6 +732,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             return latitude is >= -90 and <= 90 &&
                    longitude is >= -180 and <= 180;
+        }
+
+        private static bool IsFinalUsableResponse(string response)
+        {
+            if (string.IsNullOrWhiteSpace(response))
+                return false;
+
+            if (response.Contains("— Waiting", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (response.StartsWith("GPT request failed", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            return response.Length >= 80;
         }
 
         private sealed class SpeechResult
