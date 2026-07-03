@@ -1,0 +1,185 @@
+﻿@page "/commandcenter"
+@inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
+
+<PageTitle>OutZen Command Center</PageTitle>
+
+<h1>OutZen Command Center</h1>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="card">
+            <h5>Global Risk</h5>
+            <h1>@(Snapshot?.GlobalRiskScore ?? 0)</h1>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card">
+            <h5>Critical Incidents</h5>
+            <h1>@(Snapshot?.CriticalIncidentCount ?? 0)</h1>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card">
+            <h5>Prediction Horizon</h5>
+            <h1>30 min</h1>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card">
+            <h5>Digital Twin</h5>
+            <h1>ONLINE</h1>
+        </div>
+    </div>
+</div>
+
+<hr />
+
+<div id="@MapId" style="height:700px"></div>
+
+<hr />
+
+<h3>Current incidents</h3>
+
+@if (Clusters.Count == 0)
+{
+    <p>No active incidents.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Zone</th>
+                <th>Severity</th>
+                <th>Risk</th>
+                <th>Population</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var cluster in Clusters)
+            {
+                <tr>
+                    <td>@cluster.ZoneName</td>
+                    <td>@cluster.Severity</td>
+                    <td>@cluster.RiskScore</td>
+                    <td>@cluster.EstimatedPopulation</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                @* // Copyright (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Clie *@nt. All rights reserved.
