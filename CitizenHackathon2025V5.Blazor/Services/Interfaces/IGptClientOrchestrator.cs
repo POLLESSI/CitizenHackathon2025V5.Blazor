@@ -2,27 +2,22 @@
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services.Interfaces
 {
-    public interface IGptClientOrchestrator : IAsyncDisposable
+    public interface IGptClientOrchestrator
     {
         event Func<ClientGptInteractionDTO, Task>? InteractionUpdated;
-        event Func<string, Task>? StatusChanged;
 
-        bool EnablePollingFallback { get; set; }
-        bool IsHubConnected { get; }
+        event Func<ClientGptInteractionDTO, Task>? InteractionCompleted;
 
-        Task EnsureHubAsync(CancellationToken ct = default);
+        event Func<string?, Task>? StatusChanged;
 
-        Task<GptRunResult> RunAsync(string prompt, double? latitude = null, double? longitude = null, string languageCode = "fr-FR", CancellationToken ct = default);
+        Task EnsureHubAsync(
+            CancellationToken ct = default);
 
+        Task<ClientGptStartResponseDTO?> StartAsync(string prompt, double? latitude = null, double? longitude = null, string languageCode = "fr-FR", CancellationToken ct = default);
+
+        // RunAsync is kept solely for compatibility.
         Task<bool> CancelCurrentAsync(CancellationToken ct = default);
-
-        Task<bool> CancelAsync(int interactionId, string? requestId = null, CancellationToken ct = default);
-
-        bool TryGetLiveInteraction(int interactionId, out ClientGptInteractionDTO? interaction);
-
-        IReadOnlyCollection<ClientGptInteractionDTO> GetLiveInteractionsSnapshot();
     }
-
     public sealed class GptRunResult
     {
         public bool Started { get; set; }

@@ -26,6 +26,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
         {
             Snapshot = await CommandCenterService.GetSnapshotAsync();
             Clusters = await CommandCenterService.GetIncidentsAsync();
+
+            await NotifyDataLoadedAsync(fit: true);
         }
 
         protected override async Task SeedAsync(bool fit)

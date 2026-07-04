@@ -56,6 +56,8 @@ namespace CitizenHackathon2025V5.Blazor.Client
         private List<MenuItem> MenuItems => new()
         {
             new MenuItem("Accueil", "/", "🏠"),
+            new MenuItem("Command Center", "/commandcenter", "🛰️"),
+            new MenuItem("OutZen Interactions", "/gptinteractionview", "🤖"),
             new MenuItem("Antenna Crowd Panel", "/antennacrowdpanel", "📡"),
             new MenuItem("Events", "/eventview", "📅"),
             new MenuItem("Crowd Calendar", "/crowdcalendar", "📆"),
@@ -63,7 +65,6 @@ namespace CitizenHackathon2025V5.Blazor.Client
             new MenuItem("Places", "/placeview", "📍"),
             new MenuItem("Traffic", "/trafficconditionview", "🚦"),
             new MenuItem("Weather", "/weatherforecastview", "🌤"),
-            new MenuItem("OutZen Interactions", "/gptinteractionview", "🤖"),
             new MenuItem("Historic Suggestions", "/suggestionview", "💡"),
             new MenuItem("Comments", "/messageview", "💬"),
             new MenuItem("GDPR", "/privacy", "🔐"),

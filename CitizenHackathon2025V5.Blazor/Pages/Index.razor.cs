@@ -865,6 +865,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private async Task SendUserPromptAsync()
         {
             var prompt = _userPrompt?.Trim();
+
             if (string.IsNullOrWhiteSpace(prompt) || _isSendingPrompt || _disposed)
                 return;
 
@@ -872,24 +873,37 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             try
             {
-                var result = await GptClientOrchestrator.RunAsync(
+                await GptClientOrchestrator.EnsureHubAsync();
+
+                var started = await GptClientOrchestrator.StartAsync(
                     prompt,
                     latitude: DefaultCenter.lat,
                     longitude: DefaultCenter.lng,
                     languageCode: "fr-FR");
 
-                Console.WriteLine($"[HOME GPT] Started={result.Started}, InteractionId={result.InteractionId}, RequestId={result.RequestId}");
+                if (started is null || started.InteractionId <= 0)
+                {
+                    _gptStatusMessage = "GPT request could not be started.";
+                    return;
+                }
 
+                Console.WriteLine(
+                    $"[HOME GPT] Started InteractionId={started.InteractionId}, RequestId={started.RequestId}");
+
+                _gptStatusMessage = started.Message ?? "Generation started.";
                 _userPrompt = string.Empty;
+
                 await InvokeAsync(StateHasChanged);
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[HOME GPT] SendUserPromptAsync failed: {ex}");
+                _gptStatusMessage = $"GPT error: {ex.Message}";
             }
             finally
             {
                 _isSendingPrompt = false;
+                await InvokeAsync(StateHasChanged);
             }
         }
 

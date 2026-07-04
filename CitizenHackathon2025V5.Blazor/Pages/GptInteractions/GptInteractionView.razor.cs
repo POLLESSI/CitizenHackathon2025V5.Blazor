@@ -26,6 +26,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         protected override bool ClearAllOnMapReady => true;
 
         private readonly List<ClientGptInteractionDTO> _allInteractions = new();
+        private readonly HashSet<int> _completedVoiceInteractionIds = new();
         protected readonly List<ClientGptInteractionDTO> visibleGptInteractions = new();
 
         private const int PageSize = 20;
@@ -68,7 +69,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         private bool _handlersRegistered;
         private bool _isSending;
         private bool _showAiOverlay;
-        private bool _initialDataLoaded;
 
         private DateTime _lastRenderUtc = DateTime.MinValue;
 
@@ -382,49 +382,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                         $"[GPT VIEW] Coordinates extracted from prompt: lat={effectiveLatitude}, lng={effectiveLongitude}");
                 }
 
-                var result = await GptClientOrchestrator.RunAsync(prompt, latitude: effectiveLatitude, longitude: effectiveLongitude, languageCode: _mistralResponseLang, ct: CancellationToken.None);
+                await GptClientOrchestrator.EnsureHubAsync();
 
-                if (result.InteractionId.HasValue)
-                    _activeGptInteractionId = result.InteractionId.Value;
+                var started = await GptClientOrchestrator.StartAsync(
+                    prompt,
+                    latitude: effectiveLatitude,
+                    longitude: effectiveLongitude,
+                    languageCode: _mistralResponseLang,
+                    ct: CancellationToken.None);
 
-                if (!result.Started)
+                if (started is null || started.InteractionId <= 0)
                     throw new InvalidOperationException("The GPT request could not be started.");
 
-                ClientGptInteractionDTO? finalToSpeak = null;
+                _activeGptInteractionId = started.InteractionId;
+                SelectedId = started.InteractionId;
+                NewPrompt = string.Empty;
 
-                if (result.FinalInteraction is not null &&
-                    !string.IsNullOrWhiteSpace(result.FinalInteraction.Response) &&
-                    !result.FinalInteraction.Response.Contains("— Waiting", StringComparison.OrdinalIgnoreCase))
-                {
-                    await TrySpeakCompletedInteractionAsync(result.FinalInteraction);
-                }
-                else if (result.PendingInteraction is not null)
-                {
-                    SelectedId = result.PendingInteraction.Id;
-                    NewPrompt = string.Empty;
-
-                    //await Task.Delay(300);
-
-                    //finalToSpeak = await GptInteractionService.GetByIdAsync(result.PendingInteraction.Id);
-                }
-
-                _aiState = AiProcessingState.Success;
-                _aiStatusMessage = result.StatusMessage ?? "Response generated successfully.";
-                await SafeRenderAsync();
-
-                if (finalToSpeak is not null &&
-                    !string.IsNullOrWhiteSpace(finalToSpeak.Response) &&
-                    !finalToSpeak.Response.Contains("— Waiting", StringComparison.OrdinalIgnoreCase) &&
-                    !finalToSpeak.Response.StartsWith("GPT request failed", StringComparison.OrdinalIgnoreCase))
-                {
-                    await TrySpeakCompletedInteractionAsync(finalToSpeak);
-                }
-
-                await Task.Delay(600);
-                await StopElapsedTimerAsync();
-
-                _aiState = AiProcessingState.Idle;
-                _aiStatusMessage = null;
+                _aiStatusMessage = "Generation started...";
                 await SafeRenderAsync();
             }
             catch (OperationCanceledException)
@@ -465,23 +439,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             UpsertInteraction(_allInteractions, dto);
             UpsertInteraction(visibleGptInteractions, dto);
 
-            if (SelectedId == 0)
+            if (SelectedId == 0 || SelectedId == dto.Id)
                 SelectedId = dto.Id;
 
             await SafeRenderAsync(700);
-
-            if (!CanSpeakFinalResponse(dto))
-                return;
-
-            await Task.Delay(300);
-
-            if (_disposed)
-                return;
-
-            if (dto.Id == _activeGptInteractionId && IsFinalUsableResponse(dto.Response ?? string.Empty))
-            {
-                await TrySpeakCompletedInteractionAsync(dto);
-            }
         }
 
         private bool CanSpeakFinalResponse(ClientGptInteractionDTO dto)
@@ -949,6 +910,27 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             });
         }
 
+        private async Task OnInteractionCompletedAsync(ClientGptInteractionDTO dto)
+        {
+            if (_disposed || dto is null || dto.Id <= 0)
+                return;
+
+            _completedVoiceInteractionIds.Add(dto.Id);
+
+            await OnInteractionUpdatedAsync(dto);
+
+            if (IsFinalUsableResponse(dto.Response ?? string.Empty))
+                await TrySpeakCompletedInteractionAsync(dto);
+
+            _activeGptInteractionId = null;
+            _isSending = false;
+            _aiState = AiProcessingState.Idle;
+            _aiStatusMessage = null;
+
+            await StopElapsedTimerAsync();
+            await SafeRenderAsync();
+        }
+
         private async Task StopElapsedTimerAsync()
         {
             try
@@ -983,6 +965,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             GptClientOrchestrator.InteractionUpdated += OnInteractionUpdatedAsync;
             GptClientOrchestrator.StatusChanged += OnStatusChangedAsync;
+            GptClientOrchestrator.InteractionCompleted += OnInteractionCompletedAsync;
         }
 
         private static void UpsertInteraction(List<ClientGptInteractionDTO> list, ClientGptInteractionDTO dto)
@@ -1010,6 +993,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             GptClientOrchestrator.InteractionUpdated -= OnInteractionUpdatedAsync;
             GptClientOrchestrator.StatusChanged -= OnStatusChangedAsync;
+            GptClientOrchestrator.InteractionCompleted -= OnInteractionCompletedAsync;
 
             try { await GptClientOrchestrator.CancelCurrentAsync(); } catch { }
 

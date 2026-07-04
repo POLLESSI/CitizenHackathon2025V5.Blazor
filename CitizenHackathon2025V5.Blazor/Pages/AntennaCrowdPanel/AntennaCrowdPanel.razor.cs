@@ -125,16 +125,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.AntennaCrowdPanel
             Console.WriteLine($"[AntennaCrowdPanel] OnMapReadyAsync booted={IsMapBooted}");
             // At this stage: map booted + container OK
             await FitThrottledAsync();
-            if (_allAntennas.Count == 0)
-            {
-                // mini wait for first load (évite seed vide)
-                for (int i = 0; i < 10 && _allAntennas.Count == 0; i++)
-                    await Task.Delay(50);
-            }
-
-            if (_allAntennas.Count > 0)
-                await NotifyDataLoadedAsync(fit: true);
-
+            
             await Task.Delay(50);
             await FitThrottledAsync();
 

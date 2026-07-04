@@ -1,77 +1,110 @@
 ﻿@page "/commandcenter"
+@attribute [Authorize(Roles = "Admin,Moderator")]
 @inherits CitizenHackathon2025V5.Blazor.Client.Pages.Shared.OutZenMapPageBase
+@using Microsoft.AspNetCore.Authorization
 
 <PageTitle>OutZen Command Center</PageTitle>
 
-<h1>OutZen Command Center</h1>
+<div class="command-center-page">
 
-<div class="row">
-    <div class="col-md-3">
-        <div class="card">
-            <h5>Global Risk</h5>
-            <h1>@(Snapshot?.GlobalRiskScore ?? 0)</h1>
+    <section class="cc-hero">
+        <div>
+            <p class="cc-eyebrow">OUTZEN INTELLIGENCE GRID</p>
+            <h1>Command Center</h1>
+            <p class="cc-subtitle">
+                Real-time operational overview for Wallonia: crowd risk, incidents, predictions and digital twin state.
+            </p>
         </div>
-    </div>
 
-    <div class="col-md-3">
-        <div class="card">
-            <h5>Critical Incidents</h5>
-            <h1>@(Snapshot?.CriticalIncidentCount ?? 0)</h1>
+        <div class="cc-status-online">
+            <span></span>
+            DIGITAL TWIN ONLINE
         </div>
-    </div>
+    </section>
 
-    <div class="col-md-3">
-        <div class="card">
-            <h5>Prediction Horizon</h5>
-            <h1>30 min</h1>
-        </div>
-    </div>
+    <section class="cc-kpi-grid">
 
-    <div class="col-md-3">
-        <div class="card">
-            <h5>Digital Twin</h5>
-            <h1>ONLINE</h1>
+        <article class="cc-kpi-card cc-risk">
+            <div class="cc-kpi-label">Global Risk</div>
+            <div class="cc-gauge">
+                <div class="cc-gauge-value">@(Snapshot?.GlobalRiskScore ?? 0)</div>
+                <div class="cc-gauge-caption">/ 100</div>
+            </div>
+        </article>
+
+        <article class="cc-kpi-card">
+            <div class="cc-kpi-label">Critical Incidents</div>
+            <div class="cc-kpi-value">@(Snapshot?.CriticalIncidentCount ?? 0)</div>
+            <div class="cc-kpi-trend danger">Live monitoring</div>
+        </article>
+
+        <article class="cc-kpi-card">
+            <div class="cc-kpi-label">Prediction Horizon</div>
+            <div class="cc-kpi-value">30 min</div>
+            <div class="cc-kpi-trend warning">Predictive AI ready</div>
+        </article>
+
+        <article class="cc-kpi-card">
+            <div class="cc-kpi-label">Active Connections</div>
+            <div class="cc-kpi-value">@(Snapshot?.TotalActiveConnections ?? 0)</div>
+            <div class="cc-kpi-trend ok">Sensor grid</div>
+        </article>
+
+    </section>
+
+    <section class="cc-main-grid">
+
+        <div class="cc-map-panel">
+            <div class="cc-panel-header">
+                <div>
+                    <h2>Wallonia Operational Map</h2>
+                    <p>Clusters, heat zones and live incident overlays</p>
+                </div>
+                <div class="cc-map-legend">
+                    <span class="ok-dot"></span> Normal
+                    <span class="warn-dot"></span> Warning
+                    <span class="danger-dot"></span> Critical
+                </div>
+            </div>
+
+            <div id="@MapId" class="cc-map"></div>
         </div>
-    </div>
+
+        <aside class="cc-side-panel">
+            <h2>Incident Timeline</h2>
+
+            @if (Clusters.Count == 0)
+            {
+                <div class="cc-empty">
+                    <div class="cc-radar"></div>
+                    <p>No active incidents</p>
+                    <small>System is monitoring live data streams.</small>
+                </div>
+            }
+            else
+            {
+                @foreach (var cluster in Clusters)
+                {
+                    <div class="cc-incident">
+                        <div class="cc-incident-dot"></div>
+
+                        <div>
+                            <strong>@cluster.ZoneName</strong>
+                            <p>
+                                Severity @cluster.Severity ·
+                                Risk @cluster.RiskScore ·
+                                Pop. @cluster.EstimatedPopulation
+                            </p>
+                        </div>
+                    </div>
+                }
+            }
+        </aside>
+
+    </section>
+
 </div>
 
-<hr />
-
-<div id="@MapId" style="height:700px"></div>
-
-<hr />
-
-<h3>Current incidents</h3>
-
-@if (Clusters.Count == 0)
-{
-    <p>No active incidents.</p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Zone</th>
-                <th>Severity</th>
-                <th>Risk</th>
-                <th>Population</th>
-            </tr>
-        </thead>
-
-        <tbody>
-            @foreach (var cluster in Clusters)
-            {
-                <tr>
-                    <td>@cluster.ZoneName</td>
-                    <td>@cluster.Severity</td>
-                    <td>@cluster.RiskScore</td>
-                    <td>@cluster.EstimatedPopulation</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
 
 
 
