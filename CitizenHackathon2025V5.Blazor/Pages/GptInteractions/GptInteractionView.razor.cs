@@ -71,6 +71,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         private bool _showAiOverlay;
 
         private DateTime _lastRenderUtc = DateTime.MinValue;
+        private DateTime? _gptStartedAtUtc;
 
         private DateTime? _overlayShownAtUtc;
         private static readonly TimeSpan MinOverlayDuration = TimeSpan.FromSeconds(2);
@@ -400,6 +401,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
                 _aiStatusMessage = "Generation started...";
                 await SafeRenderAsync();
+
+                _gptStartedAtUtc = DateTime.UtcNow;
+
+                Console.WriteLine($"[GPT TIMER] START #{started.InteractionId} at {_gptStartedAtUtc:HH:mm:ss.fff}");
             }
             catch (OperationCanceledException)
             {
@@ -587,9 +592,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             if (string.IsNullOrWhiteSpace(response))
                 return;
 
-            var parts = Regex.Split(response, @"(?<=[.!?])\s+")
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .ToList();
+            //var parts = Regex.Split(response, @"(?<=[.!?])\s+")
+            //    .Where(x => !string.IsNullOrWhiteSpace(x))
+            //    .ToList();
 
             if (response.Length < 80)
             {
@@ -617,20 +622,22 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             _lastSpokenInteractionId = dto.Id;
 
-            foreach (var part in parts)
-            {
-                Console.WriteLine($"[GPT VOICE] Speak part len={part.Length}");
+            Console.WriteLine($"[GPT VOICE] Speak full response len={response.Length}");
 
-                var speech = await JS.InvokeAsync<SpeechResult>(
-                    "gptVoice.speak",
-                    part,
-                    ResolveTtsLang());
+            var speech = await JS.InvokeAsync<SpeechResult>(
+                "gptVoice.speak",
+                response,
+                ResolveTtsLang());
 
-                Console.WriteLine($"[GPT VOICE] speak result ok={speech?.Ok}, error={speech?.Error}");
+            Console.WriteLine($"[GPT VOICE] speak result ok={speech?.Ok}, error={speech?.Error}");
 
-                if (speech is null || !speech.Ok)
-                    break;
-            }
+            //foreach (var part in parts)
+            //{
+                
+
+            //    if (speech is null || !speech.Ok)
+            //        break;
+            //}
         }
 
         private static readonly IReadOnlyList<VoiceLanguageOption> VoiceLanguages =
@@ -929,6 +936,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             await StopElapsedTimerAsync();
             await SafeRenderAsync();
+            if (_gptStartedAtUtc.HasValue)
+            {
+                var duration = DateTime.UtcNow - _gptStartedAtUtc.Value;
+
+                Console.WriteLine($"[GPT TIMER] COMPLETED #{dto.Id} after {duration.TotalSeconds:F1}s");
+            }
+
+            _gptStartedAtUtc = null;
         }
 
         private async Task StopElapsedTimerAsync()

@@ -23,9 +23,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         private int? _currentInteractionId;
         private string? _currentRequestId;
 
-        private const int PollingInitialDelayMs = 5000;
-        private const int PollingIntervalMs = 5000;
-        private const int PollingMaxAttempts = 72; // 72 * 5s = 6 minutes
+        private const int PollingInitialDelayMs = 15_000;
+        private const int PollingIntervalMs = 15_000;
+        private const int PollingMaxAttempts = 40;
+
         private static readonly bool EnableVerboseGptPollingLogs = false;
 
         public GptClientOrchestrator(GptInteractionService gptService, IMultiHubSignalRClient multiHub)

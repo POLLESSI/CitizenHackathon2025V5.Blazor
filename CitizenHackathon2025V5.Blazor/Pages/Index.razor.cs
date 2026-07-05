@@ -887,8 +887,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                     return;
                 }
 
-                Console.WriteLine(
-                    $"[HOME GPT] Started InteractionId={started.InteractionId}, RequestId={started.RequestId}");
+                Console.WriteLine($"[HOME GPT] Started InteractionId={started.InteractionId}, RequestId={started.RequestId}");
 
                 _gptStatusMessage = started.Message ?? "Generation started.";
                 _userPrompt = string.Empty;
