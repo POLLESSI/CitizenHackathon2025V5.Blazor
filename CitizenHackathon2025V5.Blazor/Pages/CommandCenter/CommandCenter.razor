@@ -100,9 +100,109 @@
                 }
             }
         </aside>
+        <aside class="cc-side-panel">
+            <div class="cc-panel-header compact">
+                <div>
+                    <h2>Incident timeline</h2>
+                    <p>Live fused alert clusters</p>
+                </div>
+            </div>
 
+            @if (Clusters.Count == 0)
+            {
+                <div class="cc-empty-state">
+                    No active incident detected.
+                </div>
+            }
+            else
+            {
+                <div class="cc-timeline">
+                    @foreach (var cluster in Clusters
+                                    .OrderByDescending(c => c.Severity)
+                                    .ThenByDescending(c => c.RiskScore)
+                                    .ThenByDescending(c => c.LastDetectedAtUtc))
+                    {
+                        <article class="cc-timeline-item @GetSeverityClass(cluster)">
+                            <div class="cc-timeline-dot"></div>
+
+                            <div class="cc-timeline-content">
+                                <div class="cc-timeline-topline">
+                                    <strong>@cluster.ZoneName</strong>
+                                    <span>@cluster.LastDetectedAtUtc.ToLocalTime().ToString("HH:mm:ss")</span>
+                                </div>
+
+                                <div class="cc-timeline-meta">
+                                    Risk @cluster.RiskScore/100 · Severity @cluster.Severity · @cluster.TotalActiveConnections connections
+                                </div>
+
+                                <div class="cc-timeline-message">
+                                    @GetOperationalSummary(cluster)
+                                </div>
+
+                                <div class="cc-timeline-tags">
+                                    <span>@cluster.AlertCount alert(s)</span>
+                                    <span>@cluster.AntennaIds.Count antenna(s)</span>
+                                    <span>@cluster.EstimatedPopulation estimated</span>
+                                </div>
+                            </div>
+                        </article>
+                    }
+                </div>
+            }
+        </aside>
     </section>
+    <section class="cc-actions-panel">
+        <div class="cc-panel-header compact">
+            <div>
+                <h2>Decision Engine</h2>
+                <p>Automatic operational recommendations</p>
+            </div>
+        </div>
 
+        @if (Actions.Count == 0)
+        {
+            <div class="cc-empty-state">
+                No automatic action currently recommended.
+            </div>
+        }
+        else
+        {
+            <div class="cc-action-list">
+                @foreach (var action in Actions.OrderByDescending(a => a.RiskScore))
+                {
+                    <article class="cc-action-item @GetActionPriorityClass(action)">
+                        <div class="cc-action-priority">@action.Priority</div>
+                        <div class="cc-action-body">
+                            <strong>@action.ActionType</strong>
+                            <p>@action.Message</p>
+                            <span>@action.ZoneName · Risk @action.RiskScore/100</span>
+                        </div>
+                    </article>
+                }
+            </div>
+        }
+    </section>
+    <section class="cc-live-counters">
+        <article class="cc-live-counter">
+            <span class="cc-live-value">@TotalClusterCount</span>
+            <span class="cc-live-label">Clusters actifs</span>
+        </article>
+
+        <article class="cc-live-counter">
+            <span class="cc-live-value">@TotalFusedAlertCount</span>
+            <span class="cc-live-label">Alertes fusionnées</span>
+        </article>
+
+        <article class="cc-live-counter">
+            <span class="cc-live-value">@TotalActiveConnectionCount</span>
+            <span class="cc-live-label">Connexions actives</span>
+        </article>
+
+        <article class="cc-live-counter">
+            <span class="cc-live-value">@TotalUniqueDeviceCount</span>
+            <span class="cc-live-label">Devices uniques</span>
+        </article>
+    </section>
 </div>
 
 

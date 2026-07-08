@@ -10,32 +10,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
         [Parameter] public string Title { get; set; } = "Window";
         [Parameter] public string? Subtitle { get; set; }
 
-        // Content
         [Parameter] public RenderFragment? ChildContent { get; set; }
 
-        // FAB
         [Parameter] public string FabIcon { get; set; } = "Comment";
         [Parameter] public string FabTitle { get; set; } = "Open";
         [Parameter] public string FabRight { get; set; } = "18px";
         [Parameter] public string FabBottom { get; set; } = "18px";
         [Parameter] public int FabZIndex { get; set; } = 9999;
 
-        // Drawer placement defaults
         [Parameter] public string StartLeft { get; set; } = "24px";
         [Parameter] public string StartTop { get; set; } = "120px";
         [Parameter] public int DrawerZIndex { get; set; } = 30000;
 
-        // Controlled open (optional)
         [Parameter] public bool IsOpen { get; set; }
         [Parameter] public EventCallback<bool> IsOpenChanged { get; set; }
-        [Parameter] public string? Width { get; set; }          // ex: "360px" / "min(360px, 92vw)"
-        [Parameter] public string? MaxWidth { get; set; }       // ex: "360px"
-        [Parameter] public string? MinWidth { get; set; }       // ex: "280px"
-        [Parameter] public string? Class { get; set; }          // optional for targeting CSS
 
+        [Parameter] public string? Width { get; set; }
+        [Parameter] public string? MaxWidth { get; set; }
+        [Parameter] public string? MinWidth { get; set; }
+        [Parameter] public string? Class { get; set; }
 
-        // State
-        private bool IsDockRight { get; set; }
         private bool IsPinnedTop { get; set; }
         private bool IsMinimized { get; set; }
 
@@ -50,18 +44,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
         {
             get
             {
-                var z = (IsPinnedTop ? DrawerZIndex + 30000 : DrawerZIndex);
-                var parts = new List<string>();
+                var z = IsPinnedTop ? DrawerZIndex + 30000 : DrawerZIndex;
 
-                if (!string.IsNullOrWhiteSpace(Width)) parts.Add($"width:{Width}");
-                if (!string.IsNullOrWhiteSpace(MaxWidth)) parts.Add($"max-width:{MaxWidth}");
-                if (!string.IsNullOrWhiteSpace(MinWidth)) parts.Add($"min-width:{MinWidth}");
+                var parts = new List<string>
+                {
+                    "position:fixed",
+                    $"left:{StartLeft}",
+                    $"top:{StartTop}",
+                    "right:auto",
+                    "bottom:auto",
+                    $"z-index:{z}"
+                };
 
-                // position
-                if (IsDockRight)
-                    parts.Add($"z-index:{z}");
-                else
-                    parts.Add($"left:{StartLeft};top:{StartTop};z-index:{z}");
+                if (!string.IsNullOrWhiteSpace(Width))
+                    parts.Add($"width:{Width}");
+
+                if (!string.IsNullOrWhiteSpace(MaxWidth))
+                    parts.Add($"max-width:{MaxWidth}");
+
+                if (!string.IsNullOrWhiteSpace(MinWidth))
+                    parts.Add($"min-width:{MinWidth}");
 
                 return string.Join(";", parts) + ";";
             }
@@ -69,39 +71,51 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
-            if (IsOpen)
-            {
-                if (!_dragWired)
-                {
-                    try { _dragWired = await JS.InvokeAsync<bool>("OutZen.safeMakeDrawerDraggable", Id); }
-                    catch { _dragWired = false; }
-                }
-
-                if (!_resizeWired)
-                {
-                    try { _resizeWired = await JS.InvokeAsync<bool>("OutZen.safeMakeDrawerResizable", Id); }
-                    catch { _resizeWired = false; }
-                }
-
-                try { await JS.InvokeVoidAsync("OutZen.safeBringToFront", Id); } catch { }
-                try { await JS.InvokeVoidAsync("OutZen.safeAvoidOverlap", Id); } catch { }
-            }
-
             if (!IsOpen)
             {
                 _dragWired = false;
                 _resizeWired = false;
+                return;
+            }
+
+            try
+            {
+                await JS.InvokeVoidAsync("OutZen.safeBringToFront", Id);
+            }
+            catch { }
+
+            try
+            {
+                _dragWired = await JS.InvokeAsync<bool>("OutZen.safeMakeDrawerDraggable", Id);
+            }
+            catch
+            {
+                _dragWired = false;
+            }
+
+            try
+            {
+                _resizeWired = await JS.InvokeAsync<bool>("OutZen.safeMakeDrawerResizable", Id);
+            }
+            catch
+            {
+                _resizeWired = false;
             }
         }
+
         private async Task ToggleOpen()
         {
-            // anti double-fire (very useful with mixed JS/Blazor inputs)
             var now = Environment.TickCount64;
-            if (now - _lastToggleMs < 180) return;
+            if (now - _lastToggleMs < 180)
+                return;
+
             _lastToggleMs = now;
 
             IsOpen = !IsOpen;
             _dragWired = false;
+            _resizeWired = false;
+
+            Console.WriteLine($"[OzFloatingWindow] ToggleOpen Id={Id}, IsOpen={IsOpen}");
 
             if (IsOpenChanged.HasDelegate)
                 await IsOpenChanged.InvokeAsync(IsOpen);
@@ -113,6 +127,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
         {
             IsOpen = false;
             _dragWired = false;
+            _resizeWired = false;
             IsMinimized = false;
 
             if (IsOpenChanged.HasDelegate)
@@ -128,14 +143,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
             return Task.CompletedTask;
         }
 
-        private Task ToggleDockRight()
-        {
-            IsDockRight = !IsDockRight;
-            _dragWired = false;
-            StateHasChanged();
-            return Task.CompletedTask;
-        }
-
         private Task ToggleMinimize()
         {
             IsMinimized = !IsMinimized;
@@ -146,10 +153,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
 
         private async Task BringToFront()
         {
-            try { await JS.InvokeVoidAsync("OutZen.bringToFront", Id); }
-            catch { /* noop */ }
+            try
+            {
+                await JS.InvokeVoidAsync("OutZen.bringToFront", Id);
+            }
+            catch { }
         }
-
     }
 }
 

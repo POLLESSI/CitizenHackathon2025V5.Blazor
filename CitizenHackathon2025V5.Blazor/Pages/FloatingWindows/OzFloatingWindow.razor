@@ -2,41 +2,51 @@
 @inject IJSRuntime JS
 
 <div class="oz-fab" style="@FabStyle">
-    <button class="oz-btn" type="button" @onclick="ToggleOpen" title="@FabTitle">
+    <button class="oz-btn"
+            type="button"
+            @onclick="ToggleOpen"
+            @onclick:stopPropagation="true"
+            title="@FabTitle">
         @FabIcon
     </button>
 </div>
 
-<div id="@Id"
-     class="oz-drawer @(IsOpen ? "open" : "") @(IsPinnedTop ? "pin-top" : "") @(IsMinimized ? "minimized" : "") @(IsDockRight ? "dock-right" : "") @(Class ?? "")"
-     style="@DrawerInlineStyle"
-     @onclick="BringToFront"
-     @onclick:stopPropagation="true">
-
-    <div class="oz-titlebar"
-         data-oz-drag-handle="true"
+@if (IsOpen)
+{
+    <div id="@Id"
+         class="oz-drawer open @(IsPinnedTop ? "pin-top" : "") @(IsMinimized ? "minimized" : "") @(Class ?? "")"
+         style="@DrawerInlineStyle"
+         @onclick="BringToFront"
          @onclick:stopPropagation="true">
-        <div class="oz-titlebar-left">
-            <span class="oz-title">@Title</span>
-            @if (!string.IsNullOrWhiteSpace(Subtitle))
-            {
-                <span class="oz-subtitle">@Subtitle</span>
-            }
+
+        <div class="oz-titlebar"
+             data-oz-drag-handle="true"
+             @onclick:stopPropagation="true">
+            <div class="oz-titlebar-left">
+                <span class="oz-title">@Title</span>
+
+                @if (!string.IsNullOrWhiteSpace(Subtitle))
+                {
+                    <span class="oz-subtitle">@Subtitle</span>
+                }
+            </div>
+
+            <div class="oz-titlebar-actions">
+                <button class="oz-icon-btn" type="button" title="Pin on top" @onclick="TogglePinTop">📌</button>
+                <button class="oz-icon-btn" type="button" title="Minimize" @onclick="ToggleMinimize">—</button>
+                <button class="oz-icon-btn danger" type="button" title="Close" @onclick="Close">✕</button>
+            </div>
         </div>
 
-        <div class="oz-titlebar-actions">
-            <button class="oz-icon-btn" type="button" title="Dock right" @onclick="ToggleDockRight">⇢</button>
-            <button class="oz-icon-btn" type="button" title="Pin on top" @onclick="TogglePinTop">📌</button>
-            <button class="oz-icon-btn" type="button" title="Minimize" @onclick="ToggleMinimize">—</button>
-            <button class="oz-icon-btn danger" type="button" title="Close" @onclick="Close">✕</button>
+        <div class="oz-body"
+             style="@(IsMinimized ? "display:none;" : "")"
+             @onclick:stopPropagation="true">
+            @ChildContent
         </div>
-    </div>
 
-    <div class="oz-body" style="@(IsMinimized ? "display:none;" : "")" @onclick:stopPropagation="true">
-        @ChildContent
+        <div class="oz-resize-handle" data-oz-resize="true" title="Resize"></div>
     </div>
-    <div class="oz-resize-handle" data-oz-resize="true" title="Resize"></div>
-</div>
+}
 
 
 

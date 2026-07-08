@@ -21,5 +21,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         {
             return await _http.GetFromJsonAsync<List<CrowdAlertCluster>>("commandcenter/incidents") ?? new();
         }
+
+        public async Task<List<DecisionActionDTO>> GetDecisionActionsAsync()
+        {
+            return await _http.GetFromJsonAsync<List<DecisionActionDTO>>(
+                "commandcenter/actions") ?? new();
+        }
     }
 }

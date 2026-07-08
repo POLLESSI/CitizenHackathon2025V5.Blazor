@@ -1817,7 +1817,7 @@ HIGHLIGHT / PULSE
 }
 
 /* Text */
-.critical-alert-panel.alert-cluster .outzen-alert-label {
+/*.critical-alert-panel.alert-cluster .outzen-alert-label {
     position: fixed !important;
     top: 140px;
     top: 120px !important;
@@ -1849,7 +1849,7 @@ HIGHLIGHT / PULSE
     color: #fff !important;
     text-shadow: 0 2px 4px rgba(0,0,0,.9), 0 0 10px currentColor !important;
 }
-
+*/
 .critical-alert-panel.alert-cluster:hover {
     box-shadow: 0 0 35px rgba(0,247,255,.35), 0 0 90px rgba(0,247,255,.20), inset 0 0 35px rgba(255,255,255,.05);
 }
@@ -2521,13 +2521,13 @@ HIGHLIGHT / PULSE
     transform: scale(1);
 }
 
-.alert-cluster:hover .alert-secondary,
+/*.alert-cluster:hover .alert-secondary,
 .alert-cluster:focus-within .alert-secondary {
     opacity: 1;
     pointer-events: auto;
     transform: scale(1);
     filter: blur(0);
-}
+}*/
 
 .alert-cluster-hint {
     margin-top: 8px;
@@ -5160,13 +5160,13 @@ HIGHLIGHT / PULSE
     transform: scale(1);
 }
 
-.alert-cluster:hover .alert-secondary,
+/*.alert-cluster:hover .alert-secondary,
 .alert-cluster:focus-within .alert-secondary {
     opacity: 1;
     pointer-events: auto;
     transform: scale(1);
     filter: blur(0);
-}
+}*/
 
 .alert-cluster-hint {
     margin-top: 8px;
@@ -5611,6 +5611,1286 @@ HIGHLIGHT / PULSE
     .cc-map {
         height: 520px;
         min-height: 520px;
+    }
+}
+
+.cc-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    max-height: 620px;
+    overflow-y: auto;
+    padding-right: 0.35rem;
+}
+
+.cc-timeline-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 18px 1fr;
+    gap: 0.7rem;
+    padding: 0.85rem;
+    border-radius: 18px;
+    background: rgba(8, 18, 38, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    box-shadow: inset 0 0 22px rgba(255, 255, 255, 0.03);
+}
+
+.cc-timeline-dot {
+    width: 12px;
+    height: 12px;
+    margin-top: 0.3rem;
+    border-radius: 999px;
+    background: #22c55e;
+    box-shadow: 0 0 18px rgba(34, 197, 94, 0.8);
+}
+
+.cc-timeline-item.is-moderate .cc-timeline-dot {
+    background: #facc15;
+    box-shadow: 0 0 18px rgba(250, 204, 21, 0.8);
+}
+
+.cc-timeline-item.is-high .cc-timeline-dot {
+    background: #fb923c;
+    box-shadow: 0 0 18px rgba(251, 146, 60, 0.8);
+}
+
+.cc-timeline-item.is-critical .cc-timeline-dot {
+    background: #ef4444;
+    box-shadow: 0 0 22px rgba(239, 68, 68, 0.95);
+    animation: ccPulse 1.4s infinite;
+}
+
+.cc-timeline-topline {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    color: #e5f2ff;
+    font-size: 0.92rem;
+}
+
+.cc-timeline-topline span {
+    color: rgba(191, 219, 254, 0.72);
+    font-size: 0.78rem;
+}
+
+.cc-timeline-meta {
+    margin-top: 0.25rem;
+    color: rgba(147, 197, 253, 0.92);
+    font-size: 0.78rem;
+}
+
+.cc-timeline-message {
+    margin-top: 0.45rem;
+    color: rgba(226, 232, 240, 0.9);
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+
+.cc-timeline-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin-top: 0.6rem;
+}
+
+.cc-timeline-tags span {
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(96, 165, 250, 0.22);
+    color: rgba(219, 234, 254, 0.92);
+    font-size: 0.72rem;
+}
+
+@keyframes ccPulse {
+    0%, 100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: scale(1.35);
+        opacity: 0.68;
+    }
+}
+
+.cc-live-counters {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.cc-live-counter {
+    padding: 1rem;
+    border-radius: 18px;
+    background: rgba(8, 18, 38, 0.78);
+    border: 1px solid rgba(96, 165, 250, 0.22);
+    box-shadow: inset 0 0 22px rgba(255, 255, 255, 0.03);
+}
+
+.cc-live-value {
+    display: block;
+    font-size: 1.65rem;
+    font-weight: 900;
+    color: #e5f2ff;
+}
+
+.cc-live-label {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8rem;
+    color: rgba(191, 219, 254, 0.75);
+}
+
+/* =========================================================
+   OUTZEN CONTROL CENTER — FINAL OVERRIDE
+   Compact by default, double-click via .is-expanded, no hover deploy
+   ========================================================= */
+
+/* Base panel: always visible, JS can move it with left/top */
+.critical-alert-panel.alert-cluster {
+    position: fixed !important;
+    top: 120px !important;
+    right: 30px !important;
+    left: auto !important;
+    bottom: auto !important;
+    width: 210px !important;
+    min-width: 210px !important;
+    max-width: 210px !important;
+    height: auto !important;
+    min-height: 230px !important;
+    max-height: calc(100vh - 20px) !important;
+    z-index: 2147483640 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
+    padding: 16px !important;
+    box-sizing: border-box !important;
+    overflow: visible !important;
+    border-radius: 28px !important;
+    background: rgba(8, 12, 24, .58) !important;
+    border: 1px solid rgba(0, 247, 255, .38) !important;
+    box-shadow: 0 0 25px rgba(0, 247, 255, .22), 0 0 60px rgba(0, 247, 255, .12), inset 0 0 30px rgba(255, 255, 255, .04) !important;
+    backdrop-filter: blur(18px) !important;
+    -webkit-backdrop-filter: blur(18px) !important;
+    cursor: grab !important;
+    user-select: none !important;
+    touch-action: none !important;
+    transform: none !important;
+    transition: width .28s ease, min-width .28s ease, max-width .28s ease, min-height .28s ease, background .28s ease, box-shadow .28s ease !important;
+}
+
+.critical-alert-panel.alert-cluster.is-dragging {
+    cursor: grabbing !important;
+    opacity: .96 !important;
+    transform: none !important;
+}
+
+/* Expanded mode: controlled only by JS class .is-expanded */
+.critical-alert-panel.alert-cluster.is-expanded {
+    width: min(390px, calc(100vw - 20px)) !important;
+    min-width: min(390px, calc(100vw - 20px)) !important;
+    max-width: min(390px, calc(100vw - 20px)) !important;
+    min-height: 460px !important;
+    background: rgba(8, 12, 24, .88) !important;
+    box-shadow: 0 0 35px rgba(0, 247, 255, .35), 0 0 90px rgba(0, 247, 255, .20), inset 0 0 35px rgba(255, 255, 255, .05) !important;
+}
+
+/* Keep title clean */
+.critical-alert-panel.alert-cluster::before {
+    content: none !important;
+}
+
+.critical-alert-panel.alert-cluster .alert-cluster-header {
+    width: 100% !important;
+    text-align: center !important;
+    color: #00f7ff !important;
+    font-size: .78rem !important;
+    font-weight: 900 !important;
+    letter-spacing: .18em !important;
+    line-height: 1.25 !important;
+    text-transform: uppercase !important;
+    text-shadow: 0 0 10px rgba(0, 247, 255, .8), 0 0 25px rgba(0, 247, 255, .5) !important;
+}
+
+/* Grid matching your Razor markup */
+.critical-alert-panel.alert-cluster .alert-cluster-grid {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    justify-items: center !important;
+    align-items: center !important;
+    gap: 18px !important;
+    position: relative !important;
+}
+
+.critical-alert-panel.alert-cluster.is-expanded .alert-cluster-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr)) !important;
+}
+
+/* Main button centered in compact mode */
+.critical-alert-panel.alert-cluster .alert-main {
+    grid-column: 1 / -1 !important;
+}
+
+/* Alert buttons */
+.critical-alert-panel.alert-cluster .outzen-alert-button {
+    position: relative !important;
+    width: 120px !important;
+    height: 120px !important;
+    min-width: 120px !important;
+    min-height: 120px !important;
+    max-width: 120px !important;
+    max-height: 120px !important;
+    display: grid !important;
+    place-items: center !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 50% !important;
+    border: 3px solid currentColor !important;
+    overflow: visible !important;
+    cursor: pointer !important;
+    box-shadow: 0 0 12px currentColor, 0 0 28px currentColor, inset 0 0 18px rgba(255, 255, 255, .08) !important;
+    animation: outzenPulse 2s infinite ease-in-out !important;
+}
+
+/* Important: text must stay INSIDE the button */
+.critical-alert-panel.alert-cluster .outzen-alert-label {
+    position: relative !important;
+    inset: auto !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    z-index: 3 !important;
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    color: #fff !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 1.15rem !important;
+    font-weight: 900 !important;
+    line-height: 1.05 !important;
+    letter-spacing: .07em !important;
+    text-align: center !important;
+    text-transform: uppercase !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, .9), 0 0 10px currentColor !important;
+    cursor: pointer !important;
+    pointer-events: none !important;
+}
+
+.critical-alert-panel.alert-cluster .outzen-alert-label--traffic,
+.critical-alert-panel.alert-cluster .outzen-alert-label--disaster {
+    font-size: .78rem !important;
+}
+
+/* Button colors */
+.critical-alert-panel.alert-cluster .outzen-alert-button--crowd {
+    color: #ff2b2b !important;
+    background: radial-gradient(circle at 50% 55%, rgba(255, 43, 43, .42), rgba(75, 0, 0, .62) 58%, rgba(8, 0, 0, .86) 100%) !important;
+}
+
+.critical-alert-panel.alert-cluster .outzen-alert-button--weather {
+    color: #00f7ff !important;
+    background: radial-gradient(circle at 50% 55%, rgba(0, 247, 255, .40), rgba(0, 72, 80, .62) 58%, rgba(0, 12, 16, .88) 100%) !important;
+}
+
+.critical-alert-panel.alert-cluster .outzen-alert-button--traffic {
+    color: #ff9800 !important;
+    background: radial-gradient(circle at 50% 55%, rgba(255, 152, 0, .42), rgba(105, 48, 0, .62) 58%, rgba(16, 7, 0, .88) 100%) !important;
+}
+
+.critical-alert-panel.alert-cluster .outzen-alert-button--disaster {
+    color: #ff3cff !important;
+    background: radial-gradient(circle at 50% 55%, rgba(255, 60, 255, .42), rgba(82, 0, 82, .62) 58%, rgba(16, 0, 16, .88) 100%) !important;
+}
+
+/* Compact mode: only FULL ALERT visible */
+.critical-alert-panel.alert-cluster:not(.is-expanded) .alert-secondary {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    transform: scale(.35) translateY(-60px) !important;
+    filter: blur(4px) !important;
+}
+
+/* Neutralize old hover/focus deployment rules */
+.critical-alert-panel.alert-cluster:not(.is-expanded):hover .alert-secondary,
+.critical-alert-panel.alert-cluster:not(.is-expanded):focus-within .alert-secondary {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    transform: scale(.35) translateY(-60px) !important;
+    filter: blur(4px) !important;
+}
+
+/* Expanded mode: show secondary buttons */
+.critical-alert-panel.alert-cluster.is-expanded .alert-secondary {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    position: relative !important;
+    transform: scale(1) translateY(0) !important;
+    filter: none !important;
+}
+
+/* Infos hidden in compact mode */
+.critical-alert-panel.alert-cluster:not(.is-expanded) .critical-alert-infos {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+    margin: 0 !important;
+}
+
+/* Infos visible in expanded mode */
+.critical-alert-panel.alert-cluster.is-expanded .critical-alert-infos {
+    opacity: 1 !important;
+    visibility: visible !important;
+    max-height: 180px !important;
+    pointer-events: auto !important;
+}
+
+/* Hint */
+.critical-alert-panel.alert-cluster .alert-cluster-hint {
+    margin-top: 4px !important;
+    color: rgba(0, 247, 255, .80) !important;
+    font-size: .66rem !important;
+    font-weight: 900 !important;
+    letter-spacing: .14em !important;
+    text-transform: uppercase !important;
+    text-align: center !important;
+    opacity: 1 !important;
+    text-shadow: 0 0 10px rgba(0, 255, 255, .8) !important;
+}
+
+.critical-alert-panel.alert-cluster:hover .alert-cluster-hint,
+.critical-alert-panel.alert-cluster:focus-within .alert-cluster-hint {
+    opacity: 1 !important;
+}
+
+/* Info pills */
+.critical-alert-panel.alert-cluster .critical-alert-infos {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 8px !important;
+    transition: opacity .25s ease, max-height .25s ease, visibility .25s ease !important;
+}
+
+.critical-alert-panel.alert-cluster .critical-alert-place,
+.critical-alert-panel.alert-cluster .critical-alert-status {
+    max-width: 100% !important;
+    padding: 8px 12px !important;
+    border-radius: 999px !important;
+    background: rgba(5, 8, 14, .78) !important;
+    border: 1px solid rgba(0, 247, 255, .32) !important;
+    color: #fff !important;
+    font-weight: 900 !important;
+    font-size: .78rem !important;
+    text-align: center !important;
+    overflow-wrap: anywhere !important;
+    box-shadow: 0 0 14px rgba(0, 247, 255, .22), inset 0 0 10px rgba(255, 255, 255, .06) !important;
+}
+
+/* No transform scale on responsive: JS drag uses real screen coordinates */
+@media (max-width: 900px) {
+    .critical-alert-panel.alert-cluster {
+        top: 96px !important;
+        right: 14px !important;
+        transform: none !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .critical-alert-panel.alert-cluster {
+        top: 86px !important;
+        right: 8px !important;
+        width: min(210px, calc(100vw - 16px)) !important;
+        min-width: min(210px, calc(100vw - 16px)) !important;
+        max-width: min(210px, calc(100vw - 16px)) !important;
+        transform: none !important;
+    }
+
+        .critical-alert-panel.alert-cluster.is-expanded {
+            width: calc(100vw - 16px) !important;
+            min-width: calc(100vw - 16px) !important;
+            max-width: calc(100vw - 16px) !important;
+        }
+}
+
+/* =========================================================
+   OZ FLOATING WINDOWS — FINAL FREE DRAG OVERRIDE
+   ========================================================= */
+
+.oz-drawer {
+    position: fixed !important;
+    right: auto !important;
+    bottom: auto !important;
+    max-height: calc(100vh - 16px) !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+}
+
+.oz-drawer.open {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.oz-drawer.dock-right {
+    right: auto !important;
+    bottom: auto !important;
+}
+
+.oz-drawer .oz-titlebar {
+    cursor: grab !important;
+    user-select: none !important;
+    touch-action: none !important;
+}
+
+.oz-drawer.oz-dragging .oz-titlebar {
+    cursor: grabbing !important;
+}
+
+.oz-drawer.oz-dragging {
+    opacity: .96 !important;
+}
+
+.oz-drawer .oz-body {
+    min-width: 0 !important;
+    min-height: 0 !important;
+    overflow: auto !important;
+}
+
+.oz-drawer--gpt .oz-body {
+    height: auto !important;
+    max-height: calc(100vh - 120px) !important;
+}
+
+.oz-resize-handle {
+    position: absolute !important;
+    right: 4px !important;
+    bottom: 4px !important;
+    width: 18px !important;
+    height: 18px !important;
+    cursor: nwse-resize !important;
+    opacity: .75 !important;
+    z-index: 5 !important;
+}
+
+.oz-resize-handle::after {
+    content: "" !important;
+    position: absolute !important;
+    right: 3px !important;
+    bottom: 3px !important;
+    width: 10px !important;
+    height: 10px !important;
+    border-right: 2px solid rgba(255, 255, 255, .55) !important;
+    border-bottom: 2px solid rgba(255, 255, 255, .55) !important;
+}
+
+/* DEBUG FINAL — OutZen Control Center expansion */
+.critical-alert-panel.alert-cluster {
+    width: 210px !important;
+    min-width: 210px !important;
+    max-width: 210px !important;
+}
+
+.critical-alert-panel.alert-cluster.is-expanded {
+    width: 390px !important;
+    min-width: 390px !important;
+    max-width: 390px !important;
+}
+
+.critical-alert-panel.alert-cluster:not(.is-expanded) .alert-secondary {
+    display: none !important;
+}
+
+.critical-alert-panel.alert-cluster.is-expanded .alert-secondary {
+    display: grid !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+}
+
+/* =========================================================
+   OZ FLOATING WINDOWS — FINAL FIX
+   ========================================================= */
+
+.oz-fab {
+    position: fixed !important;
+    z-index: 2147483000 !important;
+}
+
+    .oz-fab .oz-btn {
+        min-width: 96px !important;
+        min-height: 46px !important;
+        padding: 0.65rem 1rem !important;
+        border-radius: 999px !important;
+        border: 0 !important;
+        background: #24a647 !important;
+        color: #fff !important;
+        font-weight: 800 !important;
+        cursor: pointer !important;
+        box-shadow: 0 10px 26px rgba(0,0,0,.35) !important;
+    }
+
+.oz-drawer {
+    display: none !important;
+    position: fixed !important;
+    left: 24px !important;
+    top: 120px !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 420px;
+    min-width: 320px;
+    max-width: min(960px, calc(100vw - 24px));
+    max-height: calc(100vh - 24px) !important;
+    z-index: 30000 !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    border-radius: 18px !important;
+    border: 1px solid rgba(0,247,255,.30) !important;
+    background: rgba(8, 12, 24, .94) !important;
+    color: #fff !important;
+    box-shadow: 0 20px 70px rgba(0,0,0,.55), 0 0 30px rgba(0,247,255,.14), inset 0 0 24px rgba(255,255,255,.04) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+}
+
+    .oz-drawer.open {
+        display: flex !important;
+    }
+
+    .oz-drawer.dock-right {
+        right: auto !important;
+        bottom: auto !important;
+    }
+
+.oz-titlebar {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0.75rem !important;
+    min-height: 42px !important;
+    padding: 0.65rem 0.75rem !important;
+    background: linear-gradient(90deg, rgba(111,0,255,.80), rgba(0,247,255,.18)) !important;
+    border-bottom: 1px solid rgba(255,255,255,.10) !important;
+    cursor: grab !important;
+    user-select: none !important;
+    touch-action: none !important;
+}
+
+.oz-drawer.oz-dragging .oz-titlebar {
+    cursor: grabbing !important;
+}
+
+.oz-titlebar-left {
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 0.35rem !important;
+    min-width: 0 !important;
+}
+
+.oz-title {
+    font-weight: 900 !important;
+    color: #fff !important;
+    white-space: nowrap !important;
+}
+
+.oz-subtitle {
+    font-size: 0.82rem !important;
+    color: rgba(255,255,255,.72) !important;
+    white-space: nowrap !important;
+}
+
+.oz-titlebar-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+}
+
+.oz-icon-btn {
+    width: 28px !important;
+    height: 28px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(255,255,255,.14) !important;
+    background: rgba(255,255,255,.06) !important;
+    color: #fff !important;
+    cursor: pointer !important;
+}
+
+    .oz-icon-btn:hover {
+        background: rgba(255,255,255,.12) !important;
+    }
+
+    .oz-icon-btn.danger {
+        background: rgba(255, 50, 80, .20) !important;
+        border-color: rgba(255, 80, 110, .35) !important;
+    }
+
+.oz-body {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0.85rem !important;
+    overflow: auto !important;
+    box-sizing: border-box !important;
+}
+
+.oz-drawer--gpt .oz-body {
+    max-height: calc(100vh - 120px) !important;
+}
+
+.oz-resize-handle {
+    position: absolute !important;
+    right: 4px !important;
+    bottom: 4px !important;
+    width: 18px !important;
+    height: 18px !important;
+    cursor: nwse-resize !important;
+    opacity: .75 !important;
+    z-index: 5 !important;
+}
+
+    .oz-resize-handle::after {
+        content: "" !important;
+        position: absolute !important;
+        right: 3px !important;
+        bottom: 3px !important;
+        width: 10px !important;
+        height: 10px !important;
+        border-right: 2px solid rgba(255,255,255,.55) !important;
+        border-bottom: 2px solid rgba(255,255,255,.55) !important;
+    }
+
+.oz-drawer input,
+.oz-drawer textarea,
+.oz-drawer select {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(255,255,255,.14) !important;
+    background: rgba(255,255,255,.92) !important;
+    color: #10151f !important;
+    padding: 0.55rem 0.65rem !important;
+}
+
+.oz-drawer textarea {
+    resize: vertical !important;
+}
+
+.oz-drawer .oz-btn,
+.oz-drawer .chip,
+.oz-drawer .add-chip {
+    border-radius: 999px !important;
+    border: 0 !important;
+    padding: 0.55rem 0.9rem !important;
+    background: #24a647 !important;
+    color: #fff !important;
+    font-weight: 800 !important;
+    cursor: pointer !important;
+}
+
+    .oz-drawer .oz-btn:disabled,
+    .oz-drawer .chip:disabled,
+    .oz-drawer .add-chip:disabled {
+        opacity: .55 !important;
+        cursor: not-allowed !important;
+    }
+
+/* =========================================================
+   OZ FLOATING WINDOWS — FINAL FIX
+   ========================================================= */
+
+.oz-fab {
+    position: fixed !important;
+    z-index: 2147483000 !important;
+}
+
+    .oz-fab .oz-btn {
+        min-width: 96px !important;
+        min-height: 46px !important;
+        padding: 0.65rem 1rem !important;
+        border-radius: 999px !important;
+        border: 0 !important;
+        background: #24a647 !important;
+        color: #fff !important;
+        font-weight: 800 !important;
+        cursor: pointer !important;
+        box-shadow: 0 10px 26px rgba(0,0,0,.35) !important;
+    }
+
+.oz-drawer {
+    display: none !important;
+    position: fixed !important;
+    left: 24px !important;
+    top: 120px !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 420px;
+    min-width: 320px;
+    max-width: min(960px, calc(100vw - 24px));
+    max-height: calc(100vh - 24px) !important;
+    z-index: 30000 !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+    border-radius: 18px !important;
+    border: 1px solid rgba(0,247,255,.30) !important;
+    background: rgba(8, 12, 24, .94) !important;
+    color: #fff !important;
+    box-shadow: 0 20px 70px rgba(0,0,0,.55), 0 0 30px rgba(0,247,255,.14), inset 0 0 24px rgba(255,255,255,.04) !important;
+    backdrop-filter: blur(14px) !important;
+    -webkit-backdrop-filter: blur(14px) !important;
+}
+
+.oz-drawer.open {
+    display: flex !important;
+}
+
+.oz-drawer.dock-right {
+    right: auto !important;
+    bottom: auto !important;
+}
+
+.oz-titlebar {
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 0.75rem !important;
+    min-height: 42px !important;
+    padding: 0.65rem 0.75rem !important;
+    background: linear-gradient(90deg, rgba(111,0,255,.80), rgba(0,247,255,.18)) !important;
+    border-bottom: 1px solid rgba(255,255,255,.10) !important;
+    cursor: grab !important;
+    user-select: none !important;
+    touch-action: none !important;
+}
+
+.oz-drawer.oz-dragging .oz-titlebar {
+    cursor: grabbing !important;
+}
+
+.oz-titlebar-left {
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 0.35rem !important;
+    min-width: 0 !important;
+}
+
+.oz-title {
+    font-weight: 900 !important;
+    color: #fff !important;
+    white-space: nowrap !important;
+}
+
+.oz-subtitle {
+    font-size: 0.82rem !important;
+    color: rgba(255,255,255,.72) !important;
+    white-space: nowrap !important;
+}
+
+.oz-titlebar-actions {
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.25rem !important;
+}
+
+.oz-icon-btn {
+    width: 28px !important;
+    height: 28px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 8px !important;
+    border: 1px solid rgba(255,255,255,.14) !important;
+    background: rgba(255,255,255,.06) !important;
+    color: #fff !important;
+    cursor: pointer !important;
+}
+
+.oz-icon-btn:hover {
+    background: rgba(255,255,255,.12) !important;
+}
+
+.oz-icon-btn.danger {
+    background: rgba(255, 50, 80, .20) !important;
+    border-color: rgba(255, 80, 110, .35) !important;
+}
+
+.oz-body {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0.85rem !important;
+    overflow: auto !important;
+    box-sizing: border-box !important;
+}
+
+.oz-drawer--gpt .oz-body {
+    max-height: calc(100vh - 120px) !important;
+}
+
+.oz-resize-handle {
+    position: absolute !important;
+    right: 4px !important;
+    bottom: 4px !important;
+    width: 18px !important;
+    height: 18px !important;
+    cursor: nwse-resize !important;
+    opacity: .75 !important;
+    z-index: 5 !important;
+}
+
+.oz-resize-handle::after {
+    content: "" !important;
+    position: absolute !important;
+    right: 3px !important;
+    bottom: 3px !important;
+    width: 10px !important;
+    height: 10px !important;
+    border-right: 2px solid rgba(255,255,255,.55) !important;
+    border-bottom: 2px solid rgba(255,255,255,.55) !important;
+}
+
+.oz-drawer input,
+.oz-drawer textarea,
+.oz-drawer select {
+    width: 100% !important;
+    box-sizing: border-box !important;
+    border-radius: 10px !important;
+    border: 1px solid rgba(255,255,255,.14) !important;
+    background: rgba(255,255,255,.92) !important;
+    color: #10151f !important;
+    padding: 0.55rem 0.65rem !important;
+}
+
+.oz-drawer textarea {
+    resize: vertical !important;
+}
+
+.oz-drawer .oz-btn,
+.oz-drawer .chip,
+.oz-drawer .add-chip {
+    border-radius: 999px !important;
+    border: 0 !important;
+    padding: 0.55rem 0.9rem !important;
+    background: #24a647 !important;
+    color: #fff !important;
+    font-weight: 800 !important;
+    cursor: pointer !important;
+}
+
+.oz-drawer .oz-btn:disabled,
+.oz-drawer .chip:disabled,
+.oz-drawer .add-chip:disabled {
+    opacity: .55 !important;
+    cursor: not-allowed !important;
+}
+
+/* =========================================================
+   OZ FLOATING WINDOWS — SAFETY OVERRIDE
+   ========================================================= */
+
+.oz-drawer.open {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    position: fixed !important;
+    z-index: 2147483000 !important;
+}
+
+.oz-drawer:not(.open) {
+    display: none !important;
+}
+
+.oz-fab {
+    position: fixed !important;
+    z-index: 2147482500 !important;
+}
+
+.oz-fab .oz-btn {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+    /* =========================================================
+   OZ FAB BUTTONS — ICON + TEXT
+   ========================================================= */
+
+    .oz-fab .oz-btn {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: .45rem !important;
+        min-width: 132px !important;
+        min-height: 48px !important;
+        padding: .7rem 1.1rem !important;
+        border-radius: 999px !important;
+        border: 0 !important;
+        background: #24a647 !important;
+        color: #fff !important;
+        font-weight: 900 !important;
+        font-size: .95rem !important;
+        line-height: 1 !important;
+        white-space: nowrap !important;
+        cursor: pointer !important;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, .38), 0 0 18px rgba(36, 166, 71, .35) !important;
+    }
+
+    .oz-fab .oz-btn:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, .45), 0 0 26px rgba(36, 166, 71, .55) !important;
+    }
+
+/* =========================================================
+   OUTZEN CONTROL CENTER — FINAL LAYOUT V2
+   Double-click deploy, pointer-leave retract
+   ========================================================= */
+
+.critical-alert-panel.alert-cluster {
+    position: fixed !important;
+    width: 210px !important;
+    min-width: 210px !important;
+    max-width: 210px !important;
+    height: auto !important;
+    min-height: 240px !important;
+    max-height: calc(100vh - 20px) !important;
+    padding: 16px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+    border-radius: 28px !important;
+    border: 1px solid rgba(0, 247, 255, .38) !important;
+    background: rgba(8, 12, 24, .66) !important;
+    box-shadow: 0 0 28px rgba(0, 247, 255, .28), 0 0 75px rgba(0, 247, 255, .16), inset 0 0 30px rgba(255, 255, 255, .04) !important;
+    backdrop-filter: blur(18px) !important;
+    -webkit-backdrop-filter: blur(18px) !important;
+    transform: none !important;
+    user-select: none !important;
+    touch-action: none !important;
+    cursor: grab !important;
+    z-index: 2147483640 !important;
+}
+
+.critical-alert-panel.alert-cluster.is-dragging {
+    cursor: grabbing !important;
+    opacity: .96 !important;
+}
+
+.critical-alert-panel.alert-cluster.is-expanded {
+    width: min(470px, calc(100vw - 24px)) !important;
+    min-width: min(470px, calc(100vw - 24px)) !important;
+    max-width: min(470px, calc(100vw - 24px)) !important;
+    min-height: auto !important;
+    padding: 20px !important;
+    gap: 14px !important;
+    overflow: visible !important;
+    background: rgba(8, 12, 24, .91) !important;
+    box-shadow: 0 0 38px rgba(0, 247, 255, .38), 0 0 95px rgba(0, 247, 255, .22), inset 0 0 35px rgba(255, 255, 255, .05) !important;
+}
+
+/* Header */
+.critical-alert-panel.alert-cluster .alert-cluster-header {
+    width: 100% !important;
+    text-align: center !important;
+    color: #00f7ff !important;
+    font-size: .76rem !important;
+    font-weight: 900 !important;
+    letter-spacing: .20em !important;
+    line-height: 1.25 !important;
+    text-transform: uppercase !important;
+    text-shadow: 0 0 10px rgba(0, 247, 255, .9), 0 0 24px rgba(0, 247, 255, .55) !important;
+}
+
+/* Grid base */
+.critical-alert-panel.alert-cluster .alert-cluster-grid {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    align-items: center !important;
+    justify-items: center !important;
+    gap: 14px !important;
+    position: relative !important;
+    inset: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Expanded grid */
+.critical-alert-panel.alert-cluster.is-expanded .alert-cluster-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 18px 20px !important;
+}
+
+/* FULL ALERT top center */
+.critical-alert-panel.alert-cluster .alert-main,
+.critical-alert-panel.alert-cluster .outzen-alert-button--crowd {
+    grid-column: 1 / -1 !important;
+    justify-self: center !important;
+}
+
+/* Disaster bottom center */
+.critical-alert-panel.alert-cluster.is-expanded .outzen-alert-button--disaster {
+    grid-column: 1 / -1 !important;
+    justify-self: center !important;
+}
+
+/* All buttons */
+.critical-alert-panel.alert-cluster .outzen-alert-button {
+    position: relative !important;
+    inset: auto !important;
+    width: 122px !important;
+    height: 122px !important;
+    min-width: 122px !important;
+    min-height: 122px !important;
+    max-width: 122px !important;
+    max-height: 122px !important;
+    display: grid !important;
+    place-items: center !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border-radius: 50% !important;
+    border: 3px solid currentColor !important;
+    overflow: hidden !important;
+    cursor: pointer !important;
+    pointer-events: auto !important;
+    transform: none !important;
+    filter: none !important;
+    box-shadow: 0 0 12px currentColor, 0 0 30px currentColor, inset 0 0 18px rgba(255, 255, 255, .08) !important;
+}
+
+/* FULL ALERT slightly larger */
+.critical-alert-panel.alert-cluster .outzen-alert-button--crowd {
+    width: 132px !important;
+    height: 132px !important;
+    min-width: 132px !important;
+    min-height: 132px !important;
+    max-width: 132px !important;
+    max-height: 132px !important;
+}
+
+/* Compact mode: only FULL ALERT visible */
+.critical-alert-panel.alert-cluster:not(.is-expanded) .alert-secondary,
+.critical-alert-panel.alert-cluster:not(.is-expanded) .outzen-alert-button--weather,
+.critical-alert-panel.alert-cluster:not(.is-expanded) .outzen-alert-button--traffic,
+.critical-alert-panel.alert-cluster:not(.is-expanded) .outzen-alert-button--disaster {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    position: static !important;
+    transform: none !important;
+}
+
+/* Expanded mode: all alert buttons visible */
+.critical-alert-panel.alert-cluster.is-expanded .alert-secondary,
+.critical-alert-panel.alert-cluster.is-expanded .outzen-alert-button--weather,
+.critical-alert-panel.alert-cluster.is-expanded .outzen-alert-button--traffic,
+.critical-alert-panel.alert-cluster.is-expanded .outzen-alert-button--disaster {
+    display: grid !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    position: relative !important;
+    inset: auto !important;
+    transform: none !important;
+}
+
+/* Neutralize all old hover behavior */
+.critical-alert-panel.alert-cluster:hover .alert-secondary,
+.critical-alert-panel.alert-cluster:focus-within .alert-secondary {
+    pointer-events: inherit !important;
+}
+
+.critical-alert-panel.alert-cluster:not(.is-expanded):hover .alert-secondary,
+.critical-alert-panel.alert-cluster:not(.is-expanded):focus-within .alert-secondary {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* Labels inside buttons */
+.critical-alert-panel.alert-cluster .outzen-alert-label {
+    position: relative !important;
+    inset: auto !important;
+    z-index: 3 !important;
+    display: block !important;
+    padding: 0 8px !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    color: #fff !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 1.05rem !important;
+    font-weight: 900 !important;
+    line-height: 1.02 !important;
+    letter-spacing: .05em !important;
+    text-align: center !important;
+    text-transform: uppercase !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, .95), 0 0 10px currentColor !important;
+    pointer-events: none !important;
+}
+
+.critical-alert-panel.alert-cluster .outzen-alert-label--traffic,
+.critical-alert-panel.alert-cluster .outzen-alert-label--disaster {
+    font-size: .72rem !important;
+    line-height: 1.05 !important;
+}
+
+/* Button colors */
+.critical-alert-panel.alert-cluster .outzen-alert-button--crowd {
+    color: #ff3030 !important;
+    background: radial-gradient(circle at 50% 55%, rgba(255, 58, 58, .48), rgba(95, 0, 0, .72) 58%, rgba(12, 0, 0, .92) 100%) !important;
+}
+
+.critical-alert-panel.alert-cluster .outzen-alert-button--weather {
+    color: #00f7ff !important;
+    background: radial-gradient(circle at 50% 55%, rgba(0, 247, 255, .42), rgba(0, 78, 86, .72) 58%, rgba(0, 12, 18, .92) 100%) !important;
+}
+
+.critical-alert-panel.alert-cluster .outzen-alert-button--traffic {
+    color: #ff9800 !important;
+    background: radial-gradient(circle at 50% 55%, rgba(255, 152, 0, .46), rgba(105, 48, 0, .74) 58%, rgba(18, 8, 0, .92) 100%) !important;
+}
+
+.critical-alert-panel.alert-cluster .outzen-alert-button--disaster {
+    color: #ff3cff !important;
+    background: radial-gradient(circle at 50% 55%, rgba(255, 60, 255, .44), rgba(82, 0, 82, .74) 58%, rgba(18, 0, 18, .92) 100%) !important;
+}
+
+/* Hint text dynamic */
+.critical-alert-panel.alert-cluster .alert-cluster-hint {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    text-align: center !important;
+    color: rgba(0, 247, 255, .86) !important;
+    font-size: 0 !important;
+    font-weight: 900 !important;
+    letter-spacing: .13em !important;
+    text-transform: uppercase !important;
+    text-shadow: 0 0 10px rgba(0, 247, 255, .8) !important;
+}
+
+.critical-alert-panel.alert-cluster:not(.is-expanded) .alert-cluster-hint::after {
+    content: "DOUBLE-CLICK TO DEPLOY";
+    font-size: .66rem !important;
+}
+
+.critical-alert-panel.alert-cluster.is-expanded .alert-cluster-hint::after {
+    content: "MOVE MOUSE OUT TO RETRACT";
+    font-size: .66rem !important;
+}
+
+/* Infos separated from buttons */
+.critical-alert-panel.alert-cluster .critical-alert-infos {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    margin-top: 2px !important;
+    padding: 0 !important;
+    pointer-events: auto !important;
+}
+
+/* Hidden compact infos */
+.critical-alert-panel.alert-cluster:not(.is-expanded) .critical-alert-infos {
+    display: none !important;
+}
+
+/* Visible expanded infos */
+.critical-alert-panel.alert-cluster.is-expanded .critical-alert-infos {
+    display: flex !important;
+}
+
+.critical-alert-panel.alert-cluster .critical-alert-place,
+.critical-alert-panel.alert-cluster .critical-alert-status {
+    max-width: 100% !important;
+    padding: 7px 12px !important;
+    border-radius: 999px !important;
+    border: 1px solid rgba(0, 247, 255, .32) !important;
+    background: rgba(5, 8, 14, .78) !important;
+    color: #fff !important;
+    font-size: .76rem !important;
+    font-weight: 900 !important;
+    line-height: 1.25 !important;
+    text-align: center !important;
+    overflow-wrap: anywhere !important;
+    box-shadow: 0 0 14px rgba(0, 247, 255, .22), inset 0 0 10px rgba(255, 255, 255, .06) !important;
+}
+
+/* Responsive small viewport */
+@media (max-width: 640px) {
+    .critical-alert-panel.alert-cluster.is-expanded {
+        width: calc(100vw - 18px) !important;
+        min-width: calc(100vw - 18px) !important;
+        max-width: calc(100vw - 18px) !important;
+        padding: 16px !important;
+    }
+
+    .critical-alert-panel.alert-cluster.is-expanded .alert-cluster-grid {
+        gap: 14px !important;
+    }
+
+    .critical-alert-panel.alert-cluster .outzen-alert-button {
+        width: 108px !important;
+        height: 108px !important;
+        min-width: 108px !important;
+        min-height: 108px !important;
+        max-width: 108px !important;
+        max-height: 108px !important;
+    }
+
+    .critical-alert-panel.alert-cluster .outzen-alert-button--crowd {
+        width: 122px !important;
+        height: 122px !important;
+        min-width: 122px !important;
+        min-height: 122px !important;
+        max-width: 122px !important;
+        max-height: 122px !important;
+    }
+
+    .critical-alert-panel.alert-cluster .outzen-alert-label {
+        font-size: .86rem !important;
+    }
+
+    .critical-alert-panel.alert-cluster .outzen-alert-label--traffic,
+    .critical-alert-panel.alert-cluster .outzen-alert-label--disaster {
+        font-size: .62rem !important;
     }
 }
 

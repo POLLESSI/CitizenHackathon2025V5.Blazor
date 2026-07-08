@@ -419,6 +419,7 @@ function buildMarkerIcon(L, level, {
 export function dumpState(scopeKey = null, { createIfMissing = false } = {}) {
     const k = pickScopeKey(scopeKey);
     const s = createIfMissing ? getS(k) : peekS(k);
+
     if (!s) return { loaded: true, scopeKey: k, exists: false };
 
     const has = makeHas(s);
@@ -440,23 +441,26 @@ export function dumpState(scopeKey = null, { createIfMissing = false } = {}) {
         detailMarkers: s.detailMarkers?.size ?? 0,
 
         calendarMarkers: s.calendarMarkers?.size ?? 0,
-        hasCalendarLayer: has(s.calendarLayer),
+        hasCalendarLayer: !!s.calendarLayer,
 
         antennaMarkers: s.antennaMarkers?.size ?? 0,
-        hasAntennaLayer: has(s.antennaLayer),
+        antennaAlertMarkers: s.antennaAlertMarkers?.size ?? 0,
+        hasAntennaLayer: !!s.antennaLayer,
+        hasAntennaAlertLayer: !!s.antennaAlertLayer,
+        hasAntennaAlertPane: !!s.map?.getPane?.("ozAntennaAlertPane"),
 
         showing: s.hybrid?.showing ?? null,
-        hasDetailLayer: has(s.detailLayer),
+        hasDetailLayer: !!s.detailLayer
 
-        bundleLastInputSizes: s.bundleLastInput ? {
-            places: safeCount(s.bundleLastInput.places),
-            events: safeCount(s.bundleLastInput.events),
-            crowds: safeCount(s.bundleLastInput.crowds),
-            traffic: safeCount(s.bundleLastInput.traffic),
-            weather: safeCount(s.bundleLastInput.weather),
-            suggestions: safeCount(s.bundleLastInput.suggestions),
-            gpt: safeCount(s.bundleLastInput.gpt),
-        } : null,
+        //bundleLastInputSizes: s.bundleLastInput ? {
+        //    places: safeCount(s.bundleLastInput.places),
+        //    events: safeCount(s.bundleLastInput.events),
+        //    crowds: safeCount(s.bundleLastInput.crowds),
+        //    traffic: safeCount(s.bundleLastInput.traffic),
+        //    weather: safeCount(s.bundleLastInput.weather),
+        //    suggestions: safeCount(s.bundleLastInput.suggestions),
+        //    gpt: safeCount(s.bundleLastInput.gpt),
+        //} : null,
     };
 }
 
@@ -2795,6 +2799,56 @@ export function fitToDetails(scopeKey = null, opts = {}) {
     return true;
 }
 
+export function fitToAntennaAlertMarkers(scopeKey = null, opts = {}) {
+    const ready = ensureMapReady(scopeKey);
+
+    if (!ready) {
+        console.warn("[OutZen] fitToAntennaAlertMarkers: map not ready", scopeKey);
+        return false;
+    }
+
+    const { s, L, map } = ready;
+
+    const padding = opts.padding ?? [40, 40];
+    const maxZoom = opts.maxZoom ?? 9;
+
+    s.antennaAlertMarkers ??= new Map();
+
+    const latlngs = [];
+
+    for (const marker of s.antennaAlertMarkers.values()) {
+        try {
+            const latlng = marker.getLatLng?.();
+
+            if (latlng) {
+                latlngs.push(latlng);
+            }
+        } catch {
+            // ignore invalid marker
+        }
+    }
+
+    if (latlngs.length === 0) {
+        console.warn("[OutZen] fitToAntennaAlertMarkers: no alert markers");
+        return false;
+    }
+
+    try {
+        const bounds = L.latLngBounds(latlngs);
+
+        map.fitBounds(bounds, {
+            padding: opts.padding ?? [40, 40],
+            maxZoom: opts.maxZoom ?? 9,
+            animate: true
+        });
+
+        return true;
+    } catch (err) {
+        console.error("[OutZen] fitToAntennaAlertMarkers failed", err);
+        return false;
+    }
+}
+
 export function activateHybridAndZoom(scopeKey = null, threshold = 13) {
     const k = pickScopeKey(scopeKey);
     enableHybridZoom(true, threshold, k);
@@ -2832,6 +2886,45 @@ export function pruneMarkersByPrefix(prefix = "", scopeKey = null) {
 
     return removed;
 }
+
+export function pruneAntennaAlertMarkers(activeIds, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+
+    if (!ready) {
+        console.warn("[OutZen] pruneAntennaAlertMarkers: map not ready", scopeKey);
+        return 0;
+    }
+
+    const { s, map } = ready;
+
+    s.antennaAlertMarkers ??= new Map();
+
+    const activeSet = new Set(
+        (activeIds ?? [])
+            .filter(x => x !== null && x !== undefined)
+            .map(x => `antenna-alert:${x}`)
+    );
+
+    let removed = 0;
+
+    for (const [key, marker] of Array.from(s.antennaAlertMarkers.entries())) {
+        if (activeSet.has(key)) {
+            continue;
+        }
+
+        try {
+            map.removeLayer(marker);
+        } catch {
+            // ignore remove failure
+        }
+
+        s.antennaAlertMarkers.delete(key);
+        removed++;
+    }
+
+    return removed;
+}
+
 /* ---------------------------------------------------------
    Resize helper
 --------------------------------------------------------- */
@@ -2921,6 +3014,17 @@ export function upsertWeatherIntoBundleInput(delta, scopeKey = null) {
 
     const wid = raw.Id ?? raw.id;
     if (wid == null) return false;
+
+    if (window.__ccDumpTimer) {
+        clearTimeout(window.__ccDumpTimer);
+    }
+
+    window.__ccDumpTimer = setTimeout(() => {
+        console.log(
+            "AFTER 35s",
+            OutZenInterop.__esm.dumpState("commandcenter", { createIfMissing: false })
+        );
+    }, 35000);
 
     const ll = pickLatLng(raw);
     if (!ll) {

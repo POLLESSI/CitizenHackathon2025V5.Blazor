@@ -6,6 +6,7 @@ using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Services;
 using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
+using DevExpress.CodeParser;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Http.Connections;
 using Microsoft.AspNetCore.SignalR.Client;
@@ -52,6 +53,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         protected override bool ForceBootOnFirstRender => false;
         protected override bool ResetMarkersOnBoot => false;
         private bool _criticalDisasterSending;
+
+        private bool _msgDrawerOpen = false;
+        private bool _gptDrawerOpen = false;
+
         private string _criticalDisasterStatus;
 
         public MessageFormModel Model { get; } = new();
@@ -217,30 +222,34 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 try { await JS.InvokeVoidAsync("OutZenInterop.refreshHybridNow", ScopeKey); } catch { }
             }
         }
-
         private async Task SendCriticalCrowdAlertAsync()
         {
-            await ResolveNearestPlaceFromUserLocationAsync();
-            if (_selectedPlaceId is null or <= 0)
-            {
-                await ResolveNearestPlaceFromUserLocationAsync();
-            }
-
-            if (_selectedPlaceId is null or <= 0)
-            {
-                ToastService.ShowWarning("No nearby place could be resolved from your location.");
+            if (_criticalAlertSending)
                 return;
-            }
 
             _criticalAlertSending = true;
+            await InvokeAsync(StateHasChanged);
 
             try
             {
+                await ResolveNearestPlaceFromUserLocationAsync();
+
+                if (_selectedPlaceId is null or <= 0)
+                {
+                    await ResolveNearestPlaceFromUserLocationAsync();
+                }
+
+                if (_selectedPlaceId is null or <= 0)
+                {
+                    ToastService.ShowWarning("No nearby place could be resolved from your location.");
+                    return;
+                }
+
                 Console.WriteLine($"[ALERT] Selected={_selectedPlaceName} ({_selectedPlaceId})");
 
                 var result = await CriticalAlertService.SendCriticalAlertAsync(
-                     _selectedPlaceId.Value,
-                     $"Manual critical alert for {_selectedPlaceName}");
+                    _selectedPlaceId.Value,
+                    $"Manual critical alert for {_selectedPlaceName}");
 
                 if (result.Ok)
                 {
@@ -324,25 +333,25 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
                     await RefreshHomeDataAsync(fit: false);
                 }
-
-                else
-                {
-                    Console.Error.WriteLine(result.Error);
-                    ToastService.ShowWarning("Alert could not be sent. Check browser/API console.");
-                }
             }
             finally
             {
                 _criticalAlertSending = false;
+                await InvokeAsync(StateHasChanged);
             }
         }
 
         private async Task SendCriticalWeatherAlertAsync()
         {
+            if (_criticalWeatherAlertSending)
+                return;
+
+            _criticalWeatherAlertSending = true;
+
+            await InvokeAsync(StateHasChanged);
+
             try
             {
-                _criticalWeatherAlertSending = true;
-
                 await ResolveNearestPlaceFromUserLocationAsync();
 
                 if (_selectedLatitude == 0 || _selectedLongitude == 0)
@@ -405,7 +414,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
         private async Task SendCriticalTrafficAlertAsync()
         {
+            if (_criticalTrafficSending)
+                return;
+
             _criticalTrafficSending = true;
+            await InvokeAsync(StateHasChanged);
 
             try
             {
@@ -479,7 +492,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
         private async Task SendCriticalDisasterAlertAsync()
         {
+            if (_criticalDisasterSending)
+                return;
+
             _criticalDisasterSending = true;
+            await InvokeAsync(StateHasChanged);
 
             try
             {

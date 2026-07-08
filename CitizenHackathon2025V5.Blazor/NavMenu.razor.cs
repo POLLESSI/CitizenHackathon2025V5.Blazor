@@ -56,7 +56,6 @@ namespace CitizenHackathon2025V5.Blazor.Client
         private List<MenuItem> MenuItems => new()
         {
             new MenuItem("Accueil", "/", "🏠"),
-            new MenuItem("Command Center", "/commandcenter", "🛰️"),
             new MenuItem("OutZen Interactions", "/gptinteractionview", "🤖"),
             new MenuItem("Antenna Crowd Panel", "/antennacrowdpanel", "📡"),
             new MenuItem("Events", "/eventview", "📅"),
@@ -69,7 +68,9 @@ namespace CitizenHackathon2025V5.Blazor.Client
             new MenuItem("Comments", "/messageview", "💬"),
             new MenuItem("GDPR", "/privacy", "🔐"),
             new MenuItem("Help", "/help", "❓"),
-            new MenuItem("Presentation", "/presentation", "🛡"),
+            new MenuItem("Command Center", "/commandcenter", "🛰️"),
+            new MenuItem("Presentation", "/presentation", "🛡")
+            
         };
         //protected override void OnInitialized() =>
         //    NavManager.LocationChanged += (_, _) => InvokeAsync(StateHasChanged);

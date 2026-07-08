@@ -253,46 +253,117 @@
             return false;
         }
 
+        const storageKey = "outzen.alertCluster.position";
+        const margin = 10;
+
+        const clamp = (left, top) => {
+            const rect = panel.getBoundingClientRect();
+
+            const width = Math.max(rect.width || 210, 210);
+            const height = Math.max(rect.height || 210, 210);
+
+            const maxLeft = Math.max(margin, window.innerWidth - width - margin);
+            const maxTop = Math.max(margin, window.innerHeight - height - margin);
+
+            return {
+                left: Math.min(Math.max(left, margin), maxLeft),
+                top: Math.min(Math.max(top, margin), maxTop)
+            };
+        };
+
+        const setPosition = (left, top, save = false) => {
+            const pos = clamp(left, top);
+
+            panel.style.setProperty("position", "fixed", "important");
+            panel.style.setProperty("left", `${pos.left}px`, "important");
+            panel.style.setProperty("top", `${pos.top}px`, "important");
+            panel.style.setProperty("right", "auto", "important");
+            panel.style.setProperty("bottom", "auto", "important");
+
+            if (save) {
+                localStorage.setItem(storageKey, JSON.stringify(pos));
+            }
+
+            return pos;
+        };
+
+        const restoreOrDefault = () => {
+            const rect = panel.getBoundingClientRect();
+
+            let left = window.innerWidth - rect.width - 30;
+            let top = 120;
+
+            const saved = localStorage.getItem(storageKey);
+
+            if (saved) {
+                try {
+                    const pos = JSON.parse(saved);
+
+                    if (Number.isFinite(pos.left) && Number.isFinite(pos.top)) {
+                        left = pos.left;
+                        top = pos.top;
+                    }
+                } catch {
+                    localStorage.removeItem(storageKey);
+                }
+            }
+
+            setPosition(left, top, true);
+        };
+
+        restoreOrDefault();
+
         if (panel.dataset.draggable === "true") {
             return true;
         }
 
         panel.dataset.draggable = "true";
 
-        const lockSize = () => {
-            panel.style.removeProperty("width");
-            panel.style.removeProperty("min-width");
-            panel.style.removeProperty("max-width");
-            panel.style.setProperty("height", "auto", "important");
-        };
+        panel.addEventListener("dblclick", function (e) {
+            if (e.target.closest("button")) {
+                return;
+            }
 
-        const setPosition = (left, top) => {
-            panel.style.setProperty("left", `${left}px`, "important");
-            panel.style.setProperty("top", `${top}px`, "important");
-            panel.style.setProperty("right", "auto", "important");
-            panel.style.setProperty("bottom", "auto", "important");
-            lockSize();
-        };
+            const shouldExpand = !panel.classList.contains("is-expanded");
 
-        lockSize();
+            panel.classList.toggle("is-expanded", shouldExpand);
 
-        panel.addEventListener("dblclick", function () {
-            panel.classList.toggle("is-expanded");
+            requestAnimationFrame(() => {
+                const rect = panel.getBoundingClientRect();
+                setPosition(rect.left, rect.top, true);
+
+                console.log("[OutZen] alert cluster expanded =", shouldExpand, {
+                    left: rect.left,
+                    top: rect.top,
+                    width: rect.width,
+                    height: rect.height
+                });
+            });
         });
 
-        const saved = localStorage.getItem("outzen.alertCluster.position");
-
-        if (saved) {
-            try {
-                const pos = JSON.parse(saved);
-
-                if (Number.isFinite(pos.left) && Number.isFinite(pos.top)) {
-                    setPosition(pos.left, pos.top);
-                }
-            } catch {
-                localStorage.removeItem("outzen.alertCluster.position");
+        panel.addEventListener("pointerleave", function () {
+            if (dragging) {
+                return;
             }
-        }
+
+            if (!panel.classList.contains("is-expanded")) {
+                return;
+            }
+
+            panel.classList.remove("is-expanded");
+
+            requestAnimationFrame(() => {
+                const rect = panel.getBoundingClientRect();
+                setPosition(rect.left, rect.top, true);
+
+                console.log("[OutZen] alert cluster auto-collapsed on pointer leave", {
+                    left: rect.left,
+                    top: rect.top,
+                    width: rect.width,
+                    height: rect.height
+                });
+            });
+        });
 
         let dragging = false;
         let startX = 0;
@@ -315,7 +386,10 @@
             startTop = rect.top;
 
             panel.classList.add("is-dragging");
-            panel.setPointerCapture(e.pointerId);
+
+            try {
+                panel.setPointerCapture(e.pointerId);
+            } catch { }
 
             e.preventDefault();
         });
@@ -328,23 +402,10 @@
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
 
-            const rect = panel.getBoundingClientRect();
-            const margin = 8;
-
-            const nextLeft = Math.min(
-                Math.max(startLeft + dx, margin),
-                window.innerWidth - rect.width - margin
-            );
-
-            const nextTop = Math.min(
-                Math.max(startTop + dy, margin),
-                window.innerHeight - rect.height - margin
-            );
-
-            setPosition(nextLeft, nextTop);
+            setPosition(startLeft + dx, startTop + dy, false);
         });
 
-        panel.addEventListener("pointerup", function (e) {
+        const stopDrag = function (e) {
             if (!dragging) {
                 return;
             }
@@ -357,19 +418,318 @@
             } catch { }
 
             const rect = panel.getBoundingClientRect();
+            setPosition(rect.left, rect.top, true);
+        };
 
-            localStorage.setItem("outzen.alertCluster.position", JSON.stringify({
-                left: rect.left,
-                top: rect.top
-            }));
+        panel.querySelectorAll(".outzen-alert-button").forEach(btn => {
+            btn.addEventListener("dblclick", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }, true);
         });
 
-        console.log("[OutZen] alert cluster draggable enabled");
+        panel.addEventListener("pointerup", stopDrag);
+        panel.addEventListener("pointercancel", stopDrag);
+
+        window.addEventListener("resize", function () {
+            const rect = panel.getBoundingClientRect();
+            setPosition(rect.left, rect.top, true);
+        });
+
+        console.log("[OutZen] alert cluster draggable + double-click enabled");
 
         return true;
     };
     window.OutZenInterop = window.OutZenInterop || {};
 
+    window.OutZen = window.OutZen || {};
+
+    window.OutZen.__drawerZ = window.OutZen.__drawerZ || 30000;
+
+    window.OutZen.bringToFront = function (id) {
+        const el = document.getElementById(id);
+        if (!el) return false;
+
+        window.OutZen.__drawerZ += 1;
+        el.style.setProperty("z-index", String(window.OutZen.__drawerZ), "important");
+
+        return true;
+    };
+
+    window.OutZen = window.OutZen || {};
+    window.OutZen.__drawerZ = window.OutZen.__drawerZ || 30000;
+
+    window.OutZen.bringToFront = function (id) {
+        const drawer = document.getElementById(id);
+        if (!drawer) return false;
+
+        window.OutZen.__drawerZ += 1;
+        drawer.style.setProperty("z-index", String(window.OutZen.__drawerZ), "important");
+
+        return true;
+    };
+
+    window.OutZen.makeDrawerDraggable = function (id) {
+        const drawer = document.getElementById(id);
+
+        if (!drawer) {
+            console.warn("[OutZen] drawer not found:", id);
+            return false;
+        }
+
+        const handle =
+            drawer.querySelector("[data-oz-drag-handle='true']")
+            || drawer.querySelector(".oz-titlebar");
+
+        if (!handle) {
+            console.warn("[OutZen] drawer drag handle not found:", id);
+            return false;
+        }
+
+        const storageKey = `outzen.drawer.${id}.position`;
+        const margin = 8;
+
+        const clamp = function (left, top) {
+            const rect = drawer.getBoundingClientRect();
+
+            const width = Math.max(rect.width || 320, 320);
+            const height = Math.max(rect.height || 160, 160);
+
+            const maxLeft = Math.max(margin, window.innerWidth - width - margin);
+            const maxTop = Math.max(margin, window.innerHeight - height - margin);
+
+            return {
+                left: Math.min(Math.max(left, margin), maxLeft),
+                top: Math.min(Math.max(top, margin), maxTop)
+            };
+        };
+
+        const setPosition = function (left, top, save) {
+            const pos = clamp(left, top);
+
+            drawer.style.setProperty("position", "fixed", "important");
+            drawer.style.setProperty("left", `${pos.left}px`, "important");
+            drawer.style.setProperty("top", `${pos.top}px`, "important");
+            drawer.style.setProperty("right", "auto", "important");
+            drawer.style.setProperty("bottom", "auto", "important");
+
+            drawer.classList.remove("dock-right");
+
+            if (save) {
+                localStorage.setItem(storageKey, JSON.stringify(pos));
+            }
+
+            return pos;
+        };
+
+        const restorePosition = function () {
+            const saved = localStorage.getItem(storageKey);
+
+            if (saved) {
+                try {
+                    const pos = JSON.parse(saved);
+
+                    if (Number.isFinite(pos.left) && Number.isFinite(pos.top)) {
+                        setPosition(pos.left, pos.top, true);
+                        return;
+                    }
+                } catch {
+                    localStorage.removeItem(storageKey);
+                }
+            }
+
+            const rect = drawer.getBoundingClientRect();
+
+            const startLeft = Number.isFinite(rect.left) && rect.left > 0 ? rect.left : 24;
+            const startTop = Number.isFinite(rect.top) && rect.top > 0 ? rect.top : 120;
+
+            setPosition(startLeft, startTop, false);
+        };
+
+        restorePosition();
+
+        if (drawer.dataset.ozDragWired === "true") {
+            return true;
+        }
+
+        drawer.dataset.ozDragWired = "true";
+
+        let dragging = false;
+        let startX = 0;
+        let startY = 0;
+        let startLeft = 0;
+        let startTop = 0;
+
+        const onPointerMove = function (e) {
+            if (!dragging) {
+                return;
+            }
+
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            setPosition(startLeft + dx, startTop + dy, false);
+        };
+
+        const onPointerUp = function () {
+            if (!dragging) {
+                return;
+            }
+
+            dragging = false;
+            drawer.classList.remove("oz-dragging");
+
+            const rect = drawer.getBoundingClientRect();
+            setPosition(rect.left, rect.top, true);
+
+            document.removeEventListener("pointermove", onPointerMove, true);
+            document.removeEventListener("pointerup", onPointerUp, true);
+            document.removeEventListener("pointercancel", onPointerUp, true);
+
+            console.log("[OutZen] drawer saved", id, localStorage.getItem(storageKey));
+        };
+
+        handle.addEventListener("pointerdown", function (e) {
+            if (e.target.closest("button, input, textarea, select, a")) {
+                return;
+            }
+
+            window.OutZen.bringToFront(id);
+
+            const rect = drawer.getBoundingClientRect();
+
+            dragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            startLeft = rect.left;
+            startTop = rect.top;
+
+            drawer.classList.add("oz-dragging");
+
+            document.addEventListener("pointermove", onPointerMove, true);
+            document.addEventListener("pointerup", onPointerUp, true);
+            document.addEventListener("pointercancel", onPointerUp, true);
+
+            e.preventDefault();
+        });
+
+        window.addEventListener("resize", function () {
+            const rect = drawer.getBoundingClientRect();
+            setPosition(rect.left, rect.top, true);
+        });
+
+        console.log("[OutZen] drawer draggable wired:", id);
+
+        return true;
+    };
+
+    window.OutZen.makeDrawerResizable = function (id) {
+        const drawer = document.getElementById(id);
+
+        if (!drawer) {
+            console.warn("[OutZen] drawer not found for resize:", id);
+            return false;
+        }
+
+        const handle =
+            drawer.querySelector("[data-oz-resize='true']")
+            || drawer.querySelector(".oz-resize-handle");
+
+        if (!handle) {
+            console.warn("[OutZen] resize handle not found:", id);
+            return false;
+        }
+
+        const storageKey = `outzen.drawer.${id}.size`;
+
+        const saved = localStorage.getItem(storageKey);
+
+        if (saved) {
+            try {
+                const size = JSON.parse(saved);
+
+                if (Number.isFinite(size.width)) {
+                    drawer.style.setProperty("width", `${size.width}px`, "important");
+                }
+
+                if (Number.isFinite(size.height)) {
+                    drawer.style.setProperty("height", `${size.height}px`, "important");
+                }
+            } catch {
+                localStorage.removeItem(storageKey);
+            }
+        }
+
+        if (drawer.dataset.ozResizeWired === "true") {
+            return true;
+        }
+
+        drawer.dataset.ozResizeWired = "true";
+
+        let resizing = false;
+        let startX = 0;
+        let startY = 0;
+        let startWidth = 0;
+        let startHeight = 0;
+
+        const onPointerMove = function (e) {
+            if (!resizing) {
+                return;
+            }
+
+            const nextWidth = Math.max(320, startWidth + (e.clientX - startX));
+            const nextHeight = Math.max(180, startHeight + (e.clientY - startY));
+
+            drawer.style.setProperty("width", `${nextWidth}px`, "important");
+            drawer.style.setProperty("height", `${nextHeight}px`, "important");
+        };
+
+        const onPointerUp = function () {
+            if (!resizing) {
+                return;
+            }
+
+            resizing = false;
+            drawer.classList.remove("oz-resizing");
+
+            const rect = drawer.getBoundingClientRect();
+
+            localStorage.setItem(storageKey, JSON.stringify({
+                width: rect.width,
+                height: rect.height
+            }));
+
+            document.removeEventListener("pointermove", onPointerMove, true);
+            document.removeEventListener("pointerup", onPointerUp, true);
+            document.removeEventListener("pointercancel", onPointerUp, true);
+
+            console.log("[OutZen] drawer size saved", id, localStorage.getItem(storageKey));
+        };
+
+        handle.addEventListener("pointerdown", function (e) {
+            window.OutZen.bringToFront(id);
+
+            const rect = drawer.getBoundingClientRect();
+
+            resizing = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            startWidth = rect.width;
+            startHeight = rect.height;
+
+            drawer.classList.add("oz-resizing");
+
+            document.addEventListener("pointermove", onPointerMove, true);
+            document.addEventListener("pointerup", onPointerUp, true);
+            document.addEventListener("pointercancel", onPointerUp, true);
+
+            e.preventDefault();
+        });
+
+        console.log("[OutZen] drawer resizable wired:", id);
+
+        return true;
+    };
 })();
 
 

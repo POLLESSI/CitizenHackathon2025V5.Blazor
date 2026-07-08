@@ -23,33 +23,33 @@
                 <span class="outzen-alert-label">FULL<br />ALERT</span>
             </button>
 
-            <button type="button"
-                    class="outzen-alert-button outzen-alert-button--weather alert-secondary"
-                    disabled="@_criticalWeatherAlertSending"
-                    @onclick="SendCriticalWeatherAlertAsync">
+            <button class="outzen-alert-button outzen-alert-button--weather alert-secondary"
+                    type="button"
+                    @onclick="SendCriticalWeatherAlertAsync"
+                    disabled="@_criticalWeatherAlertSending">
                 <span class="outzen-alert-label">CRITICAL<br />WEATHER</span>
             </button>
 
-            <button type="button"
-                    class="outzen-alert-button outzen-alert-button--traffic alert-secondary"
-                    disabled="@_criticalTrafficSending"
-                    @onclick="SendCriticalTrafficAlertAsync">
+            <button class="outzen-alert-button outzen-alert-button--traffic alert-secondary"
+                    type="button"
+                    @onclick="SendCriticalTrafficAlertAsync"
+                    disabled="@_criticalTrafficSending">
                 <span class="outzen-alert-label outzen-alert-label--traffic">
                     CRITICAL<br />TRAFFIC<br />CONGESTION
                 </span>
             </button>
 
-            <button type="button"
-                    class="outzen-alert-button outzen-alert-button--disaster alert-secondary"
-                    disabled="@_criticalDisasterSending"
-                    @onclick="SendCriticalDisasterAlertAsync">
+            <button class="outzen-alert-button outzen-alert-button--disaster alert-secondary"
+                    type="button"
+                    @onclick="SendCriticalDisasterAlertAsync"
+                    disabled="@_criticalDisasterSending">
                 <span class="outzen-alert-label outzen-alert-label--disaster">
                     DISASTER<br />ALERT
                 </span>
             </button>
         </div>
 
-        <div class="alert-cluster-hint">HOVER TO DEPLOY</div>
+        <div class="alert-cluster-hint">DOUBLE-CLICK TO DEPLOY</div>
 
         <div class="critical-alert-infos">
             @if (!string.IsNullOrWhiteSpace(_criticalAlertStatus))
@@ -94,10 +94,11 @@
         </div>
     </div>
     <OzFloatingWindow Id="msgDrawer"
+                      @bind-IsOpen="_msgDrawerOpen"
                       Class="oz-glass oz-drawer--fill"
                       Title="Messages"
                       Subtitle="Live"
-                      FabIcon="Comments"
+                      FabIcon="💬 Comments"
                       FabTitle="Open Messages"
                       FabRight="18px"
                       FabBottom="84px"
@@ -108,11 +109,13 @@
                       MaxWidth="900px">
         <MessageFloatingContent />
     </OzFloatingWindow>
+
     <OzFloatingWindow Id="gptDrawer"
+                      @bind-IsOpen="_gptDrawerOpen"
                       Class="oz-glass oz-drawer--fill oz-drawer--gpt"
                       Title="OutZen GPT"
                       Subtitle="Suggestions"
-                      FabIcon="IA Suggestions"
+                      FabIcon="🧠 IA Suggestions"
                       FabTitle="Open GPT"
                       FabRight="18px"
                       FabBottom="18px"
@@ -226,7 +229,7 @@
 
                                         <div class="gpt-block">
                                             <div class="gpt-block-label">Prompt</div>
-                                            <pre class="gpt-pre gpt-pre--prompt">@(string.IsNullOrWhiteSpace(x.Prompt) ? "— Prompt vide —" : x.Prompt)</pre>
+                                            <pre class="gpt-pre gpt-pre--prompt">@(string.IsNullOrWhiteSpace(x.Prompt) ? "— Empty prompt —" : x.Prompt)</pre>
                                         </div>
 
                                         <div class="gpt-block">
