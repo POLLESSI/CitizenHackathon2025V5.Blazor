@@ -105,6 +105,8 @@ function getS(scopeKey = "main") {
             detailMarkers: new Map(),   // detailed markers
             calendarMarkers: new Map(), // calendar markers
             antennaMarkers: new Map(),  // antenna markers
+            antennaAlertMarkers: new Map(), // antenna alert markers
+
 
             // hybrid
             hybrid: { enabled: true, threshold: 13, showing: null },
@@ -116,6 +118,7 @@ function getS(scopeKey = "main") {
             bundleLastInput: null,
             _bundleRefreshT: 0,
             _weatherById: new Map(),
+            bundleToleranceMeters: null,
 
             // charts
             chart: null,
@@ -277,19 +280,23 @@ function addLayerSmart(layer, s) {
 }
 
 function removeLayerSmart(layer, s) {
-    if (!s?.map || !layer) return;
-
-    const noCluster = !!(layer?.options?.__ozNoCluster);
-
-    if (noCluster) {
-        try { s.map.removeLayer(layer); } catch { }
+    if (!s?.map || !layer) {
         return;
     }
 
     try {
-        if (s.cluster && typeof s.cluster.removeLayer === "function") s.cluster.removeLayer(layer);
-        else s.map.removeLayer(layer);
-    } catch { }
+        if (s.cluster?.hasLayer?.(layer)) {
+            s.cluster.removeLayer(layer);
+        }
+    } catch {
+    }
+
+    try {
+        if (s.map.hasLayer(layer)) {
+            s.map.removeLayer(layer);
+        }
+    } catch {
+    }
 }
 
 /* ---------------------------------------------------------
@@ -446,21 +453,11 @@ export function dumpState(scopeKey = null, { createIfMissing = false } = {}) {
         antennaMarkers: s.antennaMarkers?.size ?? 0,
         antennaAlertMarkers: s.antennaAlertMarkers?.size ?? 0,
         hasAntennaLayer: !!s.antennaLayer,
-        hasAntennaAlertLayer: !!s.antennaAlertLayer,
         hasAntennaAlertPane: !!s.map?.getPane?.("ozAntennaAlertPane"),
 
         showing: s.hybrid?.showing ?? null,
         hasDetailLayer: !!s.detailLayer
 
-        //bundleLastInputSizes: s.bundleLastInput ? {
-        //    places: safeCount(s.bundleLastInput.places),
-        //    events: safeCount(s.bundleLastInput.events),
-        //    crowds: safeCount(s.bundleLastInput.crowds),
-        //    traffic: safeCount(s.bundleLastInput.traffic),
-        //    weather: safeCount(s.bundleLastInput.weather),
-        //    suggestions: safeCount(s.bundleLastInput.suggestions),
-        //    gpt: safeCount(s.bundleLastInput.gpt),
-        //} : null,
     };
 }
 
@@ -542,25 +539,83 @@ export async function bootOutZen({
     hybridThreshold = 13,
 } = {}) {
     globalThis.__OutZenActiveScope = scopeKey;
-    const s = getS(scopeKey);
+
+    let s = getS(scopeKey);
 
     const host = await waitForContainer(mapId, 30);
-    if (!host) return bootFail(mapId, scopeKey, "container-not-found");
 
-    // If map exists and container changed => dispose old map (internal call => allowNoToken)
-    if (s.map && s.mapContainerId && s.mapContainerId !== mapId) {
-        disposeOutZen({ mapId: s.mapContainerId, scopeKey, allowNoToken: true });
+    if (!host) {
+        return bootFail(
+            mapId,
+            scopeKey,
+            "container-not-found");
     }
 
     // Force dispose current
-    if (s.map && force) {
-        disposeOutZen({ mapId: s.mapContainerId, scopeKey, allowNoToken: true });
+    const sameMap =
+        !!s.map &&
+        s.mapContainerId === mapId;
+
+    const canReuseExistingMap =
+        sameMap &&
+        !force &&
+        !resetAll &&
+        !resetMarkers;
+
+    if (canReuseExistingMap) {
+        try {
+            s.map.invalidateSize({
+                animate: false,
+                debounceMoveend: true
+            });
+        } catch {
+        }
+
+        return {
+            ok: true,
+            reused: true,
+            token: s._domToken,
+            mapId,
+            scopeKey
+        };
+    }
+    /*
+     * Optionally save the last payload before
+     * disposeOutZen() does not remove it.
+     */
+    const previousBundleInput =
+        resetAll
+            ? null
+            : s.bundleLastInput;
+
+    if (s.map) {
+        disposeOutZen({
+            mapId: s.mapContainerId,
+            scopeKey,
+            allowNoToken: true
+        });
+
+        /*
+         * Very important:
+         * disposeOutZen() has removed the singleton.
+         */
+        s = getS(scopeKey);
+
+        if (previousBundleInput) {
+            s.bundleLastInput = previousBundleInput;
+        }
     }
 
     resetLeafletDomId(mapId);
 
     const L = ensureLeaflet();
-    if (!L) return bootFail(mapId, scopeKey, "leaflet-missing");
+
+    if (!L) {
+        return bootFail(
+            mapId,
+            scopeKey,
+            "leaflet-missing");
+    }
 
     // Always clean host before creating map
     try { host.replaceChildren(); } catch { host.innerHTML = ""; }
@@ -655,6 +710,8 @@ export async function bootOutZen({
         s.detailMarkers = new Map();
         s.calendarMarkers = new Map();
         s.antennaMarkers = new Map();
+        s.antennaAlertMarkers = new Map();
+        s.bundleToleranceMeters = null;
 
         s._weatherById = new Map();
         s.bundleLastInput = null;
@@ -702,7 +759,7 @@ export async function bootOutZen({
 
     // Restore last bundles
     if (s.bundleLastInput) {
-        try { addOrUpdateBundleMarkers(s.bundleLastInput, 80, scopeKey); } catch { }
+        try { addOrUpdateBundleMarkers(s.bundleLastInput, 0, scopeKey); } catch { }
     }
 
     queueMicrotask(() => {
@@ -746,6 +803,9 @@ export function disposeOutZen({ mapId, scopeKey = "main", token = null, allowNoT
     // charts
     destroyChartIfAny(s);
     destroyWxChartIfAny(s);
+    for (const marker of s.markers.values()) {
+        clearManagedMarkerTimers(marker);
+    }
 
     // remove map
     try { s.map?.remove?.(); } catch { }
@@ -760,8 +820,10 @@ export function disposeOutZen({ mapId, scopeKey = "main", token = null, allowNoT
     s.detailMarkers = new Map();
     s.calendarMarkers = new Map();
     s.antennaMarkers = new Map();
+    s.antennaAlertMarkers = new Map();
     s._weatherById = new Map();
     s.bundleLastInput = null;
+    s.bundleToleranceMeters = null;
 
     s.initialized = false;
 
@@ -855,40 +917,41 @@ export function removeCrowdMarker(id, scopeKey = null) {
 
     removeLayerSmart(marker, s);
     s.markers.delete(key);
+    clearManagedMarkerTimers(marker)
     return true;
 }
 
 export function clearCrowdMarkers(scopeKey = null) {
     const ready = ensureMapReady(scopeKey);
-    if (!ready) return false;
+
+    if (!ready) {
+        return false;
+    }
 
     const { s } = ready;
 
-    try { s.cluster?.clearLayers?.(); } catch { }
-    if (!s.cluster) {
-        for (const m of s.markers.values()) {
-            try { s.map.removeLayer(m); } catch { }
-        }
+    for (const marker of s.markers.values()) {
+        clearManagedMarkerTimers(marker);
+        removeLayerSmart(marker, s);
     }
+
+    try {
+        s.cluster?.clearLayers?.();
+    } catch {
+    }
+
     s.markers.clear();
+
     return true;
 }
 
-export function clearMarkersByPrefix(prefix, scopeKey = null) {
-    const k = pickScopeKey(scopeKey);
-    const s = peekS(k) || getS(k);
-    if (!(s?.markers instanceof Map)) return 0;
+export function clearMarkersByPrefix(
+    prefix = "",
+    scopeKey = null) {
 
-    let n = 0;
-    for (const [id, m] of Array.from(s.markers.entries())) {
-        if (!String(id).startsWith(prefix)) continue;
-        try { removeLayerSmart(m, s); } catch { }
-        s.markers.delete(id);
-        n++;
-    }
-
-    try { s.cluster?.refreshClusters?.(); } catch { }
-    return n;
+    return pruneMarkersByPrefix(
+        prefix,
+        scopeKey);
 }
 
 export function addOrUpdatePlaceMarker(place, scopeKey = null) {
@@ -1037,6 +1100,24 @@ export function addOrUpdateFullAlertMarker(alert, scopeKey = "home") {
     return true;
 }
 
+const MANAGED_MARKER_TIMER_KEYS = [
+    "__ozFullAlertTimer",
+    "__ozWeatherAlertTimer",
+    "__ozTrafficAlertTimer",
+    "__ozDisasterAlertTimer"
+];
+
+function clearManagedMarkerTimers(marker) {
+    if (!marker) {
+        return;
+    }
+
+    for (const timerKey of MANAGED_MARKER_TIMER_KEYS) {
+        clearTimeout(marker[timerKey]);
+        marker[timerKey] = 0;
+    }
+}
+
 export function addOrUpdateWeatherAlertMarker(alert, scopeKey = "home") {
     const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
@@ -1108,8 +1189,10 @@ export function addOrUpdateWeatherAlertMarker(alert, scopeKey = "home") {
         try { removeCrowdMarker(key, k); } catch { }
     }, delay);
 
-    return true;
     console.log("[WEATHER ALERT]", { declaredAtUtc, expiresAtUtc, expiresMs, delay });
+
+    return true;
+    
 }
 
 export function addOrUpdateTrafficAlertMarker(alert, scopeKey = "home") {
@@ -1183,8 +1266,10 @@ export function addOrUpdateTrafficAlertMarker(alert, scopeKey = "home") {
         try { removeCrowdMarker(key, k); } catch { }
     }, delay);
 
-    return true;
     console.log("[TRAFFIC ALERT]", { declaredAtUtc, expiresAtUtc, expiresMs, delay });
+
+    return true;
+    
 }
 
 export function addOrUpdateDisasterAlertMarker(alert, scopeKey = "home") {
@@ -1588,10 +1673,10 @@ export function addOrUpdateAntennaAlertCircle(alert, scopeKey = null) {
     const popupHtml = buildPopupHtml({
         title,
         description:
-            `${message}<br>` +
-            `Connexions actives : ${active}<br>` +
-            `Devices uniques : ${unique}<br>` +
-            `Sévérité : ${severity}`
+            `${message}\n` +
+            `Active connections : ${active}\n` +
+            `Unique devices : ${unique}\n` +
+            `Severity : ${severity}`
     }, s);
 
     const icon = L.divIcon({
@@ -1834,10 +1919,6 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
 
-        //applyWarningStateToMarker(m, {
-        //    warn: shouldWarnMarker("weather", level, item, scopeKey),
-        //    isCalendar: false
-        //});
         return;
     }
 
@@ -1862,10 +1943,6 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
 
-        //applyWarningStateToMarker(m, {
-        //    warn: shouldWarnMarker("place", level, item, scopeKey),
-        //    isCalendar: false
-        //});
         return;
     }
 
@@ -1890,10 +1967,6 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
 
-        //applyWarningStateToMarker(m, {
-        //    warn: shouldWarnMarker("event", level, item, scopeKey),
-        //    isCalendar: false
-        //});
         return;
     }
 
@@ -1918,10 +1991,6 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
 
-        //applyWarningStateToMarker(m, {
-        //    warn: shouldWarnMarker("crowd", level, item, scopeKey),
-        //    isCalendar: false
-        //});
         return;
     }
 
@@ -1950,10 +2019,6 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
 
-        //applyWarningStateToMarker(m, {
-        //    warn: shouldWarnMarker("traffic", level, item, scopeKey),
-        //    isCalendar: false
-        //});
         return;
     }
 
@@ -2034,29 +2099,257 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
     }
 }
 
-export function addOrUpdateDetailMarkers(payload, scopeKey = null) {
-    const ready = ensureMapReady(scopeKey);
-    if (!ready) return false;
+export function addOrUpdateDetailMarkers(
+    payload,
+    scopeKey = null) {
+
+    const ready =
+        ensureMapReady(scopeKey);
+
+    if (!ready) {
+        return false;
+    }
 
     const { k, s, L } = ready;
+
     clearDetailMarkers(s);
 
-    const norm = normalizePayload(payload);
+    const norm =
+        normalizePayload(payload);
 
-    const push = (arr, kind) => {
-        if (!Array.isArray(arr)) return;
-        for (const x of arr) addDetailMarker(kind, x, s, L, k);
+    const push = (items, kind) => {
+        if (!Array.isArray(items)) {
+            return;
+        }
+
+        for (const item of items) {
+            addDetailMarker(
+                kind,
+                item,
+                s,
+                L,
+                k
+            );
+        }
     };
 
     push(norm.events, "event");
-    if (k !== "home") {
-        push(norm.places, "place");
-    }
+    push(norm.places, "place");
     push(norm.crowds, "crowd");
     push(norm.traffic, "traffic");
     push(norm.weather, "weather");
     push(norm.suggestions, "suggestion");
     push(norm.gpt, "gpt");
+
+    console.log(
+        "[OutZen details] markers created",
+        {
+            scopeKey: k,
+            events: norm.events.length,
+            places: norm.places.length,
+            crowds: norm.crowds.length,
+            traffic: norm.traffic.length,
+            weather: norm.weather.length,
+            suggestions: norm.suggestions.length,
+            gpt: norm.gpt.length,
+            markerCount:
+                s.detailMarkers.size
+        }
+    );
+
+    return true;
+}
+
+function showSelectedBundleDetails(
+    bundle,
+    scopeKey = null) {
+
+    const ready =
+        ensureMapReady(scopeKey);
+
+    if (!ready || !bundle) {
+        return false;
+    }
+
+    const { k, s, L, map } =
+        ready;
+
+    /*
+     * Clear the old details.
+     */
+    clearDetailMarkers(s);
+
+    /*
+     * Hide all bundles.
+     */
+    for (const bundleMarker
+        of s.bundleMarkers.values()) {
+
+        try {
+            if (map.hasLayer(bundleMarker)) {
+                map.removeLayer(bundleMarker);
+            }
+        }
+        catch {
+        }
+    }
+
+    const addItems = (items, kind) => {
+        if (!Array.isArray(items)) {
+            return;
+        }
+
+        for (const item of items) {
+            addDetailMarker(
+                kind,
+                item,
+                s,
+                L,
+                k
+            );
+        }
+    };
+
+    /*
+     * Here, places are also added
+     * on the homepage.
+     */
+    addItems(bundle.events, "event");
+    addItems(bundle.places, "place");
+    addItems(bundle.crowds, "crowd");
+    addItems(bundle.traffic, "traffic");
+    addItems(bundle.weather, "weather");
+    addItems(bundle.suggestions, "suggestion");
+    addItems(bundle.gpt, "gpt");
+
+    s.flags.userLockedMode = true;
+    s.hybrid.enabled = true;
+    s.hybrid.showing = "details";
+    s.activeDetailBundleKey =
+        bundle.key ?? null;
+
+    const positions = [];
+
+    for (const detailMarker
+        of s.detailMarkers.values()) {
+
+        try {
+            const latLng =
+                detailMarker.getLatLng?.();
+
+            if (latLng) {
+                positions.push(latLng);
+            }
+        }
+        catch {
+        }
+    }
+
+    if (positions.length === 0) {
+        console.warn(
+            "[Bundle details] no marker created",
+            {
+                scopeKey: k,
+                bundleKey: bundle.key,
+                bundle
+            }
+        );
+
+        /*
+         * Do not leave the card blank.
+         */
+        s.flags.userLockedMode = false;
+        s.hybrid.showing = "bundles";
+
+        for (const bundleMarker
+            of s.bundleMarkers.values()) {
+
+            try {
+                if (!map.hasLayer(bundleMarker)) {
+                    map.addLayer(bundleMarker);
+                }
+            }
+            catch {
+            }
+        }
+
+        return false;
+    }
+
+    try {
+        if (positions.length === 1) {
+            map.setView(
+                positions[0],
+                Math.max(
+                    Number(s.hybrid.threshold) || 14,
+                    15
+                ),
+                {
+                    animate: true
+                }
+            );
+        }
+        else {
+            const bounds =
+                L.latLngBounds(positions);
+
+            map.fitBounds(
+                bounds,
+                {
+                    padding: [45, 45],
+                    maxZoom: 16,
+                    animate: true
+                }
+            );
+        }
+    }
+    catch (error) {
+        console.warn(
+            "[Bundle details] fit failed",
+            error
+        );
+
+        map.setView(
+            [
+                Number(bundle.lat),
+                Number(bundle.lng)
+            ],
+            15,
+            {
+                animate: false
+            }
+        );
+    }
+
+    console.log(
+        "[Bundle details] visible",
+        {
+            scopeKey: k,
+            bundleKey:
+                bundle.key,
+
+            markerCount:
+                s.detailMarkers.size,
+
+            zoom:
+                map.getZoom?.(),
+
+            places:
+                bundle.places?.length ?? 0,
+
+            events:
+                bundle.events?.length ?? 0,
+
+            crowds:
+                bundle.crowds?.length ?? 0,
+
+            traffic:
+                bundle.traffic?.length ?? 0,
+
+            weather:
+                bundle.weather?.length ?? 0
+        }
+    );
 
     return true;
 }
@@ -2139,7 +2432,36 @@ function refreshHybridVisibility(scopeKey = null) {
     if (s._hybridSwitching) return;
 
     if (s.flags?.userLockedMode) {
-        if (s.hybrid.showing !== "details") switchToDetails(s, map, k);
+        const zoom =
+            Number(map.getZoom?.()) || 0;
+
+        const threshold =
+            Number(s.hybrid.threshold) || 14;
+
+        /*
+         * If the user drops back below the threshold,
+         * resume normal hybrid behavior.
+         */
+        if (zoom < threshold - 1) {
+            s.flags.userLockedMode = false;
+            s.activeDetailBundleKey = null;
+
+            switchToBundles(
+                s,
+                map
+            );
+
+            return;
+        }
+
+        /*
+         * Keep the selected details.
+         * Do not rebuild the global details.
+         */
+        if (s.hybrid.showing !== "details") {
+            s.hybrid.showing = "details";
+        }
+
         return;
     }
 
@@ -2175,7 +2497,26 @@ export function enableHybridZoom(enabled = true, threshold = 13, scopeKey = "mai
 
     if (!s._hybridBound) {
         s._hybridBound = true;
-        const h = throttleOZ(() => refreshHybridVisibility(k), 150);
+        const h = throttleOZ(() => {
+            const zoom = s.map?.getZoom?.() ?? 12;
+            const threshold = Number(s.hybrid.threshold) || 13;
+
+            if (!s.flags?.userLockedMode &&
+                zoom < threshold &&
+                s.bundleLastInput) {
+
+                const nextTolerance = bundleToleranceForZoom(zoom);
+
+                if (nextTolerance !== s.bundleToleranceMeters) {
+                    addOrUpdateBundleMarkers(
+                        s.bundleLastInput,
+                        0,
+                        k);
+                }
+            }
+
+            refreshHybridVisibility(k);
+        }, 180);
         s._hybridHandler = h;
         try { s.map.on("zoomend", h); } catch { }
     }
@@ -2219,18 +2560,230 @@ export function refreshHybridNow(scopeKey = null) {
 /* ---------------------------------------------------------
    Bundles (group by proximity)
 --------------------------------------------------------- */
-function metersToDegLat(m) { return m / 111320; }
-function metersToDegLng(m, lat) {
-    const cos = Math.cos((lat * Math.PI) / 180);
-    return m / (111320 * Math.max(cos, 0.1));
+function bundleToleranceForZoom(zoom) {
+    const z =
+        Number(zoom) || 12;
+
+    if (z <= 7) return 20_000;
+    if (z === 8) return 10_000;
+    if (z === 9) return 5_000;
+    if (z === 10) return 2_500;
+    if (z === 11) return 1_200;
+    if (z === 12) return 600;
+    if (z === 13) return 300;
+    if (z === 14) return 150;
+
+    return 80;
+}
+function haversineMeters(lat1, lng1, lat2, lng2) {
+    const earthRadiusMeters = 6_371_000;
+    const toRadians = value => value * Math.PI / 180;
+
+    const dLat = toRadians(lat2 - lat1);
+    const dLng = toRadians(lng2 - lng1);
+
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRadians(lat1)) *
+        Math.cos(toRadians(lat2)) *
+        Math.sin(dLng / 2) ** 2;
+
+    return 2 * earthRadiusMeters * Math.asin(Math.sqrt(a));
 }
 
-function bundleKeyFor(lat, lng, tolMeters) {
-    const dLat = metersToDegLat(tolMeters);
-    const dLng = metersToDegLng(tolMeters, lat);
-    const gy = Math.floor(lat / dLat);
-    const gx = Math.floor(lng / dLng);
-    return `${gy}:${gx}`;
+function flattenBundlePayload(payload) {
+    const points = [];
+
+    const append = (items, kind) => {
+        if (!Array.isArray(items)) return;
+
+        for (const item of items) {
+            const ll = pickLatLng(item);
+            if (!ll) continue;
+
+            points.push({
+                kind,
+                item,
+                lat: ll.lat,
+                lng: ll.lng
+            });
+        }
+    };
+
+    append(payload.events, "events");
+    append(payload.places, "places");
+    append(payload.crowds, "crowds");
+    append(payload.traffic, "traffic");
+    append(payload.weather, "weather");
+    append(payload.suggestions, "suggestions");
+    append(payload.gpt, "gpt");
+
+    // A stable order limits the unnecessary recreation of bundles.
+    points.sort((a, b) =>
+        a.lat - b.lat ||
+        a.lng - b.lng ||
+        a.kind.localeCompare(b.kind));
+
+    return points;
+}
+
+function computeBundles(payload, tolMeters) {
+    const radiusMeters = Math.max(25, Number(tolMeters) || 80);
+    const referenceLatitude = 50.5;
+
+    const metersPerDegreeLatitude = 111_320;
+    const metersPerDegreeLongitude =
+        111_320 * Math.cos(referenceLatitude * Math.PI / 180);
+
+    const points = flattenBundlePayload(payload);
+    const grid = new Map();
+    const bundles = [];
+
+    const getCell = (lat, lng) => {
+        const y = Math.floor(
+            lat * metersPerDegreeLatitude / radiusMeters);
+
+        const x = Math.floor(
+            lng * metersPerDegreeLongitude / radiusMeters);
+
+        return { x, y, key: `${x}:${y}` };
+    };
+
+    const addBundleToCell = (bundle, cellKey) => {
+        let set = grid.get(cellKey);
+
+        if (!set) {
+            set = new Set();
+            grid.set(cellKey, set);
+        }
+
+        set.add(bundle);
+        bundle._cellKey = cellKey;
+    };
+
+    const removeBundleFromCell = bundle => {
+        const set = grid.get(bundle._cellKey);
+        if (!set) return;
+
+        set.delete(bundle);
+
+        if (set.size === 0) {
+            grid.delete(bundle._cellKey);
+        }
+    };
+
+    const createBundle = (point, index) => {
+        const id =
+            point.item?.Id ??
+            point.item?.id ??
+            point.item?.EventId ??
+            point.item?.CrowdInfoId ??
+            point.item?.TrafficConditionId ??
+            point.item?.WeatherForecastId ??
+            index;
+
+        const bundle = {
+            key:
+                `bundle:${point.kind}:${id}:` +
+                `${Math.round(point.lat * 100_000)}:` +
+                `${Math.round(point.lng * 100_000)}`,
+
+            lat: point.lat,
+            lng: point.lng,
+
+            events: [],
+            places: [],
+            crowds: [],
+            traffic: [],
+            weather: [],
+            suggestions: [],
+            gpt: [],
+
+            _sumLat: 0,
+            _sumLng: 0,
+            _pointCount: 0,
+            _cellKey: null
+        };
+
+        bundles.push(bundle);
+
+        const cell = getCell(point.lat, point.lng);
+        addBundleToCell(bundle, cell.key);
+
+        return bundle;
+    };
+
+    const addPointToBundle = (bundle, point) => {
+        bundle[point.kind].push(point.item);
+
+        bundle._sumLat += point.lat;
+        bundle._sumLng += point.lng;
+        bundle._pointCount++;
+
+        bundle.lat = bundle._sumLat / bundle._pointCount;
+        bundle.lng = bundle._sumLng / bundle._pointCount;
+
+        const newCell = getCell(bundle.lat, bundle.lng);
+
+        if (newCell.key !== bundle._cellKey) {
+            removeBundleFromCell(bundle);
+            addBundleToCell(bundle, newCell.key);
+        }
+    };
+
+    points.forEach((point, index) => {
+        const cell = getCell(point.lat, point.lng);
+        const candidates = new Set();
+
+        // A distance less than the radius implies a neighboring cell.
+        // or the current cell.
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                const candidateCell =
+                    grid.get(`${cell.x + dx}:${cell.y + dy}`);
+
+                if (!candidateCell) continue;
+
+                for (const bundle of candidateCell) {
+                    candidates.add(bundle);
+                }
+            }
+        }
+
+        let selectedBundle = null;
+        let selectedDistance = Number.POSITIVE_INFINITY;
+
+        for (const bundle of candidates) {
+            const distance = haversineMeters(
+                point.lat,
+                point.lng,
+                bundle.lat,
+                bundle.lng);
+
+            if (distance <= radiusMeters &&
+                distance < selectedDistance) {
+
+                selectedBundle = bundle;
+                selectedDistance = distance;
+            }
+        }
+
+        selectedBundle ??= createBundle(point, index);
+        addPointToBundle(selectedBundle, point);
+    });
+
+    const result = new Map();
+
+    for (const bundle of bundles) {
+        delete bundle._sumLat;
+        delete bundle._sumLng;
+        delete bundle._pointCount;
+        delete bundle._cellKey;
+
+        result.set(bundle.key, bundle);
+    }
+
+    return result;
 }
 
 function pickCrowdLevel(item) {
@@ -2241,92 +2794,174 @@ function pickTrafficLevel(item) {
 }
 function pickWeatherLevel(item) {
     const severe = !!(item?.IsSevere ?? item?.isSevere);
-    return severe ? 4 : 2;
+
+    return severe ? 4 : 1;
 }
 
+function pickEventLevel(item) {
+    const expectedCrowd = readNumber(
+        item,
+        "ExpectedCrowd",
+        "expectedCrowd");
+
+    if (expectedCrowd == null) return 1;
+    if (expectedCrowd >= 50_000) return 4;
+    if (expectedCrowd >= 10_000) return 3;
+    if (expectedCrowd >= 1_000) return 2;
+
+    return 1;
+}
 function bundleSeverity(b) {
-    let sev = 1;
-    if (Array.isArray(b?.crowds)) for (const c of b.crowds) sev = Math.max(sev, pickCrowdLevel(c));
-    if (Array.isArray(b?.traffic)) for (const t of b.traffic) sev = Math.max(sev, pickTrafficLevel(t));
-    if (Array.isArray(b?.weather)) for (const w of b.weather) sev = Math.max(sev, pickWeatherLevel(w));
-    return sev;
-}
+    let severity = 1;
 
+    for (const crowd of b?.crowds ?? []) {
+        severity = Math.max(
+            severity,
+            pickCrowdLevel(crowd));
+    }
+
+    for (const traffic of b?.traffic ?? []) {
+        severity = Math.max(
+            severity,
+            pickTrafficLevel(traffic));
+    }
+
+    for (const weather of b?.weather ?? []) {
+        severity = Math.max(
+            severity,
+            pickWeatherLevel(weather));
+    }
+
+    for (const event of b?.events ?? []) {
+        severity = Math.max(
+            severity,
+            pickEventLevel(event));
+    }
+
+    return severity;
+}
 function bundleTotal(b) {
-    const arrs = ["events", "places", "crowds", "traffic", "weather", "suggestions", "gpt"];
+    const arrs = ["events", "places", "crowds", "traffic", "weather", "suggestions"/*, "gpt"*/];
     let total = 0;
     for (const k of arrs) total += (b?.[k]?.length ?? 0);
     return total;
 }
-
-function hasOnlyWeather(b) {
-    return (b.weather?.length ?? 0) > 0
-        && (b.events?.length ?? 0) === 0
-        && (b.places?.length ?? 0) === 0
-        && (b.crowds?.length ?? 0) === 0
-        && (b.traffic?.length ?? 0) === 0
-        && (b.suggestions?.length ?? 0) === 0
-        && (b.gpt?.length ?? 0) === 0;
-}
-
-function weatherEmojiForBundle(b) {
-    const w = b.weather?.[0];
-    const s = String(w?.WeatherMain ?? w?.WeatherType ?? w?.Summary ?? "").toLowerCase();
-    if (s.includes("rain") || s.includes("pluie")) return "🌧️";
-    if (s.includes("storm") || s.includes("orage")) return "⛈️";
-    if (s.includes("snow") || s.includes("neige")) return "❄️";
-    if (s.includes("fog") || s.includes("brou")) return "🌫️";
-    if (s.includes("cloud") || s.includes("nuage")) return "☁️";
-    return "🌤️";
-}
-
-function makeBadgeIcon(totalCount, severity = 1, b = null) {
+function makeBadgeIcon(totalCount, severity = 1, b = null, zoom = 12) {
     const Leaflet = ensureLeaflet();
     if (!Leaflet) return null;
 
-    const lvlClass =
-        severity === 1 ? "oz-bundle-lvl1" :
-            severity === 2 ? "oz-bundle-lvl2" :
-                severity === 3 ? "oz-bundle-lvl3" :
-                    severity === 4 ? "oz-bundle-lvl4" : "oz-bundle-lvl1";
+    const categories = [
+        {
+            key: "events",
+            icon: "🎪",
+            label: "Événements",
+            count: b?.events?.length ?? 0
+        },
+        {
+            key: "places",
+            icon: "📍",
+            label: "Lieux",
+            count: b?.places?.length ?? 0
+        },
+        {
+            key: "crowds",
+            icon: "👥",
+            label: "Affluence",
+            count: b?.crowds?.length ?? 0
+        },
+        {
+            key: "traffic",
+            icon: "🚗",
+            label: "Trafic",
+            count: b?.traffic?.length ?? 0
+        },
+        {
+            key: "weather",
+            icon: "🌦️",
+            label: "Météo",
+            count: b?.weather?.length ?? 0
+        },
+        {
+            key: "suggestions",
+            icon: "💡",
+            label: "Suggestions",
+            count:
+                (b?.suggestions?.length ?? 0) +
+                (b?.gpt?.length ?? 0)
+        }
+    ].filter(x => x.count > 0);
 
-    const onlyWeather = b && hasOnlyWeather(b);
+    const numericZoom =
+        Number(zoom) || 12;
 
-    const nEvents = b?.events?.length ?? 0;
-    const nPlaces = b?.places?.length ?? 0;
-    const nCrowds = b?.crowds?.length ?? 0;
-    const nTraffic = b?.traffic?.length ?? 0;
-    const nWeather = b?.weather?.length ?? 0;
-    const nSugg = b?.suggestions?.length ?? 0;
-    const nGpt = b?.gpt?.length ?? 0;
+    const compact =
+        numericZoom <= 8;
 
-    const dots = `
-    <div class="oz-dots">
-      ${nEvents ? `<span class="oz-dot oz-dot-events" title="Events"></span>` : ``}
-      ${nPlaces ? `<span class="oz-dot oz-dot-places" title="Places"></span>` : ``}
-      ${nCrowds ? `<span class="oz-dot oz-dot-crowds" title="Crowd"></span>` : ``}
-      ${nTraffic ? `<span class="oz-dot oz-dot-traffic" title="Traffic"></span>` : ``}
-      ${nWeather ? `<span class="oz-dot oz-dot-weather" title="Weather"></span>` : ``}
-      ${(nSugg || nGpt) ? `<span class="oz-dot oz-dot-gpt" title="Suggestion/GPT"></span>` : ``}
-    </div>
-  `.trim();
+    const medium =
+        numericZoom >= 9 &&
+        numericZoom <= 11;
 
-    const tag = onlyWeather ? `<div class="oz-bundle-tag">${weatherEmojiForBundle(b)}</div>` : "";
+    const maxDisplayedCategories =
+        compact
+            ? 0
+            : medium
+                ? 2
+                : 4;
+
+    const displayedCategories =
+        categories.slice(
+            0,
+            maxDisplayedCategories
+        );
+
+    const hiddenCategoryCount =
+        compact
+            ? 0
+            : Math.max(
+                0,
+                categories.length -
+                displayedCategories.length
+            );
+
+    const displayClass =
+        compact
+            ? "oz-bundle-icon--compact"
+            : medium
+                ? "oz-bundle-icon--medium"
+                : "oz-bundle-icon--full";
+
+    const categoryHtml = displayedCategories
+        .map(category => `
+            <span class="oz-zone-type oz-zone-type--${category.key}"
+                  title="${category.label}: ${category.count}">
+                <span>${category.icon}</span>
+                <strong>${category.count}</strong>
+            </span>
+        `)
+        .join("");
+
+    const moreHtml = hiddenCategoryCount > 0
+        ? `<span class="oz-zone-more">+${hiddenCategoryCount}</span>`
+        : "";
 
     const html = `
-    <div class="oz-bundle ${lvlClass} ${onlyWeather ? "oz-bundle-weather" : ""}">
-      <div class="oz-badge">${totalCount}</div>
-      ${tag}
-      ${dots}
-    </div>
-  `.trim();
+        <div class="oz-zone-marker oz-zone-sev-${severity}">
+            <div class="oz-zone-count">${totalCount}</div>
+
+            <div class="oz-zone-types">
+                ${categoryHtml}
+                ${moreHtml}
+            </div>
+        </div>
+    `.trim();
 
     return Leaflet.divIcon({
-        className: "oz-bundle-icon",
+        className:
+            `oz-bundle-icon ${displayClass}`,
         html,
-        iconSize: [34, 34],
-        iconAnchor: [17, 17],
-        popupAnchor: [0, -12],
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
+        popupAnchor: [0, -26]
     });
 }
 
@@ -2369,8 +3004,8 @@ function firstSingleBundleItem(b) {
         ["event", b?.events],
         ["crowd", b?.crowds],
         ["traffic", b?.traffic],
-        ["suggestion", b?.suggestions],
-        ["gpt", b?.gpt]
+        ["suggestion", b?.suggestions]
+        /*["gpt", b?.gpt]*/
     ];
 
     const found = groups
@@ -2385,6 +3020,137 @@ function firstSingleBundleItem(b) {
     };
 }
 
+function readFirst(item, ...propertyNames) {
+    for (const propertyName of propertyNames) {
+        const value = item?.[propertyName];
+
+        if (value !== null &&
+            value !== undefined &&
+            String(value).trim() !== "") {
+
+            return value;
+        }
+    }
+
+    return null;
+}
+
+function readNumber(item, ...propertyNames) {
+    const value = readFirst(item, ...propertyNames);
+
+    if (value === null) return null;
+
+    const number = Number(
+        typeof value === "string"
+            ? value.replace(",", ".")
+            : value);
+
+    return Number.isFinite(number) ? number : null;
+}
+
+function maximumNumber(items, ...propertyNames) {
+    const values = items
+        .map(item => readNumber(item, ...propertyNames))
+        .filter(Number.isFinite);
+
+    return values.length > 0 ? Math.max(...values) : null;
+}
+
+function minimumNumber(items, ...propertyNames) {
+    const values = items
+        .map(item => readNumber(item, ...propertyNames))
+        .filter(Number.isFinite);
+
+    return values.length > 0 ? Math.min(...values) : null;
+}
+
+function uniqueTexts(items, ...propertyNames) {
+    return [
+        ...new Set(
+            items
+                .map(item => readFirst(item, ...propertyNames))
+                .filter(Boolean)
+                .map(String)
+                .map(value => value.trim())
+                .filter(Boolean)
+        )
+    ];
+}
+
+function levelLabel(level) {
+    const numericLevel = clampLevel14(level);
+
+    return numericLevel === 4 ? "Critique" :
+        numericLevel === 3 ? "Élevé" :
+            numericLevel === 2 ? "Modéré" :
+                "Faible";
+}
+
+function bundleRiskLabel(severity) {
+    return severity >= 4 ? "Critique" :
+        severity === 3 ? "Attention" :
+            severity === 2 ? "Surveillance" :
+                "Normal";
+}
+
+function bundleZoneName(b) {
+    const orderedItems = [
+        ...(b.places ?? []),
+        ...(b.crowds ?? []),
+        ...(b.traffic ?? []),
+        ...(b.events ?? []),
+        ...(b.weather ?? [])
+    ];
+
+    for (const item of orderedItems) {
+        const name = readFirst(
+            item,
+            "LocationName",
+            "locationName",
+            "PlaceName",
+            "placeName",
+            "Location",
+            "location",
+            "Road",
+            "road",
+            "RoadName",
+            "roadName",
+            "Name",
+            "name");
+
+        if (name) return String(name);
+    }
+
+    return "zone sélectionnée";
+}
+
+function buildZoneCard({
+    type,
+    icon,
+    title,
+    count,
+    headline,
+    details
+}) {
+    return `
+        <section class="oz-zone-card oz-zone-card--${type}">
+            <div class="oz-zone-card-icon">${icon}</div>
+
+            <div class="oz-zone-card-content">
+                <div class="oz-zone-card-head">
+                    <strong>${title}</strong>
+                    <span class="oz-zone-card-count">${count}</span>
+                </div>
+
+                <div class="oz-zone-card-headline">${headline}</div>
+
+                ${details
+            ? `<div class="oz-zone-card-details">${details}</div>`
+            : ""}
+            </div>
+        </section>
+    `.trim();
+}
 function buildSingleBundlePopupHtml(kind, item, s) {
     const esc = s.utils.escapeHtml;
 
@@ -2509,65 +3275,357 @@ function bundlePopupHtml(b, s) {
     const single = firstSingleBundleItem(b);
 
     if (single) {
-        const html = buildSingleBundlePopupHtml(single.kind, single.item, s);
+        const html =
+            buildSingleBundlePopupHtml(
+                single.kind,
+                single.item,
+                s);
+
         if (html) return html;
     }
 
     const esc = s.utils.escapeHtml;
     const total = bundleTotal(b);
-    const breakdown = (k) => (b?.[k]?.length ?? 0);
+    const severity = bundleSeverity(b);
+    const cards = [];
+
+    const zoneName = bundleZoneName(b);
+
+    // -----------------------------------------------------
+    // Events
+    // -----------------------------------------------------
+    if ((b.events?.length ?? 0) > 0) {
+        const events = [...b.events];
+
+        events.sort((a, b) => {
+            const dateA = new Date(
+                readFirst(a,
+                    "DateEvent",
+                    "dateEvent",
+                    "StartDate",
+                    "startDate") ?? 0);
+
+            const dateB = new Date(
+                readFirst(b,
+                    "DateEvent",
+                    "dateEvent",
+                    "StartDate",
+                    "startDate") ?? 0);
+
+            return dateA.getTime() - dateB.getTime();
+        });
+
+        const nextEvent = events[0];
+
+        const eventName = readFirst(
+            nextEvent,
+            "Name",
+            "name",
+            "Title",
+            "title") ?? "Événement";
+
+        const eventDate = readFirst(
+            nextEvent,
+            "DateEvent",
+            "dateEvent",
+            "StartDate",
+            "startDate");
+
+        const expectedCrowd = maximumNumber(
+            events,
+            "ExpectedCrowd",
+            "expectedCrowd");
+
+        cards.push(buildZoneCard({
+            type: "events",
+            icon: "🎪",
+            title: "Événements",
+            count: events.length,
+            headline: esc(eventName),
+            details: [
+                eventDate
+                    ? `Prochain : ${esc(fmtDate(eventDate))}`
+                    : null,
+
+                expectedCrowd !== null
+                    ? `Affluence attendue max. : ${expectedCrowd.toLocaleString("fr-BE")}`
+                    : null
+            ].filter(Boolean).join(" • ")
+        }));
+    }
+
+    // -----------------------------------------------------
+    // Crowd
+    // -----------------------------------------------------
+    if ((b.crowds?.length ?? 0) > 0) {
+        const crowdLevel = maximumNumber(
+            b.crowds,
+            "CrowdLevel",
+            "crowdLevel",
+            "Level",
+            "level");
+
+        cards.push(buildZoneCard({
+            type: "crowds",
+            icon: "👥",
+            title: "Affluence",
+            count: b.crowds.length,
+            headline:
+                `Niveau maximal : ${esc(levelLabel(crowdLevel ?? 1))}`,
+            details:
+                `${b.crowds.length} observation(s) active(s)`
+        }));
+    }
+
+    // -----------------------------------------------------
+    // Traffic
+    // -----------------------------------------------------
+    if ((b.traffic?.length ?? 0) > 0) {
+        const trafficLevel = maximumNumber(
+            b.traffic,
+            "TrafficLevel",
+            "trafficLevel",
+            "CongestionLevel",
+            "congestionLevel",
+            "Level",
+            "level");
+
+        const roads = uniqueTexts(
+            b.traffic,
+            "Road",
+            "road",
+            "RoadName",
+            "roadName",
+            "Location",
+            "location");
+
+        const incidents = uniqueTexts(
+            b.traffic,
+            "IncidentType",
+            "incidentType",
+            "Title",
+            "title");
+
+        cards.push(buildZoneCard({
+            type: "traffic",
+            icon: "🚗",
+            title: "Trafic",
+            count: b.traffic.length,
+            headline:
+                `Congestion maximale : ${esc(levelLabel(trafficLevel ?? 1))}`,
+            details: [
+                roads.length > 0
+                    ? `Route(s) : ${esc(roads.slice(0, 3).join(", "))}`
+                    : null,
+
+                incidents.length > 0
+                    ? `Incident(s) : ${esc(incidents.slice(0, 3).join(", "))}`
+                    : null
+            ].filter(Boolean).join(" • ")
+        }));
+    }
+
+    // -----------------------------------------------------
+    // Weather
+    // -----------------------------------------------------
+    if ((b.weather?.length ?? 0) > 0) {
+        const minimumTemperature = minimumNumber(
+            b.weather,
+            "TemperatureC",
+            "temperatureC");
+
+        const maximumTemperature = maximumNumber(
+            b.weather,
+            "TemperatureC",
+            "temperatureC");
+
+        const maximumWind = maximumNumber(
+            b.weather,
+            "WindSpeedKmh",
+            "windSpeedKmh",
+            "WindSeedKmh",
+            "windSeedKmh");
+
+        const maximumRain = maximumNumber(
+            b.weather,
+            "RainfallMm",
+            "rainfallMm");
+
+        const severeCount = b.weather.filter(
+            item => item?.IsSevere ?? item?.isSevere).length;
+
+        const temperatureText =
+            minimumTemperature !== null &&
+                maximumTemperature !== null &&
+                minimumTemperature !== maximumTemperature
+
+                ? `${minimumTemperature} à ${maximumTemperature} °C`
+                : maximumTemperature !== null
+                    ? `${maximumTemperature} °C`
+                    : "Température inconnue";
+
+        cards.push(buildZoneCard({
+            type: "weather",
+            icon: severeCount > 0 ? "⛈️" : "🌦️",
+            title: "Météo",
+            count: b.weather.length,
+            headline: esc(temperatureText),
+            details: [
+                maximumWind !== null
+                    ? `Vent max. : ${maximumWind} km/h`
+                    : null,
+
+                maximumRain !== null
+                    ? `Pluie max. : ${maximumRain} mm`
+                    : null,
+
+                severeCount > 0
+                    ? `${severeCount} prévision(s) sévère(s)`
+                    : null
+            ].filter(Boolean).join(" • ")
+        }));
+    }
+
+    // -----------------------------------------------------
+    // Places
+    // -----------------------------------------------------
+    if ((b.places?.length ?? 0) > 0) {
+        const placeNames = uniqueTexts(
+            b.places,
+            "Name",
+            "name",
+            "Title",
+            "title");
+
+        cards.push(buildZoneCard({
+            type: "places",
+            icon: "📍",
+            title: "Lieux",
+            count: b.places.length,
+            headline:
+                esc(placeNames.slice(0, 3).join(", ") || "Lieux proches"),
+            details: ""
+        }));
+    }
 
     return `
-    <div class="oz-bundle-popup">
-      <div class="oz-bundle-head">
-        <div class="oz-bundle-title">Summary area</div>
-        <div class="oz-bundle-sub">${total} element(s)</div>
-        <div class="oz-bundle-coords">${Number(b.lat).toFixed(5)}, ${Number(b.lng).toFixed(5)}</div>
-      </div>
+        <div class="oz-zone-popup">
+            <header class="oz-zone-popup-header">
+                <div>
+                    <div class="oz-zone-popup-title">
+                        Zone autour de ${esc(zoneName)}
+                    </div>
 
-      <div class="oz-sec">
-        <div class="oz-sec-title">Counts</div>
-        <div class="oz-sec-body">
-          <div class="oz-row"><span class="oz-k">Events</span><span class="oz-v">${esc(breakdown("events"))}</span></div>
-          <div class="oz-row"><span class="oz-k">Places</span><span class="oz-v">${esc(breakdown("places"))}</span></div>
-          <div class="oz-row"><span class="oz-k">Crowds</span><span class="oz-v">${esc(breakdown("crowds"))}</span></div>
-          <div class="oz-row"><span class="oz-k">Traffic</span><span class="oz-v">${esc(breakdown("traffic"))}</span></div>
-          <div class="oz-row"><span class="oz-k">Weather</span><span class="oz-v">${esc(breakdown("weather"))}</span></div>
-          <div class="oz-row"><span class="oz-k">Suggestions</span><span class="oz-v">${esc(breakdown("suggestions"))}</span></div>
-          <div class="oz-row"><span class="oz-k">GPT</span><span class="oz-v">${esc(breakdown("gpt"))}</span></div>
+                    <div class="oz-zone-popup-meta">
+                        ${total} information(s) fusionnée(s)
+                    </div>
+                </div>
+
+                <span class="oz-zone-risk oz-zone-risk--${severity}">
+                    ${bundleRiskLabel(severity)}
+                </span>
+            </header>
+
+            <div class="oz-zone-card-list">
+                ${cards.join("")}
+            </div>
+
+            <div class="oz-zone-popup-actions">
+                <button type="button"
+                        class="oz-zone-action"
+                        data-oz-action="details">
+                    🔎 Zoomer et afficher les détails
+                </button>
+            </div>
+
+            <div class="oz-zone-popup-coordinates">
+                Centre de la zone :
+                ${Number(b.lat).toFixed(5)},
+                ${Number(b.lng).toFixed(5)}
+            </div>
         </div>
-      </div>
-    </div>`.trim();
+    `.trim();
 }
-function computeBundles(payload, tolMeters) {
-    const buckets = new Map();
-    const norm = payload;
 
-    const push = (arr, kind) => {
-        if (!Array.isArray(arr) || arr.length === 0) return;
-        for (const item of arr) {
-            const ll = pickLatLng(item);
-            if (!ll) continue;
+const BUNDLE_POPUP_WIRING_VERSION = 3;
 
-            const key = bundleKeyFor(ll.lat, ll.lng, tolMeters);
-            let b = buckets.get(key);
-            if (!b) {
-                b = { key, lat: ll.lat, lng: ll.lng, events: [], places: [], crowds: [], traffic: [], weather: [], suggestions: [], gpt: [] };
-                buckets.set(key, b);
+function wireBundlePopupActions(
+    marker,
+    s,
+    scopeKey) {
+
+    if (!marker || !s?.map) {
+        return;
+    }
+
+    if (
+        marker.__ozBundlePopupWiringVersion ===
+        BUNDLE_POPUP_WIRING_VERSION
+    ) {
+        return;
+    }
+
+    marker.__ozBundlePopupWiringVersion =
+        BUNDLE_POPUP_WIRING_VERSION;
+
+    marker.on("popupopen", () => {
+        requestAnimationFrame(() => {
+            const popupElement =
+                marker
+                    .getPopup?.()
+                    ?.getElement?.();
+
+            if (!popupElement) {
+                return;
             }
-            b[kind].push(item);
-        }
-    };
 
-    push(norm.places, "places");
-    push(norm.events, "events");
-    push(norm.crowds, "crowds");
-    push(norm.traffic, "traffic");
-    push(norm.weather, "weather");
-    push(norm.suggestions, "suggestions");
-    push(norm.gpt, "gpt");
+            const detailsButton =
+                popupElement.querySelector(
+                    '[data-oz-action="details"]'
+                );
 
-    return buckets;
+            if (!detailsButton) {
+                return;
+            }
+
+            try {
+                globalThis.L
+                    ?.DomEvent
+                    ?.disableClickPropagation(
+                        detailsButton
+                    );
+            }
+            catch {
+            }
+
+            detailsButton.onclick = event => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                const bundle =
+                    marker.__ozBundleData;
+
+                if (!bundle) {
+                    console.warn(
+                        "[Bundle popup] no bundle data"
+                    );
+
+                    return;
+                }
+
+                try {
+                    marker.closePopup();
+                }
+                catch {
+                }
+
+                showSelectedBundleDetails(
+                    bundle,
+                    scopeKey
+                );
+            };
+        });
+    });
 }
 export function updateBundleMarker(b, scopeKey = "main") {
     const ready = ensureMapReady(scopeKey);
@@ -2590,82 +3648,249 @@ export function updateBundleMarker(b, scopeKey = "main") {
         return;
     }
 
-    const icon = makeBadgeIcon(total, sev, b);
+    const icon = makeBadgeIcon(total, sev, b, map.getZoom?.() ?? 12);
 
     if (!existing) {
         const m = L.marker([b.lat, b.lng], {
             icon,
-            title: `Area (${total})`,
+            title: `Zone (${total})`,
             riseOnHover: true,
-            __ozNoCluster: true,
+            __ozNoCluster: true
         });
 
-        try { safeBindPopup(m, popup, { maxWidth: 460 }); } catch { }
-        addLayerSmart(m, s);
+        m.__ozBundleData = b;
+
+        safeBindPopup(m, popup, {
+            maxWidth: 520,
+            minWidth: 320
+        });
+
+        wireBundlePopupActions(m, s, scopeKey);
+
+        if (s.hybrid?.showing !== "details") {
+            addLayerSmart(m, s);
+        }
 
         s.bundleMarkers.set(b.key, m);
         s.bundleIndex.set(b.key, b);
         return;
     }
 
-    try { existing.setLatLng([b.lat, b.lng]); } catch { }
-    try { existing.setIcon(icon); } catch { }
-    try {
-        if (existing.getPopup()) existing.setPopupContent(popup);
-        else safeBindPopup(existing, popup);
-    } catch { }
+    existing.__ozBundleData = b;
 
-    // Hybrid: hide bundle markers when in details
     try {
-        if (s.hybrid?.showing === "details") {
-            if (map.hasLayer(existing)) map.removeLayer(existing);
-        } else {
-            if (!map.hasLayer(existing)) map.addLayer(existing);
+        existing.setLatLng([
+            b.lat,
+            b.lng
+        ]);
+    }
+    catch {
+    }
+
+    try {
+        existing.setIcon(icon);
+    }
+    catch {
+    }
+
+    try {
+        if (existing.getPopup()) {
+            existing.setPopupContent(popup);
         }
-    } catch { }
+        else {
+            safeBindPopup(
+                existing,
+                popup,
+                {
+                    maxWidth: 520,
+                    minWidth: 320
+                }
+            );
+        }
+    }
+    catch {
+    }
+
+    wireBundlePopupActions(existing, s, scopeKey
+    );
 
     s.bundleIndex.set(b.key, b);
 }
 
-export function addOrUpdateBundleMarkers(payload, tolMeters = 80, scopeKey = null) {
-    const ready = ensureMapReady(scopeKey);
-    if (!ready) return false;
+function rebuildWeatherIndex(s, weatherItems) {
+    const index = new Map();
 
+    for (const item of weatherItems ?? []) {
+        const id =
+            item?.Id ??
+            item?.id ??
+            item?.WeatherForecastId ??
+            item?.weatherForecastId;
+
+        if (id == null) {
+            continue;
+        }
+
+        index.set(String(id), item);
+    }
+
+    s._weatherById = index;
+}
+
+export function addOrUpdateBundleMarkers(
+    payload,
+    tolMeters = 0,
+    scopeKey = null) {
+
+    const ready = ensureMapReady(scopeKey);
+
+    if (!ready) {
+        console.warn(
+            "[addOrUpdateBundleMarkers] map not ready",
+            { scopeKey }
+        );
+
+        return false;
+    }
+
+    /*
+     * We need to retrieve k AND s.
+     *
+     * k = standardized scope
+     * s = Leaflet state of the scope
+     */
     const { k, s } = ready;
 
-    const tol = Number(tolMeters);
-    const tolFinal = (Number.isFinite(tol) && tol > 0) ? tol : 80;
+    const requestedTolerance = Number(tolMeters);
+    const currentZoom =
+        s.map?.getZoom?.() ?? 12;
+
+    const tolFinal =
+        Number.isFinite(requestedTolerance) &&
+            requestedTolerance > 0
+
+            ? requestedTolerance
+            : bundleToleranceForZoom(currentZoom);
+
+    s.bundleToleranceMeters = tolFinal;
 
     const norm = normalizePayload(payload);
+
     s.bundleLastInput = norm;
 
-    const bundles = computeBundles(norm, tolFinal);
+    /*
+     * Synchronize the weather index before future
+     * incremental updates.
+     */
+    rebuildWeatherIndex(
+        s,
+        norm.weather
+    );
 
-    // remove old
-    for (const oldKey of Array.from(s.bundleMarkers.keys())) {
-        if (!bundles.has(oldKey)) {
-            const marker = s.bundleMarkers.get(oldKey);
-            removeLayerSmart(marker, s);
-            s.bundleMarkers.delete(oldKey);
-            s.bundleIndex.delete(oldKey);
+    /*
+     * Single declaration.
+     */
+    const bundles =
+        computeBundles(
+            norm,
+            tolFinal
+        );
+
+    /*
+     * Removes bundles that have become obsolete.
+     */
+    for (const oldKey of Array.from(
+        s.bundleMarkers.keys())) {
+
+        if (bundles.has(oldKey)) {
+            continue;
+        }
+
+        const marker =
+            s.bundleMarkers.get(oldKey);
+
+        removeLayerSmart(
+            marker,
+            s
+        );
+
+        s.bundleMarkers.delete(oldKey);
+        s.bundleIndex.delete(oldKey);
+    }
+
+    /*
+     * Adds or updates the current bundles.
+     */
+    for (const bundle of bundles.values()) {
+        updateBundleMarker(
+            bundle,
+            k
+        );
+    }
+
+    /*
+     * Refreshes the bundles/details display.
+     */
+    try {
+        refreshHybridVisibility(k);
+    }
+    catch (error) {
+        console.warn(
+            "[addOrUpdateBundleMarkers] " +
+            "hybrid refresh failed",
+            error
+        );
+    }
+
+    /*
+     * Updates the classic clusters if the
+     * The plugin is active for this page.
+     */
+    if (
+        s.cluster &&
+        typeof s.cluster.refreshClusters === "function"
+    ) {
+        try {
+            s.cluster.refreshClusters();
+        }
+        catch (error) {
+            console.warn(
+                "[addOrUpdateBundleMarkers] " +
+                "cluster refresh failed",
+                error
+            );
         }
     }
 
-    // upsert current
-    for (const b of bundles.values()) updateBundleMarker(b, k);
-
-    // hybrid refresh
-    try { refreshHybridVisibility(k); } catch { }
-
-    // refresh cluster
-    if (s.cluster && typeof s.cluster.refreshClusters === "function") {
-        try { s.cluster.refreshClusters(); } catch { }
+    /*
+     * Optional: show markers
+     * Individual weather items in bundle mode.
+     */
+    if (
+        s.flags.showWeatherPinsInBundles &&
+        s.hybrid?.showing !== "details"
+    ) {
+        addOrUpdateWeatherMarkers(
+            norm.weather ?? [],
+            k
+        );
     }
 
-    // optional: show weather pins in bundles mode
-    if (s.flags.showWeatherPinsInBundles && s.hybrid?.showing !== "details") {
-        addOrUpdateWeatherMarkers(norm.weather ?? [], k);
-    }
+    console.log(
+        "[addOrUpdateBundleMarkers] ok",
+        {
+            scopeKey: k,
+            zoom: currentZoom,
+            toleranceMeters: tolFinal,
+            bundleCount: bundles.size,
+            events: norm.events.length,
+            places: norm.places.length,
+            crowds: norm.crowds.length,
+            traffic: norm.traffic.length,
+            weather: norm.weather.length,
+            suggestions: norm.suggestions.length
+        }
+    );
 
     return true;
 }
@@ -2967,15 +4192,23 @@ export function refreshMapSize(scopeKey = null, tries = 10) {
 /* ---------------------------------------------------------
    Incremental weather bundle input
 --------------------------------------------------------- */
-export function scheduleBundleRefresh(delayMs = 150, tolMeters = 80, scopeKey = null) {
+export function scheduleBundleRefresh(delayMs = 150, tolMeters = 0, scopeKey = null) {
+
     const k = pickScopeKey(scopeKey);
     const s = peekS(k) || getS(k);
 
     clearTimeout(s._bundleRefreshT);
+
     s._bundleRefreshT = setTimeout(() => {
         try {
-            if (s.bundleLastInput) addOrUpdateBundleMarkers(s.bundleLastInput, tolMeters, k);
-        } catch { }
+            if (s.bundleLastInput) {
+                addOrUpdateBundleMarkers(
+                    s.bundleLastInput,
+                    tolMeters,
+                    k);
+            }
+        } catch {
+        }
     }, delayMs);
 }
 
@@ -3014,17 +4247,6 @@ export function upsertWeatherIntoBundleInput(delta, scopeKey = null) {
 
     const wid = raw.Id ?? raw.id;
     if (wid == null) return false;
-
-    if (window.__ccDumpTimer) {
-        clearTimeout(window.__ccDumpTimer);
-    }
-
-    window.__ccDumpTimer = setTimeout(() => {
-        console.log(
-            "AFTER 35s",
-            OutZenInterop.__esm.dumpState("commandcenter", { createIfMissing: false })
-        );
-    }, 35000);
 
     const ll = pickLatLng(raw);
     if (!ll) {
@@ -3109,6 +4331,29 @@ export function clearAllOutZenLayers(scopeKey = null) {
     try { s.calendarLayer?.clearLayers?.(); } catch { }
     try { s.antennaLayer?.clearLayers?.(); } catch { }
 
+    for (const marker of s.bundleMarkers?.values?.() ?? []) {
+        try {
+            removeLayerSmart(marker, s);
+        } catch {
+        }
+    }
+
+    for (const marker of s.antennaAlertMarkers?.values?.() ?? []) {
+        try {
+            if (s.map?.hasLayer?.(marker)) {
+                s.map.removeLayer(marker);
+            }
+        } catch {
+        }
+    }
+
+    destroyChartIfAny(s);
+    destroyWxChartIfAny(s);
+
+    for (const marker of s.markers.values()) {
+        clearManagedMarkerTimers(marker);
+        removeLayerSmart(marker, s);
+    }
     // Reset registries
     try { s.markers?.clear?.(); } catch { }
     try { s.bundleMarkers?.clear?.(); } catch { }
@@ -3116,9 +4361,17 @@ export function clearAllOutZenLayers(scopeKey = null) {
     try { s.detailMarkers?.clear?.(); } catch { }
     try { s.calendarMarkers?.clear?.(); } catch { }
     try { s.antennaMarkers?.clear?.(); } catch { }
+    try {s.antennaAlertMarkers?.clear?.(); } catch { }
 
-    // Reset bundle cache (optionnel mais cohérent si tu “clear all”)
+    // Reset bundle cache (optional, but consistent if you “clear all”)
+    clearTimeout(s._bundleRefreshT);
+
+    s._bundleRefreshT = 0;
+    s._weatherById = new Map();
     s.bundleLastInput = null;
+    s.bundleToleranceMeters = null;
+    s.hybrid.showing = null;
+    s.flags.userLockedMode = false;
 
     return true;
 }

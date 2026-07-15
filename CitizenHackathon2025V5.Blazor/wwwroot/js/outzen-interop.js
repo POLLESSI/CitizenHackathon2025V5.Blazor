@@ -14,45 +14,185 @@
             ? globalThis.OutZenInterop
             : {};
 
-    const isDev =
-        location.hostname === "localhost" ||
-        location.hostname === "127.0.0.1";
+    const isDev = location.hostname === "localhost" || location.hostname === "127.0.0.1";
 
-    const BUILD = globalThis.__ozBuild || "20260603-full-alert-marker-1";
+    const BUILD = globalThis.__ozBuild || "20260714-map-bundle-fix-1";
 
-    const url = isDev
-        ? `/js/app/leafletOutZen.module.js?v=${encodeURIComponent(BUILD)}&t=${Date.now()}`
-        : `/js/app/leafletOutZen.module.js?v=${encodeURIComponent(BUILD)}`;
+    const MODULE_BASE_URL = `/js/app/leafletOutZen.module.js` + `?v=${encodeURIComponent(BUILD)}`;
 
-    async function loadModule(force = false) {
-        if (force || globalThis.__OutZenImportUrl !== url || !globalThis.__OutZenImportP) {
-            globalThis.__OutZenImportUrl = url;
-            globalThis.__OutZenImportP = import(url);
+    let importAttempt = 0;
+
+    function createModuleUrl(cacheBust = false) {
+        /*
+         * During development, each new attempt
+         * receives a different URL.
+         *
+         * In production, the URL remains stable unless an
+         * explicit reload is requested.
+         */
+        if (!isDev && !cacheBust) {
+            return MODULE_BASE_URL;
         }
 
-        const m = await globalThis.__OutZenImportP;
+        importAttempt++;
 
-        for (const [k, v] of Object.entries(m)) {
-            globalThis.OutZenInterop[k] = v;
-        }
-
-        globalThis.OutZenInterop.__esm = m;
-        globalThis.OutZenInterop.module = m;
-
-        return m;
+        return (
+            MODULE_BASE_URL +
+            `&t=${Date.now()}-${importAttempt}`
+        );
     }
 
-    globalThis.OutZen.ensure = async (force = false) => {
-        await loadModule(force);
-        return true;
-    };
+    function exposeModuleExports(module) {
+        if (!module) {
+            return;
+        }
 
-    globalThis.OutZen.reload = async () => {
-        globalThis.__OutZenImportP = null;
-        globalThis.__OutZenImportUrl = null;
-        await loadModule(true);
-        return true;
-    };
+        for (const [key, value]
+            of Object.entries(module)) {
+
+            globalThis.OutZenInterop[key] =
+                value;
+        }
+
+        globalThis.OutZenInterop.__esm =
+            module;
+
+        globalThis.OutZenInterop.module =
+            module;
+    }
+
+    async function loadModule(force = false) {
+        const mustCreateImport =
+            force ||
+            !globalThis.__OutZenImportP ||
+            !globalThis.__OutZenImportUrl;
+
+        if (mustCreateImport) {
+            const importUrl =
+                createModuleUrl(
+                    force || isDev
+                );
+
+            globalThis.__OutZenImportUrl =
+                importUrl;
+
+            console.log(
+                "[OutZenInterop] loading ESM",
+                {
+                    force,
+                    url: importUrl
+                }
+            );
+
+            globalThis.__OutZenImportP =
+                import(importUrl);
+        }
+
+        const importUrl =
+            globalThis.__OutZenImportUrl;
+
+        try {
+            const module =
+                await globalThis.__OutZenImportP;
+
+            exposeModuleExports(module);
+
+            delete globalThis.OutZenInterop.__loadError;
+
+            /*
+             * Several callers can wait for the same one
+             * import promise. The module should only be
+             * logged once per URL.
+             */
+            if (
+                globalThis.__OutZenLastLoggedImportUrl !==
+                importUrl
+            ) {
+                globalThis.__OutZenLastLoggedImportUrl =
+                    importUrl;
+
+                console.log(
+                    "[OutZenInterop] ESM loaded",
+                    {
+                        url: importUrl,
+
+                        exportCount:
+                            Object.keys(module).length,
+
+                        hasBootOutZen:
+                            typeof module.bootOutZen ===
+                            "function",
+
+                        hasBundleUpdater:
+                            typeof module
+                                .addOrUpdateBundleMarkers ===
+                            "function"
+                    }
+                );
+            }
+
+            return module;
+        }
+        catch (error) {
+            /*
+             * Do not keep a rejected promise.
+             * The next call can make a new
+             * attempt with a new URL.
+             */
+            globalThis.__OutZenImportP = null;
+            globalThis.__OutZenImportUrl = null;
+
+            globalThis.OutZenInterop.__loadError = {
+                name:
+                    error?.name ??
+                    "UnknownError",
+
+                message:
+                    error?.message ??
+                    String(error),
+
+                url:
+                    importUrl ??
+                    null,
+
+                timestamp:
+                    new Date().toISOString()
+            };
+
+            console.error(
+                "[OutZenInterop] " +
+                "leafletOutZen.module.js load failed",
+                {
+                    url: importUrl,
+                    name: error?.name,
+                    message: error?.message,
+                    stack: error?.stack,
+                    error
+                }
+            );
+
+            throw error;
+        }
+    }
+
+    globalThis.OutZen.ensure =
+        async function (force = false) {
+
+            await loadModule(force);
+
+            return true;
+        };
+
+    globalThis.OutZen.reload =
+        async function () {
+
+            globalThis.__OutZenImportP = null;
+            globalThis.__OutZenImportUrl = null;
+
+            await loadModule(true);
+
+            return true;
+        };
 
     globalThis.OutZenInterop.pruneMarkersByPrefix = async (prefix, scopeKey) => {
         const m = await loadModule(false);
@@ -69,11 +209,71 @@
         return 0;
     };
 
-    globalThis.OutZenReady = async () => {
-        await globalThis.OutZen.ensure(false);
-        console.log("[OutZen] ✅ interop ready:", Object.keys(globalThis.OutZenInterop));
-        return true;
-    };
+    globalThis.OutZenReady =
+        async function (force = false) {
+
+            try {
+                await globalThis.OutZen.ensure(force);
+
+                const requiredFunctions = [
+                    "bootOutZen",
+                    "disposeOutZen",
+                    "addOrUpdateBundleMarkers",
+                    "addOrUpdateDetailMarkers",
+                    "refreshHybridNow"
+                ];
+
+                const missingFunctions =
+                    requiredFunctions.filter(
+                        function (name) {
+                            return (
+                                typeof globalThis
+                                    .OutZenInterop[name] !==
+                                "function"
+                            );
+                        });
+
+                if (missingFunctions.length > 0) {
+                    console.error(
+                        "[OutZen] interop incomplete",
+                        {
+                            missingFunctions,
+                            availableExports:
+                                Object.keys(
+                                    globalThis
+                                        .OutZenInterop
+                                )
+                        }
+                    );
+
+                    return false;
+                }
+
+                console.log(
+                    "[OutZen] ✅ interop ready",
+                    {
+                        exports:
+                            Object.keys(
+                                globalThis.OutZenInterop
+                            ),
+
+                        moduleUrl:
+                            globalThis
+                                .__OutZenImportUrl
+                    }
+                );
+
+                return true;
+            }
+            catch (error) {
+                console.error(
+                    "[OutZen] ❌ interop initialization failed",
+                    error
+                );
+
+                return false;
+            }
+        };
 
     // ---------------------------------------------------------------------
     // Legacy lowercase alias expected by Presentation.razor
@@ -341,30 +541,6 @@
             });
         });
 
-        panel.addEventListener("pointerleave", function () {
-            if (dragging) {
-                return;
-            }
-
-            if (!panel.classList.contains("is-expanded")) {
-                return;
-            }
-
-            panel.classList.remove("is-expanded");
-
-            requestAnimationFrame(() => {
-                const rect = panel.getBoundingClientRect();
-                setPosition(rect.left, rect.top, true);
-
-                console.log("[OutZen] alert cluster auto-collapsed on pointer leave", {
-                    left: rect.left,
-                    top: rect.top,
-                    width: rect.width,
-                    height: rect.height
-                });
-            });
-        });
-
         let dragging = false;
         let startX = 0;
         let startY = 0;
@@ -440,23 +616,7 @@
 
         return true;
     };
-    window.OutZenInterop = window.OutZenInterop || {};
 
-    window.OutZen = window.OutZen || {};
-
-    window.OutZen.__drawerZ = window.OutZen.__drawerZ || 30000;
-
-    window.OutZen.bringToFront = function (id) {
-        const el = document.getElementById(id);
-        if (!el) return false;
-
-        window.OutZen.__drawerZ += 1;
-        el.style.setProperty("z-index", String(window.OutZen.__drawerZ), "important");
-
-        return true;
-    };
-
-    window.OutZen = window.OutZen || {};
     window.OutZen.__drawerZ = window.OutZen.__drawerZ || 30000;
 
     window.OutZen.bringToFront = function (id) {

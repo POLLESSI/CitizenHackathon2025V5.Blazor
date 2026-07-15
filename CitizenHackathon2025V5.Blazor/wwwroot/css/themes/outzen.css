@@ -15,7 +15,7 @@
     --oz-event: rgba(240,7,189,.95);
     --oz-suggestion: rgba(155,89,255,.95);
     --oz-marker-size: 26px;
-    --oz-bundle-size: 34px;
+    --oz-bundle-size: 64px;
     --oz-calendar-size: 30px;
 }
 
@@ -1489,21 +1489,18 @@ HIGHLIGHT / PULSE
 .outzen-alert-button--crowd {
     color: #ff2b2b !important;
     background: radial-gradient( circle at 50% 50%, rgba(255,43,43,.40), rgba(50,0,0,.85) ) !important;
-    /*box-shadow: 0 0 0 9px #170404, 0 0 0 15px #b6b6b6, 0 0 0 19px #202020, 0 0 22px rgba(255,0,0,.75), 0 0 52px rgba(255,0,0,.35), 0 12px 26px rgba(0,0,0,.62), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 26px rgba(0,0,0,.72) !important;*/
 }
 
 /* Weather - turquoise / cyan */
 .outzen-alert-button--weather {
     color: #00f7ff !important;
     background: radial-gradient( circle at 50% 50%, rgba(0,247,255,.40), rgba(0,40,50,.85) ) !important;
-    /*box-shadow: 0 0 0 9px #03191c, 0 0 0 15px #c8ffff, 0 0 0 19px #073035, 0 0 24px rgba(0,255,255,.88), 0 0 58px rgba(0,255,255,.45), 0 12px 26px rgba(0,0,0,.62), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 26px rgba(0,0,0,.72) !important;*/
 }
 
 /* Traffic - orange / amber */
 .outzen-alert-button--traffic {
     color: #ff9800 !important;
     background: radial-gradient( circle at 50% 50%, rgba(255,152,0,.40), rgba(55,25,0,.85) ) !important;
-    /*box-shadow: 0 0 0 9px #1d1002, 0 0 0 15px #ffd38a, 0 0 0 19px #2b1601, 0 0 24px rgba(255,152,0,.88), 0 0 58px rgba(255,152,0,.48), 0 12px 26px rgba(0,0,0,.62), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 26px rgba(0,0,0,.72) !important;*/
 }
 
 /* =========================================================
@@ -1744,12 +1741,10 @@ HIGHLIGHT / PULSE
     display: block;
     width: 100%;
     text-align: center;
-    /*margin-bottom: 4px;*/
     color: #00f7ff;
     font-size: .95rem;
     font-weight: 900;
     letter-spacing: .22em;
-    /*text-align: center;*/
     text-transform: uppercase;
     text-shadow: 0 0 10px rgba(0,247,255,.8), 0 0 25px rgba(0,247,255,.5);
 }
@@ -1769,20 +1764,12 @@ HIGHLIGHT / PULSE
 .critical-alert-panel.alert-cluster .outzen-alert-button {
     width: 120px !important;
     height: 120px !important;
-    /*min-width: 126px !important;
-    min-height: 126px !important;*/
     position: relative !important;
-    /*display: grid !important;*/
-    /*place-items: center !important;*/
     border-radius: 50% !important;
     border: 3px solid currentColor !important;
-    /*padding: 0 !important;*/
-    /*margin: 0 !important;*/
     color: white !important;
     background: rgba(10,15,25,.65) !important;
     overflow: visible !important;
-    /*isolation: isolate !important;*/
-    /*cursor: pointer !important;*/
     box-shadow: 0 0 12px currentColor, 0 0 28px currentColor, inset 0 0 18px rgba(255,255,255,.08);
     animation: outzenPulse 2s infinite ease-in-out;
 }
@@ -1794,11 +1781,8 @@ HIGHLIGHT / PULSE
     inset: -12px;
     border-radius: 50%;
     border: 2px solid currentColor;
-    /*background: conic-gradient( from 0deg, transparent 0deg, currentColor 35deg, transparent 75deg, transparent 135deg, currentColor 180deg, transparent 235deg, transparent 300deg, currentColor 340deg, transparent 360deg ) !important;*/
     opacity: .6;
-    /*filter: drop-shadow(0 0 10px currentColor) !important;*/
     animation: outzenHudRotate 5s linear infinite;
-    /*z-index: -1 !important;*/
 }
 
 /* discreet reflection */
@@ -1811,47 +1795,7 @@ HIGHLIGHT / PULSE
     height: 18px;
     border-radius: 999px;
     background: rgba(255,255,255,.30);
-    /*filter: blur(1px) !important;*/
     transform: rotate(-20deg);
-    /*pointer-events: none !important;*/
-}
-
-/* Text */
-/*.critical-alert-panel.alert-cluster .outzen-alert-label {
-    position: fixed !important;
-    top: 140px;
-    top: 120px !important;
-    right: 30px !important;
-    left: auto !important;
-    bottom: auto !important;
-    z-index: 2147483640 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    gap: 12px !important;
-    padding: 18px !important;
-    border-radius: 28px !important;
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    background: rgba(8,12,24,.38) !important;
-    border: 1px solid rgba(0,247,255,.35) !important;
-    box-shadow: 0 0 25px rgba(0,247,255,.20), 0 0 60px rgba(0,247,255,.12), inset 0 0 30px rgba(255,255,255,.04);
-    cursor: move;
-    transition: box-shadow .25s ease, transform .25s ease;
-    user-select: none;
-    font-family: Arial, Helvetica, sans-serif !important;
-    font-size: 1.25rem !important;
-    font-weight: 900 !important;
-    line-height: 1.05 !important;
-    letter-spacing: .07em !important;
-    text-align: center !important;
-    text-transform: uppercase !important;
-    color: #fff !important;
-    text-shadow: 0 2px 4px rgba(0,0,0,.9), 0 0 10px currentColor !important;
-}
-*/
-.critical-alert-panel.alert-cluster:hover {
-    box-shadow: 0 0 35px rgba(0,247,255,.35), 0 0 90px rgba(0,247,255,.20), inset 0 0 35px rgba(255,255,255,.05);
 }
 
 .critical-alert-panel.alert-cluster .outzen-alert-label--traffic {
@@ -1922,16 +1866,6 @@ HIGHLIGHT / PULSE
     box-shadow: 0 0 14px rgba(0,247,255,.22), inset 0 0 10px rgba(255,255,255,.06) !important;
 }
 
-/* Animations */
-/*@keyframes outzenHudPulse {
-    0%, 100% {
-        box-shadow: 0 0 10px currentColor, 0 0 24px currentColor, inset 0 0 18px rgba(255,255,255,.12), inset 0 -18px 28px rgba(0,0,0,.62);
-    }
-
-    50% {
-        box-shadow: 0 0 18px currentColor, 0 0 42px currentColor, 0 0 68px rgba(0,247,255,.28), inset 0 0 22px rgba(255,255,255,.16), inset 0 -18px 28px rgba(0,0,0,.62);
-    }
-}*/
 @keyframes outzenPulse {
 
     0%,100% {
@@ -1973,31 +1907,6 @@ HIGHLIGHT / PULSE
         transform: scale(.68) !important;
     }
 }
-
-/* =========================================================
-   OUTZEN CONTROL CENTER
-   HUD / CYBERPUNK / SATELLITE STYLE
-   ========================================================= */
-
-/*.critical-alert-panel.alert-cluster {
-    position: fixed !important;
-    right: 30px !important;
-    top: 120px !important;
-    width: 380px !important;
-    padding: 20px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    gap: 16px !important;
-    border-radius: 28px !important;
-    background: linear-gradient( 180deg, rgba(0,247,255,.08), rgba(0,0,0,.25) ) !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
-    border: 1px solid rgba(0,247,255,.55) !important;
-    z-index: 999999999 !important;
-    isolation: isolate !important;
-    box-shadow: 0 0 30px rgba(0,247,255,.35), 0 0 80px rgba(0,247,255,.18), inset 0 0 25px rgba(0,247,255,.12) !important;
-}*/
 
 /* =========================================================
    OUTZEN CONTROL CENTER — FLOATING / DRAGGABLE
@@ -2129,10 +2038,6 @@ HIGHLIGHT / PULSE
     gap: 8px !important;
 }
 
-/* =========================================================
-   OUTZEN CONTROL CENTER — COMPACT / EXPAND ON HOVER
-   ========================================================= */
-
 /* compact state */
 .critical-alert-panel.alert-cluster {
     width: 190px !important;
@@ -2145,7 +2050,6 @@ HIGHLIGHT / PULSE
 }
 
 /* deployed state */
-.critical-alert-panel.alert-cluster:hover,
 .critical-alert-panel.alert-cluster.is-expanded {
     width: 390px !important;
     min-width: 390px !important;
@@ -2209,7 +2113,7 @@ HIGHLIGHT / PULSE
 }
 
 /* deployed state */
-.critical-alert-panel.alert-cluster:hover .outzen-alert-button,
+.outzen-alert-button,
 .critical-alert-panel.alert-cluster.is-expanded .outzen-alert-button {
     opacity: 1 !important;
     position: relative !important;
@@ -2217,7 +2121,7 @@ HIGHLIGHT / PULSE
     pointer-events: auto !important;
 }
 
-.critical-alert-panel.alert-cluster:hover .critical-alert-infos,
+.critical-alert-infos,
 .critical-alert-panel.alert-cluster.is-expanded .critical-alert-infos {
     opacity: 1 !important;
     max-height: 120px !important;
@@ -2508,27 +2412,6 @@ HIGHLIGHT / PULSE
     min-height: 430px;
 }
 
-.alert-cluster:hover .alert-cluster-grid,
-.alert-cluster:focus-within .alert-cluster-grid {
-    width: 280px;
-    height: 280px;
-}
-
-.alert-cluster:hover .alert-main,
-.alert-cluster:focus-within .alert-main {
-    grid-column: auto;
-    grid-row: auto;
-    transform: scale(1);
-}
-
-/*.alert-cluster:hover .alert-secondary,
-.alert-cluster:focus-within .alert-secondary {
-    opacity: 1;
-    pointer-events: auto;
-    transform: scale(1);
-    filter: blur(0);
-}*/
-
 .alert-cluster-hint {
     margin-top: 8px;
     color: #18f7ff;
@@ -2650,7 +2533,7 @@ HIGHLIGHT / PULSE
     --oz-event: rgba(240,7,189,.95);
     --oz-suggestion: rgba(155,89,255,.95);
     --oz-marker-size: 26px;
-    --oz-bundle-size: 34px;
+    --oz-bundle-size: 64px;
     --oz-calendar-size: 30px;
 }
 
@@ -3172,6 +3055,10 @@ HIGHLIGHT / PULSE
 .oz-popup .outzen-popup .desc {
     opacity: .9;
     line-height: 1.25rem;
+}
+
+.outzen-popup .desc {
+    white-space: pre-line;
 }
 
 .oz-text-wrap {
@@ -4072,15 +3959,15 @@ HIGHLIGHT / PULSE
     min-height: 10cm !important;
 }
 
-    .oz-page--home .homeMapCard > .oz-map,
-    #leafletMap-home {
-        width: 100% !important;
-        height: 10cm !important;
-        min-height: 10cm !important;
-        display: block !important;
-        border-radius: 16px;
-        overflow: hidden;
-    }
+.oz-page--home .homeMapCard > .oz-map,
+#leafletMap-home {
+    width: 100% !important;
+    height: 10cm !important;
+    min-height: 10cm !important;
+    display: block !important;
+    border-radius: 16px;
+    overflow: hidden;
+}
 
 .critical-alert-panel {
     position: fixed !important;
@@ -4093,29 +3980,273 @@ HIGHLIGHT / PULSE
     gap: 14px !important;
 }
 
-    .critical-alert-panel .outzen-alert-button span {
-        color: #fff !important;
-        font-family: Arial, Helvetica, sans-serif !important;
-        font-size: 1.5rem !important;
-        font-weight: 700 !important;
-        letter-spacing: .08em !important;
-        text-shadow: 0 2px 4px rgba(0,0,0,.75) !important;
-    }
+.critical-alert-panel .outzen-alert-button span {
+    color: #fff !important;
+    font-family: Arial, Helvetica, sans-serif !important;
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
+    letter-spacing: .08em !important;
+    text-shadow: 0 2px 4px rgba(0,0,0,.75) !important;
+}
 
 .outzen-weather-alert-button {
     background: radial-gradient(circle at 35% 22%, rgba(255,255,255,.95) 0%, rgba(255,255,255,.35) 13%, transparent 28%), radial-gradient(circle at 50% 54%, #43fff4 0%, #00d8d8 42%, #007c88 72%, #00343d 100%) !important;
     box-shadow: 0 0 0 10px #06363b, 0 0 0 16px #00f5ff, 0 0 0 19px #02191d, 0 0 32px rgba(0,255,255,.9), 0 0 70px rgba(0,255,255,.45), 0 12px 24px rgba(0,0,0,.55), inset 0 12px 18px rgba(255,255,255,.38), inset 0 -18px 28px rgba(0,0,0,.65) !important;
 }
 
-    .outzen-weather-alert-button::before {
-        background: radial-gradient(circle at 30% 22%, #eaffff 0%, #00eaff 24%, #006a75 58%, #011417 100%) !important;
-    }
+.outzen-weather-alert-button::before {
+    background: radial-gradient(circle at 30% 22%, #eaffff 0%, #00eaff 24%, #006a75 58%, #011417 100%) !important;
+}
 
-    .outzen-weather-alert-button .outzen-alert-label {
-        font-size: 1.15rem !important;
-        color: #001b1d !important;
-        text-shadow: 0 1px 2px rgba(255,255,255,.75), 0 0 8px rgba(0,255,255,.9) !important;
-    }
+.outzen-weather-alert-button .outzen-alert-label {
+    font-size: 1.15rem !important;
+    color: #001b1d !important;
+    text-shadow: 0 1px 2px rgba(255,255,255,.75), 0 0 8px rgba(0,255,255,.9) !important;
+}
+
+/* =========================================================
+   OutZen intelligent zone bundles
+   ========================================================= */
+
+.oz-bundle-icon {
+    width: 64px !important;
+    height: 64px !important;
+    overflow: visible !important;
+    background: transparent !important;
+    border: 0 !important;
+}
+
+.oz-zone-marker {
+    position: relative;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    color: #fff;
+    background: linear-gradient( 145deg, rgba(35, 45, 55, 0.98), rgba(10, 15, 22, 0.98));
+    border: 4px solid #38b45b;
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.42), 0 0 0 3px rgba(255, 255, 255, 0.88);
+    transition: transform 160ms ease, filter 160ms ease;
+}
+
+.oz-zone-marker:hover {
+    transform: scale(1.12);
+    filter: brightness(1.12);
+}
+
+.oz-zone-sev-1 {
+    border-color: #35b65d;
+}
+
+.oz-zone-sev-2 {
+    border-color: #e0b323;
+}
+
+.oz-zone-sev-3 {
+    border-color: #f18420;
+}
+
+.oz-zone-sev-4 {
+    border-color: #e23434;
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.48), 0 0 0 3px rgba(255, 255, 255, 0.9), 0 0 18px rgba(226, 52, 52, 0.85);
+}
+
+.oz-zone-count {
+    font-size: 18px;
+    font-weight: 900;
+    line-height: 1;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+}
+
+.oz-zone-types {
+    position: absolute;
+    left: 50%;
+    top: 41px;
+    display: flex;
+    gap: 3px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+
+.oz-zone-type,
+.oz-zone-more {
+    min-width: 23px;
+    height: 20px;
+    padding: 0 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    border-radius: 10px;
+    color: #fff;
+    background: rgba(18, 22, 30, 0.94);
+    font-size: 10px;
+    font-weight: 800;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.38);
+}
+
+.oz-zone-type--events {
+    background: rgba(139, 73, 205, 0.96);
+}
+
+.oz-zone-type--places {
+    background: rgba(34, 122, 190, 0.96);
+}
+
+.oz-zone-type--crowds {
+    background: rgba(38, 158, 77, 0.96);
+}
+
+.oz-zone-type--traffic {
+    background: rgba(223, 119, 24, 0.96);
+}
+
+.oz-zone-type--weather {
+    background: rgba(33, 135, 177, 0.96);
+}
+
+.oz-zone-type--suggestions {
+    background: rgba(150, 83, 186, 0.96);
+}
+
+/* Popup */
+
+.oz-zone-popup {
+    width: min(440px, calc(100vw - 70px));
+    color: #17202a;
+}
+
+.oz-zone-popup-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.oz-zone-popup-title {
+    font-size: 17px;
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.oz-zone-popup-meta {
+    margin-top: 3px;
+    color: #59636e;
+    font-size: 12px;
+}
+
+.oz-zone-risk {
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    border-radius: 999px;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.oz-zone-risk--1 {
+    background: #29984a;
+}
+
+.oz-zone-risk--2 {
+    background: #b98b00;
+}
+
+.oz-zone-risk--3 {
+    background: #d86c0e;
+}
+
+.oz-zone-risk--4 {
+    background: #c92828;
+}
+
+.oz-zone-card-list {
+    display: grid;
+    gap: 8px;
+}
+
+.oz-zone-card {
+    display: grid;
+    grid-template-columns: 34px 1fr;
+    gap: 8px;
+    padding: 9px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    background: rgba(245, 247, 249, 0.96);
+}
+
+.oz-zone-card-icon {
+    display: grid;
+    place-items: center;
+    font-size: 22px;
+}
+
+.oz-zone-card-content {
+    min-width: 0;
+}
+
+.oz-zone-card-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.oz-zone-card-count {
+    min-width: 22px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    text-align: center;
+    color: #fff;
+    background: #394958;
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.oz-zone-card-headline {
+    margin-top: 2px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.oz-zone-card-details {
+    margin-top: 3px;
+    color: #57616c;
+    font-size: 11px;
+    line-height: 1.35;
+}
+
+.oz-zone-popup-actions {
+    margin-top: 12px;
+}
+
+.oz-zone-action {
+    width: 100%;
+    padding: 9px 12px;
+    border: 0;
+    border-radius: 9px;
+    color: #fff;
+    background: #263c57;
+    font-weight: 750;
+    cursor: pointer;
+}
+
+.oz-zone-action:hover {
+    background: #182a40;
+}
+
+.oz-zone-popup-coordinates {
+    margin-top: 8px;
+    color: #7c858e;
+    font-size: 10px;
+    text-align: right;
+}
 
 /* =========================================================
    COLORS
@@ -4125,21 +4256,18 @@ HIGHLIGHT / PULSE
 .outzen-alert-button--crowd {
     color: #ff2b2b !important;
     background: radial-gradient( circle at 50% 50%, rgba(255,43,43,.40), rgba(50,0,0,.85) ) !important;
-    /*box-shadow: 0 0 0 9px #170404, 0 0 0 15px #b6b6b6, 0 0 0 19px #202020, 0 0 22px rgba(255,0,0,.75), 0 0 52px rgba(255,0,0,.35), 0 12px 26px rgba(0,0,0,.62), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 26px rgba(0,0,0,.72) !important;*/
 }
 
 /* Weather - turquoise / cyan */
 .outzen-alert-button--weather {
     color: #00f7ff !important;
     background: radial-gradient( circle at 50% 50%, rgba(0,247,255,.40), rgba(0,40,50,.85) ) !important;
-    /*box-shadow: 0 0 0 9px #03191c, 0 0 0 15px #c8ffff, 0 0 0 19px #073035, 0 0 24px rgba(0,255,255,.88), 0 0 58px rgba(0,255,255,.45), 0 12px 26px rgba(0,0,0,.62), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 26px rgba(0,0,0,.72) !important;*/
 }
 
 /* Traffic - orange / amber */
 .outzen-alert-button--traffic {
     color: #ff9800 !important;
     background: radial-gradient( circle at 50% 50%, rgba(255,152,0,.40), rgba(55,25,0,.85) ) !important;
-    /*box-shadow: 0 0 0 9px #1d1002, 0 0 0 15px #ffd38a, 0 0 0 19px #2b1601, 0 0 24px rgba(255,152,0,.88), 0 0 58px rgba(255,152,0,.48), 0 12px 26px rgba(0,0,0,.62), inset 0 12px 20px rgba(255,255,255,.35), inset 0 -18px 26px rgba(0,0,0,.72) !important;*/
 }
 
 /* =========================================================
@@ -4383,12 +4511,10 @@ HIGHLIGHT / PULSE
     display: block;
     width: 100%;
     text-align: center;
-    /*margin-bottom: 4px;*/
     color: #00f7ff;
     font-size: .95rem;
     font-weight: 900;
     letter-spacing: .22em;
-    /*text-align: center;*/
     text-transform: uppercase;
     text-shadow: 0 0 10px rgba(0,247,255,.8), 0 0 25px rgba(0,247,255,.5);
 }
@@ -4408,20 +4534,12 @@ HIGHLIGHT / PULSE
 .critical-alert-panel.alert-cluster .outzen-alert-button {
     width: 120px !important;
     height: 120px !important;
-    /*min-width: 126px !important;
-    min-height: 126px !important;*/
     position: relative !important;
-    /*display: grid !important;*/
-    /*place-items: center !important;*/
     border-radius: 50% !important;
     border: 3px solid currentColor !important;
-    /*padding: 0 !important;*/
-    /*margin: 0 !important;*/
     color: white !important;
     background: rgba(10,15,25,.65) !important;
     overflow: visible !important;
-    /*isolation: isolate !important;*/
-    /*cursor: pointer !important;*/
     box-shadow: 0 0 12px currentColor, 0 0 28px currentColor, inset 0 0 18px rgba(255,255,255,.08);
     animation: outzenPulse 2s infinite ease-in-out;
 }
@@ -4433,11 +4551,8 @@ HIGHLIGHT / PULSE
         inset: -12px;
         border-radius: 50%;
         border: 2px solid currentColor;
-        /*background: conic-gradient( from 0deg, transparent 0deg, currentColor 35deg, transparent 75deg, transparent 135deg, currentColor 180deg, transparent 235deg, transparent 300deg, currentColor 340deg, transparent 360deg ) !important;*/
         opacity: .6;
-        /*filter: drop-shadow(0 0 10px currentColor) !important;*/
         animation: outzenHudRotate 5s linear infinite;
-        /*z-index: -1 !important;*/
     }
 
     /* discreet reflection */
@@ -4450,9 +4565,7 @@ HIGHLIGHT / PULSE
         height: 18px;
         border-radius: 999px;
         background: rgba(255,255,255,.30);
-        /*filter: blur(1px) !important;*/
         transform: rotate(-20deg);
-        /*pointer-events: none !important;*/
     }
 
 /* Text */
@@ -4487,10 +4600,6 @@ HIGHLIGHT / PULSE
     text-transform: uppercase !important;
     color: #fff !important;
     text-shadow: 0 2px 4px rgba(0,0,0,.9), 0 0 10px currentColor !important;
-}
-
-.critical-alert-panel.alert-cluster:hover {
-    box-shadow: 0 0 35px rgba(0,247,255,.35), 0 0 90px rgba(0,247,255,.20), inset 0 0 35px rgba(255,255,255,.05);
 }
 
 .critical-alert-panel.alert-cluster .outzen-alert-label--traffic {
@@ -4561,16 +4670,6 @@ HIGHLIGHT / PULSE
     box-shadow: 0 0 14px rgba(0,247,255,.22), inset 0 0 10px rgba(255,255,255,.06) !important;
 }
 
-/* Animations */
-/*@keyframes outzenHudPulse {
-    0%, 100% {
-        box-shadow: 0 0 10px currentColor, 0 0 24px currentColor, inset 0 0 18px rgba(255,255,255,.12), inset 0 -18px 28px rgba(0,0,0,.62);
-    }
-
-    50% {
-        box-shadow: 0 0 18px currentColor, 0 0 42px currentColor, 0 0 68px rgba(0,247,255,.28), inset 0 0 22px rgba(255,255,255,.16), inset 0 -18px 28px rgba(0,0,0,.62);
-    }
-}*/
 @keyframes outzenPulse {
 
     0%,100% {
@@ -4612,31 +4711,6 @@ HIGHLIGHT / PULSE
         transform: scale(.68) !important;
     }
 }
-
-/* =========================================================
-   OUTZEN CONTROL CENTER
-   HUD / CYBERPUNK / SATELLITE STYLE
-   ========================================================= */
-
-/*.critical-alert-panel.alert-cluster {
-    position: fixed !important;
-    right: 30px !important;
-    top: 120px !important;
-    width: 380px !important;
-    padding: 20px !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    gap: 16px !important;
-    border-radius: 28px !important;
-    background: linear-gradient( 180deg, rgba(0,247,255,.08), rgba(0,0,0,.25) ) !important;
-    backdrop-filter: blur(12px) !important;
-    -webkit-backdrop-filter: blur(12px) !important;
-    border: 1px solid rgba(0,247,255,.55) !important;
-    z-index: 999999999 !important;
-    isolation: isolate !important;
-    box-shadow: 0 0 30px rgba(0,247,255,.35), 0 0 80px rgba(0,247,255,.18), inset 0 0 25px rgba(0,247,255,.12) !important;
-}*/
 
 /* =========================================================
    OUTZEN CONTROL CENTER — FLOATING / DRAGGABLE
@@ -4768,10 +4842,6 @@ HIGHLIGHT / PULSE
     gap: 8px !important;
 }
 
-/* =========================================================
-   OUTZEN CONTROL CENTER — COMPACT / EXPAND ON HOVER
-   ========================================================= */
-
 /* compact state */
 .critical-alert-panel.alert-cluster {
     width: 190px !important;
@@ -4784,7 +4854,6 @@ HIGHLIGHT / PULSE
 }
 
     /* deployed state */
-    .critical-alert-panel.alert-cluster:hover,
     .critical-alert-panel.alert-cluster.is-expanded {
         width: 390px !important;
         min-width: 390px !important;
@@ -4848,7 +4917,7 @@ HIGHLIGHT / PULSE
     }
 
     /* deployed state */
-    .critical-alert-panel.alert-cluster:hover .outzen-alert-button,
+    .outzen-alert-button,
     .critical-alert-panel.alert-cluster.is-expanded .outzen-alert-button {
         opacity: 1 !important;
         position: relative !important;
@@ -4856,7 +4925,7 @@ HIGHLIGHT / PULSE
         pointer-events: auto !important;
     }
 
-    .critical-alert-panel.alert-cluster:hover .critical-alert-infos,
+    .critical-alert-infos,
     .critical-alert-panel.alert-cluster.is-expanded .critical-alert-infos {
         opacity: 1 !important;
         max-height: 120px !important;
@@ -5147,26 +5216,12 @@ HIGHLIGHT / PULSE
     min-height: 430px;
 }
 
-.alert-cluster:hover .alert-cluster-grid,
-.alert-cluster:focus-within .alert-cluster-grid {
-    width: 280px;
-    height: 280px;
-}
-
 .alert-cluster:hover .alert-main,
 .alert-cluster:focus-within .alert-main {
     grid-column: auto;
     grid-row: auto;
     transform: scale(1);
 }
-
-/*.alert-cluster:hover .alert-secondary,
-.alert-cluster:focus-within .alert-secondary {
-    opacity: 1;
-    pointer-events: auto;
-    transform: scale(1);
-    filter: blur(0);
-}*/
 
 .alert-cluster-hint {
     margin-top: 8px;
@@ -5978,7 +6033,7 @@ HIGHLIGHT / PULSE
     text-shadow: 0 0 10px rgba(0, 255, 255, .8) !important;
 }
 
-.critical-alert-panel.alert-cluster:hover .alert-cluster-hint,
+.alert-cluster-hint,
 .critical-alert-panel.alert-cluster:focus-within .alert-cluster-hint {
     opacity: 1 !important;
 }
@@ -6725,7 +6780,7 @@ HIGHLIGHT / PULSE
 }
 
 /* Neutralize all old hover behavior */
-.critical-alert-panel.alert-cluster:hover .alert-secondary,
+.alert-secondary,
 .critical-alert-panel.alert-cluster:focus-within .alert-secondary {
     pointer-events: inherit !important;
 }
@@ -6892,6 +6947,492 @@ HIGHLIGHT / PULSE
     .critical-alert-panel.alert-cluster .outzen-alert-label--disaster {
         font-size: .62rem !important;
     }
+}
+
+/* =========================================================
+   OUTZEN BUNDLES — FINAL OVERRIDES
+   ========================================================= */
+
+:root {
+    --oz-bundle-size: 48px;
+}
+
+.leaflet-marker-icon.oz-bundle-icon {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    max-width: 48px !important;
+    max-height: 48px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: visible !important;
+    background: transparent !important;
+    border: 0 !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-marker {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-width: 3px;
+    border-style: solid;
+    border-radius: 50%;
+    color: #fff;
+    background: radial-gradient( circle at 35% 25%, #293645 0%, #111820 58%, #080c11 100% );
+    box-shadow: 0 0 0 2px rgba(255,255,255,.86), 0 5px 12px rgba(0,0,0,.42);
+    transition: transform 150ms ease, filter 150ms ease;
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-marker:hover {
+    transform: scale(1.08);
+    filter: brightness(1.12);
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-count {
+    font-size: 16px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-types {
+    position: absolute;
+    left: 50%;
+    top: 35px;
+    display: flex;
+    gap: 2px;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-type,
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-more {
+    min-width: 20px;
+    height: 17px;
+    padding: 0 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    border: 1px solid rgba(255,255,255,.78);
+    border-radius: 9px;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1;
+    box-shadow: 0 2px 4px rgba(0,0,0,.38);
+}
+
+/* Low zoom: total only */
+
+.leaflet-marker-icon
+.oz-bundle-icon--compact
+.oz-zone-marker {
+    width: 34px;
+    height: 34px;
+    border-width: 3px;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.82), 0 4px 9px rgba(0,0,0,.38);
+}
+
+.leaflet-marker-icon
+.oz-bundle-icon--compact
+.oz-zone-count {
+    font-size: 14px;
+}
+
+.leaflet-marker-icon
+.oz-bundle-icon--compact
+.oz-zone-types {
+    display: none !important;
+}
+
+/* Intermediate zoom */
+
+.leaflet-marker-icon
+.oz-bundle-icon--medium
+.oz-zone-marker {
+    width: 38px;
+    height: 38px;
+}
+
+.leaflet-marker-icon
+.oz-bundle-icon--medium
+.oz-zone-count {
+    font-size: 15px;
+}
+
+.leaflet-marker-icon
+.oz-bundle-icon--medium
+.oz-zone-types {
+    top: 32px;
+}
+
+/* Severity */
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-sev-1 {
+    border-color: #35b65d;
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-sev-2 {
+    border-color: #e0b323;
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-sev-3 {
+    border-color: #f18420;
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-sev-4 {
+    border-color: #e23434;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.9), 0 5px 13px rgba(0,0,0,.45), 0 0 13px rgba(226,52,52,.65);
+}
+
+/* The popup and its actions must remain clickable */
+
+.leaflet-popup-pane,
+.leaflet-popup,
+.leaflet-popup-content-wrapper,
+.leaflet-popup-content,
+.oz-zone-popup,
+.oz-zone-popup-actions,
+.oz-zone-action {
+    pointer-events: auto !important;
+}
+
+.oz-zone-action {
+    cursor: pointer !important;
+    touch-action: manipulation;
+}
+
+/* =========================================================
+   OUTZEN CONTROL CENTER
+   Fixed on hover — deployment only with .is-expanded
+   ========================================================= */
+
+/*
+ * Compact state.
+ * Hovering and focusing never change its dimensions.
+ */
+.critical-alert-panel.alert-cluster:not(.is-expanded),
+.critical-alert-panel.alert-cluster:not(.is-expanded):hover,
+.critical-alert-panel.alert-cluster:not(.is-expanded):focus-within {
+    box-sizing: border-box !important;
+    width: 190px !important;
+    min-width: 190px !important;
+    max-width: 190px !important;
+    height: 210px !important;
+    min-height: 210px !important;
+    max-height: 210px !important;
+    /*
+     * Above all, do not animate width and height anymore.
+     */
+    transition: box-shadow 0.25s ease, background 0.25s ease, border-color 0.25s ease !important;
+}
+
+/*
+ * Deployed state.
+ * Only the class added by the double-click can activate it.
+ */
+.critical-alert-panel.alert-cluster.is-expanded,
+.critical-alert-panel.alert-cluster.is-expanded:hover,
+.critical-alert-panel.alert-cluster.is-expanded:focus-within {
+    box-sizing: border-box !important;
+    width: 390px !important;
+    min-width: 390px !important;
+    max-width: 390px !important;
+    height: 460px !important;
+    min-height: 460px !important;
+    max-height: 460px !important;
+    background: rgba(8, 12, 24, 0.96) !important;
+    box-shadow: 0 0 35px rgba(0, 247, 255, 0.35), 0 0 90px rgba(0, 247, 255, 0.20), inset 0 0 35px rgba(255, 255, 255, 0.05) !important;
+}
+
+/*
+ * The compact title remains identical with or without hover.
+ */
+.critical-alert-panel.alert-cluster:not(.is-expanded)::before,
+.critical-alert-panel.alert-cluster:not(.is-expanded):hover::before,
+.critical-alert-panel.alert-cluster:not(.is-expanded):focus-within::before {
+    opacity: 0.65 !important;
+    transform: none !important;
+    font-size: 0.72rem !important;
+    letter-spacing: 0.12em !important;
+}
+
+/*
+ * Disables the old pseudo-element text.
+ * "hover to deploy".
+ * The actual "DOUBLE-CLICK TO DEPLOY" text already exists in Razor.
+ */
+.critical-alert-panel.alert-cluster:not(.is-expanded)::after {
+    content: none !important;
+    display: none !important;
+}
+
+/*
+ * Secondary buttons remain hidden,
+ * even when the mouse hovers over the panel.
+ */
+.critical-alert-panel.alert-cluster:not(.is-expanded) .alert-secondary,
+.critical-alert-panel.alert-cluster:not(.is-expanded):hover .alert-secondary,
+.critical-alert-panel.alert-cluster:not(.is-expanded):focus-within .alert-secondary {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    position: absolute !important;
+    transform: scale(0.35) translateY(-60px) !important;
+    filter: blur(4px) !important;
+}
+
+/*
+ * The main button remains centered and stable.
+ */
+.critical-alert-panel.alert-cluster:not(.is-expanded) .alert-main,
+.critical-alert-panel.alert-cluster:not(.is-expanded):hover .alert-main,
+.critical-alert-panel.alert-cluster:not(.is-expanded):focus-within .alert-main {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    position: relative !important;
+    transform: scale(1.05) !important;
+    filter: none !important;
+}
+
+/*
+ * The information remains hidden in compact mode,
+ * including on hover and focus.
+ */
+.critical-alert-panel.alert-cluster:not(.is-expanded) .critical-alert-infos,
+.critical-alert-panel.alert-cluster:not(.is-expanded):hover .critical-alert-infos,
+.critical-alert-panel.alert-cluster:not(.is-expanded):focus-within .critical-alert-infos {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+}
+
+/*
+ * Content visible only after double-clicking.
+ */
+.critical-alert-panel.alert-cluster.is-expanded .alert-secondary {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    position: relative !important;
+    transform: scale(1) translateY(0) !important;
+    filter: none !important;
+}
+
+.critical-alert-panel.alert-cluster.is-expanded .critical-alert-infos {
+    opacity: 1 !important;
+    visibility: visible !important;
+    max-height: 180px !important;
+    pointer-events: auto !important;
+}
+
+/*
+ * The hint remains stable on hover.
+ */
+.critical-alert-panel.alert-cluster .alert-cluster-hint,
+.critical-alert-panel.alert-cluster:focus-within .alert-cluster-hint {
+    opacity: 1 !important;
+    transform: none !important;
+}
+
+/* =========================================================
+   OUTZEN CONTROL CENTER — FINAL COMPACT STABILITY V3
+   No internal expansion on hover
+   ========================================================= */
+
+/*
+ * The compact panel retains exactly the same ones
+ * dimensions at rest, on hover, and on focus.
+ */
+.critical-alert-panel.alert-cluster:not(.is-expanded),
+.critical-alert-panel.alert-cluster:not(.is-expanded):hover,
+.critical-alert-panel.alert-cluster:not(.is-expanded):focus-within {
+    box-sizing: border-box !important;
+    width: 190px !important;
+    min-width: 190px !important;
+    max-width: 190px !important;
+    /*
+     * 210px was too small for :
+     * - the title ;
+     * - the 132 px button ;
+     * - the hint ;
+     * - the margins and paddings.
+     */
+    height: 240px !important;
+    min-height: 240px !important;
+    max-height: 240px !important;
+    padding: 12px 14px 10px !important;
+    gap: 6px !important;
+    /*
+     * Prevent any old animated element from visually escaping
+     * the panel.
+     */
+    overflow: hidden !important;
+    transition: box-shadow 0.25s ease, background 0.25s ease, border-color 0.25s ease !important;
+}
+
+    /*
+ * The title remains stable.
+ */
+    .critical-alert-panel.alert-cluster:not(.is-expanded)
+    .alert-cluster-header,
+    .critical-alert-panel.alert-cluster:not(.is-expanded):hover
+    .alert-cluster-header,
+    .critical-alert-panel.alert-cluster:not(.is-expanded):focus-within
+    .alert-cluster-header {
+        flex: 0 0 auto !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1.1 !important;
+        transform: none !important;
+    }
+
+    .critical-alert-panel.alert-cluster:not(.is-expanded)
+    .alert-cluster-grid,
+    .critical-alert-panel.alert-cluster:not(.is-expanded):hover
+    .alert-cluster-grid,
+    .critical-alert-panel.alert-cluster:not(.is-expanded):focus-within
+    .alert-cluster-grid {
+        flex: 0 0 142px !important;
+        width: 100% !important;
+        min-width: 100% !important;
+        max-width: 100% !important;
+        height: 142px !important;
+        min-height: 142px !important;
+        max-height: 142px !important;
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        grid-template-rows: 1fr !important;
+        place-items: center !important;
+        gap: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        position: relative !important;
+        inset: auto !important;
+        transform: none !important;
+        overflow: visible !important;
+        transition: none !important;
+    }
+
+    /*
+ * The main button does not change its cell,
+ * size, or position on hover.
+ */
+    .critical-alert-panel.alert-cluster:not(.is-expanded)
+    .alert-main,
+    .critical-alert-panel.alert-cluster:not(.is-expanded):hover
+    .alert-main,
+    .critical-alert-panel.alert-cluster:not(.is-expanded):focus-within
+    .alert-main {
+        grid-column: 1 !important;
+        grid-row: 1 !important;
+        justify-self: center !important;
+        align-self: center !important;
+        position: relative !important;
+        inset: auto !important;
+        transform: none !important;
+        filter: none !important;
+        transition: box-shadow 0.2s ease, filter 0.2s ease !important;
+    }
+
+/*
+ * The hint has its own reserved line.
+ */
+.critical-alert-panel.alert-cluster
+.alert-cluster-hint,
+.critical-alert-panel.alert-cluster:hover
+.alert-cluster-hint,
+.critical-alert-panel.alert-cluster:focus-within
+.alert-cluster-hint {
+    flex: 0 0 24px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: 24px !important;
+    min-height: 24px !important;
+    max-height: 24px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: static !important;
+    inset: auto !important;
+    margin: 0 !important;
+    padding: 0 2px !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-align: center !important;
+    line-height: 1 !important;
+    /*
+     * The old .13em was too wide in 190 px.
+     */
+    letter-spacing: 0.06em !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+}
+
+/*
+ * Compact text.
+ */
+.critical-alert-panel.alert-cluster:not(.is-expanded)
+.alert-cluster-hint::after,
+.critical-alert-panel.alert-cluster:not(.is-expanded):hover
+.alert-cluster-hint::after,
+.critical-alert-panel.alert-cluster:not(.is-expanded):focus-within
+.alert-cluster-hint::after {
+    content: "DOUBLE-CLICK TO DEPLOY" !important;
+    display: block !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+    font-size: 0.58rem !important;
+    font-weight: 900 !important;
+    line-height: 1 !important;
+    letter-spacing: 0.06em !important;
+    transform: none !important;
+}
+
+/*
+ * The pointerleave has been removed:
+ * the deployed message must therefore refer to the double-click,
+ * not a mouse movement.
+ */
+.critical-alert-panel.alert-cluster.is-expanded
+.alert-cluster-hint::after {
+    content: "DOUBLE-CLICK TO RETRACT" !important;
+    display: block !important;
+    max-width: 100% !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    font-size: 0.64rem !important;
+    line-height: 1 !important;
+    letter-spacing: 0.08em !important;
 }
 
 

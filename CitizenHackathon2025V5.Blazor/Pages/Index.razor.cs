@@ -49,7 +49,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         protected override bool EnableCluster => false;
         protected override bool EnableWeatherLegend => true;
         protected override int DefaultZoom => 12;
-        protected override int HybridThreshold => 13;
+        protected override int HybridThreshold => 14;
         protected override bool ForceBootOnFirstRender => false;
         protected override bool ResetMarkersOnBoot => false;
         private bool _criticalDisasterSending;
@@ -194,32 +194,83 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         }
         protected override async Task SeedAsync(bool fit)
         {
+            Console.WriteLine(
+                $"[HOME][Seed] fit={fit}, " +
+                $"events={_events.Count}, " +
+                $"places={_places.Count}, " +
+                $"crowds={_crowds.Count}, " +
+                $"traffic={_traffic.Count}, " +
+                $"weather={_weather.Count}, " +
+                $"suggestions={_suggestions.Count}");
             var payload = new
             {
                 events = _events,
-                places = Array.Empty<object>(),
+
+                // Use _places only if you wish
+                // display them in the homepage areas.
+                places = _places,
+
                 crowds = _crowds,
                 suggestions = _suggestions,
                 traffic = _traffic,
                 weather = _weather,
+
                 gpt = Array.Empty<object>()
             };
 
-            await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateBundleMarkers", payload, 80, ScopeKey);
+            // 0 = adaptive tolerance based on the zoom level.
+            await JS.InvokeVoidAsync(
+                "OutZenInterop.addOrUpdateBundleMarkers",
+                payload,
+                0,
+                ScopeKey);
 
             var nowUtc = DateTime.UtcNow;
-            var todayCalendar = _allCal.Where(x => IsNowActive(x, nowUtc)).ToList();
 
-            await JS.InvokeVoidAsync("OutZenInterop.upsertCrowdCalendarMarkers", todayCalendar, ScopeKey);
+            var todayCalendar = _allCal
+                .Where(x => IsNowActive(x, nowUtc))
+                .ToList();
 
-            Console.WriteLine($"[HOME][Calendar] Seeded calendar markers: {todayCalendar.Count}");
+            await JS.InvokeVoidAsync(
+                "OutZenInterop.upsertCrowdCalendarMarkers",
+                todayCalendar,
+                ScopeKey);
 
             if (fit)
             {
-                //try { await JS.InvokeVoidAsync("OutZenInterop.fitToBundles", ScopeKey, new { maxZoom = 16 }); } catch { }
-                try { await JS.InvokeVoidAsync("OutZenInterop.fitToMarkers", ScopeKey, new { maxZoom = 16 }); } catch { }
-                try { await JS.InvokeVoidAsync("OutZenInterop.activateHybridAndZoom", ScopeKey, HybridThreshold); } catch { }
-                try { await JS.InvokeVoidAsync("OutZenInterop.refreshHybridNow", ScopeKey); } catch { }
+                try
+                {
+                    await JS.InvokeVoidAsync(
+                        "OutZenInterop.fitToAllMarkers",
+                        ScopeKey,
+                        new { maxZoom = 16 });
+                }
+                catch
+                {
+                    // Loading the map must not fail.
+                    // solely because of a zoom adjustment.
+                }
+
+                try
+                {
+                    await JS.InvokeVoidAsync(
+                        "OutZenInterop.activateHybridAndZoom",
+                        ScopeKey,
+                        HybridThreshold);
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    await JS.InvokeVoidAsync(
+                        "OutZenInterop.refreshHybridNow",
+                        ScopeKey);
+                }
+                catch
+                {
+                }
             }
         }
         private async Task SendCriticalCrowdAlertAsync()
@@ -564,59 +615,245 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         }
         private async Task RefreshHomeDataAsync(bool fit = false)
         {
-            if (_disposed) return;
-            if (!IsMapBooted) return;
+            if (_disposed || !IsMapBooted)
+                return;
 
             if (!await _homeRefreshLock.WaitAsync(0))
+            {
+                Console.WriteLine(
+                    "[HOME][Refresh] skipped: " +
+                    "another refresh is running.");
+
                 return;
+            }
 
             try
             {
-                var trafficTask = TrafficConditionService.GetLatestTrafficConditionAsync();
-                var crowdTask = CrowdInfoService.GetLatestCrowdInfoNonNullAsync();
-                var eventTask = EventService.GetLatestEventAsync();
-                var suggestionTask = SuggestionService.GetLatestSuggestionAsync();
-                var weatherTask = WeatherForecastService.GetLatestWeatherForecastAsync();
+                var trafficTask =
+                    TrafficConditionService
+                        .GetLatestTrafficConditionAsync();
+
+                var crowdTask =
+                    CrowdInfoService
+                        .GetLatestCrowdInfoNonNullAsync();
+
+                var eventTask =
+                    EventService
+                        .GetLatestEventAsync();
+
+                var suggestionTask =
+                    SuggestionService
+                        .GetLatestSuggestionAsync();
+
+                var placeTask =
+                    PlaceService
+                        .GetLatestPlaceAsync();
+
+                var weatherTask =
+                    WeatherForecastService
+                        .GetLatestWeatherForecastAsync();
+
+                var calendarTask =
+                    CrowdInfoCalendarService
+                        .GetAllSafeAsync();
 
                 await Task.WhenAll(
                     trafficTask,
                     crowdTask,
                     eventTask,
                     suggestionTask,
-                    weatherTask
-                );
+                    placeTask,
+                    weatherTask,
+                    calendarTask);
 
-                static bool HasValidCoord(double lat, double lng)
-                    => lat is >= 49.45 and <= 51.6 && lng is >= 2.3 and <= 6.6;
+                static bool HasValidCoord(
+                    double latitude,
+                    double longitude)
+                {
+                    return
+                        latitude is >= 49.45 and <= 51.6 &&
+                        longitude is >= 2.3 and <= 6.6;
+                }
 
-                _traffic = trafficTask.Result ?? new();
-                _crowds = (crowdTask.Result ?? new())
-                    .Where(c => HasValidCoord(c.Latitude, c.Longitude))
-                    .Where(c => !IsStaleManualCriticalAlert(c))
+                var nextTraffic =
+                    trafficTask.Result?
+                        .ToList()
+                    ?? new List<ClientTrafficConditionDTO>();
+
+                var nextCrowds =
+                    (crowdTask.Result
+                        ?? Enumerable.Empty<ClientCrowdInfoDTO>())
+                    .Where(c =>
+                        HasValidCoord(
+                            c.Latitude,
+                            c.Longitude))
+                    .Where(c =>
+                        !IsStaleManualCriticalAlert(c))
                     .ToList();
 
-                _events = (eventTask.Result ?? Enumerable.Empty<ClientEventDTO>())
-                    .Where(e => HasValidCoord(e.Latitude, e.Longitude))
+                var nextEvents =
+                    (eventTask.Result
+                        ?? Enumerable.Empty<ClientEventDTO>())
+                    .Where(e =>
+                        HasValidCoord(
+                            e.Latitude,
+                            e.Longitude))
                     .ToList();
 
-                _suggestions = (suggestionTask.Result ?? Enumerable.Empty<ClientSuggestionDTO>())
+                var nextSuggestions =
+                    (suggestionTask.Result
+                        ?? Enumerable.Empty<ClientSuggestionDTO>())
                     .ToList();
 
-                _weather = (weatherTask.Result ?? Enumerable.Empty<ClientWeatherForecastDTO>())
+                var nextPlaces =
+                    (placeTask.Result
+                        ?? Enumerable.Empty<ClientPlaceDTO>())
+                    .Where(p =>
+                        HasValidCoord(
+                            p.Latitude,
+                            p.Longitude))
                     .ToList();
 
+                var nextWeather = (weatherTask.Result ?? Enumerable.Empty<ClientWeatherForecastDTO>()).ToList();
+
+                var nextCalendar = calendarTask.Result?.ToList() ?? new List<ClientCrowdInfoCalendarDTO>();
+
+
+                var incomingTotal =
+                    nextTraffic.Count +
+                    nextCrowds.Count +
+                    nextEvents.Count +
+                    nextSuggestions.Count +
+                    nextPlaces.Count +
+                    nextWeather.Count;
+
+                var currentTotal =
+                    _traffic.Count +
+                    _crowds.Count +
+                    _events.Count +
+                    _suggestions.Count +
+                    _places.Count +
+                    _weather.Count;
+
+                Console.WriteLine(
+                    "[HOME][Refresh] incoming: " +
+                    $"traffic={nextTraffic.Count}, " +
+                    $"crowds={nextCrowds.Count}, " +
+                    $"events={nextEvents.Count}, " +
+                    $"suggestions={nextSuggestions.Count}, " +
+                    $"places={nextPlaces.Count}, " +
+                    $"weather={nextWeather.Count}, " +
+                    $"calendar={nextCalendar.Count}");
+
+                /*
+                 * Protection principale :
+                 * une panne générale ne doit jamais effacer
+                 * une carte déjà remplie.
+                 */
+                if (
+                    incomingTotal == 0 &&
+                    currentTotal > 0)
+                {
+                    Console.Error.WriteLine(
+                        "[HOME][Refresh] all endpoints " +
+                        "returned empty results; " +
+                        "previous map data preserved.");
+
+                    return;
+                }
+
+                _traffic =
+                    KeepPreviousWhenEmpty(
+                        _traffic,
+                        nextTraffic,
+                        "traffic");
+
+                _crowds =
+                    KeepPreviousWhenEmpty(
+                        _crowds,
+                        nextCrowds,
+                        "crowds");
+
+                _events =
+                    KeepPreviousWhenEmpty(
+                        _events,
+                        nextEvents,
+                        "events");
+
+                /*
+                 * Une liste de suggestions vide peut être
+                 * parfaitement normale.
+                 */
+                _suggestions =
+                    nextSuggestions;
+
+                _places =
+                    KeepPreviousWhenEmpty(
+                        _places,
+                        nextPlaces,
+                        "places");
+
+                _weather = KeepPreviousWhenEmpty(_weather, nextWeather, "weather");
+
+                /*
+                 * Do not replace an existing calendar with a
+                 * empty list potentially caused by an API error.
+                 */
+                if (nextCalendar.Count > 0)
+                {
+                    _allCal = nextCalendar;
+
+                    Console.WriteLine(
+                        $"[HOME][Refresh] " +
+                        $"calendar={_allCal.Count}");
+                }
+                else if (_allCal.Count > 0)
+                {
+                    Console.WriteLine(
+                        "[HOME][Refresh] " +
+                        "calendar=0; preserving " +
+                        $"{_allCal.Count} previous item(s).");
+                }
+
+                /*
+                 * SeedAsync uses _allCal to select the
+                 * currently active calendar markers.
+                 */
                 await SeedAsync(fit);
 
                 await LoadLatestCrowdSafetyAlertsAsync();
 
-                try { await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey); } catch { }
-                try { await JS.InvokeVoidAsync("OutZenInterop.refreshHybridNow", ScopeKey); } catch { }
+                try
+                {
+                    await JS.InvokeVoidAsync(
+                        "OutZenInterop.refreshMapSize",
+                        ScopeKey);
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    await JS.InvokeVoidAsync(
+                        "OutZenInterop.refreshHybridNow",
+                        ScopeKey);
+                }
+                catch
+                {
+                }
 
                 await InvokeAsync(StateHasChanged);
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"[HOME] RefreshHomeDataAsync failed: {ex}");
+                /*
+                 * Les anciennes collections restent intactes,
+                 * car les affectations ont lieu seulement
+                 * après Task.WhenAll.
+                 */
+                Console.Error.WriteLine(
+                    $"[HOME] RefreshHomeDataAsync failed: {ex}");
             }
             finally
             {
@@ -673,24 +910,60 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
         private void StartCalendarTimer()
         {
-            _timer ??= new PeriodicTimer(TimeSpan.FromSeconds(15));
+            if (_timerStarted)
+                return;
+
             _timerStarted = true;
 
-            _ = Task.Run(async () =>
+            _timer = new PeriodicTimer(
+                TimeSpan.FromSeconds(15));
+
+            _ = RunHomeRefreshLoopAsync();
+        }
+
+        private async Task RunHomeRefreshLoopAsync()
+        {
+            var ticksUntilFullRefresh = 4;
+
+            try
             {
-                while (_timerStarted && await _timer.WaitForNextTickAsync())
+                while (
+                    !_disposed &&
+                    _timerStarted &&
+                    _timer is not null &&
+                    await _timer.WaitForNextTickAsync())
                 {
-                    try
-                    {
-                        await InvokeAsync(async () =>
-                        {
-                            await RefreshCalendarMarkersNowAsync();
-                            await RefreshHomeDataAsync(fit: false);
-                        });
-                    }
-                    catch { }
+                    await InvokeAsync(
+                        RefreshCalendarMarkersNowAsync);
+
+                    ticksUntilFullRefresh--;
+
+                    /*
+                     * 4 × 15 secondes = 60 secondes.
+                     */
+                    if (ticksUntilFullRefresh > 0)
+                        continue;
+
+                    ticksUntilFullRefresh = 4;
+
+                    await InvokeAsync(
+                        () => RefreshHomeDataAsync(
+                            fit: false));
                 }
-            });
+            }
+            catch (ObjectDisposedException)
+            {
+                // Fermeture normale de la page.
+            }
+            catch (OperationCanceledException)
+            {
+                // Fermeture normale de la page.
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(
+                    $"[HOME] Refresh loop failed: {ex}");
+            }
         }
 
         private async Task RefreshCalendarMarkersNowAsync()
@@ -1252,6 +1525,22 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 timestampUtc < nowUtc.AddMinutes(-5);
 
             return isOldCriticalCrowd;
+        }
+
+        private static List<T> KeepPreviousWhenEmpty<T>(List<T> current, List<T> incoming, string category)
+        {
+            if (incoming.Count > 0)
+                return incoming;
+
+            if (current.Count == 0)
+                return incoming;
+
+            Console.WriteLine(
+                $"[HOME][Refresh] " +
+                $"{category}=0; preserving " +
+                $"{current.Count} previous item(s).");
+
+            return current;
         }
         private MarkupString FormatGptResponse(string text)
         {
