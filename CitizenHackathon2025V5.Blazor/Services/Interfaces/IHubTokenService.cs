@@ -3,10 +3,9 @@
     public interface IHubTokenService
     {
         Task<string?> GetHubTokenAsync(CancellationToken ct = default);
-        Task<string?> GetHubAccessTokenAsync();
+
     }
 }
-
 
 
 

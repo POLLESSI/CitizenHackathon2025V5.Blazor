@@ -136,7 +136,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             await RaiseStatusChangedAsync(started.Message ?? "Request accepted.");
 
             if (EnablePollingFallback)
-                StartPollingFallback(started.InteractionId, started.RequestId);
+            {
+                live.PollingCts?.Cancel();
+                live.PollingCts?.Dispose();
+
+                live.PollingCts = new CancellationTokenSource();
+
+                StartPollingFallback(
+                    started.InteractionId,
+                    started.RequestId,
+                    live.PollingCts.Token);
+            }
 
             return started;
         }
@@ -324,8 +334,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             HasReceivedHubEvent = true;
 
-            var live = _live.GetOrAdd(
-                dto.InteractionId,
+            var live = _live.GetOrAdd(dto.InteractionId,
                 _ => new LiveInteractionState(dto.InteractionId));
 
             live.HasReceivedHubEvent = true;
@@ -347,6 +356,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             live.Interaction.Response = live.ResponseBuffer.ToString();
 
             await RaiseInteractionUpdatedAsync(CloneInteraction(live.Interaction));
+
+            if (!string.IsNullOrEmpty(dto.Chunk))
+            {
+                live.HasReceivedResponseChunk = true;
+
+                live.PollingCts?.Cancel();
+                live.PollingCts?.Dispose();
+                live.PollingCts = null;
+            }
 
             if (dto.IsFinal)
             {
@@ -408,7 +426,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             await CompleteInteractionAsync(completed, source: "SignalR");
         }
 
-        private void StartPollingFallback(int interactionId, string? requestId)
+        private void StartPollingFallback(int interactionId, string? requestId, CancellationToken ct)
         {
             _ = Task.Run(
                 async () =>
@@ -418,12 +436,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                         await PollFallbackAsync(
                             interactionId,
                             requestId,
-                            CancellationToken.None);
+                            ct);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Normal shutdown of the fallback.
                     }
                     catch (Exception ex)
                     {
-                        Console.Error.WriteLine(
-                            $"[GptClientOrchestrator] Polling fallback task failed for interactionId={interactionId}: {ex}");
+                        Console.Error.WriteLine($"[GptClientOrchestrator] Polling fallback failed: {ex}");
                     }
                 },
                 CancellationToken.None);
@@ -551,6 +572,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 Status = "completed",
                 Message = "Generation completed."
             };
+
+            live.PollingCts?.Cancel();
+            live.PollingCts?.Dispose();
+            live.PollingCts = null;
 
             if (_currentInteractionId == dto.Id)
             {
@@ -744,6 +769,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             public bool IsCompleted { get; set; }
 
             public bool HasReceivedHubEvent { get; set; }
+            public bool HasReceivedResponseChunk { get; set; }
+
+            public CancellationTokenSource? PollingCts { get; set; }
         }
     }
 }

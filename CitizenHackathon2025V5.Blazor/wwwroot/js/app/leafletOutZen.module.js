@@ -922,36 +922,63 @@ export function removeCrowdMarker(id, scopeKey = null) {
 }
 
 export function clearCrowdMarkers(scopeKey = null) {
+
     const ready = ensureMapReady(scopeKey);
 
     if (!ready) {
+        console.warn("[clearCrowdMarkers] map not ready",
+            {
+                scopeKey:
+                    pickScopeKey(scopeKey)
+            });
+
         return false;
     }
 
     const { s } = ready;
 
-    for (const marker of s.markers.values()) {
+    let removed = 0;
+
+    for (const marker of Array.from(s.markers.values())) {
+
         clearManagedMarkerTimers(marker);
         removeLayerSmart(marker, s);
+
+        removed++;
     }
 
+    /*
+     * removeLayerSmart() normally removes each
+     * marker from the cluster. The clearLayers is an
+     * additional safety measure for this scope.
+     */
     try {
         s.cluster?.clearLayers?.();
-    } catch {
     }
+    catch {
+    }
+
+    console.log("[clearCrowdMarkers] completed",
+    {
+        scopeKey: pickScopeKey(scopeKey),
+
+        removed,
+
+        remaining: s.markers.size
+    });
 
     s.markers.clear();
 
     return true;
 }
+export function clearGeneralMarkers(scopeKey = null) {
 
-export function clearMarkersByPrefix(
-    prefix = "",
-    scopeKey = null) {
+    return clearCrowdMarkers( scopeKey);
+}
 
-    return pruneMarkersByPrefix(
-        prefix,
-        scopeKey);
+export function clearMarkersByPrefix(prefix = "", scopeKey = null) {
+
+    return pruneMarkersByPrefix(prefix, scopeKey);
 }
 
 export function addOrUpdatePlaceMarker(place, scopeKey = null) {
@@ -1026,76 +1053,315 @@ export function addOrUpdateWeatherMarkers(items, scopeKey = null) {
     return true;
 }
 
-export function addOrUpdateFullAlertMarker(alert, scopeKey = "home") {
-    const ready = ensureMapReady(scopeKey);
-    if (!ready) return false;
+export function addOrUpdateFullAlertMarker(
+    alert,
+    scopeKey = "home") {
 
-    const { k, s, L } = ready;
+    const ready =
+        ensureMapReady(scopeKey);
 
-    const ll = pickLatLng(alert);
-    if (!ll) return false;
+    if (!ready) {
+        console.warn(
+            "[FULL ALERT] map not ready",
+            { scopeKey }
+        );
 
-    const placeId = alert.PlaceId ?? alert.placeId ?? "unknown";
-    const key = `full-alert:${placeId}`;
-
-    const title = alert.PlaceName ?? alert.placeName ?? "FULL ALERT";
-    const declaredAtUtc = alert.DeclaredAtUtc ?? alert.declaredAtUtc ?? new Date().toISOString();
-    const expiresAtUtc = alert.ExpiresAtUtc ?? alert.expiresAtUtc;
-
-    const popupHtml = buildPopupHtml({
-        title: "🚨 FULL ALERT",
-        description: `${title} • declared at ${fmtTime(declaredAtUtc)} • expires at ${fmtTime(expiresAtUtc)}`
-    }, s);
-
-    const icon = L.divIcon({
-        className: "oz-full-alert-marker",
-        html: `
-        <div class="oz-full-alert-ring">
-            <div class="oz-full-alert-core">
-                <div class="oz-full-alert-title">FULL</div>
-                <div class="oz-full-alert-title">ALERT</div>
-            </div>
-        </div>
-    `.trim(),
-        iconSize: [86, 86],
-        iconAnchor: [43, 43],
-        popupAnchor: [0, -46]
-    });
-
-    let marker = s.markers.get(key);
-
-    if (marker) {
-        try { marker.setLatLng([ll.lat, ll.lng]); } catch { }
-        try { marker.setIcon(icon); } catch { }
-        try {
-            if (marker.getPopup()) marker.setPopupContent(popupHtml);
-            else safeBindPopup(marker, popupHtml);
-        } catch { }
-    } else {
-        marker = L.marker([ll.lat, ll.lng], {
-            icon,
-            title: "FULL ALERT",
-            riseOnHover: true,
-            zIndexOffset: 50000,
-            __ozNoCluster: true
-        });
-
-        safeBindPopup(marker, popupHtml);
-        addLayerSmart(marker, s);
-        s.markers.set(key, marker);
+        return false;
     }
 
-    const expiresMs = expiresAtUtc
-        ? new Date(expiresAtUtc).getTime()
-        : Date.now() + 5 * 60 * 1000;
+    const { k, s, L, map } = ready;
 
-    const delay = Math.max(1000, expiresMs - Date.now());
+    const ll = pickLatLng(alert);
 
-    clearTimeout(marker.__ozFullAlertTimer);
+    if (!ll) {
+        console.warn(
+            "[FULL ALERT] invalid coordinates",
+            alert
+        );
 
-    marker.__ozFullAlertTimer = setTimeout(() => {
-        try { removeCrowdMarker(key, k); } catch { }
-    }, delay);
+        return false;
+    }
+
+    const placeId =
+        alert.PlaceId ??
+        alert.placeId ??
+        "unknown";
+
+    const key =
+        `full-alert:${placeId}`;
+
+    const placeName =
+        alert.PlaceName ??
+        alert.placeName ??
+        "FULL ALERT";
+
+    const declaredAtUtc =
+        alert.DeclaredAtUtc ??
+        alert.declaredAtUtc ??
+        new Date().toISOString();
+
+    const expiresAtUtc =
+        alert.ExpiresAtUtc ??
+        alert.expiresAtUtc ??
+        new Date(
+            Date.now() +
+            5 * 60 * 1000
+        ).toISOString();
+
+    /*
+     * Pane independent of the bundles,
+     * clusters and detail markers.
+     */
+    ensureCustomPane(
+        map,
+        "ozCriticalAlertPane",
+        12000
+    );
+
+    const popupHtml =
+        buildPopupHtml(
+            {
+                title:
+                    "🚨 FULL ALERT",
+
+                description:
+                    `${placeName} • ` +
+                    `declared at ` +
+                    `${fmtTime(declaredAtUtc)} • ` +
+                    `expires at ` +
+                    `${fmtTime(expiresAtUtc)}`
+            },
+            s
+        );
+
+    const icon =
+        L.divIcon({
+            className:
+                "oz-full-alert-marker",
+
+            html: `
+                <div class="oz-full-alert-ring">
+                    <div class="oz-full-alert-core">
+                        <div class="oz-full-alert-title">
+                            FULL
+                        </div>
+
+                        <div class="oz-full-alert-title">
+                            ALERT
+                        </div>
+                    </div>
+                </div>
+            `.trim(),
+
+            iconSize: [86, 86],
+            iconAnchor: [43, 43],
+            popupAnchor: [0, -46]
+        });
+
+    let marker =
+        s.markers.get(key);
+
+    if (!marker) {
+        marker =
+            L.marker(
+                [ll.lat, ll.lng],
+                {
+                    icon,
+                    pane:
+                        "ozCriticalAlertPane",
+
+                    title:
+                        "FULL ALERT",
+
+                    riseOnHover:
+                        true,
+
+                    zIndexOffset:
+                        50000,
+
+                    __ozNoCluster:
+                        true
+                }
+            );
+
+        safeBindPopup(
+            marker,
+            popupHtml
+        );
+
+        s.markers.set(
+            key,
+            marker
+        );
+    }
+    else {
+        try {
+            marker.setLatLng([
+                ll.lat,
+                ll.lng
+            ]);
+        }
+        catch (error) {
+            console.error(
+                "[FULL ALERT] setLatLng failed",
+                error
+            );
+        }
+
+        try {
+            marker.setIcon(icon);
+        }
+        catch (error) {
+            console.error(
+                "[FULL ALERT] setIcon failed",
+                error
+            );
+        }
+
+        try {
+            marker.options.pane =
+                "ozCriticalAlertPane";
+
+            marker.options.zIndexOffset =
+                50000;
+        }
+        catch {
+        }
+
+        try {
+            if (marker.getPopup()) {
+                marker.setPopupContent(
+                    popupHtml
+                );
+            }
+            else {
+                safeBindPopup(
+                    marker,
+                    popupHtml
+                );
+            }
+        }
+        catch (error) {
+            console.error(
+                "[FULL ALERT] popup update failed",
+                error
+            );
+        }
+    }
+
+    /*
+     * Ne pas utiliser addLayerSmart ici :
+     * une alerte critique doit toujours être
+     * ajoutée directement à la carte.
+     */
+    try {
+        const hasLayer =
+            map.hasLayer(marker);
+
+        const hasElement =
+            !!marker.getElement?.();
+
+        /*
+         * Répare aussi le cas où Leaflet croit
+         * posséder le layer alors que son élément
+         * DOM n'existe plus.
+         */
+        if (hasLayer && !hasElement) {
+            map.removeLayer(marker);
+        }
+
+        if (!map.hasLayer(marker)) {
+            marker.addTo(map);
+        }
+    }
+    catch (error) {
+        console.error(
+            "[FULL ALERT] marker attachment failed",
+            {
+                key,
+                scopeKey: k,
+                latitude: ll.lat,
+                longitude: ll.lng,
+                error
+            }
+        );
+
+        return false;
+    }
+
+    const expiresMs =
+        new Date(
+            expiresAtUtc
+        ).getTime();
+
+    const effectiveExpiresMs =
+        Number.isFinite(expiresMs)
+            ? expiresMs
+            : Date.now() +
+            5 * 60 * 1000;
+
+    const delay =
+        Math.max(
+            1000,
+            effectiveExpiresMs -
+            Date.now()
+        );
+
+    clearTimeout(
+        marker.__ozFullAlertTimer
+    );
+
+    marker.__ozKind =
+        "full-alert";
+
+    marker.__ozFullAlertKey =
+        key;
+
+    marker.__ozFullAlertExpiresMs =
+        effectiveExpiresMs;
+
+    marker.__ozFullAlertTimer =
+        setTimeout(
+            () => {
+                try {
+                    removeCrowdMarker(
+                        key,
+                        k
+                    );
+                }
+                catch (error) {
+                    console.error(
+                        "[FULL ALERT] removal failed",
+                        error
+                    );
+                }
+            },
+            delay
+        );
+
+    requestAnimationFrame(() => {
+        console.log(
+            "[FULL ALERT] marker upserted",
+            {
+                key,
+                scopeKey: k,
+                mapHasLayer:
+                    map.hasLayer(marker),
+
+                elementExists:
+                    !!marker.getElement?.(),
+
+                elementClass:
+                    marker
+                        .getElement?.()
+                        ?.className ??
+                    null,
+
+                expiresAtUtc,
+                delay
+            }
+        );
+    });
 
     return true;
 }
@@ -1643,6 +1909,55 @@ export function addOrUpdateAntennaAlertCircle(alert, scopeKey = null) {
 
     if (!alert) return false;
 
+    const status =
+        String(
+            alert.Status ??
+            alert.status ??
+            ""
+        )
+            .trim()
+            .toLowerCase();
+
+    const confirmationCount =
+        Number(
+            alert.ConfirmationCount ??
+            alert.confirmationCount ??
+            0
+        );
+
+    const requestedRequiredCount =
+        Number(
+            alert.RequiredCount ??
+            alert.requiredCount ??
+            4
+        );
+
+    const requiredCount =
+        Math.max(
+            4,
+            Number.isFinite(
+                requestedRequiredCount)
+                ? requestedRequiredCount
+                : 4
+        );
+
+    if (
+        status !== "confirmed" ||
+        confirmationCount < requiredCount
+    ) {
+        console.info(
+            "[FULL ALERT] marker skipped: " +
+            "Incomplete confirmation",
+            {
+                status,
+                confirmationCount,
+                requiredCount
+            }
+        );
+
+        return false;
+    }
+
     const ll = pickLatLng(alert);
     if (!ll) return false;
 
@@ -1665,19 +1980,26 @@ export function addOrUpdateAntennaAlertCircle(alert, scopeKey = null) {
     const size = computeAntennaAlertSize(active);
 
     const title =
-        alert.Title ?? alert.title ?? "Alerte antenne";
+        alert.Title ?? alert.title ?? "On-air alert";
 
     const message =
-        alert.Message ?? alert.message ?? "Concentration critique détectée.";
+        alert.Message ?? alert.message ?? "Critical concentration detected.";
 
-    const popupHtml = buildPopupHtml({
-        title,
-        description:
-            `${message}\n` +
-            `Active connections : ${active}\n` +
-            `Unique devices : ${unique}\n` +
-            `Severity : ${severity}`
-    }, s);
+    const popupHtml =
+        buildPopupHtml(
+            {
+                title:
+                    "🚨 FULL ALERT CONFIRMED",
+
+                description:
+                    `${title} • ` +
+                    `${confirmationCount}/${requiredCount} ` +
+                    `distinct devices • ` +
+                    `declared at ${fmtTime(declaredAtUtc)} • ` +
+                    `expires at ${fmtTime(expiresAtUtc)}`
+            },
+            s
+        );
 
     const icon = L.divIcon({
         className: "oz-antenna-alert-marker",
@@ -2944,6 +3266,21 @@ function makeBadgeIcon(totalCount, severity = 1, b = null, zoom = 12) {
         ? `<span class="oz-zone-more">+${hiddenCategoryCount}</span>`
         : "";
 
+    const criticalCrowdCount =
+        (b?.crowds ?? [])
+            .filter(crowd =>
+                pickCrowdLevel(crowd) >= 4
+            )
+            .length;
+
+    const hasCriticalCrowd =
+        criticalCrowdCount > 0;
+
+    const criticalCrowdClass =
+        hasCriticalCrowd
+            ? "oz-bundle-icon--critical-crowd"
+            : "";
+
     const html = `
         <div class="oz-zone-marker oz-zone-sev-${severity}">
             <div class="oz-zone-count">${totalCount}</div>
@@ -2957,7 +3294,7 @@ function makeBadgeIcon(totalCount, severity = 1, b = null, zoom = 12) {
 
     return Leaflet.divIcon({
         className:
-            `oz-bundle-icon ${displayClass}`,
+            `oz-bundle-icon ${displayClass} ${criticalCrowdClass}`.trim(),
         html,
         iconSize: [48, 48],
         iconAnchor: [24, 24],
@@ -4404,7 +4741,7 @@ function shouldWarnMarker(kind, level, item = null, scopeKey = null) {
 
     switch (k) {
         case "crowd":
-            return lvl >= 2;
+            return lvl >= 4;
 
         case "event":
             return true;
@@ -4419,7 +4756,7 @@ function shouldWarnMarker(kind, level, item = null, scopeKey = null) {
             return lvl >= 2 || !!(item?.IsSevere ?? item?.isSevere);
 
         case "antenna":
-            return true;
+            return lvl >= 4;
 
         case "place":
             return true;
@@ -4575,6 +4912,8 @@ export function setLineChart(points, seriesLabel = "Série", scopeKey = null, ca
     s._wxChart.update("none");
     return true;
 }
+
+
 
 
 

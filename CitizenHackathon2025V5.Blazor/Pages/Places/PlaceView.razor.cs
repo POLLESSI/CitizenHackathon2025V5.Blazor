@@ -18,7 +18,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 {
     public partial class PlaceView 
     {
-#nullable disable
+    #nullable disable
         [Inject] public HttpClient Client { get; set; }
         [Inject] public PlaceService PlaceService { get; set; }
         [Inject] public NavigationManager Navigation { get; set; }
@@ -31,8 +31,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
         private const string ApiBase = "https://localhost:7254";
 
-        //private IJSObjectReference _outzen;
-        
         private bool _disposed;
 
         public HubConnection hubConnection { get; set; }
@@ -52,9 +50,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         // Optionnel
         protected override bool ForceBootOnFirstRender => true;
         protected override bool ResetMarkersOnBoot => true;
-        protected override OutZenMarkerPolicy MarkerPolicy => OutZenMarkerPolicy.OnlyPrefix;
-        protected override string AllowedMarkerPrefix => "place:";
-        protected override bool ClearAllOnMapReady => true;
+        protected override bool EnableHybrid => false;
+
+        protected override bool EnableCluster => true;
+
         private static string PlMarkerId(int id) => $"place:{id}";
         protected override async Task SeedAsync(bool fit)
         {
@@ -238,18 +237,33 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         }
         private async Task SyncMapMarkersAsync(bool fit = true)
         {
-            Console.WriteLine($"[PlaceView] SyncMapMarkersAsync: visiblePlaces={visiblePlaces.Count}, allPlaces={allPlaces.Count}");
+            if (IsDisposed)
+                return;
 
-            if (IsDisposed) return;
-            if (!IsMapBooted) return;
+            if (!IsMapBooted)
+                return;
+
+            var source = FilterPlace(allPlaces).ToList();
+
+            Console.WriteLine(
+                $"[PlaceView][Sync] " +
+                $"source={source.Count}, " +
+                $"all={allPlaces.Count}, " +
+                $"visibleRows={visiblePlaces.Count}");
 
             await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
 
-            foreach (var pl in FilterPlace(visiblePlaces))
-                await AddOrUpdatePlaceMarkerAsync(pl, fit: false);
+            foreach (var place in source)
+            {
+                await AddOrUpdatePlaceMarkerAsync(
+                    place,
+                    fit: false);
+            }
 
-            if (visiblePlaces.Any() && fit)
+            if (fit && source.Count > 0)
+            {
                 await FitThrottledAsync();
+            }
         }
 
         private async Task FitThrottledAsync(int ms = 250)
@@ -396,55 +410,35 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
         }
         private async Task ReseedPlaceMarkersAsync(bool fit)
         {
-            if (_disposed) return;
-            if (!IsMapBooted) return;
+            if (_disposed)
+                return;
+
+            if (!IsMapBooted)
+                return;
 
             await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
 
-            foreach (var dto in allPlaces)
-                await AddOrUpdatePlaceMarkerAsync(dto, fit: false);
+            var source =FilterPlace(allPlaces).ToList();
 
-            await FitThrottledAsync();
-            if (fit) await FitThrottledAsync();
-        }
-        private async Task ApplySinglePlaceMarkerAsync(ClientPlaceDTO dto)
-        {
-            if (_disposed) return;
-            if (!IsMapBooted) return;
-            if (dto is null) return;
+            var added = 0;
 
-            var lat = dto.Latitude;
-            var lng = dto.Longitude;
-
-            if (!double.IsFinite(lat) || !double.IsFinite(lng) || (lat == 0 && lng == 0) ||
-                lat is < -90 or > 90 || lng is < -180 or > 180)
+            foreach (var place in source)
             {
-                lat = 50.85;
-                lng = 4.35;
+                await AddOrUpdatePlaceMarkerAsync(
+                    place,
+                    fit: false);
+
+                added++;
             }
 
-            ///    var level = PlaceLevel(dto);
-            var level = 1;
+            Console.WriteLine($"[PlaceView][Seed] source={source.Count}, " + $"added={added}");
 
-            await JS.InvokeVoidAsync(
-                "OutZenInterop.addOrUpdateCrowdMarker",
-                PlMarkerId(dto.Id),
-                lat,
-                lng,
-                level,
-                new
-                {
-                    kind = "place",
-                    title = dto.Name ?? "Place",
-                    description = $"{dto.Type ?? "Unknown"} • Cap: {dto.Capacity}" +
-                                  (string.IsNullOrWhiteSpace(dto.Tag) ? "" : $" • Tag: {dto.Tag}"),
-                    icon = "🏰"
-                },
-                ScopeKey
-            );
-            await JS.InvokeVoidAsync("OutZenInterop.addOrUpdatePlaceMarker", dto, ScopeKey);
+            if (fit && source.Count > 0)
+            {
+                await FitThrottledAsync();
+            }
         }
-
+        
         private async Task HighlightBestMatchAsync(CancellationToken ct)
         {
             if (ct.IsCancellationRequested) return;

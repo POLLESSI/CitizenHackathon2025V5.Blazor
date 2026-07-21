@@ -210,8 +210,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         protected override async Task OnInitializedAsync()
         {
-            _gptLatitude = DefaultCenter.lat;
-            _gptLongitude = DefaultCenter.lng;
+            _gptLatitude = null;
+            _gptLongitude = null;
 
             _dotNetRef = DotNetObjectReference.Create(this);
 

@@ -108,6 +108,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
        
         private const int PageSize = 20;
         private const int MaxVisibleGptItems = 30;
+        private const int FullAlertMinimumDistinctDevices = 4;
 
         private const double DevFallbackLatitude = 50.380000;
         private const double DevFallbackLongitude = 4.682000;
@@ -279,7 +280,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 return;
 
             _criticalAlertSending = true;
-            await InvokeAsync(StateHasChanged);
+
+            await InvokeAsync(
+                StateHasChanged);
 
             try
             {
@@ -292,103 +295,173 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
                 if (_selectedPlaceId is null or <= 0)
                 {
-                    ToastService.ShowWarning("No nearby place could be resolved from your location.");
+                    ToastService.ShowWarning(
+                        "No nearby place could be resolved " +
+                        "from your location.");
+
                     return;
                 }
 
-                Console.WriteLine($"[ALERT] Selected={_selectedPlaceName} ({_selectedPlaceId})");
+                Console.WriteLine(
+                    $"[ALERT] Selected=" +
+                    $"{_selectedPlaceName} " +
+                    $"({_selectedPlaceId})");
 
-                var result = await CriticalAlertService.SendCriticalAlertAsync(
-                    _selectedPlaceId.Value,
-                    $"Manual critical alert for {_selectedPlaceName}");
+                var result =
+                    await CriticalAlertService
+                        .SendCriticalAlertAsync(
+                            _selectedPlaceId.Value,
+                            $"Manual critical alert for " +
+                            $"{_selectedPlaceName}");
 
-                if (result.Ok)
-                {
-                    ToastService.ShowError(
-                        $"CRITICAL CROWD ALERT sent for {_selectedPlaceName}.",
-                        settings =>
-                        {
-                            settings.Timeout = 0;
-                            settings.ShowProgressBar = true;
-                        });
-
-                    _criticalAlertStatus = $"Critical alert active for {_selectedPlaceName}";
-
-                    var declaredAtUtc = DateTime.UtcNow;
-                    var expiresAtUtc = declaredAtUtc.AddMinutes(5);
-
-                    await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateFullAlertMarker",
-                        new
-                        {
-                            PlaceId = _selectedPlaceId.Value,
-                            PlaceName = _selectedPlaceName,
-                            Latitude = _selectedLatitude,
-                            Longitude = _selectedLongitude,
-                            DeclaredAtUtc = declaredAtUtc,
-                            ExpiresAtUtc = expiresAtUtc,
-                            kind = "crowd",
-                            title = "🚨 FULL ALERT",
-                            description = $"Critical crowd alert declared at {_selectedPlaceName}",
-                            icon = "🚨"
-                        },
-                        ScopeKey);
-
-                    await RefreshHomeDataAsync(fit: false);
-                }
+                Console.WriteLine(
+                    "[ALERT RESULT] " +
+                    $"Ok={result.Ok}, " +
+                    $"Status={result.Status}, " +
+                    $"ConfirmationCount=" +
+                    $"{result.ConfirmationCount}, " +
+                    $"RequiredCount=" +
+                    $"{result.RequiredCount}, " +
+                    $"ExpiresAtUtc=" +
+                    $"{result.ExpiresAtUtc}, " +
+                    $"Error={result.Error}");
 
                 if (!result.Ok)
                 {
-                    Console.Error.WriteLine(result.Error);
-                    ToastService.ShowWarning("Alert could not be sent. Check browser/API console.");
+                    Console.Error.WriteLine(
+                        result.Error);
+
+                    ToastService.ShowWarning(
+                        "Alert could not be sent. " +
+                        "Check browser/API console.");
+
                     return;
                 }
 
-                if (result.Status == "Pending")
+                var requiredConfirmations =
+                    Math.Max(
+                        FullAlertMinimumDistinctDevices,
+                        result.RequiredCount);
+
+                var isConfirmed =
+                    string.Equals(
+                        result.Status,
+                        "Confirmed",
+                        StringComparison.OrdinalIgnoreCase)
+                    &&
+                    result.ConfirmationCount >=
+                        requiredConfirmations;
+
+                if (!isConfirmed)
                 {
                     _criticalAlertStatus =
-                        $"Signalement reçu pour {_selectedPlaceName}. Confirmation {result.ConfirmationCount}/{result.RequiredCount}.";
-                    ToastService.ShowInfo(_criticalAlertStatus);
+                        $"Signalement reçu pour " +
+                        $"{_selectedPlaceName}. " +
+                        $"Confirmation " +
+                        $"{result.ConfirmationCount}/" +
+                        $"{requiredConfirmations}.";
+
+                    ToastService.ShowInfo(
+                        _criticalAlertStatus);
+
+                    /*
+                     * Aucun marqueur Full Alert avant
+                     * confirmation par le nombre minimal
+                     * d'appareils distincts.
+                     */
                     return;
                 }
 
-                if (result.Status == "Confirmed")
-                {
-                    ToastService.ShowError(
-                        $"CRITICAL CROWD ALERT confirmed for {_selectedPlaceName}.",
-                        settings =>
-                        {
-                            settings.Timeout = 0;
-                            settings.ShowProgressBar = true;
-                        });
+                _criticalAlertStatus =
+                    $"Critical alert confirmed for " +
+                    $"{_selectedPlaceName}";
 
-                    _criticalAlertStatus = $"Critical alert confirmed for {_selectedPlaceName}";
+                ToastService.ShowError(
+                    $"CRITICAL CROWD ALERT confirmed for " +
+                    $"{_selectedPlaceName}.",
+                    settings =>
+                    {
+                        settings.Timeout = 0;
+                        settings.ShowProgressBar = true;
+                    });
 
-                    var declaredAtUtc = DateTime.UtcNow;
+                var declaredAtUtc =
+                    DateTime.UtcNow;
 
-                    await JS.InvokeVoidAsync(
-                        "OutZenInterop.addOrUpdateFullAlertMarker",
-                        new
-                        {
-                            PlaceId = _selectedPlaceId.Value,
-                            PlaceName = _selectedPlaceName,
-                            Latitude = _selectedLatitude,
-                            Longitude = _selectedLongitude,
-                            DeclaredAtUtc = declaredAtUtc,
-                            ExpiresAtUtc = result.ExpiresAtUtc ?? declaredAtUtc.AddMinutes(5),
-                            kind = "crowd",
-                            title = "🚨 FULL ALERT",
-                            description = $"Confirmed critical crowd alert at {_selectedPlaceName}",
-                            icon = "🚨"
-                        },
-                        ScopeKey);
+                var expiresAtUtc =
+                    result.ExpiresAtUtc
+                    ?? declaredAtUtc.AddMinutes(5);
 
-                    await RefreshHomeDataAsync(fit: false);
-                }
+                await JS.InvokeVoidAsync(
+                    "OutZenInterop.addOrUpdateFullAlertMarker",
+                    new
+                    {
+                        PlaceId =
+                            _selectedPlaceId.Value,
+
+                        PlaceName =
+                            _selectedPlaceName,
+
+                        Latitude =
+                            _selectedLatitude,
+
+                        Longitude =
+                            _selectedLongitude,
+
+                        DeclaredAtUtc =
+                            declaredAtUtc,
+
+                        ExpiresAtUtc =
+                            expiresAtUtc,
+
+                        Status =
+                            "Confirmed",
+
+                        ConfirmationCount =
+                            result.ConfirmationCount,
+
+                        RequiredCount =
+                            requiredConfirmations,
+
+                        Source =
+                            "ControlCenter",
+
+                        kind =
+                            "crowd",
+
+                        title =
+                            "🚨 FULL ALERT",
+
+                        description =
+                            $"Confirmed critical crowd alert " +
+                            $"at {_selectedPlaceName}",
+
+                        icon =
+                            "🚨"
+                    },
+                    ScopeKey);
+
+                await RefreshHomeDataAsync(
+                    fit: false);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine(
+                    $"[ALERT] SendCriticalCrowdAlertAsync " +
+                    $"failed: {ex}");
+
+                _criticalAlertStatus =
+                    $"Critical alert error: {ex.Message}";
+
+                ToastService.ShowError(
+                    _criticalAlertStatus);
             }
             finally
             {
                 _criticalAlertSending = false;
-                await InvokeAsync(StateHasChanged);
+
+                await InvokeAsync(
+                    StateHasChanged);
             }
         }
 
@@ -1088,7 +1161,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             var antenna = _allAntennas.FirstOrDefault(a => a.Id == antennaId);
             if (antenna is null) return;
 
-            var level = ComputeLevelByCapacity(antenna, counts.ActiveConnections);
+            var observedDevices = counts.UniqueDevices > 0 ? counts.UniqueDevices : counts.ActiveConnections;
+
+            var level = ComputeLevelByCapacity(antenna, observedDevices);
+
             var key = $"ant:{antennaId}";
 
             if (level == (int)CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Critical)
@@ -1098,8 +1174,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                     AntennaId = antennaId,
                     Latitude = antenna.Latitude,
                     Longitude = antenna.Longitude,
-                    Title = "Concentration critique détectée",
-                    Message = $"Concentration critique détectée près de {antenna.Name}.",
+                    Title = "Concentration critique " + "détectée par antenne",
+                    Message = $"Concentration critique " + $"détectée près de " + $"{antenna.Name}.",
                     Severity = 4,
                     ActiveConnections = counts.ActiveConnections,
                     UniqueDevices = counts.UniqueDevices,
@@ -1109,10 +1185,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             }
             else
             {
-                await JS.InvokeVoidAsync(
-                    "OutZenInterop.removeAntennaAlertCircle",
-                    antennaId,
-                    ScopeKey);
+                await JS.InvokeVoidAsync("OutZenInterop.removeAntennaAlertCircle", antennaId, ScopeKey);
             }
         }
 
@@ -1414,11 +1487,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             {
                 var alerts = await CrowdSafetyAlertService.GetLatestAsync(50);
 
-                var activeCriticalAlerts = alerts
-                    .Where(a => a.Active)
-                    .Where(a => a.Status == "PendingValidation" || a.Status == "Validated")
-                    .Where(a => a.Severity >= 3)
-                    .ToList();
+                var activeCriticalAlerts =
+                    alerts
+                        .Where(a =>
+                            a.Active)
+
+                        .Where(a =>
+                            string.Equals(
+                                a.Status,
+                                "Validated",
+                                StringComparison.OrdinalIgnoreCase))
+
+                        .Where(a =>
+                            a.Severity >= 4)
+
+                        .ToList();
 
                 foreach (var alert in activeCriticalAlerts)
                 {

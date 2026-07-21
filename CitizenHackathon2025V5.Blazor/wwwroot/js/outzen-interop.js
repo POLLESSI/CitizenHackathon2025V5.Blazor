@@ -4,19 +4,17 @@
 
     console.log("[outzen-interop] loaded");
 
-    globalThis.OutZen =
-        (typeof globalThis.OutZen === "object" && globalThis.OutZen)
+    globalThis.OutZen = (typeof globalThis.OutZen === "object" && globalThis.OutZen)
             ? globalThis.OutZen
             : {};
 
-    globalThis.OutZenInterop =
-        (typeof globalThis.OutZenInterop === "object" && globalThis.OutZenInterop)
+    globalThis.OutZenInterop = (typeof globalThis.OutZenInterop === "object" && globalThis.OutZenInterop)
             ? globalThis.OutZenInterop
             : {};
 
     const isDev = location.hostname === "localhost" || location.hostname === "127.0.0.1";
 
-    const BUILD = globalThis.__ozBuild || "20260714-map-bundle-fix-1";
+    const BUILD = globalThis.__ozBuild || "20260717-marker-clear-fix-1";
 
     const MODULE_BASE_URL = `/js/app/leafletOutZen.module.js` + `?v=${encodeURIComponent(BUILD)}`;
 
@@ -201,79 +199,130 @@
             return m.pruneMarkersByPrefix(prefix, scopeKey);
         }
 
-        console.warn("[OutZenInterop] pruneMarkersByPrefix missing export", {
-            url,
-            esmKeys: m ? Object.keys(m) : []
-        });
+        console.warn("[OutZenInterop] pruneMarkersByPrefix missing export",
+            {
+                url:globalThis.__OutZenImportUrl?? null,
+
+                esmKeys: m ? Object.keys(m) : []
+            });
 
         return 0;
     };
 
-    globalThis.OutZenReady =
-        async function (force = false) {
+    globalThis.OutZenInterop.clearCrowdMarkers = async function (scopeKey) {
 
-            try {
-                await globalThis.OutZen.ensure(force);
+        const module = await loadModule(false);
 
-                const requiredFunctions = [
-                    "bootOutZen",
-                    "disposeOutZen",
-                    "addOrUpdateBundleMarkers",
-                    "addOrUpdateDetailMarkers",
-                    "refreshHybridNow"
-                ];
+        if (typeof module?.clearCrowdMarkers === "function")
+        {
+            console.error("[OutZenInterop] " + "clearCrowdMarkers missing",
+            {
+                url: globalThis.__OutZenImportUrl ?? null,
 
-                const missingFunctions =
-                    requiredFunctions.filter(
-                        function (name) {
-                            return (
-                                typeof globalThis
-                                    .OutZenInterop[name] !==
-                                "function"
-                            );
-                        });
+                exports: module ? Object.keys(module) : []
+            });
 
-                if (missingFunctions.length > 0) {
-                    console.error(
-                        "[OutZen] interop incomplete",
-                        {
-                            missingFunctions,
-                            availableExports:
-                                Object.keys(
-                                    globalThis
-                                        .OutZenInterop
-                                )
-                        }
-                    );
+            return false;
+        }
 
-                    return false;
-                }
+        return module.clearGeneralMarkers(scopeKey);
+        
+        /*
+            * Temporary compatibility if alone
+            * clearGeneralMarkers exists.
+            */
+        if (typeof module?.clearGeneralMarkers === "function") {
+            console.warn(
+                "[OutZenInterop] " +
+                "clearCrowdMarkers missing; " +
+                "using clearGeneralMarkers fallback",
+                {
+                    scopeKey,
 
-                console.log(
-                    "[OutZen] ✅ interop ready",
-                    {
-                        exports:
-                            Object.keys(
-                                globalThis.OutZenInterop
-                            ),
+                    url:globalThis.__OutZenImportUrl ?? null
+                });
 
-                        moduleUrl:
-                            globalThis
-                                .__OutZenImportUrl
-                    }
-                );
+            return module.clearGeneralMarkers(scopeKey);
+        }
 
-                return true;
-            }
-            catch (error) {
+        console.error(
+            "[OutZenInterop] " +
+            "no marker clear function exported",
+            {
+                scopeKey,
+
+                url:globalThis.__OutZenImportUrl ?? null,
+
+                esmKeys: module ? Object.keys(module) : []
+            });
+
+        return false;
+    };
+
+    globalThis.OutZenReady = async function (force = false) {
+
+        try {
+            await globalThis.OutZen.ensure(force);
+
+            const requiredFunctions = [
+                "bootOutZen",
+                "disposeOutZen",
+                "addOrUpdateBundleMarkers",
+                "addOrUpdateDetailMarkers",
+                "refreshHybridNow"
+            ];
+
+            const missingFunctions =
+                requiredFunctions.filter(
+                    function (name) {
+                        return (
+                            typeof globalThis
+                                .OutZenInterop[name] !==
+                            "function"
+                        );
+                    });
+
+            if (missingFunctions.length > 0) {
                 console.error(
-                    "[OutZen] ❌ interop initialization failed",
-                    error
+                    "[OutZen] interop incomplete",
+                    {
+                        missingFunctions,
+                        availableExports:
+                            Object.keys(
+                                globalThis
+                                    .OutZenInterop
+                            )
+                    }
                 );
 
                 return false;
             }
-        };
+
+            console.log(
+                "[OutZen] ✅ interop ready",
+                {
+                    exports:
+                        Object.keys(
+                            globalThis.OutZenInterop
+                        ),
+
+                    moduleUrl:
+                        globalThis
+                            .__OutZenImportUrl
+                }
+            );
+
+            return true;
+        }
+        catch (error) {
+            console.error(
+                "[OutZen] ❌ interop initialization failed",
+                error
+            );
+
+            return false;
+        }
+    };
 
     // ---------------------------------------------------------------------
     // Legacy lowercase alias expected by Presentation.razor

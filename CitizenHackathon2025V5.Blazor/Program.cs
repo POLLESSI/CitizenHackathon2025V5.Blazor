@@ -176,9 +176,6 @@ builder.Services.AddScoped<WeatherForecastService>();
 builder.Services.AddScoped<WeatherHubClient>();
 builder.Services.AddScoped<WeatherForecastHubClient>();
 
-
-
-
 Console.WriteLine("✅ PROGRAM CLIENT V5 - cleaned and loaded");
 
 await builder.Build().RunAsync();

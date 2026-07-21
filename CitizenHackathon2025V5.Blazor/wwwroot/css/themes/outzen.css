@@ -7435,6 +7435,291 @@ HIGHLIGHT / PULSE
     letter-spacing: 0.08em !important;
 }
 
+/* =========================================================
+   OUTZEN BUNDLES — SOFT VISUAL TUNING
+   Softens the black background in clustered mode
+   ========================================================= */
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-marker {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-width: 3px;
+    border-style: solid;
+    border-radius: 50%;
+    color: #f8fbff;
+    /* Much less aggressive background */
+    background: radial-gradient( circle at 35% 25%, #5e7690 0%, #395166 52%, #26394a 100% ) !important;
+    /* Lighter shadows */
+    box-shadow: 0 0 0 2px rgba(255,255,255,.68), 0 4px 10px rgba(12, 22, 34, .22) !important;
+    transition: transform 150ms ease, filter 150ms ease, box-shadow 150ms ease !important;
+}
+
+    .leaflet-marker-icon.oz-bundle-icon
+    .oz-zone-marker:hover {
+        transform: scale(1.06);
+        filter: brightness(1.05);
+    }
+
+/* Central number slightly softer */
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-count {
+    font-size: 16px;
+    font-weight: 900;
+    line-height: 1;
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,.20);
+}
+
+/* Category badges less contrasted */
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-type,
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-more {
+    min-width: 20px;
+    height: 17px;
+    padding: 0 3px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    border: 1px solid rgba(255,255,255,.58);
+    border-radius: 9px;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1;
+    background: rgba(52, 84, 116, .88) !important;
+    color: #fff !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,.18) !important;
+}
+
+/* Compact version */
+.leaflet-marker-icon
+.oz-bundle-icon--compact
+.oz-zone-marker {
+    width: 34px;
+    height: 34px;
+    border-width: 3px;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.64), 0 3px 8px rgba(12, 22, 34, .18) !important;
+}
+
+/* Medium version */
+.leaflet-marker-icon
+.oz-bundle-icon--medium
+.oz-zone-marker {
+    width: 38px;
+    height: 38px;
+}
+
+/* Severity: softer colors */
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-sev-1 {
+    border-color: #56b97b !important;
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-sev-2 {
+    border-color: #d8bb54 !important;
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-sev-3 {
+    border-color: #e39a4d !important;
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-sev-4 {
+    border-color: #d95f5f !important;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.72), 0 4px 11px rgba(12,22,34,.24), 0 0 8px rgba(217,95,95,.28) !important;
+}
+
+/* =========================================================
+   OUTZEN BUNDLES — ARDOISE ARDENNAISE
+   Slate blue base + subtle cool reflection
+   ========================================================= */
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-marker {
+    position: relative;
+    overflow: hidden;
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-width: 3px;
+    border-style: solid;
+    border-radius: 50%;
+    color: #f8fbff !important;
+    /* Blue-grey slate base */
+    background: linear-gradient( 160deg, rgba(255,255,255,.08) 0%, rgba(255,255,255,0) 26% ), linear-gradient( 180deg, #738ba0 0%, #5c7589 28%, #486073 58%, #354a5c 100% ) !important;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.64), 0 4px 10px rgba(16, 28, 40, .20) !important;
+    transition: transform 150ms ease, filter 150ms ease, box-shadow 150ms ease !important;
+}
+
+    /* Blue reflection resembling wet slate / cool light */
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-marker::before {
+    content: "";
+    position: absolute;
+    inset: 3px 4px 15px 4px;
+    border-radius: 999px;
+    pointer-events: none;
+    background: radial-gradient( circle at 30% 18%, rgba(155, 220, 255, .42) 0%, rgba(155, 220, 255, .18) 24%, rgba(155, 220, 255, 0) 58% ), linear-gradient( 180deg, rgba(255,255,255,.12) 0%, rgba(255,255,255,0) 100% );
+    opacity: .95;
+}
+
+/* Subtle micro-texture reminiscent of slate */
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-marker::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    pointer-events: none;
+    background: repeating-linear-gradient( 135deg, rgba(255,255,255,.030) 0 2px, rgba(255,255,255,0) 2px 6px );
+    opacity: .28;
+}
+
+/* Central number */
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-count {
+    position: relative;
+    z-index: 2;
+    font-size: 16px;
+    font-weight: 900;
+    line-height: 1;
+    color: #ffffff !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,.18);
+}
+
+/* Secondary badges */
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-types {
+    position: absolute;
+    z-index: 3;
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-type,
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-more {
+    border: 1px solid rgba(255,255,255,.56);
+    background: rgba(63, 94, 124, .90) !important;
+    color: #fff !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,.16) !important;
+}
+
+/* Subtle hover */
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-marker:hover {
+    transform: scale(1.06);
+    filter: brightness(1.05);
+    box-shadow: 0 0 0 2px rgba(255,255,255,.70), 0 5px 12px rgba(16, 28, 40, .24) !important;
+}
+
+/* Compact mode */
+.leaflet-marker-icon
+.oz-bundle-icon--compact
+.oz-zone-marker {
+    width: 34px;
+    height: 34px;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.60), 0 3px 8px rgba(16, 28, 40, .18) !important;
+}
+
+/* Medium mode */
+.leaflet-marker-icon
+.oz-bundle-icon--medium
+.oz-zone-marker {
+    width: 38px;
+    height: 38px;
+}
+
+/* Slightly softer severity rings */
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-sev-1 {
+    border-color: #65c189 !important;
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-sev-2 {
+    border-color: #d9c063 !important;
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-sev-3 {
+    border-color: #e4a05a !important;
+}
+
+.leaflet-marker-icon.oz-bundle-icon
+.oz-zone-sev-4 {
+    border-color: #d96e6e !important;
+    box-shadow: 0 0 0 2px rgba(255,255,255,.72), 0 4px 11px rgba(16,28,40,.24), 0 0 8px rgba(217,110,110,.26) !important;
+}
+
+/* =========================================================
+   CROWD LEVEL 4 — CRITICAL ESCALATION
+   Keep the slate; just add the critical signal.
+   ========================================================= */
+
+.leaflet-marker-icon.oz-bundle-icon--critical-crowd {
+    overflow: visible !important;
+    z-index: 100500 !important;
+}
+
+    /*
+ * The slate background remains visible.
+ * The alert is produced by the rings and the pulse.
+ */
+    .leaflet-marker-icon.oz-bundle-icon--critical-crowd
+    .oz-zone-marker {
+        border-color: #ff4b4b !important;
+        box-shadow: 0 0 0 2px rgba(255,255,255,.86), 0 0 0 6px rgba(255,55,55,.20), 0 0 18px rgba(255,35,35,.72), 0 5px 12px rgba(16,28,40,.25) !important;
+        animation: ozCriticalCrowdBundlePulse 1.15s ease-in-out infinite !important;
+    }
+
+    /*
+ * Small independent indicator from the slate core.
+ * It remains visible even in compact zoom.
+ */
+    .leaflet-marker-icon.oz-bundle-icon--critical-crowd::after {
+        content: "🚨";
+        position: absolute;
+        z-index: 6;
+        right: -8px;
+        top: -9px;
+        width: 22px;
+        height: 22px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: radial-gradient( circle at 35% 25%, #ff8585 0%, #df2020 55%, #810000 100% );
+        border: 2px solid rgba(255,255,255,.94);
+        box-shadow: 0 2px 8px rgba(0,0,0,.32), 0 0 12px rgba(255,30,30,.62);
+        font-size: 12px;
+        line-height: 1;
+    }
+
+@keyframes ozCriticalCrowdBundlePulse {
+    0%, 100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+
+    50% {
+        transform: scale(1.08);
+        filter: brightness(1.14) saturate(1.12);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .leaflet-marker-icon.oz-bundle-icon--critical-crowd
+    .oz-zone-marker {
+        animation: none !important;
+    }
+}
 
 
 

@@ -38,9 +38,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
         // Optional
         protected override bool ForceBootOnFirstRender => true;
         protected override bool ResetMarkersOnBoot => true;
-        protected override OutZenMarkerPolicy MarkerPolicy => OutZenMarkerPolicy.OnlyPrefix;
-        protected override string AllowedMarkerPrefix => "event:";
-        protected override bool ClearAllOnMapReady => true; // Optional but recommended for a single-type page
+
+        // No hybrid mode on a single-category page.
+        protected override bool EnableHybrid => false;
+
+        protected override bool EnableCluster => true;
+
         private static string EvMarkerId(int id) => $"event:{id}";
 
         private ElementReference ScrollContainerRef;
@@ -103,34 +106,33 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
         }
         protected override async Task SeedAsync(bool fit)
         {
+            if (_disposed)
+                return;
             // 1) Clear markers of scope
             await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
 
             // 2) Source (filtered if you want)
-            var source = allEvents; // or FilterEvent(...).ToList()
+            var source =FilterEvent(allEvents).ToList();
+
+            var added = 0;
 
             foreach (var ev in source)
             {
-                var lvl = MapCrowdLevelFromExpected(ev.ExpectedCrowd);
-
-                var (lat, lng) = Normalize(ev.Latitude, ev.Longitude);
-
-                await MapInterop.UpsertCrowdMarkerAsync(
-                    id: EvMarkerId(ev.Id),
-                    lat: lat,
-                    lng: lng,
-                    level: lvl,
-                    info: new
-                    {
-                        title = ev.Name ?? "Event",
-                        description = $"{ev.DateEvent:yyyy-MM-dd HH:mm}",
-                        kind = "event",
-                        icon = "🎪",
-                        expected = ev.ExpectedCrowd
-                    },
-                    scopeKey: ScopeKey
-                );
+                await ApplySingleEventMarkerAsync(ev);
+                added++;
             }
+
+            _initialMarkersApplied = true;
+
+            while (_pendingHubUpdates.TryDequeue(out var pending))
+            {
+                await ApplySingleEventMarkerAsync(pending);
+            }
+
+            Console.WriteLine(
+                $"[EventView][Seed] " +
+                $"source={source.Count}, " +
+                $"added={added}");
 
             if (fit && source.Count > 0)
             {
@@ -321,42 +323,38 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
 
         private async Task SyncMapMarkersAsync(bool fit)
         {
-            var baseSource = visibleEvents.Any() ? visibleEvents : allEvents;
-            var source = FilterEvent(baseSource).ToList();
+            if (_disposed)
+                return;
+
+            if (!IsMapBooted)
+                return;
+
+            var source = FilterEvent(allEvents).ToList();
 
             try
             {
                 await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
 
+                var added = 0;
+
                 foreach (var ev in source)
                 {
-                    var lvl = MapCrowdLevelFromExpected(ev.ExpectedCrowd);
-
-                    double lat = ev.Latitude;
-                    double lng = ev.Longitude;
-
-                    if (!double.IsFinite(lat) || !double.IsFinite(lng) ||
-                        lat < -90 || lat > 90 || lng < -180 || lng > 180 ||
-                        (lat == 0 && lng == 0))
-                    {
-                        lat = 50.85;
-                        lng = 4.35;
-                    }
-
-                    await MapInterop.UpsertCrowdMarkerAsync(
-                        id: EvMarkerId(ev.Id),
-                        lat: lat,
-                        lng: lng,
-                        level: lvl,
-                        info: new { title = ev.Name, description = $"{ev.DateEvent:yyyy-MM-dd HH:mm}", kind = "event", icon = "🎪" },
-                        scopeKey: ScopeKey
-                    );
+                    await ApplySingleEventMarkerAsync(ev);
+                    added++;
                 }
 
-                if (source.Any())
+                Console.WriteLine($"[EventView][Sync] source={source.Count}, " + $"added={added}");
+
+                if (source.Count > 0)
                 {
-                    await MapInterop.RefreshSizeAsync(ScopeKey);
-                    if (fit) await MapInterop.FitToDetailsAsync(ScopeKey);
+                    await MapInterop.RefreshSizeAsync(
+                        ScopeKey);
+
+                    if (fit)
+                    {
+                        await MapInterop.FitToDetailsAsync(
+                            ScopeKey);
+                    }
                 }
             }
             catch (Exception ex)

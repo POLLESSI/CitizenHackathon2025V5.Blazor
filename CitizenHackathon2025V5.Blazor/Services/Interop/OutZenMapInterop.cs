@@ -75,31 +75,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services.Interop
         public Task FitToDetailsAsync(string scopeKey)
             => _js.InvokeVoidAsync("OutZenInterop.fitToDetails", scopeKey).AsTask();
 
-        public Task ClearCrowdMarkersAsync(string scopeKey)
-    => _js.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", scopeKey).AsTask();
+        public async ValueTask<bool>ClearCrowdMarkersAsync(string scopeKey)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(scopeKey);
+            
+            await _js.InvokeVoidAsync("OutZen.ensure");
+
+            return await _js.InvokeAsync<bool>("OutZenInterop.clearCrowdMarkers", scopeKey);
+        }
 
         public Task RemoveCrowdMarkerAsync(string markerId, string scopeKey)
             => _js.InvokeVoidAsync("OutZenInterop.removeCrowdMarker", markerId, scopeKey).AsTask();
 
-        public Task UpsertCrowdMarkerAsync(
-            string id,
-            double lat,
-            double lng,
-            int level,
-            object info,
-            string scopeKey)
-            => _js.InvokeVoidAsync(
-                    "OutZenInterop.addOrUpdateCrowdMarker",
-                    id,
-                    lat,
-                    lng,
-                    level,
-                    info,
-                    scopeKey
-               ).AsTask();
+        public Task UpsertCrowdMarkerAsync(string id, double lat, double lng, int level, object info, string scopeKey)
+            => _js.InvokeVoidAsync("OutZenInterop.addOrUpdateCrowdMarker", id, lat, lng, level, info, scopeKey).AsTask();
 
         public Task ClearCrowdCalendarMarkersAsync(string scopeKey)
-    => _js.InvokeVoidAsync("OutZenInterop.clearCrowdCalendarMarkers", scopeKey).AsTask();
+            => _js.InvokeVoidAsync("OutZenInterop.clearCrowdCalendarMarkers", scopeKey).AsTask();
 
         public Task RemoveCrowdCalendarMarkerAsync(string markerId, string scopeKey)
             => _js.InvokeVoidAsync("OutZenInterop.removeCrowdCalendarMarker", markerId, scopeKey).AsTask();
