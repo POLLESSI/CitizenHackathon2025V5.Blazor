@@ -357,7 +357,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 return;
 
             var prompt = rawPrompt;
-            var languageCode = _selectedVoiceLang;
+
+            var languageCode = ResolvePromptLanguage(rawPrompt, _mistralResponseLang);
+
+            _mistralResponseLang = languageCode;
+
+            _ttsLang = languageCode == "wa-central" ? "fr-BE" : languageCode;
 
             try
             {
@@ -379,8 +384,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                     effectiveLatitude = parsedLat;
                     effectiveLongitude = parsedLng;
 
-                    Console.WriteLine(
-                        $"[GPT VIEW] Coordinates extracted from prompt: lat={effectiveLatitude}, lng={effectiveLongitude}");
+                    Console.WriteLine($"[GPT VIEW] Coordinates extracted from prompt: lat={effectiveLatitude}, lng={effectiveLongitude}");
                 }
 
                 await GptClientOrchestrator.EnsureHubAsync();
@@ -389,7 +393,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                     prompt,
                     latitude: effectiveLatitude,
                     longitude: effectiveLongitude,
-                    languageCode: _mistralResponseLang,
+                    languageCode: languageCode,
                     ct: CancellationToken.None);
 
                 if (started is null || started.InteractionId <= 0)
@@ -486,22 +490,60 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             };
         }
 
-        private Task OnStatusChangedAsync(string? message)
+        private async Task OnStatusChangedAsync(string? message)
         {
-            if (_disposed)
-                return Task.CompletedTask;
+            if (_disposed || string.IsNullOrWhiteSpace(message))
+            {
+                return;
+            }
 
-            if (string.IsNullOrWhiteSpace(message))
-                return Task.CompletedTask;
+            var cleanMessage = message.Trim();
 
-            if (string.Equals(_aiStatusMessage, message, StringComparison.Ordinal))
-                return Task.CompletedTask;
+            _aiStatusMessage = cleanMessage;
 
-            _aiStatusMessage = message;
+            var isFailed = cleanMessage.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
+                cleanMessage.Contains("failure", StringComparison.OrdinalIgnoreCase) ||
+                cleanMessage.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+                cleanMessage.Contains("timed out", StringComparison.OrdinalIgnoreCase) ||
+                cleanMessage.Contains("exceeded", StringComparison.OrdinalIgnoreCase) ||
+                cleanMessage.Contains("exception", StringComparison.OrdinalIgnoreCase);
 
-            return SafeRenderAsync(500);
+            var isCancelled = cleanMessage.Contains("cancelled", StringComparison.OrdinalIgnoreCase) ||
+                cleanMessage.Contains("canceled", StringComparison.OrdinalIgnoreCase) ||
+                cleanMessage.Contains("annulée", StringComparison.OrdinalIgnoreCase) ||
+                cleanMessage.Contains("annulee", StringComparison.OrdinalIgnoreCase);
+
+            if (isFailed || isCancelled)
+            {
+                _activeGptInteractionId = null;
+                _isSending = false;
+
+                _aiState = AiProcessingState.Error;
+
+                await StopElapsedTimerAsync();
+
+                if (_gptStartedAtUtc.HasValue)
+                {
+                    var duration = DateTime.UtcNow - _gptStartedAtUtc.Value;
+
+                    Console.WriteLine($"[GPT TIMER] TERMINATED after " + $"{duration.TotalSeconds:F1}s. " + $"Reason={cleanMessage}");
+                }
+
+                _gptStartedAtUtc = null;
+
+                await SafeRenderAsync(100);
+
+                return;
+            }
+
+            if (string.Equals(_aiStatusMessage, cleanMessage, StringComparison.Ordinal))
+            {
+                await SafeRenderAsync(500);
+                return;
+            }
+
+            await SafeRenderAsync(500);
         }
-
         private async Task ToggleVoiceAsync()
         {
             if (_disposed || IsAiBusy || _isSending)
@@ -523,19 +565,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             try
             {
-                var result = await JS.InvokeAsync<VoiceStartResult>(
-                    "gptVoice.start",
-                    _dotNetRef,
-                     _speechRecognitionLang);
+                var result = await JS.InvokeAsync<VoiceStartResult>("gptVoice.start", _dotNetRef, _speechRecognitionLang);
 
                 Console.WriteLine($"[GPT VOICE] Start result: ok={result?.Ok}, error={result?.Error}");
 
                 if (result is null || !result.Ok)
                 {
                     _aiState = AiProcessingState.Error;
-                    _aiStatusMessage = string.IsNullOrWhiteSpace(result?.Error)
-                        ? "Unable to start voice recognition."
-                        : result.Error;
+                    _aiStatusMessage = string.IsNullOrWhiteSpace(result?.Error) ? "Unable to start voice recognition." : result.Error;
 
                     _isListening = false;
                     await InvokeAsync(StateHasChanged);
@@ -624,10 +661,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             Console.WriteLine($"[GPT VOICE] Speak full response len={response.Length}");
 
-            var speech = await JS.InvokeAsync<SpeechResult>(
-                "gptVoice.speak",
-                response,
-                ResolveTtsLang());
+            var speech = await JS.InvokeAsync<SpeechResult>("gptVoice.speak", response, ResolveTtsLang());
 
             Console.WriteLine($"[GPT VOICE] speak result ok={speech?.Ok}, error={speech?.Error}");
 
@@ -698,8 +732,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             if (!double.TryParse(lngText, NumberStyles.Float, CultureInfo.InvariantCulture, out longitude))
                 return false;
 
-            return latitude is >= -90 and <= 90 &&
-                   longitude is >= -180 and <= 180;
+            return latitude is >= -90 and <= 90 && longitude is >= -180 and <= 180;
         }
 
         private static bool IsFinalUsableResponse(string response)
@@ -765,20 +798,31 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 var clean = finalText.Trim();
 
                 if (string.IsNullOrWhiteSpace(NewPrompt))
+                {
                     NewPrompt = clean;
+                }
                 else
+                {
                     NewPrompt = $"{NewPrompt.Trim()} {clean}".Trim();
+                }
 
-                _voiceInterimText = "Voice captured. Sending...";
+                _voiceInterimText =
+                    "Phrase capturée. " +
+                    "Continuez à parler ou appuyez sur " +
+                    "« Stop and send ».";
+            }
+            else if (!string.IsNullOrWhiteSpace(interimText))
+            {
+                _voiceInterimText = interimText.Trim();
             }
             else
             {
-                _voiceInterimText = interimText ?? string.Empty;
+                _voiceInterimText = "Écoute en cours…";
             }
 
             await SafeRenderAsync();
 
-            Console.WriteLine($"[GPT VOICE] final='{finalText}', interim='{interimText}'");
+            Console.WriteLine($"[GPT VOICE] final='{finalText}', " + $"interim='{interimText}'");
         }
 
         [JSInvokable]
@@ -787,23 +831,38 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             if (_disposed)
                 return;
 
-            if (!string.IsNullOrWhiteSpace(errorMessage) &&
-                errorMessage.Contains("aborted", StringComparison.OrdinalIgnoreCase))
+            var error = errorMessage?.Trim() ?? "unknown";
+
+            /*
+             * Additional security :
+             * a pause should not stop the dictation.
+             */
+            if (error.Contains("No speech", StringComparison.OrdinalIgnoreCase) || error.Contains("no-speech", StringComparison.OrdinalIgnoreCase))
             {
-                _isListening = false;
-                _voiceInterimText = "Dictation stopped.";
+                _isListening = true;
+
+                _voiceInterimText = "Pause détectée. " + "OutZen continue de vous écouter…";
+
+                _aiStatusMessage = null;
+
                 await SafeRenderAsync();
+
                 return;
             }
 
-            if (errorMessage.Contains("No speech", StringComparison.OrdinalIgnoreCase))
+            if (error.Contains("aborted", StringComparison.OrdinalIgnoreCase))
             {
-                _isListening = false;
-                _voiceInterimText = errorMessage;
-                _aiStatusMessage = null;
-                await SafeRenderAsync();
                 return;
             }
+
+            _isListening = false;
+            _voiceInterimText = $"Erreur du microphone : {error}";
+
+            _aiState = AiProcessingState.Error;
+
+            _aiStatusMessage = error;
+
+            await SafeRenderAsync();
         }
 
         [JSInvokable]
@@ -860,6 +919,49 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 .Replace("autour de N'amur", "autour de Namur", StringComparison.OrdinalIgnoreCase)
                 .Replace("autour d Namur", "autour de Namur", StringComparison.OrdinalIgnoreCase)
                 .Trim();
+        }
+
+        private static string ResolvePromptLanguage(string prompt, string fallbackLanguage)
+        {
+            if (string.IsNullOrWhiteSpace(prompt))
+            {
+                return string.IsNullOrWhiteSpace(fallbackLanguage) ? "fr-FR" : fallbackLanguage;
+            }
+
+            /*
+             * Cyrillic alphabet :
+             * Russian, Ukrainian, Bulgarian, etc.
+             */
+            if (Regex.IsMatch(prompt, @"[\u0400-\u04FF]"))
+            {
+                return "ru-RU";
+            }
+
+            /*
+             * Alphabet arabe.
+             */
+            if (Regex.IsMatch(prompt, @"[\u0600-\u06FF]"))
+            {
+                return "ar-SA";
+            }
+
+            /*
+             * Hiragana and Katakana.
+             */
+            if (Regex.IsMatch(prompt, @"[\u3040-\u30FF]"))
+            {
+                return "ja-JP";
+            }
+
+            /*
+             * Chinese ideograms.
+             */
+            if (Regex.IsMatch(prompt, @"[\u4E00-\u9FFF]"))
+            {
+                return "zh-CN";
+            }
+
+            return string.IsNullOrWhiteSpace(fallbackLanguage) ? "fr-FR" : fallbackLanguage;
         }
 
         private async Task ShowOverlayAsync()

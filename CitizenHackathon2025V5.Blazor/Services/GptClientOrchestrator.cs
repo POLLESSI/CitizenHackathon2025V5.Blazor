@@ -24,8 +24,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         private string? _currentRequestId;
 
         private const int PollingInitialDelayMs = 15_000;
+
         private const int PollingIntervalMs = 15_000;
-        private const int PollingMaxAttempts = 40;
+
+        private const int PollingMaxAttempts = 60;
 
         private static readonly bool EnableVerboseGptPollingLogs = false;
 
@@ -378,36 +380,82 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             if (dto.InteractionId <= 0)
                 return;
 
-            if (EnableVerboseGptPollingLogs || dto.IsTerminal)
-            {
-                Console.WriteLine(
-                    $"[GptClientOrchestrator] STATUS received -> InteractionId={dto.InteractionId}, Status={dto.Status}, IsTerminal={dto.IsTerminal}");
-            }
+            Console.WriteLine(
+                "[GptClientOrchestrator] STATUS received -> " +
+                $"InteractionId={dto.InteractionId}, " +
+                $"Status={dto.Status}, " +
+                $"IsTerminal={dto.IsTerminal}, " +
+                $"Message={dto.Message}");
 
-            var live = _live.GetOrAdd(
-                dto.InteractionId,
-                _ => new LiveInteractionState(dto.InteractionId));
+            HasReceivedHubEvent = true;
+
+            var live = _live.GetOrAdd(dto.InteractionId, _ => new LiveInteractionState(dto.InteractionId));
 
             live.HasReceivedHubEvent = true;
             live.RequestId ??= dto.RequestId;
 
+            var isCompleted = string.Equals(dto.Status, "completed", StringComparison.OrdinalIgnoreCase);
+
+            var isFailed = string.Equals(dto.Status, "failed", StringComparison.OrdinalIgnoreCase);
+
+            var isCancelled = string.Equals(dto.Status, "cancelled", StringComparison.OrdinalIgnoreCase) ||
+
+                string.Equals(dto.Status, "canceled", StringComparison.OrdinalIgnoreCase);
+
             live.LastStatus = new GptInteractionService.ClientGptStatusResponseDTO
             {
                 Id = dto.InteractionId,
-                IsCompleted =
-                    dto.IsTerminal &&
-                    string.Equals(dto.Status, "completed", StringComparison.OrdinalIgnoreCase),
-                CreatedAt = dto.TimestampUtc == default
-                    ? DateTime.UtcNow
-                    : dto.TimestampUtc,
+                IsCompleted = isCompleted,
+                CreatedAt = dto.TimestampUtc == default ? DateTime.UtcNow : dto.TimestampUtc,
                 Status = dto.Status,
                 Message = dto.Message
             };
 
+            if (dto.IsTerminal)
+            {
+                live.PollingCts?.Cancel();
+                live.PollingCts?.Dispose();
+                live.PollingCts = null;
+
+                /*
+                 * "IsCompleted" sert ici à indiquer
+                 * que le suivi de cette requête est terminé,
+                 * même lorsque son résultat est un échec.
+                 */
+                live.IsCompleted = true;
+
+                if (_currentInteractionId ==
+                    dto.InteractionId)
+                {
+                    _currentInteractionId = null;
+                    _currentRequestId = null;
+                }
+            }
+
+            if (isFailed)
+            {
+                var failureMessage = string.IsNullOrWhiteSpace(dto.Message) ? "GPT request failed." : $"GPT request failed: {dto.Message}";
+
+                await RaiseStatusChangedAsync(failureMessage);
+
+                return;
+            }
+
+            if (isCancelled)
+            {
+                await RaiseStatusChangedAsync(string.IsNullOrWhiteSpace(dto.Message) ? "Generation cancelled." : dto.Message);
+
+                return;
+            }
+
             if (!string.IsNullOrWhiteSpace(dto.Message))
+            {
                 await RaiseStatusChangedAsync(dto.Message);
+            }
             else if (!string.IsNullOrWhiteSpace(dto.Status))
+            {
                 await RaiseStatusChangedAsync(dto.Status);
+            }
         }
 
         private async Task HandleCompletedAsync(ClientGptInteractionCompletedDTO dto)
@@ -416,8 +464,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 return;
 
             Console.WriteLine($"[GPT CLIENT] COMPLETED {dto.Id}");
-            Console.WriteLine(
-                $"[GptClientOrchestrator] COMPLETED received -> InteractionId={dto.Id}");
+            Console.WriteLine($"[GptClientOrchestrator] COMPLETED received -> InteractionId={dto.Id}");
 
             HasReceivedHubEvent = true;
 

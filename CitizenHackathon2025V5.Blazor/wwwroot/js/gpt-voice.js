@@ -9,14 +9,32 @@
         recognition: null,
         isListening: false,
         dotNetRef: null,
+
         selectedVoiceName: null,
         selectedLang: "fr-FR",
         rate: 0.95,
         pitch: 1.0,
-        volume: 1.0
+        volume: 1.0,
+
+        /*
+         * Remains true as long as the user
+         * has not explicitly requested a stop.
+         */
+        keepListening: false,
+
+        /*
+         * Allows differentiating a natural pause
+         * from a click on "Stop and send".
+         */
+        manualStopRequested: false,
+
+        stopNotificationSent: false,
+        restartTimer: null,
+        sessionId: 0
     };
 
-    function buildRecognition(lang) {
+    function buildRecognition(lang)
+    {
         if (!SpeechRecognition) {
             return null;
         }
@@ -25,7 +43,7 @@
         /*recognition.lang = lang || "fr-BE";*/
         recognition.lang = lang || "fr-FR";
         /*recognition.lang = "en-US";*/
-        recognition.continuous = false;
+        recognition.continuous = true;
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
 
@@ -36,27 +54,72 @@
         return !!SpeechRecognition;
     }
 
-    async function stopInternal(notifyStopped) {
-        if (!state.recognition) {
-            state.isListening = false;
+    function clearRestartTimer() {
+        if (state.restartTimer !== null) {
+            window.clearTimeout(state.restartTimer);
+            state.restartTimer = null;
+        }
+    }
+
+    async function notifyStoppedOnce() {
+        if (state.stopNotificationSent) {
+            return;
+        }
+
+        state.stopNotificationSent = true;
+
+        console.log("[gptVoice] explicit stop notification");
+
+        if (!state.dotNetRef) {
             return;
         }
 
         try {
-            state.recognition.onresult = null;
-            state.recognition.onerror = null;
-            state.recognition.onend = null;
-            state.recognition.abort();
-        } catch {
+            await state.dotNetRef.invokeMethodAsync("OnVoiceStopped");
+        }
+        catch (error) {
+            console.warn("[gptVoice] OnVoiceStopped failed", error);
+        }
+    }
+
+    async function stopInternal(notifyStopped) {
+        clearRestartTimer();
+
+        state.keepListening = false;
+        state.manualStopRequested = notifyStopped === true;
+
+        const recognition = state.recognition;
+
+        if (!recognition) {
+            state.isListening = false;
+
+            if (notifyStopped) {
+                await notifyStoppedOnce();
+            }
+
+            return;
         }
 
-        state.recognition = null;
-        state.isListening = false;
+        /*
+         * stop() allows the engine to provide
+         * a final result.
+         *
+         * abort() would potentially discard
+         * the last spoken words.
+         */
+        try {
+            recognition.stop();
+        }
+        catch (error) {
+            console.warn(
+                "[gptVoice] recognition.stop failed",
+                error);
 
-        if (notifyStopped && state.dotNetRef) {
-            try {
-                await state.dotNetRef.invokeMethodAsync("OnVoiceStopped");
-            } catch {
+            state.recognition = null;
+            state.isListening = false;
+
+            if (notifyStopped) {
+                await notifyStoppedOnce();
             }
         }
     }
@@ -133,6 +196,9 @@
 
             // IMPORTANT: Properly terminate all old sessions
             if (state.recognition) {
+                state.keepListening = false;
+                state.manualStopRequested = false;
+                clearRestartTimer();
                 try {
                     state.recognition.onresult = null;
                     state.recognition.onerror = null;
@@ -147,7 +213,18 @@
                 await new Promise(resolve => setTimeout(resolve, 250));
             }
 
+            clearRestartTimer();
+
             state.dotNetRef = dotNetRef;
+
+            state.sessionId++;
+            const currentSessionId = state.sessionId;
+
+            state.keepListening = true;
+            state.manualStopRequested = false;
+            state.stopNotificationSent = false;
+            state.isListening = false;
+
             state.recognition = buildRecognition(lang);
 
             const recognition = state.recognition;
@@ -194,35 +271,56 @@
                 }
             };
 
-            recognition.onerror = async (event) => {
-                const code = event?.error || "";
-                console.warn("[gptVoice] onerror", code, event);
+            recognition.onerror = async event => {const code = event?.error || "unknown";
 
+                console.warn("[gptVoice] onerror",
+                {
+                    code,
+                    keepListening:
+                        state.keepListening,
+                    manualStopRequested:
+                        state.manualStopRequested
+                });
+
+                /*
+                 * A temporary loss of speech
+                 * usually corresponds to a pause.
+                 *
+                 * onend will restart the recognition.
+                 */
+                if (code === "no-speech") {
+                    console.log("[gptVoice] no-speech ignored; " + "listening will restart");
+
+                    return;
+                }
+
+                /*
+                 * Can happen during a stop or
+                 * when replacing an old session.
+                 */
+                if (code === "aborted") {
+                    console.log("[gptVoice] aborted ignored");
+
+                    return;
+                }
+
+                state.keepListening = false;
                 state.isListening = false;
 
-                if (code === "aborted") {
-                    console.warn("[gptVoice] aborted ignored");
-                    return;
-                }
+                clearRestartTimer();
 
-                if (code === "no-speech") {
-                    if (state.dotNetRef) {
-                        await state.dotNetRef.invokeMethodAsync(
-                            "OnVoiceRecognitionError",
-                            "No speech detected. Click Start dictation and speak immediately."
-                        );
-                    }
-                    return;
-                }
+                let message =`Voice recognition error: ${code}`;
 
-                let message = `Voice recognition error: ${code || "unknown"}`;
-
-                if (code === "not-allowed")
+                if (code === "not-allowed") {
                     message = "Microphone access was denied.";
-                else if (code === "audio-capture")
+                }
+                else if (code === "audio-capture") {
                     message = "No microphone was detected.";
-                else if (code === "network")
-                    message = "A network error occurred during voice recognition.";
+                }
+                else if (code === "network") {
+                    message = "A network error occurred during " +
+                        "voice recognition.";
+                }
 
                 if (state.dotNetRef) {
                     await state.dotNetRef.invokeMethodAsync("OnVoiceRecognitionError", message);
@@ -230,18 +328,76 @@
             };
 
             recognition.onend = async () => {
-                console.log("[gptVoice] onend");
-
-                state.recognition = null;
                 state.isListening = false;
 
-                if (state.suppressNextEnd) {
-                    state.suppressNextEnd = false;
+                console.log(
+                    "[gptVoice] onend",
+                    {
+                        currentSessionId,
+                        activeSessionId: state.sessionId,
+                        keepListening: state.keepListening,
+                        manualStopRequested: state.manualStopRequested
+                    });
+
+                /*
+                 * Ignore events from a previous session.
+                 */
+                if (
+                    currentSessionId !== state.sessionId) {
                     return;
                 }
 
-                if (state.dotNetRef) {
-                    await state.dotNetRef.invokeMethodAsync("OnVoiceStopped");
+                /*
+                 * A natural pause should not send
+                 * the prompt.
+                 *
+                 * We silently restart the same engine.
+                 */
+                if (
+                    state.keepListening && !state.manualStopRequested) {
+
+                    clearRestartTimer();
+
+                    state.restartTimer =
+                        window.setTimeout(
+                            () => {
+                                if (
+                                    !state.keepListening ||
+                                    state.manualStopRequested ||
+                                    currentSessionId !==
+                                    state.sessionId) {
+                                    return;
+                                }
+
+                                try {
+                                    console.log("[gptVoice] restarting " + "after natural pause");
+
+                                    recognition.start();
+                                }
+                                catch (error) {
+                                    /*
+                                     * Chrome can flag
+                                     * InvalidStateError if a start
+                                     * is already in progress.
+                                     */
+                                    if (error?.name !== "InvalidStateError") {
+                                        console.warn("[gptVoice] restart failed", error);
+                                    }
+                                }
+                            },
+                            350);
+
+                    return;
+                }
+
+                state.recognition = null;
+
+                /*
+                 * We notify Blazor only after
+                 * a manual stop.
+                 */
+                if (state.manualStopRequested) {
+                    await notifyStoppedOnce();
                 }
             };
 
