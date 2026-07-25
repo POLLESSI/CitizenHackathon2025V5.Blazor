@@ -210,51 +210,28 @@
     };
 
     globalThis.OutZenInterop.clearCrowdMarkers = async function (scopeKey) {
-
         const module = await loadModule(false);
 
-        if (typeof module?.clearCrowdMarkers === "function")
-        {
-            console.error("[OutZenInterop] " + "clearCrowdMarkers missing",
-            {
-                url: globalThis.__OutZenImportUrl ?? null,
-
-                exports: module ? Object.keys(module) : []
-            });
-
-            return false;
+        if (typeof module?.clearCrowdMarkers === "function") {
+            return module.clearCrowdMarkers(scopeKey);
         }
 
-        return module.clearGeneralMarkers(scopeKey);
-        
-        /*
-            * Temporary compatibility if alone
-            * clearGeneralMarkers exists.
-            */
         if (typeof module?.clearGeneralMarkers === "function") {
-            console.warn(
-                "[OutZenInterop] " +
-                "clearCrowdMarkers missing; " +
-                "using clearGeneralMarkers fallback",
-                {
-                    scopeKey,
-
-                    url:globalThis.__OutZenImportUrl ?? null
-                });
+            console.warn("[OutZenInterop] clearCrowdMarkers missing; using clearGeneralMarkers fallback",
+            {
+                scopeKey,
+                url: globalThis.__OutZenImportUrl ?? null
+            });
 
             return module.clearGeneralMarkers(scopeKey);
         }
 
-        console.error(
-            "[OutZenInterop] " +
-            "no marker clear function exported",
-            {
-                scopeKey,
-
-                url:globalThis.__OutZenImportUrl ?? null,
-
-                esmKeys: module ? Object.keys(module) : []
-            });
+        console.error("[OutZenInterop] no marker clear function exported",
+        {
+            scopeKey,
+            url: globalThis.__OutZenImportUrl ?? null,
+            esmKeys: module ? Object.keys(module) : []
+        });
 
         return false;
     };

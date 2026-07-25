@@ -98,7 +98,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
                 }
 
                 var markerKey = BuildMarkerKey(cluster);
-                activeMarkerKeys.Add(markerKey);
+                activeMarkerKeys.Add($"antenna-alert:{markerKey}");
 
                 var payload = new
                 {
@@ -121,10 +121,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
 
                 try
                 {
-                    var ok = await JS.InvokeAsync<bool>(
-                        "OutZenInterop.__esm.addOrUpdateAntennaAlertCircle",
-                        payload,
-                        ScopeKey);
+                    var ok = await JS.InvokeAsync<bool>("OutZenInterop.__esm.addOrUpdateAntennaAlertCircle", payload, ScopeKey);
 
                     LogVerbose($"Marker added={ok} key={markerKey} zone={cluster.ZoneName}");
                 }
@@ -148,10 +145,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
         {
             try
             {
-                var removed = await JS.InvokeAsync<int>(
-                    "OutZenInterop.__esm.pruneAntennaAlertMarkers",
-                    activeMarkerKeys,
-                    ScopeKey);
+                var removed = await JS.InvokeAsync<int>("OutZenInterop.__esm.pruneAntennaAlertMarkers", activeMarkerKeys, ScopeKey);
 
                 Console.WriteLine($"[COMMAND CENTER] Old markers pruned={removed}");
             }
@@ -166,10 +160,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
         {
             try
             {
-                var removed = await JS.InvokeAsync<int>(
-                    "OutZenInterop.__esm.pruneAntennaAlertMarkers",
-                    Array.Empty<string>(),
-                    ScopeKey);
+                var removed = await JS.InvokeAsync<int>("OutZenInterop.__esm.pruneAntennaAlertMarkers", Array.Empty<string>(), ScopeKey);
 
                 Console.WriteLine($"[COMMAND CENTER] All old markers pruned={removed}");
             }
@@ -184,9 +175,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
         {
             try
             {
-                var fitted = await JS.InvokeAsync<bool>(
-                    "OutZenInterop.__esm.fitToAntennaAlertMarkers",
-                    ScopeKey,
+                var fitted = await JS.InvokeAsync<bool>("OutZenInterop.__esm.fitToAntennaAlertMarkers", ScopeKey,
                     new
                     {
                         maxZoom = 9,
@@ -197,8 +186,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
             }
             catch (JSException ex)
             {
-                Console.WriteLine(
-                    $"[COMMAND CENTER] fitToAntennaAlertMarkers failed: {ex.Message}");
+                Console.WriteLine($"[COMMAND CENTER] fitToAntennaAlertMarkers failed: {ex.Message}");
             }
         }
 
