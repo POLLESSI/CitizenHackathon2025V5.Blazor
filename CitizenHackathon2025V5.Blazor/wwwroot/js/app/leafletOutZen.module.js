@@ -4372,6 +4372,18 @@ export function pruneMarkersByPrefix(prefix = "", scopeKey = null) {
     return removed;
 }
 
+function normalizeAntennaAlertKey(value) {
+    const raw = String(value ?? "").trim();
+
+    if (!raw) {
+        return "";
+    }
+
+    return raw.startsWith("antenna-alert:")
+        ? raw
+        : `antenna-alert:${raw}`;
+}
+
 export function pruneAntennaAlertMarkers(activeIds, scopeKey = null) {
     const ready = ensureMapReady(scopeKey);
 
@@ -4387,7 +4399,8 @@ export function pruneAntennaAlertMarkers(activeIds, scopeKey = null) {
     const activeSet = new Set(
         (activeIds ?? [])
             .filter(x => x !== null && x !== undefined)
-            .map(x => `antenna-alert:${x}`)
+            .map(normalizeAntennaAlertKey)
+            .filter(x => x.length > 0)
     );
 
     let removed = 0;
@@ -4400,12 +4413,20 @@ export function pruneAntennaAlertMarkers(activeIds, scopeKey = null) {
         try {
             map.removeLayer(marker);
         } catch {
-            // ignore remove failure
+            // ignore removal failure
         }
 
         s.antennaAlertMarkers.delete(key);
         removed++;
     }
+
+    console.log("[ANTENNA ALERT] prune completed", {
+        scopeKey,
+        activeIds,
+        keep: Array.from(activeSet),
+        remaining: Array.from(s.antennaAlertMarkers.keys()),
+        removed
+    });
 
     return removed;
 }

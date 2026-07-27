@@ -98,11 +98,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
                 }
 
                 var markerKey = BuildMarkerKey(cluster);
-                activeMarkerKeys.Add($"antenna-alert:{markerKey}");
+                var jsMarkerKey = ToAntennaAlertMarkerKey(markerKey);
+
+                activeMarkerKeys.Add(jsMarkerKey);
 
                 var payload = new
                 {
-                    AntennaId = markerKey,
+                    AntennaId = jsMarkerKey,
 
                     Latitude = cluster.Latitude,
                     Longitude = cluster.Longitude,
@@ -190,6 +192,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
             }
         }
 
+        private static string ToAntennaAlertMarkerKey(string markerKey)
+        {
+            if (string.IsNullOrWhiteSpace(markerKey))
+                return "antenna-alert:unknown";
+
+            return markerKey.StartsWith(
+                "antenna-alert:",
+                StringComparison.OrdinalIgnoreCase)
+                    ? markerKey
+                    : $"antenna-alert:{markerKey}";
+        }
         private static string BuildMarkerKey(CrowdAlertCluster cluster)
         {
             var alertIds = cluster.AlertIds ?? new List<long>();
