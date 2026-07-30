@@ -916,6 +916,74 @@
 
         return true;
     };
+
+    globalThis.OutZen ??= {};
+
+    globalThis.OutZen.scrollIntoViewById = function (id, options = null) {
+
+        globalThis.__outZenScrollCallCount ??= 0;
+
+        const callNumber =
+            ++globalThis.__outZenScrollCallCount;
+
+        const target = document.getElementById(id);
+
+        if (!target) {
+            console.warn("[OutZen] Scroll target not found",
+                {
+                    callNumber,
+                    id
+                }
+            );
+
+            return false;
+        }
+
+        const behavior = options?.behavior ?? "smooth";
+        const offsetValue = Number(options?.offset);
+        const offset = Number.isFinite(offsetValue) ? offsetValue : 140;
+
+            /*
+             * Search for the first parent that possesses
+             * actually its own vertical scrolling.
+             */
+            let scrollParent = target.parentElement;
+
+        while (scrollParent && scrollParent !== document.body && scrollParent !== document.documentElement)
+        {
+            const style = getComputedStyle(scrollParent);
+            const canScroll = /^(auto|scroll|overlay)$/.test(style.overflowY)
+                && scrollParent.scrollHeight > scrollParent.clientHeight + 1;
+
+            if (canScroll) {
+                break;
+            }
+
+            scrollParent = scrollParent.parentElement;
+        }
+
+        if (!scrollParent || scrollParent === document.body || scrollParent === document.documentElement)
+        {
+            const absoluteTop = target.getBoundingClientRect().top + window.scrollY - offset;
+
+            window.scrollTo({top: Math.max(0, absoluteTop), behavior
+        });
+
+            console.log("[OutZen] Window scroll requested",{id, absoluteTop, offset});
+
+            return true;
+        }
+
+        const targetRect = target.getBoundingClientRect();
+        const parentRect = scrollParent.getBoundingClientRect();
+        const destination = scrollParent.scrollTop + targetRect.top - parentRect.top - offset;
+
+        scrollParent.scrollTo({top: Math.max(0, destination), behavior});
+
+        console.log("[OutZen] Container scroll requested", {id, scrollParent: scrollParent.id || scrollParent.className || scrollParent.tagName, destination, offset});
+
+        return true;
+    };
 })();
 
 

@@ -1,0 +1,21 @@
+﻿/*OzFloatingWindow.razor.css*/
+.oz-drawer.minimized {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    resize: none !important;
+}
+
+    .oz-drawer.minimized .oz-body {
+        display: none !important;
+    }
+
+    .oz-drawer.minimized .oz-resize-handle {
+        display: none !important;
+    }
+
+    .oz-drawer.minimized .oz-titlebar {
+        border-bottom-left-radius: inherit;
+        border-bottom-right-radius: inherit;
+    }

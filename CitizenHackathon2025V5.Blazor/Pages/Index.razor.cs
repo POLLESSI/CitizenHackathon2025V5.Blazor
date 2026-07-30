@@ -22,25 +22,25 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
     {
     #nullable disable
         [Inject] public MessageService MessageService { get; set; } = default!;
-        [Inject] public IJSRuntime JS { get; set; } = default!;
         [Inject] public TrafficConditionService TrafficConditionService { get; set; } = default!;
         [Inject] public CrowdInfoService CrowdInfoService { get; set; } = default!;
         [Inject] public CrowdInfoCalendarService CrowdInfoCalendarService { get; set; } = default!;
-        [Inject] public ICrowdInfoAntennaService CrowdInfoAntennaService { get; set; } = default!;
         [Inject] public CrowdSafetyAlertClientService CrowdSafetyAlertService { get; set; } = default!;
-        [Inject] public IDisasterCriticalAlertClientService DisasterCriticalAlertService { get; set; } = default!;
-
         [Inject] public EventService EventService { get; set; } = default!;
         [Inject] public SuggestionService SuggestionService { get; set; } = default!;
         [Inject] public PlaceService PlaceService { get; set; } = default!;
         [Inject] public WeatherForecastService WeatherForecastService { get; set; } = default!;
         [Inject] public GptInteractionService GptInteractionService { get; set; } = default!;
+        [Inject] public NavigationManager Navigation { get; set; } = default!;
+        [Inject] public IJSRuntime JS { get; set; } = default!;
+        [Inject] public ICrowdInfoAntennaService CrowdInfoAntennaService { get; set; } = default!;
+        [Inject] public IDisasterCriticalAlertClientService DisasterCriticalAlertService { get; set; } = default!;
+        [Inject] public IHubTokenService HubTokenService { get; set; } = default!;
         [Inject] public IGptClientOrchestrator GptClientOrchestrator { get; set; } = default!;
         [Inject] public ITrafficCriticalAlertClientService TrafficCriticalAlertService { get; set; } = default!;
         [Inject] public IWeatherCriticalAlertClientService WeatherCriticalAlertService { get; set; } = default!;
-        [Inject] public NavigationManager Navigation { get; set; } = default!;
         [Inject] public IHubUrlBuilder HubUrls { get; set; } = default!;
-        [Inject] public IAuthService Auth { get; set; } = default!;
+        //[Inject] public IAuthService Auth { get; set; } = default!;
 
         protected override string ScopeKey => "home";
         protected override string MapId => "leafletMap-home";
@@ -117,6 +117,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private readonly List<ClientGptInteractionDTO> _all = new();
         private readonly List<ClientGptInteractionDTO> _visible = new();
         private readonly SemaphoreSlim _homeRefreshLock = new(1, 1);
+        private readonly string _instanceId = Guid.NewGuid().ToString("N")[..8];
 
         [JSInvokable]
         public Task SelectSuggestionFromMap(int suggestionId)
@@ -127,6 +128,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
         protected override async Task OnInitializedAsync()
         {
+            Console.WriteLine($"[HOME][{_instanceId}] " + "OnInitializedAsync started.");
+
             GptClientOrchestrator.InteractionUpdated += OnGptInteractionUpdatedAsync;
             GptClientOrchestrator.StatusChanged += OnGptStatusChangedAsync;
 
@@ -167,8 +170,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             await SafeLoadAntennasAsync();
             await EnsureAntennaHubAsync();
-            await LoadLatestCrowdSafetyAlertsAsync();
-
+           
             try
             {
                 await GptClientOrchestrator.EnsureHubAsync();
@@ -181,6 +183,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             StartCalendarTimer();
 
             await InvokeAsync(StateHasChanged);
+
+            Console.WriteLine($"[HOME][{_instanceId}] " + "Initial data loaded.");
+
             await NotifyDataLoadedAsync(fit: true);
         }
 
@@ -188,9 +193,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         {
             await base.OnAfterRenderAsync(firstRender);
 
-            if (firstRender)
+            if (!firstRender)
+                return;
+
+            try
             {
                 await JS.InvokeVoidAsync("OutZenInterop.makeAlertClusterDraggable");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[HOME] Alert cluster wiring failed: {ex.Message}");
             }
         }
         protected override async Task SeedAsync(bool fit)
@@ -220,11 +232,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             };
 
             // 0 = adaptive tolerance based on the zoom level.
-            await JS.InvokeVoidAsync(
-                "OutZenInterop.addOrUpdateBundleMarkers",
-                payload,
-                0,
-                ScopeKey);
+            await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateBundleMarkers", payload, 0, ScopeKey);
 
             var nowUtc = DateTime.UtcNow;
 
@@ -232,19 +240,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 .Where(x => IsNowActive(x, nowUtc))
                 .ToList();
 
-            await JS.InvokeVoidAsync(
-                "OutZenInterop.upsertCrowdCalendarMarkers",
-                todayCalendar,
-                ScopeKey);
+            await JS.InvokeVoidAsync("OutZenInterop.upsertCrowdCalendarMarkers", todayCalendar, ScopeKey);
 
             if (fit)
             {
                 try
                 {
-                    await JS.InvokeVoidAsync(
-                        "OutZenInterop.fitToAllMarkers",
-                        ScopeKey,
-                        new { maxZoom = 16 });
+                    await JS.InvokeVoidAsync("OutZenInterop.fitToAllMarkers", ScopeKey, new { maxZoom = 16 });
                 }
                 catch
                 {
@@ -254,10 +256,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
                 try
                 {
-                    await JS.InvokeVoidAsync(
-                        "OutZenInterop.activateHybridAndZoom",
-                        ScopeKey,
-                        HybridThreshold);
+                    await JS.InvokeVoidAsync("OutZenInterop.activateHybridAndZoom", ScopeKey, HybridThreshold);
                 }
                 catch
                 {
@@ -265,9 +264,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
                 try
                 {
-                    await JS.InvokeVoidAsync(
-                        "OutZenInterop.refreshHybridNow",
-                        ScopeKey);
+                    await JS.InvokeVoidAsync("OutZenInterop.refreshHybridNow", ScopeKey);
                 }
                 catch
                 {
@@ -295,24 +292,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
                 if (_selectedPlaceId is null or <= 0)
                 {
-                    ToastService.ShowWarning(
-                        "No nearby place could be resolved " +
-                        "from your location.");
+                    ToastService.ShowWarning("No nearby place could be resolved " + "from your location.");
 
                     return;
                 }
 
-                Console.WriteLine(
-                    $"[ALERT] Selected=" +
-                    $"{_selectedPlaceName} " +
-                    $"({_selectedPlaceId})");
+                Console.WriteLine($"[ALERT] Selected=" + $"{_selectedPlaceName} " + $"({_selectedPlaceId})");
 
-                var result =
-                    await CriticalAlertService
-                        .SendCriticalAlertAsync(
-                            _selectedPlaceId.Value,
-                            $"Manual critical alert for " +
-                            $"{_selectedPlaceName}");
+                var result = await CriticalAlertService.SendCriticalAlertAsync(_selectedPlaceId.Value, $"Manual critical alert for " + $"{_selectedPlaceName}");
 
                 Console.WriteLine(
                     "[ALERT RESULT] " +
@@ -328,20 +315,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
                 if (!result.Ok)
                 {
-                    Console.Error.WriteLine(
-                        result.Error);
+                    Console.Error.WriteLine(result.Error);
 
-                    ToastService.ShowWarning(
-                        "Alert could not be sent. " +
-                        "Check browser/API console.");
+                    ToastService.ShowWarning("Alert could not be sent. " + "Check browser/API console.");
 
                     return;
                 }
 
                 var requiredConfirmations =
-                    Math.Max(
-                        FullAlertMinimumDistinctDevices,
-                        result.RequiredCount);
+                    Math.Max(FullAlertMinimumDistinctDevices, result.RequiredCount);
 
                 var isConfirmed =
                     string.Equals(
@@ -361,20 +343,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                         $"{result.ConfirmationCount}/" +
                         $"{requiredConfirmations}.";
 
-                    ToastService.ShowInfo(
-                        _criticalAlertStatus);
+                    ToastService.ShowInfo(_criticalAlertStatus);
 
                     /*
-                     * Aucun marqueur Full Alert avant
-                     * confirmation par le nombre minimal
-                     * d'appareils distincts.
+                     * No prior Full Alert marker
+                     * confirmation by the minimum number
+                     * of distinct devices.
                      */
                     return;
                 }
 
-                _criticalAlertStatus =
-                    $"Critical alert confirmed for " +
-                    $"{_selectedPlaceName}";
+                _criticalAlertStatus = $"Critical alert confirmed for " + $"{_selectedPlaceName}";
 
                 ToastService.ShowError(
                     $"CRITICAL CROWD ALERT confirmed for " +
@@ -385,83 +364,48 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                         settings.ShowProgressBar = true;
                     });
 
-                var declaredAtUtc =
-                    DateTime.UtcNow;
+                var declaredAtUtc = DateTime.UtcNow;
 
-                var expiresAtUtc =
-                    result.ExpiresAtUtc
-                    ?? declaredAtUtc.AddMinutes(5);
+                var expiresAtUtc = result.ExpiresAtUtc ?? declaredAtUtc.AddMinutes(5);
 
-                await JS.InvokeVoidAsync(
-                    "OutZenInterop.addOrUpdateFullAlertMarker",
+                await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateFullAlertMarker",
                     new
                     {
-                        PlaceId =
-                            _selectedPlaceId.Value,
+                        PlaceId = _selectedPlaceId.Value,
+                        PlaceName = _selectedPlaceName,
+                        Latitude = _selectedLatitude,
+                        Longitude = _selectedLongitude,
+                        DeclaredAtUtc = declaredAtUtc,
+                        ExpiresAtUtc = expiresAtUtc,
+                        Status = "Confirmed",
 
-                        PlaceName =
-                            _selectedPlaceName,
+                        ConfirmationCount = result.ConfirmationCount,
 
-                        Latitude =
-                            _selectedLatitude,
+                        RequiredCount = requiredConfirmations,
 
-                        Longitude =
-                            _selectedLongitude,
-
-                        DeclaredAtUtc =
-                            declaredAtUtc,
-
-                        ExpiresAtUtc =
-                            expiresAtUtc,
-
-                        Status =
-                            "Confirmed",
-
-                        ConfirmationCount =
-                            result.ConfirmationCount,
-
-                        RequiredCount =
-                            requiredConfirmations,
-
-                        Source =
-                            "ControlCenter",
-
-                        kind =
-                            "crowd",
-
-                        title =
-                            "🚨 FULL ALERT",
-
-                        description =
-                            $"Confirmed critical crowd alert " +
-                            $"at {_selectedPlaceName}",
-
-                        icon =
-                            "🚨"
+                        Source = "ControlCenter",
+                        kind = "crowd",
+                        title = "🚨 FULL ALERT",
+                        description = $"Confirmed critical crowd alert " + $"at {_selectedPlaceName}",
+                        icon = "🚨"
                     },
                     ScopeKey);
 
-                await RefreshHomeDataAsync(
-                    fit: false);
+                await RefreshHomeDataAsync(fit: false);
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine(
-                    $"[ALERT] SendCriticalCrowdAlertAsync " +
-                    $"failed: {ex}");
+                Console.Error.WriteLine($"[ALERT] SendCriticalCrowdAlertAsync " + $"failed: {ex}");
 
-                _criticalAlertStatus =
-                    $"Critical alert error: {ex.Message}";
+                _criticalAlertStatus = $"Critical alert error: {ex.Message}";
 
-                ToastService.ShowError(
-                    _criticalAlertStatus);
+                ToastService.ShowError(_criticalAlertStatus);
             }
             finally
             {
                 _criticalAlertSending = false;
 
-                await InvokeAsync(
-                    StateHasChanged);
+                await InvokeAsync(StateHasChanged);
             }
         }
 
@@ -578,16 +522,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
                 _criticalTrafficStatus = $"Critical traffic congestion confirmed for {placeName}";
 
-                ToastService.ShowWarning(
-                    $"🚗 CRITICAL TRAFFIC CONGESTION confirmed for {placeName}.",
+                ToastService.ShowWarning($"🚗 CRITICAL TRAFFIC CONGESTION confirmed for {placeName}.",
                     settings =>
                     {
                         settings.Timeout = 0;
                         settings.ShowProgressBar = true;
                     });
 
-                await JS.InvokeVoidAsync(
-                    "OutZenInterop.addOrUpdateTrafficAlertMarker",
+                await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateTrafficAlertMarker",
                     new
                     {
                         PlaceId = placeId,
@@ -646,26 +588,22 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
                 if (result.Status == "Pending")
                 {
-                    _criticalDisasterStatus =
-                        $"Disaster alert pending: {result.ConfirmationCount}/{result.RequiredCount} confirmations.";
+                    _criticalDisasterStatus = $"Disaster alert pending: {result.ConfirmationCount}/{result.RequiredCount} confirmations.";
 
                     ToastService.ShowWarning(_criticalDisasterStatus);
                     return;
                 }
 
-                _criticalDisasterStatus =
-                    $"DISASTER ALERT confirmed for {placeName}. Emergency escalation simulated.";
+                _criticalDisasterStatus = $"DISASTER ALERT confirmed for {placeName}. Emergency escalation simulated.";
 
-                ToastService.ShowError(
-                    $"🚨 DISASTER ALERT confirmed for {placeName}. Simulation: emergency escalation request created.",
+                ToastService.ShowError($"🚨 DISASTER ALERT confirmed for {placeName}. Simulation: emergency escalation request created.",
                     settings =>
                     {
                         settings.Timeout = 0;
                         settings.ShowProgressBar = true;
                     });
 
-                await JS.InvokeVoidAsync(
-                    "OutZenInterop.addOrUpdateDisasterAlertMarker",
+                await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateDisasterAlertMarker",
                     new
                     {
                         PlaceName = placeName,
@@ -693,42 +631,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             if (!await _homeRefreshLock.WaitAsync(0))
             {
-                Console.WriteLine(
-                    "[HOME][Refresh] skipped: " +
-                    "another refresh is running.");
+                Console.WriteLine("[HOME][Refresh] skipped: " + "another refresh is running.");
 
                 return;
             }
 
             try
             {
-                var trafficTask =
-                    TrafficConditionService
-                        .GetLatestTrafficConditionAsync();
-
-                var crowdTask =
-                    CrowdInfoService
-                        .GetLatestCrowdInfoNonNullAsync();
-
-                var eventTask =
-                    EventService
-                        .GetLatestEventAsync();
-
-                var suggestionTask =
-                    SuggestionService
-                        .GetLatestSuggestionAsync();
-
-                var placeTask =
-                    PlaceService
-                        .GetLatestPlaceAsync();
-
-                var weatherTask =
-                    WeatherForecastService
-                        .GetLatestWeatherForecastAsync();
-
-                var calendarTask =
-                    CrowdInfoCalendarService
-                        .GetAllSafeAsync();
+                var trafficTask = TrafficConditionService.GetLatestTrafficConditionAsync();
+                var crowdTask = CrowdInfoService.GetLatestCrowdInfoNonNullAsync();
+                var eventTask = EventService.GetLatestEventAsync();
+                var suggestionTask = SuggestionService.GetLatestSuggestionAsync();
+                var placeTask = PlaceService.GetLatestPlaceAsync();
+                var weatherTask = WeatherForecastService.GetLatestWeatherForecastAsync();
+                var calendarTask = CrowdInfoCalendarService.GetAllSafeAsync();
 
                 await Task.WhenAll(
                     trafficTask,
@@ -739,56 +655,31 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                     weatherTask,
                     calendarTask);
 
-                static bool HasValidCoord(
-                    double latitude,
-                    double longitude)
+                static bool HasValidCoord(double latitude, double longitude)
                 {
                     return
                         latitude is >= 49.45 and <= 51.6 &&
                         longitude is >= 2.3 and <= 6.6;
                 }
 
-                var nextTraffic =
-                    trafficTask.Result?
-                        .ToList()
-                    ?? new List<ClientTrafficConditionDTO>();
-
-                var nextCrowds =
-                    (crowdTask.Result
-                        ?? Enumerable.Empty<ClientCrowdInfoDTO>())
-                    .Where(c =>
-                        HasValidCoord(
-                            c.Latitude,
-                            c.Longitude))
-                    .Where(c =>
-                        !IsStaleManualCriticalAlert(c))
+                var nextTraffic = trafficTask.Result?.ToList() ?? new List<ClientTrafficConditionDTO>();
+                var nextCrowds = (crowdTask.Result ?? Enumerable.Empty<ClientCrowdInfoDTO>())
+                    .Where(c => HasValidCoord(c.Latitude, c.Longitude))
+                    .Where(c => !IsStaleManualCriticalAlert(c))
                     .ToList();
 
-                var nextEvents =
-                    (eventTask.Result
-                        ?? Enumerable.Empty<ClientEventDTO>())
-                    .Where(e =>
-                        HasValidCoord(
-                            e.Latitude,
-                            e.Longitude))
+                var nextEvents = (eventTask.Result ?? Enumerable.Empty<ClientEventDTO>())
+                    .Where(e => HasValidCoord(e.Latitude, e.Longitude))
                     .ToList();
 
-                var nextSuggestions =
-                    (suggestionTask.Result
-                        ?? Enumerable.Empty<ClientSuggestionDTO>())
+                var nextSuggestions = (suggestionTask.Result ?? Enumerable.Empty<ClientSuggestionDTO>())
                     .ToList();
 
-                var nextPlaces =
-                    (placeTask.Result
-                        ?? Enumerable.Empty<ClientPlaceDTO>())
-                    .Where(p =>
-                        HasValidCoord(
-                            p.Latitude,
-                            p.Longitude))
+                var nextPlaces = (placeTask.Result ?? Enumerable.Empty<ClientPlaceDTO>())
+                    .Where(p => HasValidCoord(p.Latitude,p.Longitude))
                     .ToList();
 
                 var nextWeather = (weatherTask.Result ?? Enumerable.Empty<ClientWeatherForecastDTO>()).ToList();
-
                 var nextCalendar = calendarTask.Result?.ToList() ?? new List<ClientCrowdInfoCalendarDTO>();
 
 
@@ -823,9 +714,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                  * une panne générale ne doit jamais effacer
                  * une carte déjà remplie.
                  */
-                if (
-                    incomingTotal == 0 &&
-                    currentTotal > 0)
+                if (incomingTotal == 0 && currentTotal > 0)
                 {
                     Console.Error.WriteLine(
                         "[HOME][Refresh] all endpoints " +
@@ -835,37 +724,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                     return;
                 }
 
-                _traffic =
-                    KeepPreviousWhenEmpty(
-                        _traffic,
-                        nextTraffic,
-                        "traffic");
-
-                _crowds =
-                    KeepPreviousWhenEmpty(
-                        _crowds,
-                        nextCrowds,
-                        "crowds");
-
-                _events =
-                    KeepPreviousWhenEmpty(
-                        _events,
-                        nextEvents,
-                        "events");
+                _traffic = KeepPreviousWhenEmpty(_traffic, nextTraffic, "traffic");
+                _crowds = KeepPreviousWhenEmpty(_crowds, nextCrowds, "crowds");
+                _events = KeepPreviousWhenEmpty(_events, nextEvents, "events");
 
                 /*
-                 * Une liste de suggestions vide peut être
-                 * parfaitement normale.
+                 * An empty list of suggestions can be
+                 * perfectly normal.
                  */
-                _suggestions =
-                    nextSuggestions;
-
-                _places =
-                    KeepPreviousWhenEmpty(
-                        _places,
-                        nextPlaces,
-                        "places");
-
+                _suggestions = nextSuggestions;
+                _places = KeepPreviousWhenEmpty(_places, nextPlaces,"places");
                 _weather = KeepPreviousWhenEmpty(_weather, nextWeather, "weather");
 
                 /*
@@ -876,16 +744,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 {
                     _allCal = nextCalendar;
 
-                    Console.WriteLine(
-                        $"[HOME][Refresh] " +
-                        $"calendar={_allCal.Count}");
+                    Console.WriteLine($"[HOME][Refresh] " + $"calendar={_allCal.Count}");
                 }
                 else if (_allCal.Count > 0)
                 {
-                    Console.WriteLine(
-                        "[HOME][Refresh] " +
-                        "calendar=0; preserving " +
-                        $"{_allCal.Count} previous item(s).");
+                    Console.WriteLine("[HOME][Refresh] " + "calendar=0; preserving " + $"{_allCal.Count} previous item(s).");
                 }
 
                 /*
@@ -893,14 +756,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                  * currently active calendar markers.
                  */
                 await SeedAsync(fit);
-
                 await LoadLatestCrowdSafetyAlertsAsync();
 
                 try
                 {
-                    await JS.InvokeVoidAsync(
-                        "OutZenInterop.refreshMapSize",
-                        ScopeKey);
+                    await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey);
                 }
                 catch
                 {
@@ -908,9 +768,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
                 try
                 {
-                    await JS.InvokeVoidAsync(
-                        "OutZenInterop.refreshHybridNow",
-                        ScopeKey);
+                    await JS.InvokeVoidAsync("OutZenInterop.refreshHybridNow", ScopeKey);
                 }
                 catch
                 {
@@ -921,12 +779,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             catch (Exception ex)
             {
                 /*
-                 * Les anciennes collections restent intactes,
-                 * car les affectations ont lieu seulement
-                 * après Task.WhenAll.
+                 * The old collections remain intact,
+                 * because assignments only occur
+                 * after Task.WhenAll.
                  */
-                Console.Error.WriteLine(
-                    $"[HOME] RefreshHomeDataAsync failed: {ex}");
+                Console.Error.WriteLine($"[HOME] RefreshHomeDataAsync failed: {ex}");
             }
             finally
             {
@@ -979,6 +836,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             try { await JS.InvokeVoidAsync("OutZenInterop.unregisterDotNetRef", ScopeKey); } catch { }
             try { _dotNetRef?.Dispose(); } catch { }
             _dotNetRef = null;
+
+            Console.WriteLine($"[HOME][{_instanceId}] " + "Disposing.");
         }
 
         private void StartCalendarTimer()
@@ -988,8 +847,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             _timerStarted = true;
 
-            _timer = new PeriodicTimer(
-                TimeSpan.FromSeconds(15));
+            _timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
 
             _ = RunHomeRefreshLoopAsync();
         }
@@ -1000,42 +858,34 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             try
             {
-                while (
-                    !_disposed &&
-                    _timerStarted &&
-                    _timer is not null &&
-                    await _timer.WaitForNextTickAsync())
+                while (!_disposed && _timerStarted && _timer is not null && await _timer.WaitForNextTickAsync())
                 {
-                    await InvokeAsync(
-                        RefreshCalendarMarkersNowAsync);
+                    await InvokeAsync(RefreshCalendarMarkersNowAsync);
 
                     ticksUntilFullRefresh--;
 
                     /*
-                     * 4 × 15 secondes = 60 secondes.
+                     * 4 × 15 seconds = 60 seconds.
                      */
                     if (ticksUntilFullRefresh > 0)
                         continue;
 
                     ticksUntilFullRefresh = 4;
 
-                    await InvokeAsync(
-                        () => RefreshHomeDataAsync(
-                            fit: false));
+                    await InvokeAsync(() => RefreshHomeDataAsync(fit: false));
                 }
             }
             catch (ObjectDisposedException)
             {
-                // Fermeture normale de la page.
+                // Normal page closure.
             }
             catch (OperationCanceledException)
             {
-                // Fermeture normale de la page.
+                // Normal page closure.
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine(
-                    $"[HOME] Refresh loop failed: {ex}");
+                Console.Error.WriteLine($"[HOME] Refresh loop failed: {ex}");
             }
         }
 
@@ -1045,9 +895,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 return;
 
             var nowUtc = DateTime.UtcNow;
-            var active = _allCal
-                .Where(x => IsNowActive(x, nowUtc))
-                .ToList();
+            var active = _allCal.Where(x => IsNowActive(x, nowUtc)).ToList();
 
             if (active.Count == 0)
             {
@@ -1057,9 +905,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             await JS.InvokeVoidAsync("OutZenInterop.upsertCrowdCalendarMarkers", active, ScopeKey);
 
-            var activeIds = active
-                .Select(x => $"cc:{x.Id}")
-                .ToList();
+            var activeIds = active.Select(x => $"cc:{x.Id}").ToList();
 
             if (activeIds.Count > 0)
             {
@@ -1069,65 +915,115 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
         private async Task EnsureAntennaHubAsync()
         {
+            if (_disposed)
+                return;
+
             try
             {
-                if (_antennaHub is not null &&
-                    _antennaHub.State == HubConnectionState.Connected)
+                if (_antennaHub is not null)
                 {
-                    return;
+                    if (_antennaHub.State is
+                        HubConnectionState.Connected or
+                        HubConnectionState.Connecting or
+                        HubConnectionState.Reconnecting)
+                    {
+                        return;
+                    }
+
+                    /*
+                     * An old Disconnected connection should not
+                     * remain attached with its old handlers.
+                     */
+                    try
+                    {
+                        await _antennaHub.DisposeAsync();
+                    }
+                    catch
+                    {
+                        // Best effort cleanup.
+                    }
+
+                    _antennaHub = null;
                 }
 
-                var token = await Auth.GetAccessTokenAsync();
-
-                if (string.IsNullOrWhiteSpace(token))
-                {
-                    Console.Error.WriteLine("[HOME] Antenna hub skipped: no JWT token.");
-                    return;
-                }
+                var hubUrl = HubUrls.Build(CrowdInfoAntennaConnectionHubMethods.HubPath);
 
                 _antennaHub = new HubConnectionBuilder()
                     .WithUrl(
-                        HubUrls.Build(CrowdInfoAntennaConnectionHubMethods.HubPath),
+                        hubUrl,
                         options =>
                         {
                             options.Transports =
                                 HttpTransportType.WebSockets |
                                 HttpTransportType.ServerSentEvents;
 
-                            options.AccessTokenProvider = () =>
-                            {
-                                return Task.FromResult<string>(token);
-                            };
+                            /*
+                             * Important :
+                             * do not capture a token only once.
+                             *
+                             * AccessTokenProvider will be called during
+                             * SignalR reconnections and can therefore
+                             * obtain a new ephemeral JWT.
+                             */
+                            options.AccessTokenProvider = async () =>
+                           
+                                await HubTokenService.GetHubTokenAsync();
+
                         })
-                    .WithAutomaticReconnect()
+                    .WithAutomaticReconnect(
+                        new[]
+                        {
+                            TimeSpan.Zero,
+                            TimeSpan.FromSeconds(2),
+                            TimeSpan.FromSeconds(5),
+                            TimeSpan.FromSeconds(10),
+                            TimeSpan.FromSeconds(30)
+                        })
                     .Build();
 
-                _antennaHub.On<ClientAntennaCountsUpdateDTO>(
-                    CrowdInfoAntennaConnectionHubMethods.ToClient.AntennaCountsUpdated,
-                    async msg =>
-                    {
-                        _countsByAntenna[msg.AntennaId] = msg.Counts;
+                RegisterAntennaHubHandlers();
 
-                        if (!IsMapBooted)
-                        {
-                            _pendingCountsUntilMap.Enqueue((msg.AntennaId, msg.Counts));
-                            return;
-                        }
+                _antennaHub.Reconnecting += error =>
+                {
+                    Console.WriteLine("[HOME][AntennaHub] Reconnecting. " + $"Reason={error?.Message ?? "connection lost"}");
 
-                        await ApplyAntennaCriticalOverlayAsync(msg.AntennaId, msg.Counts);
-                    });
+                    return Task.CompletedTask;
+                };
+
+                _antennaHub.Reconnected += async connectionId =>
+                {
+                    Console.WriteLine("[HOME][AntennaHub] Reconnected. " + $"ConnectionId={connectionId ?? "<unknown>"}");
+
+                    /*
+                     * A SignalR reconnection creates a new
+                     * server connection.
+                     *
+                     * The groups from the old connection
+                     * are not preserved.
+                     */
+                    await JoinCriticalAntennaGroupsAsync();
+                };
+
+                _antennaHub.Closed += error =>
+                {
+                    Console.Error.WriteLine("[HOME][AntennaHub] Closed. " + $"Reason={error?.Message ?? "normal closure"}");
+
+                    return Task.CompletedTask;
+                };
+
+                Console.WriteLine($"[HOME][AntennaHub] Connecting to {hubUrl}");
 
                 await _antennaHub.StartAsync();
+
+                Console.WriteLine("[HOME][AntennaHub] Connected. " + $"ConnectionId={_antennaHub.ConnectionId}");
 
                 await JoinCriticalAntennaGroupsAsync();
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine(
-                    $"[HOME] Antenna hub unavailable. Map rendering continues without realtime antenna updates. {ex}");
+                Console.Error.WriteLine("[HOME] Antenna hub unavailable. " + "Map rendering continues without realtime " + $"antenna updates. {ex}");
             }
         }
-
         private async Task JoinCriticalAntennaGroupsAsync()
         {
             if (_antennaHub is null || _antennaHub.State != HubConnectionState.Connected)
@@ -1144,9 +1040,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             try
             {
-                await _antennaHub.InvokeAsync(
-                    CrowdInfoAntennaConnectionHubMethods.FromClient.JoinAntennas,
-                    ids);
+                await _antennaHub.InvokeAsync(CrowdInfoAntennaConnectionHubMethods.FromClient.JoinAntennas, ids);
 
                 Console.WriteLine($"[HOME][AntennaHub] Joined {ids.Length} antenna groups.");
             }
@@ -1164,8 +1058,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             var observedDevices = counts.UniqueDevices > 0 ? counts.UniqueDevices : counts.ActiveConnections;
 
             var level = ComputeLevelByCapacity(antenna, observedDevices);
-
-            var key = $"ant:{antennaId}";
 
             if (level == (int)CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Critical)
             {
@@ -1189,15 +1081,99 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             }
         }
 
-        private static int ComputeLevelByCapacity(ClientCrowdInfoAntennaDTO antenna, int activeConnections)
+        private static int ComputeLevelByCapacity(ClientCrowdInfoAntennaDTO antenna, int observedDevices)
         {
-            var cap = antenna.MaxCapacity <= 0 ? 1 : antenna.MaxCapacity;
-            var ratio = (double)activeConnections / cap;
+            if (observedDevices <= 0)
+            {
+                return (int)
+                    CitizenHackathon2025V5
+                        .Blazor
+                        .Client
+                        .Enums
+                        .CrowdLevelEnum
+                        .Low;
+            }
 
-            if (ratio >= 0.90) return (int)CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Critical;
-            if (ratio >= 0.70) return (int)CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.High;
-            if (ratio >= 0.40) return (int)CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Medium;
-            return (int)CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Low;
+            if (antenna.MaxCapacity is null or <= 0)
+            {
+                return observedDevices switch
+                {
+                    >= 200 => (int)
+                        CitizenHackathon2025V5
+                            .Blazor
+                            .Client
+                            .Enums
+                            .CrowdLevelEnum
+                            .Critical,
+
+                    >= 100 => (int)
+                        CitizenHackathon2025V5
+                            .Blazor
+                            .Client
+                            .Enums
+                            .CrowdLevelEnum
+                            .High,
+
+                    >= 40 => (int)
+                        CitizenHackathon2025V5
+                            .Blazor
+                            .Client
+                            .Enums
+                            .CrowdLevelEnum
+                            .Medium,
+
+                    _ => (int)
+                        CitizenHackathon2025V5
+                            .Blazor
+                            .Client
+                            .Enums
+                            .CrowdLevelEnum
+                            .Low
+                };
+            }
+
+            var ratio = observedDevices / (double)antenna.MaxCapacity.Value;
+
+            if (ratio >= 0.90)
+            {
+                return (int)
+                    CitizenHackathon2025V5
+                        .Blazor
+                        .Client
+                        .Enums
+                        .CrowdLevelEnum
+                        .Critical;
+            }
+
+            if (ratio >= 0.70)
+            {
+                return (int)
+                    CitizenHackathon2025V5
+                        .Blazor
+                        .Client
+                        .Enums
+                        .CrowdLevelEnum
+                        .High;
+            }
+
+            if (ratio >= 0.40)
+            {
+                return (int)
+                    CitizenHackathon2025V5
+                        .Blazor
+                        .Client
+                        .Enums
+                        .CrowdLevelEnum
+                        .Medium;
+            }
+
+            return (int)
+                CitizenHackathon2025V5
+                    .Blazor
+                    .Client
+                    .Enums
+                    .CrowdLevelEnum
+                    .Low;
         }
 
         private async Task SafeLoadAntennasAsync()
@@ -1230,36 +1206,67 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             var prompt = _userPrompt?.Trim();
 
             if (string.IsNullOrWhiteSpace(prompt) || _isSendingPrompt || _disposed)
+            {
                 return;
+            }
 
             _isSendingPrompt = true;
+            _q = string.Empty;
 
             try
             {
                 await GptClientOrchestrator.EnsureHubAsync();
 
-                var started = await GptClientOrchestrator.StartAsync(
-                    prompt,
-                    latitude: DefaultCenter.lat,
-                    longitude: DefaultCenter.lng,
-                    languageCode: "fr-FR");
+                var latitude = _selectedLatitude is >= 49.45 and <= 51.60
+                    ? _selectedLatitude
+                    : DefaultCenter.lat;
+
+                var longitude = _selectedLongitude is >= 2.30 and <= 6.60
+                    ? _selectedLongitude
+                    : DefaultCenter.lng;
+
+                _gptStatusMessage = "Sending request to Mistral...";
+
+                await InvokeAsync(StateHasChanged);
+
+                var started = await GptClientOrchestrator.StartAsync(prompt, latitude, longitude, "fr-FR");
 
                 if (started is null || started.InteractionId <= 0)
                 {
-                    _gptStatusMessage = "GPT request could not be started.";
+                    _gptStatusMessage = "The GPT request could not be started.";
+
                     return;
                 }
 
-                Console.WriteLine($"[HOME GPT] Started InteractionId={started.InteractionId}, RequestId={started.RequestId}");
+                var pendingInteraction = new ClientGptInteractionDTO
+                {
+                    Id = started.InteractionId,
+                    Prompt = prompt,
+                    Response = "Generation in progress...",
+                    CreatedAt = DateTime.UtcNow,
+                    Active = true,
+                    SourceType = "MistralLocal"
+                };
 
-                _gptStatusMessage = started.Message ?? "Generation started.";
+                ApplyOrInsertGptInteraction(pendingInteraction);
+
+                _gptStatusMessage = started.Message ?? $"Generation started — interaction #{started.InteractionId}.";
+
                 _userPrompt = string.Empty;
+
+                Console.WriteLine(
+                    $"[HOME GPT] Started " +
+                    $"InteractionId={started.InteractionId}, " +
+                    $"RequestId={started.RequestId}, " +
+                    $"Latitude={latitude}, " +
+                    $"Longitude={longitude}");
 
                 await InvokeAsync(StateHasChanged);
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[HOME GPT] SendUserPromptAsync failed: {ex}");
+
                 _gptStatusMessage = $"GPT error: {ex.Message}";
             }
             finally
@@ -1299,6 +1306,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
         private static string BuildCrowdMarkerKey(int placeId)
             => $"crowd-place:{placeId}";
+
         private static void Upsert(List<ClientGptInteractionDTO> list, ClientGptInteractionDTO dto)
         {
             var idx = list.FindIndex(x => x.Id == dto.Id);
@@ -1306,6 +1314,57 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 list[idx] = dto;
             else
                 list.Insert(0, dto);
+        }
+
+        private void RegisterAntennaHubHandlers()
+        {
+            if (_antennaHub is null)
+                return;
+
+            _antennaHub.On<ClientAntennaCountsUpdateDTO>(CrowdInfoAntennaConnectionHubMethods
+                    .ToClient
+                    .AntennaCountsUpdated,
+                async message =>
+                {
+                    if (_disposed || message is null || message.AntennaId <= 0 || message.Counts is null)
+                    {
+                        return;
+                    }
+
+                    _countsByAntenna[message.AntennaId] = message.Counts;
+
+                    if (!IsMapBooted)
+                    {
+                        _pendingCountsUntilMap.Enqueue(
+                            (
+                                message.AntennaId,
+                                message.Counts
+                            ));
+
+                        return;
+                    }
+
+                    await InvokeAsync(
+                        async () =>
+                        {
+                            await ApplyAntennaCriticalOverlayAsync(
+                                message.AntennaId,
+                                message.Counts);
+
+                            StateHasChanged();
+                        });
+
+                    if (_disposed || message is null || message.AntennaId <= 0 || message.Counts is null)
+                    {
+                        return;
+                    }
+
+                    Console.WriteLine(
+                        "[HOME][AntennaHub] Counts received. " +
+                        $"AntennaId={message.AntennaId}, " +
+                        $"Active={message.Counts.ActiveConnections}, " +
+                        $"Unique={message.Counts.UniqueDevices}");
+                });
         }
 
         private void LoadMore()
@@ -1351,8 +1410,24 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             => string.IsNullOrWhiteSpace(s) ? "" : (s.Length <= max ? s : s[..max] + "…");
 
         private async Task ScrollToSuggestions()
-            => await JS.InvokeVoidAsync("OutZen.scrollIntoViewById", "suggestions",
-                new { behavior = "smooth", block = "start" });
+        {
+            try
+            {
+                var found = await JS.InvokeAsync<bool>("OutZen.scrollIntoViewById", "suggestions",
+                    new
+                    {
+                        behavior = "smooth",
+                        block = "start",
+                        offset = 150
+                    });
+
+                Console.WriteLine("[HOME] Scroll To Suggestions " + $"targetFound={found}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("[HOME] Scroll To Suggestions failed: " + ex);
+            }
+        }
 
         protected Task EnableSoundAsync() => Task.CompletedTask;
 
@@ -1396,8 +1471,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                     return;
                 }
 
-                var pos = await JS.InvokeAsync<ClientUserPositionDto>(
-                    "outzenLocation.getCurrentPosition");
+                var pos = await JS.InvokeAsync<ClientUserPositionDto>("outzenLocation.getCurrentPosition");
                 Console.WriteLine($"[GPS] {pos.Latitude}, {pos.Longitude}");
 
                 Console.WriteLine($"[HOME] GPS resolved: {pos.Latitude}, {pos.Longitude}");
@@ -1429,8 +1503,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 //.FirstOrDefault();
                 foreach (var p in nearestPlaces)
                 {
-                    Console.WriteLine(
-                        $"[DIST] {p.Place.Name} => {p.Distance:F2} km");
+                    Console.WriteLine($"[DIST] {p.Place.Name} => {p.Distance:F2} km");
                 }
 
                 var nearest = nearestPlaces.FirstOrDefault();
@@ -1487,21 +1560,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             {
                 var alerts = await CrowdSafetyAlertService.GetLatestAsync(50);
 
-                var activeCriticalAlerts =
-                    alerts
-                        .Where(a =>
-                            a.Active)
+                var activeCriticalAlerts = alerts
+                    .Where(a =>
+                        a.Active)
 
-                        .Where(a =>
-                            string.Equals(
-                                a.Status,
-                                "Validated",
-                                StringComparison.OrdinalIgnoreCase))
+                    .Where(a =>
+                        string.Equals(
+                            a.Status,
+                            "Validated",
+                            StringComparison.OrdinalIgnoreCase))
 
-                        .Where(a =>
-                            a.Severity >= 4)
+                    .Where(a =>
+                        a.Severity >= 4)
 
-                        .ToList();
+                    .ToList();
 
                 foreach (var alert in activeCriticalAlerts)
                 {
@@ -1618,10 +1690,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             if (current.Count == 0)
                 return incoming;
 
-            Console.WriteLine(
-                $"[HOME][Refresh] " +
-                $"{category}=0; preserving " +
-                $"{current.Count} previous item(s).");
+            Console.WriteLine($"[HOME][Refresh] " + $"{category}=0; preserving " + $"{current.Count} previous item(s).");
 
             return current;
         }

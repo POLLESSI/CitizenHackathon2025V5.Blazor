@@ -1,22 +1,35 @@
-﻿/*wwwroot / js / interop.js*/
+﻿/* wwwroot/js/vendor/interop.js */
 
 function safeLocalStorage() {
-    try { return window.localStorage; } catch { return null; }
+    try {
+        return window.localStorage;
+    }
+    catch {
+        return null;
+    }
 }
 
 window.jsInterop = {
-    setLocalStorage: (k, v) => { const ls = safeLocalStorage(); if (ls) ls.setItem(k, v); },
-    getLocalStorage: (k) => { const ls = safeLocalStorage(); return ls ? ls.getItem(k) : null; },
-    removeLocalStorage: (k) => { const ls = safeLocalStorage(); if (ls) ls.removeItem(k); }
+    setLocalStorage: (key, value) => {
+        const storage = safeLocalStorage();
+        if (storage) {storage.setItem(key, value);
+        }
+    },
+
+    getLocalStorage: key => {
+        const storage = safeLocalStorage();
+
+        return storage ? storage.getItem(key) : null;
+    },
+
+    removeLocalStorage: key => {
+        const storage = safeLocalStorage();
+
+        if (storage) {
+            storage.removeItem(key);
+        }
+    }
 };
-
-// Smooth scroll by id for Blazor JSInterop
-    window.scrollIntoViewById = (id, opts) => {
-        const el = document.getElementById(id);
-        if (el && el.scrollIntoView) el.scrollIntoView(opts || { behavior: 'smooth' });
-    };
-
-
 
 
 

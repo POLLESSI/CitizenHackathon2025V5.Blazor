@@ -55,9 +55,9 @@ namespace CitizenHackathon2025V5.Blazor.Client
 
         private List<MenuItem> MenuItems => new()
         {
+            new MenuItem("", "/", "🏠"),
             new MenuItem("Antenna Crowd Panel", "/antennacrowdpanel", "📡"),
             new MenuItem("OutZen Interactions", "/gptinteractionview", "🤖"),
-            new MenuItem("Accueil", "/", "🏠"),
             new MenuItem("Crowd Calendar", "/crowdcalendar", "📆"),
             new MenuItem("Crowd Infos", "/crowdinfoview", "✨"),
             new MenuItem("Events", "/eventview", "📅"),

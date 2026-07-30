@@ -96,7 +96,7 @@
     <OzFloatingWindow Id="msgDrawer"
                       @bind-IsOpen="_msgDrawerOpen"
                       Class="oz-glass oz-drawer--fill"
-                      Title="Messages"
+                      Title="Comments"
                       Subtitle="Live"
                       FabIcon="💬 Comments"
                       FabTitle="Open Messages"
@@ -107,7 +107,7 @@
                       Width="420px"
                       MinWidth="320px"
                       MaxWidth="900px">
-        <MessageFloatingContent />
+        <MessageFloatingContent PlaceId="@_selectedPlaceId" PlaceName="@_selectedPlaceName" />
     </OzFloatingWindow>
 
     <OzFloatingWindow Id="gptDrawer"
@@ -127,7 +127,7 @@
 
         <div class="gpt-drawer-content">
             <input class="oz-input"
-                   placeholder="To research..."
+                   placeholder="Filter GPT history..."
                    @bind="_q"
                    @bind:event="oninput" />
 
@@ -144,6 +144,14 @@
                             disabled="@(_isSendingPrompt || string.IsNullOrWhiteSpace(_userPrompt))">
                         @(_isSendingPrompt ? "Sending..." : "Send to AI")
                     </button>
+                    @if (!string.IsNullOrWhiteSpace(_gptStatusMessage))
+                    {
+                        <div class="gpt-status"
+                             role="status"
+                             aria-live="polite">
+                            @_gptStatusMessage
+                        </div>
+                    }
                 </div>
             </div>
 
@@ -301,6 +309,14 @@
                 <li>Upper Sambre Natural Park</li>
                 <li>Outdoor yoga classes in Gosselies</li>
                 <li>Open-air theater – La Traviata</li>
+                <li>Bois-du-Casier site in Marcinelle</li>
+                <li>Leisure center right next door</li>
+                <li>Mettet Circuit and its driving school</li>
+                <li>Maredsous Abbey: the third most important tourist and gastronomic destination</li>
+                <li>The Lacs de l'Eau-d'Heure dams For those who love water sports and swimming</li>
+                <li>The old arm of the Sambre in the Landelies valley For those who enjoy a peaceful change of scenery.</li>
+                <li>The white boundary stone at Loverval. For those who love places steeped in history.</li>
+                <li>The former Monceau-sur-Sambre power plant. A prime location for urban exploration in Belgium</li>
             </ul>
         </section>
     </div>

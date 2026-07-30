@@ -82,24 +82,47 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
             {
                 await JS.InvokeVoidAsync("OutZen.safeBringToFront", Id);
             }
-            catch { }
-
-            try
+            catch (Exception ex)
             {
-                _dragWired = await JS.InvokeAsync<bool>("OutZen.safeMakeDrawerDraggable", Id);
-            }
-            catch
-            {
-                _dragWired = false;
+                Console.Error.WriteLine($"[OzFloatingWindow] " + $"BringToFront failed for {Id}: " + $"{ex.Message}");
             }
 
-            try
+            if (!_dragWired)
             {
-                _resizeWired = await JS.InvokeAsync<bool>("OutZen.safeMakeDrawerResizable", Id);
+                try
+                {
+                    _dragWired = await JS.InvokeAsync<bool>("OutZen.safeMakeDrawerDraggable", Id);
+                }
+                catch (Exception ex)
+                {
+                    _dragWired = false;
+
+                    Console.Error.WriteLine($"[OzFloatingWindow] " + $"Draggable wiring failed for {Id}: " + $"{ex.Message}");
+                }
             }
-            catch
+
+            /*
+             * A minimized window must no longer be
+             * resizable.
+             */
+            if (IsMinimized)
             {
                 _resizeWired = false;
+                return;
+            }
+
+            if (!_resizeWired)
+            {
+                try
+                {
+                    _resizeWired = await JS.InvokeAsync<bool>("OutZen.safeMakeDrawerResizable", Id);
+                }
+                catch (Exception ex)
+                {
+                    _resizeWired = false;
+
+                    Console.Error.WriteLine($"[OzFloatingWindow] " + $"Resizable wiring failed for {Id}: " + $"{ex.Message}");
+                }
             }
         }
 
@@ -143,12 +166,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
             return Task.CompletedTask;
         }
 
-        private Task ToggleMinimize()
+        private async Task ToggleMinimize()
         {
             IsMinimized = !IsMinimized;
-            _dragWired = false;
-            StateHasChanged();
-            return Task.CompletedTask;
+            _resizeWired = false;
+
+            await InvokeAsync(StateHasChanged);
         }
 
         private async Task BringToFront()

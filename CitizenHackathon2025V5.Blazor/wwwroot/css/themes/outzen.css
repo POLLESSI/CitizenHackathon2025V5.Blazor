@@ -656,6 +656,16 @@ HIGHLIGHT / PULSE
     color: rgba(255,255,255,.72);
 }
 
+.gpt-status {
+    margin-top: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: 1px solid rgba(34, 211, 238, 0.35);
+    border-radius: 0.75rem;
+    background: rgba(8, 47, 73, 0.55);
+    color: #cffafe;
+    font-size: 0.95rem;
+}
+
 /* =========================================================
    HOME GPT DRAWER
    Last reply + collapsible history

@@ -285,6 +285,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
                 return null;
             }
+
         }
 
         public async Task<ClientGptInteractionDTO> WaitForCompletionAsync(int interactionId, TimeSpan? pollInterval = null, TimeSpan? timeout = null, CancellationToken ct = default)
@@ -317,11 +318,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
                 }
 
                 await Task.Delay(interval, timeoutCts.Token);
+
+                Console.WriteLine(
+                    "[GPT POLL] " +
+                    $"InteractionId={status.Id}, " +
+                    $"Status={status.Status}, " +
+                    $"IsCompleted={status.IsCompleted}, " +
+                    $"Message={status.Message}");
             }
 
             LogWarn($"[WaitForCompletionAsync] Timeout for interactionId={interactionId}. Fallback final GetByIdAsync.");
 
             return await GetByIdAsync(interactionId, CancellationToken.None);
+
+
         }
 
         public async Task DeleteAsync(int id, CancellationToken ct = default)

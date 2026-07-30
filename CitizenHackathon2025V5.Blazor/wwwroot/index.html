@@ -32,7 +32,7 @@
 
     <!-- 3. Themes (variables per theme, then OutZen) -->
     <link href="/CSS/themes/light.css" rel="stylesheet" />
-    <link href="css/themes/outzen.css?v=20260529-alert2" rel="stylesheet" />
+    <link href="/CSS/themes/outzen.css?v=20260730-bg4" rel="stylesheet" />
 
     <!-- 4. Animations (keyframes + helpers) -->
     <link href="/CSS/animations/animations.css" rel="stylesheet" />
@@ -156,12 +156,15 @@
     <!-- Helper global pour Blazor: isOutZenBooted() -->
     <script>
         window.isOutZenBooted = function () {
-            return !!window.__outzenBootFlag
-                || !!(window.__OutZenSingleton && window.__OutZenSingleton.initialized);
+            return !!window.__outzenBootFlag || !!(window.__OutZenSingleton && window.__OutZenSingleton.initialized);
         };
     </script>
+    <link href="/CSS/base/background.css?v=20260730-bg4" rel="stylesheet" />
 </head>
 <body>
+    <div id="outzen-page-background"
+         aria-hidden="true">
+    </div>
     <!--<script>
         (function () {
             const orig = document.head.appendChild;
@@ -239,9 +242,6 @@
     </div>
 
     <!-- Hidden Images -->
-    <img src="/images/day.jpg?v=2" alt="Day Background" style="display:none;" />
-    <img src="/images/night.jpg" alt="Night Background" style="display:none;" />
-    <img id="bgImage" alt="Background" style="display:none;" />
     <img src="/images/earth_texture.jpg" alt="Earth Texture" style="display:none;" />
 
     <script>
@@ -266,15 +266,14 @@
     <script src="/js/trafficInterop.js?v=20260401-1" defer></script>
     <script src="/js/crowdInterop.js?v=20260401-1" defer></script>
     <script src="/js/weatherInterop.js?v=20260401-1" defer></script>
-    <script src="/js/vendor/interop.js" defer></script>
+    <script src="/js/vendor/interop.js?v=20260730-scroll-1" defer></script>
     <script src="/js/app/oz-draggable.js"></script>
-    <script src="/js/outzen-interop.js?v=20260717-marker-clear-fix-1"></script>
+    <script src="/js/outzen-interop.js?v=20260730-scroll-1"></script>
     <script src="/js/crowdbar.js" defer></script>
     <script src="js/outzen-device.js"></script>
     <script src="/js/wasmCheck.js"></script>
     <script src="/js/gpt-voice.js?v=20260723-long-dictation-2"></script>
     <!--<script src="/js/app/earthRotation-bridge.js"></script>-->
-
     <!-- Service Worker -->
     <script>
         if ('serviceWorker' in navigator && location.hostname !== "localhost") {
@@ -300,33 +299,105 @@
             document.addEventListener('DOMContentLoaded', function () {
                 const body = document.body;
                 if (!body) return;
-                body.classList.toggle('night-mode', isNight);
-                body.classList.toggle('day-mode', !isNight);
             });
+        })();
+    </script>
+    <!-- OutZen global Day / Night background -->
+    <script>
+        (() => {
+            "use strict";
 
-            // 3) Preload globe texture (day or night)
-            const texLink = document.createElement('link');
-            texLink.rel = 'preload';
-            texLink.as = 'image';
-            texLink.crossOrigin = 'anonymous';
-            texLink.href = isNight ? '/images/earth_texture_night.jpg' : '/images/earth_texture.jpg';
-            document.head.appendChild(texLink);
+            const DAY_START_HOUR = 7;
+            const NIGHT_START_HOUR = 20;
+            const REFRESH_INTERVAL_MS = 60_000;
 
+            let refreshTimerId = 0;
 
-            // 4) Background image (day.jpg / night.jpg) via #bgImage
-            const bg = document.getElementById('bgImage');
-            if (bg) {
-                bg.src = isNight ? '/images/night.jpg' : '/images/day.jpg?v=2';
-                bg.style.display = 'block';
+            function applyOutZenDayNightTheme() {
+                const layer = document.getElementById("outzen-page-background");
+
+                if (!layer) {console.warn("[OutZen Background] " + "#outzen-page-background not found.");
+
+                    return;
+                }
+
+                const hour = new Date().getHours();
+
+                const isNight = hour >= NIGHT_START_HOUR || hour < DAY_START_HOUR;
+
+                const imageUrl = isNight ? "/images/night.jpg?v=20260730-bg4" : "/images/day.jpg?v=20260730-bg4";
+
+                const overlay = isNight
+                    ? [
+                        "linear-gradient(",
+                        "180deg,",
+                        "rgba(1, 7, 20, 0.22) 0%,",
+                        "rgba(1, 7, 20, 0.42) 55%,",
+                        "rgba(1, 7, 20, 0.62) 100%",
+                        ")"
+                    ].join(" ")
+                    : [
+                        "linear-gradient(",
+                        "180deg,",
+                        "rgba(5, 15, 30, 0.10) 0%,",
+                        "rgba(5, 15, 30, 0.24) 55%,",
+                        "rgba(5, 15, 30, 0.46) 100%",
+                        ")"
+                    ].join(" ");
+
+                /*
+                 * Global state used by OutZen and the globe.
+                 */
+                window.OutZenIsNight = isNight;
+
+                /*
+                 * Theme classes.
+                 */
+                document.body.classList.toggle("night-mode", isNight);
+                document.body.classList.toggle("day-mode", isNight);
+
+                /*
+                 * Direct application to the tracing paper.
+                 *
+                 * We no longer depend on :
+                 * - --outzen-background-image ;
+                 * - he Outzen waterfall.css ;
+                 * - an <img> tag ;
+                 * - a dynamic preload.
+                 */
+                layer.style.setProperty("background-image", `${overlay}, url("${imageUrl}")`, "important");
+                layer.dataset.outzenMode = isNight ? "night" : "day";
+                layer.dataset.outzenImage = imageUrl;
+
+                console.info(
+                    "[OutZen Background] Applied",
+                    {
+                        mode: layer.dataset.outzenMode,
+                        imageUrl,
+                        computedBackgroundImage:
+                            getComputedStyle(layer)
+                                .backgroundImage
+                    }
+                );
+            }
+
+            function initializeOutZenBackground() {applyOutZenDayNightTheme();
+
+                if (refreshTimerId !== 0) {window.clearInterval(refreshTimerId);}
+
+                refreshTimerId = window.setInterval(applyOutZenDayNightTheme, REFRESH_INTERVAL_MS);
+            }
+
+            if (document.readyState === "loading") {
+                document.addEventListener("DOMContentLoaded", initializeOutZenBackground, { once: true });
+            }
+            else {initializeOutZenBackground();
             }
         })();
     </script>
     <script>
         window.checkWasmAccess = async function () {
-            const candidates = [
-                "/_framework/dotnet.native.wasm",
-                "/_framework/dotnet.wasm"
-            ];
+            const candidates = ["/_framework/dotnet.native.wasm", "/_framework/dotnet.wasm"];
 
             for (const url of candidates) {
                 try {
@@ -344,12 +415,7 @@
                     };
                 }
                 catch (e) {
-                    return {
-                        url: url,
-                        ok: false,
-                        status: 0,
-                        error: e?.message ?? String(e)
-                    };
+                    return {url: url, ok: false, status: 0, error: e?.message ?? String(e)};
                 }
             }
         };

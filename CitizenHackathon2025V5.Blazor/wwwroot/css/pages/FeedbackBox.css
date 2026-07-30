@@ -1,4 +1,6 @@
-﻿.feedback-section {
+﻿/*wwwroot.css.pages.feedbackbox.css*/
+
+.feedback-section {
     margin: 2rem auto;
     max-width: 900px;
 }

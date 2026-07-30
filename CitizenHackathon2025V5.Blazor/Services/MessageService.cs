@@ -1,4 +1,5 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025.Contracts.DTOs;
 using System.Net.Http.Json;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Services
@@ -16,27 +17,48 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
         public Task<List<ClientMessageDTO>?> GetLatestAsync(int take = 100, CancellationToken ct = default)
             => _http.GetFromJsonAsync<List<ClientMessageDTO>>($"{BaseRoute}/latest?take={take}", ct);
 
-        public async Task<ClientMessageDTO?> PostAsync(string content, CancellationToken ct = default)
+        public async Task<ClientMessageDTO?> PostAsync(CreateMessageRequest request, CancellationToken ct = default)
         {
-            var payload = new { Content = content };
-            var resp = await _http.PostAsJsonAsync(BaseRoute, payload, ct);
-            var body = await resp.Content.ReadAsStringAsync(ct);
+            ArgumentNullException.ThrowIfNull(request);
 
-            if (!resp.IsSuccessStatusCode)
-            {
-                throw new HttpRequestException(
-                    $"POST {BaseRoute} failed. Status={(int)resp.StatusCode} {resp.ReasonPhrase}. Body={body}");
-            }
+            var content = request.Content?.Trim() ?? string.Empty;
 
-            if (string.IsNullOrWhiteSpace(body))
+            if (string.IsNullOrWhiteSpace(content))
                 return null;
 
-            return System.Text.Json.JsonSerializer.Deserialize<ClientMessageDTO>(
-                body,
-                new System.Text.Json.JsonSerializerOptions
+            /*
+             * On reconstruit un DTO propre plutôt que de modifier
+             * l'objet reçu par le composant.
+             */
+            var payload = new CreateMessageRequest
+            {
+                Content = content,
+
+                SourceType = string.IsNullOrWhiteSpace(request.SourceType) ? "Other" : request.SourceType.Trim(),
+
+                RelatedId = request.RelatedId,
+
+                RelatedName = string.IsNullOrWhiteSpace(request.RelatedName) ? null : request.RelatedName.Trim()
+            };
+
+            using var response = await _http.PostAsJsonAsync("Message", payload, ct);
+
+            response.EnsureSuccessStatusCode();
+
+            return await response.Content.ReadFromJsonAsync<ClientMessageDTO>(cancellationToken: ct);
+        }
+        public Task<ClientMessageDTO?> PostAsync(string content, CancellationToken ct = default)
+        {
+            return PostAsync(
+                new CreateMessageRequest
                 {
-                    PropertyNameCaseInsensitive = true
-                });
+                    Content = content?.Trim() ?? string.Empty,
+
+                    SourceType = "Other",
+                    RelatedId = null,
+                    RelatedName = null
+                },
+                ct);
         }
 
         public async Task<bool> DeleteAsync(int id, CancellationToken ct = default)

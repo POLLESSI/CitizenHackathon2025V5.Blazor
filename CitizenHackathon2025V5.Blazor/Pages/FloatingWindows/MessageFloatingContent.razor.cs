@@ -1,10 +1,11 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
+using CitizenHackathon2025.Contracts.DTOs;
 using CitizenHackathon2025.Contracts.Hubs;
+using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.JSInterop;
-using CitizenHackathon2025V5.Blazor.Client.Services;
-using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
 {
@@ -23,7 +24,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
         [Inject] public NavigationManager Navigation { get; set; } = default!;
         [Inject] public IJSRuntime JS { get; set; } = default!;
         [Inject] public IConfiguration Config { get; set; } = default!;
-        [Inject] public IAuthService Auth { get; set; } = default!;
+        [Inject] public IHubTokenService HubTokenService { get; set; } = default!;
+
+        [Parameter] public int? PlaceId { get; set; }
+
+        [Parameter] public string? PlaceName { get; set; }
+
+        [Parameter] public int? EventId { get; set; }
+
+        [Parameter] public string? EventName { get; set; }
 
         protected override async Task OnInitializedAsync()
         {
@@ -48,7 +57,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
             _hubConnection = new HubConnectionBuilder()
                 .WithUrl(url, options =>
                 {
-                    options.AccessTokenProvider = async () => await Auth.GetAccessTokenAsync() ?? string.Empty;
+                    options.AccessTokenProvider = async () => await HubTokenService.GetHubTokenAsync() ?? string.Empty;
                     options.Transports =
                         Microsoft.AspNetCore.Http.Connections.HttpTransportType.WebSockets |
                         Microsoft.AspNetCore.Http.Connections.HttpTransportType.ServerSentEvents;
@@ -86,32 +95,60 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
         private async Task SendAsync()
         {
             var content = _newContent?.Trim();
+
             if (string.IsNullOrWhiteSpace(content) || _isSending)
+            {
                 return;
+            }
+
+            _isSending = true;
 
             try
             {
-                _isSending = true;
+                var hasEvent = EventId is > 0;
 
-                var created = await MessageService.PostAsync(content);
-                if (created is not null)
+                var hasPlace = PlaceId is > 0;
+
+                var request =
+                    new CreateMessageRequest
+                    {
+                        Content = content,
+
+                        SourceType = hasEvent ? "Event" : hasPlace ? "Place" : "Other",
+
+                        RelatedId = hasEvent ? EventId : hasPlace ? PlaceId : null,
+
+                        RelatedName = hasEvent ? EventName : hasPlace ? PlaceName : null
+                    };
+
+                var created = await MessageService.PostAsync(request);
+
+                if (created is null)
+                    return;
+
+                var index = _messages.FindIndex(x => x.Id == created.Id);
+
+                if (index >= 0)
                 {
-                    var idx = _messages.FindIndex(x => x.Id == created.Id);
-                    if (idx >= 0)
-                        _messages[idx] = created;
-                    else
-                        _messages.Insert(0, created);
-
-                    _messages = _messages
-                        .OrderByDescending(x => x.CreatedAt)
-                        .ToList();
+                    _messages[index] = created;
+                }
+                else
+                {
+                    _messages.Insert(0, created);
                 }
 
+                _messages = _messages.OrderByDescending(x => x.CreatedAt).ToList();
+
                 _newContent = string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("[MessageFloatingContent] " + $"Send failed: {ex}");
             }
             finally
             {
                 _isSending = false;
+
                 await InvokeAsync(StateHasChanged);
             }
         }
@@ -136,7 +173,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.FloatingWindows
             var normalized = text.Replace("\r", " ").Replace("\n", " ").Trim();
             return normalized.Length <= max ? normalized : normalized[..max] + "…";
         }
-
         public async ValueTask DisposeAsync()
         {
             if (_hubConnection is not null)

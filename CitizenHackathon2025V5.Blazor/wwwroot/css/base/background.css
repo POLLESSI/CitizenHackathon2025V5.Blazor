@@ -1,0 +1,291 @@
+﻿/* ==========================================================
+   OUTZEN — GLOBAL DAY / NIGHT BACKGROUND
+   ========================================================== */
+
+html,
+body {
+    width: 100%;
+    min-height: 100%;
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow-x: hidden;
+    /*
+     * Fallback color before image loading.
+     */
+    background-color: #07111f;
+}
+
+/*
+ * Global visual overlay, outside the document flow.
+ */
+#outzen-page-background {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    height: 100dvh !important;
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: none;
+    z-index: 0;
+    background-color: #07111f;
+    background-repeat: no-repeat !important;
+    background-position: center center !important;
+    background-size: cover !important;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+/*
+ * Blazor and all its content are placed in front of the background.
+ */
+#app {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    min-height: 100dvh;
+    background-color: transparent !important;
+}
+
+    /*
+ * The main structural containers must not
+ * repaint an opaque background over the image.
+ */
+    #app > .page,
+    #app .page-layout,
+    #app .app-container,
+    #app .page-content,
+    #app main {background-color: transparent;}
+
+/*
+ * On mobile, the upper part of the vertical image
+ * is generally more attractive.
+ */
+@media (max-width: 768px) {#outzen-page-background {background-position: center top !important;}
+}
+
+/* ==========================================================
+   OUTZEN — GLOBAL CINEMATIC FRAME
+   ========================================================== */
+
+/*body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    pointer-events: none;
+    transform: translateZ(0);
+    transition: box-shadow 600ms ease, opacity 600ms ease;
+}
+*/
+/*
+ * Daytime :
+ * The image is vivid, so the frame is more pronounced.
+ */
+/*body.day-mode::after {
+    box-shadow: inset 0 0 0 8px rgba(0, 0, 0, 0.96), inset 0 0 44px 15px rgba(0, 0, 0, 0.56), inset 0 0 120px 26px rgba(0, 0, 0, 0.24);
+}*/
+
+/*
+ * Night :
+ * Frame still present, but less massive.
+ */
+/*body.night-mode::after {
+    box-shadow: inset 0 0 0 7px rgba(0, 0, 0, 0.92), inset 0 0 34px 12px rgba(0, 0, 0, 0.42), inset 0 0 90px 20px rgba(0, 0, 0, 0.18);
+}*/
+
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 5px rgba(0, 0, 0, 0.94), inset 0 0 28px 8px rgba(0, 0, 0, 0.38);
+}
+
+body.day-mode::after {
+    box-shadow: inset 0 0 0 6px rgba(0, 0, 0, 0.96),
+    /*
+    * Interior slate-like sheen.
+    */
+    inset 0 0 0 9px rgba(86, 116, 136, 0.30), inset 0 0 44px 15px rgba(0, 0, 0, 0.56), inset 0 0 120px 26px rgba(0, 0, 0, 0.24);
+}
+
+body.night-mode::after {
+    box-shadow: inset 0 0 0 7px rgba(0, 0, 0, 0.94), inset 0 0 0 6px rgba(40, 110, 135, 0.24), inset 0 0 34px 12px rgba(0, 0, 0, 0.42), inset 0 0 90px 20px rgba(0, 0, 0, 0.18);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/
