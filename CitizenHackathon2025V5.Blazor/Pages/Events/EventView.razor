@@ -74,7 +74,11 @@
                             </td>
                             <td class="text-ellipsis">@ev.DateEvent</td>
                             <td class="col-actions">
-                                <NavLink class="btn btn-sm btn-glow ev-chip" href=@($"/eventview?detailId={ev.Id}")>Info</NavLink>
+                                <button type="button"
+                                        class="btn btn-sm btn-glow ev-chip"
+                                        @onclick="() => OpenEventDetail(ev.Id)">
+                                    Info
+                                </button>
                             </td>
                         </tr>
                     }
@@ -86,20 +90,18 @@
 
 <Globe />
 
-@if (DetailId is > 0)
-{
-    <div class="oz-modal-backdrop" @onclick="CloseDetail"></div>
-    <div class="oz-modal">
-        <div class="oz-modal-header">
-            <span class="badge badge-info">Details #@DetailId</span>
-            <button class="chip" @onclick="CloseDetail">Close</button>
-        </div>
-        <div class="oz-modal-body">
-            <EventDetail Id="@DetailId.Value" />
-        </div>
-    </div>
-}
+<OutZenDetailModal WindowId="event-detail-window"
+                   Open="@(DetailId is > 0)"
+                   Title="@($"Event details #{DetailId}")"
+                   AllowBackgroundInteraction="true"
+                   OnClose="CloseDetail">
 
+    @if (DetailId is > 0)
+    {
+        <EventDetail @key="DetailId.Value"
+                     Id="@DetailId.Value" />
+    }
+</OutZenDetailModal>
 
 
 

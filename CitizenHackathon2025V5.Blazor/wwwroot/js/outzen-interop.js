@@ -13,13 +13,9 @@
             : {};
 
     const isDev = location.hostname === "localhost" || location.hostname === "127.0.0.1";
-
-    const BUILD = globalThis.__ozBuild || "20260717-marker-clear-fix-1";
-
+    const BUILD = globalThis.__ozBuild || "20260804-prune-prefix-fix-1";
     const MODULE_BASE_URL = `/js/app/leafletOutZen.module.js` + `?v=${encodeURIComponent(BUILD)}`;
-
     let importAttempt = 0;
-
     function createModuleUrl(cacheBust = false) {
         /*
          * During development, each new attempt
@@ -35,8 +31,7 @@
         importAttempt++;
 
         return (
-            MODULE_BASE_URL +
-            `&t=${Date.now()}-${importAttempt}`
+            MODULE_BASE_URL + `&t=${Date.now()}-${importAttempt}`
         );
     }
 
@@ -663,9 +658,7 @@
             return false;
         }
 
-        const handle =
-            drawer.querySelector("[data-oz-drag-handle='true']")
-            || drawer.querySelector(".oz-titlebar");
+        const handle = drawer.querySelector("[data-oz-drag-handle='true']") || drawer.querySelector(".oz-titlebar");
 
         if (!handle) {
             console.warn("[OutZen] drawer drag handle not found:", id);
@@ -675,18 +668,66 @@
         const storageKey = `outzen.drawer.${id}.position`;
         const margin = 8;
 
-        const clamp = function (left, top) {
-            const rect = drawer.getBoundingClientRect();
+        const clamp = function (left, top) {const rect = drawer.getBoundingClientRect();
 
             const width = Math.max(rect.width || 320, 320);
             const height = Math.max(rect.height || 160, 160);
+            const allowPartialOffscreen = drawer.dataset.ozAllowPartialOffscreen === "true";
 
-            const maxLeft = Math.max(margin, window.innerWidth - width - margin);
-            const maxTop = Math.max(margin, window.innerHeight - height - margin);
+            /*
+             * Historical behavior :
+             * The entire window remains within the viewport.
+             */
+            if (!allowPartialOffscreen) {
+                const maxLeft = Math.max(margin, window.innerWidth - width - margin);
+                const maxTop = Math.max(margin, window.innerHeight - height - margin);
+
+                return {
+                    left: Math.min(Math.max(left, margin), maxLeft),
+
+                    top: Math.min(Math.max(top, margin), maxTop)
+                };
+            }
+
+            /*
+             * Mode Detail :
+             * part of the window can slide out,
+             * but a strip remains always accessible.
+             */
+            const requestedVisibleWidth = Number(drawer.dataset.ozVisibleWidth);
+            const requestedVisibleHeight = Number(drawer.dataset.ozVisibleHeight);
+            const visibleWidth = Number.isFinite(requestedVisibleWidth) ? Math.max(48, requestedVisibleWidth) : 72;
+            const visibleHeight = Number.isFinite(requestedVisibleHeight) ? Math.max(42, requestedVisibleHeight): 52;
+
+            /*
+             * Left :
+             * the window can slide out, but 72 px
+             * remain visible.
+             */
+            const minLeft = -width + visibleWidth;
+
+            /*
+             * Right :
+             * 72 px remain visible.
+             */
+            const maxLeft = window.innerWidth - visibleWidth;
+
+            /*
+             * We forbid losing the banner
+             * above the screen.
+             */
+            const minTop = margin;
+
+            /*
+             * Down :
+             * 52 px remain visible.
+             */
+            const maxTop = window.innerHeight - visibleHeight;
 
             return {
-                left: Math.min(Math.max(left, margin), maxLeft),
-                top: Math.min(Math.max(top, margin), maxTop)
+                left: Math.min(Math.max(left, minLeft), maxLeft),
+
+                top: Math.min(Math.max(top, minTop), maxTop)
             };
         };
 

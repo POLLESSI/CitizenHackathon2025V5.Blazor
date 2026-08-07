@@ -407,6 +407,172 @@
     align-items: stretch !important;
 }
 
+/* ==========================================================
+   OUTZEN — MARKER SELECTED BY A DETAIL WINDOW
+   ========================================================== */
+
+/*
+ * Do not animate transform on .oz-marker-selected :
+ * Leaflet uses `transform` to position the marker.
+ */
+.oz-marker-selected {
+    overflow: visible !important;
+}
+
+    /*
+ * First halo: cyan.
+ */
+    .oz-marker-selected::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        border: 4px solid rgba(0, 229, 238, 0.95);
+        box-shadow: 0 0 10px rgba(0, 229, 238, 0.95), 0 0 22px rgba(0, 229, 238, 0.72), 0 0 38px rgba(0, 229, 238, 0.48);
+        transform: translate(-50%, -50%) scale(0.62);
+        opacity: 0;
+        pointer-events: none;
+        animation: oz-selected-marker-ring-cyan 1.35s ease-out infinite;
+    }
+
+    /*
+ * Second halo: yellow, slightly offset.
+ */
+    .oz-marker-selected::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 58px;
+        height: 58px;
+        border-radius: 50%;
+        border: 3px solid rgba(255, 215, 0, 0.92);
+        box-shadow: 0 0 10px rgba(255, 215, 0, 0.88), 0 0 26px rgba(255, 193, 7, 0.58);
+        transform: translate(-50%, -50%) scale(0.58);
+        opacity: 0;
+        pointer-events: none;
+        animation: oz-selected-marker-ring-yellow 1.35s 0.34s ease-out infinite;
+    }
+
+/*
+ * The circle remains fixed.
+ * The halo and brightness may remain on this container.
+ */
+.leaflet-marker-icon.oz-marker.oz-marker-selected
+.oz-marker-inner {
+    position: relative;
+    z-index: 3;
+    filter: brightness(1.28) saturate(1.35) drop-shadow( 0 0 7px rgba(0, 229, 238, 1) ) drop-shadow( 0 0 11px rgba(255, 215, 0, 0.85) );
+}
+
+/*
+ * Only the emoji is animated.
+ *
+ * It is not subject to the transform:none !important
+ * defined on .oz-marker-inner.
+ */
+.leaflet-marker-icon.oz-marker.oz-marker-selected
+.oz-marker-glyph {
+    position: relative;
+    z-index: 4;
+    display: inline-block;
+    transform-origin: center center;
+    will-change: transform, opacity, filter;
+    animation: oz-selected-marker-glyph-pulse 850ms ease-in-out infinite !important;
+}
+
+@keyframes oz-selected-marker-ring-cyan {
+    0% {
+        opacity: 0.95;
+        transform: translate(-50%, -50%) scale(0.52);
+    }
+
+    72% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.62);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.72);
+    }
+}
+
+@keyframes oz-selected-marker-ring-yellow {
+    0% {
+        opacity: 0.88;
+        transform: translate(-50%, -50%) scale(0.55);
+    }
+
+    72% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.72);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.82);
+    }
+}
+
+@keyframes oz-selected-marker-glyph-pulse {
+    0%, 38%, 100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+        filter: brightness(1.15) saturate(1.1) drop-shadow( 0 0 3px rgba(255, 255, 255, 0.75) );
+    }
+
+    45% {
+        transform: scale(1.45) rotate(-5deg);
+        opacity: 1;
+        filter: brightness(1.9) saturate(1.55) drop-shadow( 0 0 7px rgba(0, 229, 238, 1) ) drop-shadow( 0 0 10px rgba(255, 215, 0, 0.95) );
+    }
+
+    52% {
+        transform: scale(0.82) rotate(4deg);
+        opacity: 0.12;
+        filter: brightness(2.1) saturate(1.8);
+    }
+
+    62% {
+        transform: scale(1.32) rotate(0deg);
+        opacity: 1;
+        filter: brightness(1.75) saturate(1.45) drop-shadow( 0 0 7px rgba(255, 215, 0, 0.9) );
+    }
+}
+
+/*
+ * Accessibility:
+ * no blinking when animations are reduced,
+ * but the marker remains clearly outlined.
+ */
+@media (prefers-reduced-motion: reduce) {
+    .oz-marker-selected::before,
+    .oz-marker-selected::after,
+    .oz-marker-selected .oz-marker-inner,
+    .oz-marker-selected .oz-marker-glyph {
+        animation: none !important;
+    }
+
+    .oz-marker-selected::before {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    .oz-marker-selected::after {
+        opacity: 0.72;
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    .oz-marker-selected .oz-marker-glyph {
+        opacity: 1;
+        transform: none;
+    }
+}
+
 
 
 

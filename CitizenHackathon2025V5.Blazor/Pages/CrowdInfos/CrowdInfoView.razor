@@ -77,9 +77,10 @@
                                 <span class="crowd @($"crowd--{co.CrowdLevel}")">@co.CrowdLevel</span>
                             </td>
                             <td>
-                                <button class="btn btn-sm info-chip @GetLevelCss(co.CrowdLevel)"
+                                <button type="button"
+                                        class="btn btn-sm info-chip @GetLevelCss(co.CrowdLevel)"
                                         title="@InfoDesc(co)"
-                                        @onclick="() => ClickInfo(co.Id)">
+                                        @onclick="() => OpenCrowdDetailAsync(co.Id)">
                                     Info
                                 </button>
                             </td>
@@ -99,20 +100,18 @@
 
 <Globe />
 
-@if (SelectedId > 0)
-{
-    <div class="detail-wrapper">
-        <div class="list-toolbar">
-            <div class="left"><span class="badge badge-info">Détail #@SelectedId</span></div>
-            <div class="right">
-                <button class="chip" @onclick="() => SelectedId = 0">Fermer</button>
-            </div>
-        </div>
-        <CrowdInfoDetail Id="@SelectedId" />
-    </div>
-}
+<OutZenDetailModal WindowId="crowd-detail-window"
+                   Open="@(SelectedId > 0)"
+                   Title="@($"Crowd information #{SelectedId}")"
+                   AllowBackgroundInteraction="true"
+                   OnClose="CloseCrowdDetail">
 
-
+    @if (SelectedId > 0)
+    {
+        <CrowdInfoDetail @key="SelectedId"
+                         Id="@SelectedId" />
+    }
+</OutZenDetailModal>
 
 
 

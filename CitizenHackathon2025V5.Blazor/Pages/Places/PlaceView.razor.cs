@@ -511,21 +511,41 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Places
 
         private void ToggleRecent() => _onlyRecent = !_onlyRecent;
 
-        private void Select(int id)
+        private async Task Select(int id)
         {
             if (id <= 0)
             {
-                Console.WriteLine("[PlaceView] Ignoring click: id <= 0 payload without ID ?)");
+                Console.WriteLine("[PlaceView] Ignoring selection: id <= 0.");
+
                 return;
             }
+
             SelectedId = id;
-            Console.WriteLine($"[PlaceView] SelectedId = {SelectedId}");
+
+            await InvokeAsync(StateHasChanged);
+
+            await HighlightDetailMarkerAsync(PlMarkerId(id));
         }
 
-        private void CloseDetail() => SelectedId = 0;
+        private async Task CloseDetail()
+        {
+            await ClearDetailMarkerHighlightAsync(restoreOverview: true);
+
+            SelectedId = 0;
+
+            await InvokeAsync(StateHasChanged);
+        }
 
         protected override async Task OnBeforeDisposeAsync()
         {
+            try
+            {
+                await ClearDetailMarkerHighlightAsync(
+                    restoreOverview: false);
+            }
+            catch
+            {
+            }
             if (hubConnection is not null)
             {
                 try { await hubConnection.StopAsync(); } catch { }

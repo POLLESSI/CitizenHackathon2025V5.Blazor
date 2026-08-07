@@ -1,91 +1,182 @@
 ﻿@* CrowdInfoCalendarDetail.razor *@
-@page "/crowdcalendar/{id:int}"
+
+@page "/crowdcalendar/{Id:int}"
+
 @using CitizenHackathon2025V5.Blazor.Client.Models
-@inject CitizenHackathon2025V5.Blazor.Client.Services.CrowdInfoCalendarService Svc
-@inject NavigationManager Nav
 
-<h3>Calendar Entry @Id</h3>
-
-@if (model is null)
+@if (!Embedded)
 {
-    <p>Loading…</p>
+    <h3>Calendar Entry @Id</h3>
+}
+
+@if (_loading)
+{
+    <div class="oz-detail-state">
+        Loading calendar entry #@Id…
+    </div>
+}
+else if (!string.IsNullOrWhiteSpace(_error))
+{
+    <div class="oz-detail-state oz-detail-state--error">
+        @_error
+    </div>
+}
+else if (model is null)
+{
+    <div class="oz-detail-state oz-detail-state--empty">
+        No calendar entry found for identifier @Id.
+    </div>
 }
 else
 {
-    <EditForm Model="model" OnValidSubmit="Save">
+    <EditForm Model="model"
+              OnValidSubmit="Save"
+              class="oz-calendar-detail-form">
+
         <DataAnnotationsValidator />
-        <ValidationSummary />
 
-        <div class="row g-3">
-            <div class="col-md-3">
-                <label class="form-label">Date (UTC)</label>
-                <InputDate @bind-Value="model.DateUtc" class="form-control" /> @* ✅ *@
+        <ValidationSummary class="oz-calendar-validation" />
+
+        <div class="oz-calendar-detail-grid">
+
+            <div class="oz-calendar-field">
+                <label for="calendarDate">
+                    Date
+                    <span>UTC</span>
+                </label>
+
+                <InputDate id="calendarDate" @bind-Value="model.DateUtc" class="oz-calendar-input" />
             </div>
 
-            <div class="col-md-3">
-                <label class="form-label">Region</label>
-                <input class="form-control" @bind="model.RegionCode" />
+            <div class="oz-calendar-field">
+                <label for="calendarRegion">
+                    Region
+                </label>
+
+                <input id="calendarRegion" class="oz-calendar-input" @bind="model.RegionCode" />
             </div>
 
-            <div class="col-md-3">
-                <label class="form-label">PlaceId</label>
-                <input class="form-control" type="number" @bind="model.PlaceId" />
+            <div class="oz-calendar-field">
+                <label for="calendarPlaceId">
+                    Place ID
+                </label>
+
+                <input id="calendarPlaceId" class="oz-calendar-input" type="number" min="1" @bind="model.PlaceId" />
             </div>
 
-            <div class="col-md-3">
-                <label class="form-label">Expected Level (1..4)</label>
-                <input class="form-control" type="number" min="1" max="4" @bind="model.ExpectedLevel" />
+            <div class="oz-calendar-field">
+                <label for="calendarLevel">
+                    Expected level
+                    <span>1 à 4</span>
+                </label>
+
+                <input id="calendarLevel" class="oz-calendar-input" type="number" min="1" max="4" @bind="model.ExpectedLevel" />
             </div>
 
-            <div class="col-md-6">
-                <label class="form-label">Event Name</label>
-                <input class="form-control" @bind="model.EventName" />
+            <div class="oz-calendar-field oz-calendar-field--span-2">
+                <label for="calendarEventName">
+                    Event name
+                </label>
+
+                <input id="calendarEventName" class="oz-calendar-input" @bind="model.EventName" />
             </div>
 
-            <div class="col-md-3">
-                <label class="form-label">Confidence (0..100)</label>
-                <input class="form-control" type="number" min="0" max="100" @bind="model.Confidence" />
+            <div class="oz-calendar-field">
+                <label for="calendarConfidence">
+                    Confidence
+                    <span>0 à 100 %</span>
+                </label>
+
+                <input id="calendarConfidence" class="oz-calendar-input" type="number" min="0" max="100" @bind="model.Confidence" />
             </div>
 
-            <div class="col-md-3">
-                <label class="form-label">Lead Hours</label>
-                <input class="form-control" type="number" min="0" max="48" @bind="model.LeadHours" />
+            <div class="oz-calendar-field">
+                <label for="calendarLeadHours">
+                    Lead hours
+                </label>
+
+                <input id="calendarLeadHours" class="oz-calendar-input" type="number" min="0" max="48" @bind="model.LeadHours" />
             </div>
 
-            <div class="col-md-3">
-                <label class="form-label">Start (HH:mm)</label>
-                <input class="form-control" placeholder="HH:mm" @bind="startStr" />
+            <div class="oz-calendar-field">
+                <label for="calendarStart">
+                    Start
+                    <span>HH:mm</span>
+                </label>
+
+                <input id="calendarStart" class="oz-calendar-input" type="time" step="60" @bind="startTime" @bind:format="HH:mm" />
             </div>
 
-            <div class="col-md-3">
-                <label class="form-label">End (HH:mm)</label>
-                <input class="form-control" placeholder="HH:mm" @bind="endStr" />
+            <div class="oz-calendar-field">
+                <label for="calendarEnd">
+                    End
+                    <span>HH:mm</span>
+                </label>
+
+                <input id="calendarEnd" class="oz-calendar-input" type="time" step="60" @bind="endTime" @bind:format="HH:mm" />
             </div>
 
-            <div class="col-md-12">
-                <label class="form-label">Message Template</label>
-                <textarea class="form-control" rows="2" @bind="model.MessageTemplate"></textarea>
+            <div class="oz-calendar-field oz-calendar-field--span-2">
+                <label for="calendarTags">
+                    Tags
+                </label>
+
+                <input id="calendarTags" class="oz-calendar-input" @bind="model.Tags" />
             </div>
 
-            <div class="col-md-6">
-                <label class="form-label">Tags</label>
-                <input class="form-control" @bind="model.Tags" />
+            <div class="oz-calendar-field oz-calendar-field--full">
+                <label for="calendarMessage">
+                    Message template
+                </label>
+
+                <textarea id="calendarMessage" class="oz-calendar-input oz-calendar-textarea" rows="4" @bind="model.MessageTemplate"></textarea>
             </div>
 
-            <div class="col-md-2 d-flex align-items-center">
-                <div class="form-check mt-4">
-                    <input class="form-check-input" type="checkbox" id="activeChk" @bind="model.Active" />
-                    <label class="form-check-label" for="activeChk">Active</label>
-                </div>
+            <div class="oz-calendar-field oz-calendar-active">
+
+                <label class="oz-calendar-checkbox">
+
+                    <input type="checkbox"
+                           @bind="model.Active" />
+
+                    <span class="oz-calendar-checkbox__control"></span>
+
+                    <span class="oz-calendar-checkbox__text">
+                        Active calendar entry
+                    </span>
+
+                </label>
             </div>
+
         </div>
 
-        <div class="mt-3 d-flex gap-2">
-            <button class="btn btn-primary" type="submit">Save</button>
-            <button class="btn btn-secondary" type="button" @onclick="Back">Back</button>
-            <button class="btn btn-warning" type="button" @onclick="SoftDelete">Soft Delete</button>
-            <button class="btn btn-info" type="button" @onclick="Restore">Restore</button>
-            <button class="btn btn-danger" type="button" @onclick="HardDelete">Hard Delete</button>
+        <div class="oz-calendar-detail-actions">
+
+            <button type="submit" class="oz-calendar-action oz-calendar-action--save">
+                <span aria-hidden="true">💾</span>
+                Save
+            </button>
+
+            <button type="button" class=" oz-calendar-action "@onclick="Back">
+                <span aria-hidden="true">↩</span>
+                Back
+            </button>
+
+            <button type="button" accesskeyclass=" oz-calendar-action oz-calendar-action--archive" @onclick="SoftDelete">
+                <span aria-hidden="true">🗄️</span>
+                Soft Delete
+            </button>
+
+            <button type="button" class="oz-calendar-action oz-calendar-action--restore" @onclick="Restore">
+                <span aria-hidden="true">♻️</span>
+                Restore
+            </button>
+
+            <button type="button" accesskeyclass="oz-calendar-action oz-calendar-action--delete" @onclick="HardDelete">
+                <span aria-hidden="true">🗑️</span>
+                Hard Delete
+            </button>
+
         </div>
     </EditForm>
 }

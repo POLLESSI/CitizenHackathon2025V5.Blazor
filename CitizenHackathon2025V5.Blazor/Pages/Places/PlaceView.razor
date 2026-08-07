@@ -89,20 +89,18 @@
 
 <Globe />
 
-@if (SelectedId > 0)
-{
-    <div class="detail-wrapper">
-        <div class="list-toolbar">
-            <div class="left"><span class="badge badge-info">Details #@SelectedId</span></div>
-            <div class="right">
-                <button class="chip" @onclick="CloseDetail">Close</button>
-            </div>
-        </div>
+<OutZenDetailModal WindowId="place-detail-window"
+                   Open="@(SelectedId > 0)"
+                   Title="@($"Place details #{SelectedId}")"
+                   AllowBackgroundInteraction="true"
+                   OnClose="CloseDetail">
 
-        <!-- ✅ renders the detail panel in the same page -->
-        <PlaceDetail Id="SelectedId" />
-    </div>
-}
+    @if (SelectedId > 0)
+    {
+        <PlaceDetail @key="SelectedId"
+                     Id="@SelectedId" />
+    }
+</OutZenDetailModal>
 
 @if (!FilterPlace(visiblePlaces).Any())
 {

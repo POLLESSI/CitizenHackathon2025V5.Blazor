@@ -39,7 +39,9 @@
         </div>
 
         <div class="right">
-            <button class="chip @( _onlyRecent ? "active" : null )" @onclick="() => ToggleRecent()">Recent</button>
+            <button type="button"class="chip @(_onlyRecent ? "active" : null)" @onclick="ToggleRecent">
+                Recent
+            </button>
         </div>
         <div>
             <NavLink class="chip add-chip" href="/trafficconditioncreate">
@@ -83,7 +85,7 @@
                                 <td>
                                     <button class="btn btn-sm traffic-chip @GetTrafficCss(tr.CongestionLevel) btn-glow"
                                             title="See details0"
-                                            @onclick="() => ClickInfo(tr.Id)">
+                                            @onclick="() => OpenTrafficDetailAsync(tr.Id)">
                                         Traffic
                                     </button>
                                 </td>
@@ -98,18 +100,15 @@
 
 <Globe />
             
-@if (SelectedId > 0)
-{
-    <div class="detail-wrapper">
-        <div class="list-toolbar">
-            <div class="left"><span class="badge badge-info">Details #@SelectedId</span></div>
-            <div class="right">
-                <button class="chip" @onclick="() => SelectedId = 0">Closed</button>
-            </div>
-        </div>
-        <TrafficConditionDetail Id="@SelectedId" />
-    </div>
-}
+<OutZenDetailModal Open="@(SelectedId > 0)" WindowId="traffic-detail-window" Title="@($"Traffic condition #{SelectedId}")" OnClose="CloseTrafficDetail">
+
+    @if (SelectedId > 0)
+    {
+        <TrafficConditionDetail @key="SelectedId" Id="@SelectedId" />
+    }
+
+</OutZenDetailModal>
+
 @if (!FilterTraffic(visibleTrafficConditions).Any())
 {
     <div class="oz-empty">No items for these filters.</div>

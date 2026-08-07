@@ -52,8 +52,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         // Optional
         protected override bool ForceBootOnFirstRender => true;
         protected override bool ResetMarkersOnBoot => true;
-        protected override bool EnableHybrid
-    => false;
+        protected override bool EnableHybrid => false;
 
         // Only one incident at the moment.
         // The cluster can be handed over if necessary.
@@ -106,6 +105,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
             await InvokeAsync(StateHasChanged);
             await NotifyDataLoadedAsync(fit: true);
         }
+
+        private async Task OpenTrafficDetailAsync(int id)
+        {
+            if (id <= 0)
+                return;
+
+            SelectedId = id;
+
+            await InvokeAsync(StateHasChanged);
+
+            await HighlightDetailMarkerAsync(TrMarkerId(id));
+        }
         private async Task LoadAsync(bool resetFilters = false, bool fitMap = true)
         {
             if (resetFilters)
@@ -149,6 +160,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
 
         private Task LoadAll()
             => LoadAsync(resetFilters: true, fitMap: true);
+
+        private async Task CloseTrafficDetail()
+        {
+            await ClearDetailMarkerHighlightAsync(
+                restoreOverview: true);
+
+            SelectedId = 0;
+
+            await InvokeAsync(StateHasChanged);
+        }
         private void ApplyTrafficData(List<ClientTrafficConditionDTO> fetched)
         {
             TrafficConditions = fetched;
@@ -357,17 +378,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
                 .Where(x => !_onlyRecent || x.DateCondition >= cutoff);
         }
 
-        private void ToggleRecent()
+        private async Task ToggleRecent()
         {
             _onlyRecent = !_onlyRecent;
-            // Optional: resync markers on filter
-            if (IsMapBooted) _ = ReseedTrafficMarkersAsync(fit: false);
-        }
 
-        private void ClickInfo(int id)
-        {
-            if (id <= 0) return;
-            SelectedId = id;
+            if (IsMapBooted)
+            {
+                await ReseedTrafficMarkersAsync(fit: false);
+            }
+
+            await InvokeAsync(StateHasChanged);
         }
 
         // ----------------------------
@@ -375,6 +395,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.TrafficConditions
         // ----------------------------
         protected override async Task OnBeforeDisposeAsync()
         {
+            try
+            {
+                await ClearDetailMarkerHighlightAsync(
+                    restoreOverview: false);
+            }
+            catch
+            {
+            }
             _disposed = true;
 
             if (hubConnection is not null)

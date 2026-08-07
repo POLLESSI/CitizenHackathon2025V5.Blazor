@@ -50,13 +50,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
         public List<ClientCrowdInfoCalendarDTO> CrowdInfoCalendars { get; set; } = new();
         private List<ClientCrowdInfoCalendarDTO> _all = new();
+
+        /*
+         * Full source of the table :
+         * Filtered and sorted results, without pagination.
+         */
+        private List<ClientCrowdInfoCalendarDTO> _tableSource = new();
+
+        /*
+         * Currently visible rows in the dropdown list.
+         */
         private readonly List<ClientCrowdInfoCalendarDTO> _visible = new();
 
-        private int _currentIndex = 0;
-        private const int PageSize = 25;
+        private int _currentIndex;
+
+        /*
+         * Five records loaded at a time.
+         */
+        private const int PageSize = 5;
 
         private ElementReference ScrollContainerRef;
-        private ElementReference TableScrollRef;
         private string _q = string.Empty;
 
         private bool _onlyRecent;
@@ -93,7 +106,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
         protected override async Task SeedAsync(bool fit)
         {
-            var src = Filter(_all).ToList();
+            var src = BuildTableSource();
 
             await JS.InvokeVoidAsync("OutZenInterop.upsertCrowdCalendarMarkers", src, ScopeKey);
 
@@ -113,6 +126,101 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             try { await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey); } catch { }
             await Task.Delay(50);
             try { await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey); } catch { }
+        }
+
+        private async Task OpenCalendarDetail(int id)
+        {
+            if (id <= 0)
+                return;
+
+            SelectedId = id;
+
+            /*
+             * First, render the Detail window.
+             */
+            await InvokeAsync(StateHasChanged);
+
+            if (!IsMapBooted)
+                return;
+
+            try
+            {
+                await MapInterop.EnsureAsync();
+
+                var markerId = CICMarkerId(id);
+
+                var highlighted = await JS.InvokeAsync<bool>("OutZenInterop.highlightMarkerById",
+
+                        /*
+                         * Example: cc:121
+                         */
+                        markerId,
+
+                        ScopeKey,
+
+                        /*
+                         * Calendar markers are not
+                         * clustered, but this zoom level
+                         * allows a good view of the location.
+                         */
+                        16,
+
+                        /*
+                         * The form already contains the information.                    
+                         * the information.
+                         */
+                        false,
+
+                        /*
+                         * Move the marker up so that it
+                         * is not hidden by the window.
+                         */
+                        120
+                    );
+
+                Console.WriteLine($"[CIC Highlight] " + $"markerId={markerId}, " + $"highlighted={highlighted}");
+            }
+            catch (JSException ex)
+            {
+                Console.Error.WriteLine($"[CIC Highlight] JS failure " + $"for cc:{id}: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[CIC Highlight] failure " + $"for cc:{id}: {ex.Message}");
+            }
+        }
+
+        private async Task CloseCalendarDetail()
+        {
+            try
+            {
+                if (IsMapBooted)
+                {
+                    await MapInterop.EnsureAsync();
+
+                    await JS.InvokeAsync<bool>("OutZenInterop.clearHighlightedMarker", ScopeKey);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[CIC Highlight] " + $"clear failed: {ex.Message}");
+            }
+
+            SelectedId = 0;
+
+            await InvokeAsync(StateHasChanged);
+
+            try
+            {
+                if (IsMapBooted)
+                {
+                    await FitThrottledAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[CIC Highlight] " + $"fit after close failed: {ex.Message}");
+            }
         }
 
         private async Task FitThrottledAsync(int ms = 250)
@@ -164,34 +272,100 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             CrowdInfoCalendars = fetched;
             _all = fetched;
 
-            _visible.Clear();
-            _currentIndex = 0;
-            LoadMoreItems();
+            /*
+             * The table includes only the first five
+             * sorted rows.
+             */
+            ResetVisibleRows();
 
             _lastLevels.Clear();
+
             foreach (var co in fetched)
                 _lastLevels[co.Id] = co.ExpectedLevel.GetValueOrDefault();
         }
 
+        private List<ClientCrowdInfoCalendarDTO> BuildTableSource()
+        {
+            var today = DateTime.Today;
+
+            /*
+             * By default :
+             * - past dates are hidden ;
+             * - today appears first ;
+             * - future dates follow in order ;
+             * - events within a day follow their time.
+             */
+            return Filter(_all)
+                .Where(x => x.DateUtc.Date >= today)
+                .OrderBy(x => x.DateUtc.Date)
+                .ThenBy(x => x.StartLocalTime ?? TimeSpan.Zero)
+                .ThenBy(x => x.EventName ?? string.Empty)
+                .ThenBy(x => x.RegionCode ?? string.Empty)
+                .ThenBy(x => x.Id)
+                .ToList();
+        }
+
+        private void ResetVisibleRows()
+        {
+            /*
+             * Rebuilds the complete source according to the filters
+             * and chronological order.
+             */
+            _tableSource = BuildTableSource();
+
+            /*
+             * Starts from the first page.
+             */
+            _visible.Clear();
+            _currentIndex = 0;
+
+            LoadMoreItems();
+        }
+
         private void LoadMoreItems()
         {
-            var next = _all.Skip(_currentIndex).Take(PageSize).ToList();
+            if (_currentIndex >= _tableSource.Count)
+                return;
+
+            var next = _tableSource
+                .Skip(_currentIndex)
+                .Take(PageSize)
+                .ToList();
+
             _visible.AddRange(next);
             _currentIndex += next.Count;
+
+            Console.WriteLine(
+                $"[CIC][Table] Loaded={_visible.Count}, " +
+                $"Total={_tableSource.Count}, " +
+                $"PageSize={PageSize}");
         }
 
         private IEnumerable<ClientCrowdInfoCalendarDTO> Filter(IEnumerable<ClientCrowdInfoCalendarDTO> source)
         {
             var q = _q?.Trim();
-            var cutoff = DateTime.UtcNow.AddHours(-6);
+
+            var today = DateTime.Today;
+            var recentEnd = today.AddDays(7);
 
             return source
-                .Where(x =>
-                    string.IsNullOrEmpty(q) ||
-                    (x.EventName ?? "").Contains(q, StringComparison.OrdinalIgnoreCase) ||
-                    x.Latitude.ToString().Contains(q, StringComparison.OrdinalIgnoreCase) ||
-                    x.Longitude.ToString().Contains(q, StringComparison.OrdinalIgnoreCase))
-                .Where(x => !_onlyRecent || x.DateUtc >= cutoff);
+                .Where(x => string.IsNullOrWhiteSpace(q) || (x.EventName ?? string.Empty)
+                        .Contains(q, StringComparison.OrdinalIgnoreCase) ||
+
+                    (x.RegionCode ?? string.Empty)
+                        .Contains(q, StringComparison.OrdinalIgnoreCase) ||
+
+                    x.Latitude.ToString()
+                        .Contains(q, StringComparison.OrdinalIgnoreCase) ||
+
+                    x.Longitude.ToString()
+                        .Contains(q, StringComparison.OrdinalIgnoreCase))
+
+                /*
+                 * "Recent" now means "recent." :
+                 * today and the next seven days.
+                 */
+                .Where(x => !_onlyRecent || (x.DateUtc.Date >= today && x.DateUtc.Date <= recentEnd));
         }
 
         private async Task StartSignalRAsync()
@@ -224,8 +398,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             _hub.On<int>("CrowdInfoArchived", async id =>
             {
                 CrowdInfoCalendars.RemoveAll(c => c.Id == id);
+
                 _all.RemoveAll(c => c.Id == id);
-                _visible.RemoveAll(c => c.Id == id);
+
+                ResetVisibleRows();
 
                 if (IsMapBooted)
                 {
@@ -236,6 +412,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             });
 
             await _hub.StartAsync();
+
             Console.WriteLine($"✅ Connected to {hubUrl}");
 
             if (IsMapBooted && _visible.Count > 0)
@@ -246,16 +423,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
         {
             static void Upsert(List<ClientCrowdInfoCalendarDTO> list, ClientCrowdInfoCalendarDTO item)
             {
-                var i = list.FindIndex(c => c.Id == item.Id);
-                if (i >= 0) list[i] = item;
-                else list.Add(item);
+                var index = list.FindIndex(c => c.Id == item.Id);
+
+                if (index >= 0)
+                {
+                    list[index] = item;
+                }
+                else
+                {
+                    list.Add(item);
+                }
             }
 
             Upsert(CrowdInfoCalendars, dto);
             Upsert(_all, dto);
 
-            var j = _visible.FindIndex(c => c.Id == dto.Id);
-            if (j >= 0) _visible[j] = dto;
+            /*
+             * Replace the element as needed
+             * new DateUtc and reload five lines.
+             */
+            ResetVisibleRows();
         }
 
         public async Task ClearCrowdCalendarMarkersAsync(string scopeKey)
@@ -273,7 +460,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
         {
             if (!IsMapBooted) return;
 
-            var items = Filter(_all).ToList();
+            var items = BuildTableSource();
 
             try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdCalendarMarkers", ScopeKey); } catch { }
             try { await JS.InvokeVoidAsync("OutZenInterop.upsertCrowdCalendarMarkers", items, ScopeKey); } catch { }
@@ -282,39 +469,90 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
                 await FitThrottledAsync();
         }
 
-        
+
         private async Task HandleScroll()
         {
-            var scrollTop = await JS.InvokeAsync<int>("getScrollTop", TableScrollRef);
-            var scrollHeight = await JS.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
-            var clientHeight = await JS.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
-
-            if (scrollTop + clientHeight >= scrollHeight - 5 && _currentIndex < _all.Count)
+            try
             {
+                var scrollTop = await JS.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
+
+                var scrollHeight = await JS.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
+
+                var clientHeight = await JS.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
+
+                var reachedBottom = scrollTop + clientHeight >= scrollHeight - 8;
+
+                if (!reachedBottom)
+                    return;
+
+                if (_currentIndex >= _tableSource.Count)
+                    return;
+
+                /*
+                 * Loads five additional lines.
+                 *
+                 * We do not resynchronize the map:
+                 * it already has all the filtered results.
+                 */
                 LoadMoreItems();
-                if (IsMapBooted) await SyncMapMarkersAsync(fit: false);
+
                 await InvokeAsync(StateHasChanged);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[CIC][TableScroll] {ex.Message}");
             }
         }
 
-        private void ToggleRecent()
+        private async Task ToggleRecent()
         {
             _onlyRecent = !_onlyRecent;
-            if (IsMapBooted) _ = SyncMapMarkersAsync(fit: true);
+
+            /*
+             * Recalculate the first five lines.
+             */
+            ResetVisibleRows();
+
+            if (IsMapBooted)
+            {
+                await SyncMapMarkersAsync(fit: true);
+            }
+
+            await InvokeAsync(StateHasChanged);
         }
 
         private string Q
         {
             get => _q;
+
             set
             {
-                _q = value;
-                if (IsMapBooted) _ = SyncMapMarkersAsync(fit: true);
+                if (_q == value)
+                    return;
+
+                _q = value ?? string.Empty;
+
+                /*
+                 * The table starts again from five lines according to
+                 * the new research.
+                 */
+                ResetVisibleRows();
+
+                if (IsMapBooted)
+                {
+                    _ = SyncMapMarkersAsync(fit: true);
+                }
             }
         }
 
         private void GoNew() => Navigation.NavigateTo("/crowdcalendar/new");
-        private void GoDetail(int id) => Navigation.NavigateTo($"/calendar/{id}");
+        private void GoDetail(int id)
+        {
+            if (id <= 0)
+                return;
+
+            Navigation.NavigateTo($"/crowdcalendar/{id}");
+        }
 
         private static string InfoDescCalendar(ClientCrowdInfoCalendarDTO co)
             => CrowdInfoSeverityHelpers.GetDescription(CrowdInfoSeverityHelpers.GetSeverity(co));
@@ -324,8 +562,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             var safe = Math.Clamp(level, 0, 5);
             return $"info--lvl{safe}";
         }
-
-        private void ClickInfo(int id) => SelectedId = id;
 
         private async Task Load()
         {
@@ -374,9 +610,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
             CrowdInfoCalendars = fetched;
             _all = fetched;
 
-            _visible.Clear();
-            _currentIndex = 0;
-            LoadMoreItems();
+            ResetVisibleRows();
 
             if (IsMapBooted)
                 await SyncMapMarkersAsync(fit: true);
@@ -395,6 +629,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfoCalendars
 
         protected override async Task OnBeforeDisposeAsync()
         {
+            try
+            {
+                await ClearDetailMarkerHighlightAsync(restoreOverview: false);
+            }
+            catch
+            {
+            }
             _disposed = true;
 
             if (_hub is not null)

@@ -1,0 +1,261 @@
+﻿@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<div class="@GetOverlayClass()"aria-hidden="@((!Open).ToString().ToLowerInvariant())" @onclick="CloseFromBackdropAsync">
+
+    <section id="@WindowId"
+             class="oz-detail-dialog"
+             data-oz-allow-partial-offscreen="true"
+             data-oz-visible-width="72"
+             data-oz-visible-height="52"
+             role="dialog"
+             aria-modal="@((!AllowBackgroundInteraction).ToString().ToLowerInvariant())"
+             aria-labelledby="@_titleId"
+             tabindex="-1"
+             @onclick:stopPropagation>
+
+        <header class="oz-detail-dialog__header oz-titlebar" data-oz-drag-handle="true">
+
+            <div class="oz-detail-dialog__heading">
+                <div class="oz-detail-dialog__eyebrow">
+                    OUTZEN INFORMATION
+                </div>
+
+                <h2 id="@_titleId" class="oz-detail-dialog__title">
+                    @Title
+                </h2>
+            </div>
+
+            <button type="button"
+                    class="oz-detail-dialog__close"
+                    title="Close"
+                    aria-label="Close"
+                    disabled="@(!CanClose)"
+                    @onclick="CloseAsync">
+                ✕
+            </button>
+        </header>
+
+        <div class="oz-detail-dialog__body">
+            @ChildContent
+        </div>
+    </section>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/ *@

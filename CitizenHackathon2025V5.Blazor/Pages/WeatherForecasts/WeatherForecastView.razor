@@ -26,7 +26,9 @@
         </div>
 
         <div class="right">
-            <button class="chip @( _onlyRecent ? "active" : null )"@onclick="() => ToggleRecent()">Recent</button>
+            <button type="button" class="chip @(_onlyRecent ? "active" : null)" @onclick="ToggleRecent">
+                Recent
+            </button>
         </div>
         <div>
             <NavLink class="chip add-chip" href="/weatherforecastcreate">
@@ -137,7 +139,7 @@
                             <td>
                             <button class="btn btn-sm wx-chip @GetWeatherCss(we.IsSevere) btn-glow"
                                 title="See details"
-                                @onclick="() => ClickInfo(we.Id)">
+                                        @onclick="() => OpenWeatherDetailAsync(we.Id)">
                                     Weather 
                                 </button>
                             </td>
@@ -151,18 +153,19 @@
 
 <Globe />
           
-@if (SelectedId > 0)
-{
-    <div class="detail-wrapper">
-        <div class="list-toolbar">
-            <div class="left"><span class="badge badge-info">Details #@SelectedId</span></div>
-            <div class="right">
-                <button class="chip" @onclick="() => SelectedId = 0">Closed</button>
-            </div>
-        </div>
-        <WeatherForecastDetail Id="@SelectedId" />
-    </div>
-}
+<OutZenDetailModal WindowId="weather-detail-window"
+                   Open="@(SelectedId > 0)"
+                   Title="@($"Weather forecast #{SelectedId}")"
+                   AllowBackgroundInteraction="true"
+                   OnClose="CloseWeatherDetail">
+
+    @if (SelectedId > 0)
+    {
+        <WeatherForecastDetail @key="SelectedId"
+                               Id="@SelectedId" />
+    }
+</OutZenDetailModal>
+
 @if (!FilterWeather(visibleWeatherForecasts).Any())
 {
     <div class="oz-empty">No items for these filters.</div>

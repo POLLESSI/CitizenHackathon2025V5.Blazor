@@ -75,20 +75,19 @@
 
 <Globe />
 
-<hr />
+<OutZenDetailModal WindowId="suggestion-detail-window"
+                   Open="@(SelectedId > 0)"
+                   Title="@($"Suggestion details #{SelectedId}")"
+                   AllowBackgroundInteraction="true"
+                   OnClose="CloseSuggestionDetail">
 
-@if (SelectedId > 0)
-{
-  <div class="detail-wrapper">
-    <div class="list-toolbar">
-      <div class="left"><span class="badge badge-info">Details #@SelectedId</span></div>
-      <div class="right">
-                <button class="chip" @onclick="() => SelectedId = 0">Close</button>
-      </div>
-    </div>
-        <SuggestionDetail Id="@SelectedId" />
-  </div>
-}
+    @if (SelectedId > 0)
+    {
+        <SuggestionDetail @key="SelectedId"
+                          Id="@SelectedId" />
+    }
+</OutZenDetailModal>
+
 @if (!FilterSuggestion(visibleSuggestions).Any())
 {
     <div class="oz-empty">No items for these filters.</div>

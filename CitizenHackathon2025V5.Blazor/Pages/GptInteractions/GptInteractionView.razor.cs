@@ -22,11 +22,38 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         protected override string ScopeKey => "gptinteractionview";
         protected override int DefaultZoom => 14;
         protected override (double lat, double lng) DefaultCenter => (50.29, 4.99);
+
+        /*
+         * This page should only retain the markers
+         * whose identifier starts with "gpt:".
+         */
         protected override OutZenMarkerPolicy MarkerPolicy => OutZenMarkerPolicy.OnlyPrefix;
-        protected override bool ClearAllOnMapReady => true;
+        protected override string AllowedMarkerPrefix => "gpt:";
+        protected override bool PruneForeignMarkersOnMapReady => false;
+
+        /*
+         * A GPT page does not use hybrid bundles.
+         */
+        protected override bool EnableHybrid => false;
+
+        /*
+         * Geolocated interactions are few.
+         * No cluster is needed for the moment.
+         */
+        protected override bool EnableCluster => false;
+        protected override bool ForceBootOnFirstRender => true;
+        protected override bool ResetMarkersOnBoot => true;
+
+        /*
+         * SeedAsync already calls ClearCrowdMarkersAsync().
+         * Therefore, we avoid a second cleanup that could
+         * occur after the markers are created.
+         */
+        protected override bool ClearAllOnMapReady => false;
 
         private readonly List<ClientGptInteractionDTO> _allInteractions = new();
         private readonly HashSet<int> _completedVoiceInteractionIds = new();
+        private readonly Dictionary<int, (double Latitude, double Longitude)> _interactionLocations = new();
         protected readonly List<ClientGptInteractionDTO> visibleGptInteractions = new();
 
         private const int PageSize = 20;
@@ -63,6 +90,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         private bool _voiceOutputEnabled = true;
         private int? _lastSpokenInteractionId;
+        private int _detailRevision;
 
         private bool _disposed;
         private bool _renderQueued;
@@ -75,6 +103,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         private DateTime? _overlayShownAtUtc;
         private static readonly TimeSpan MinOverlayDuration = TimeSpan.FromSeconds(2);
+        private static string GptMarkerId(int id) => $"gpt:{id}";
 
         private PeriodicTimer? _elapsedTimer;
         private CancellationTokenSource? _elapsedTimerCts;
@@ -136,6 +165,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         private bool ShowAiOverlay =>
             _showAiOverlay || IsAiBusy;
+
+        private bool HasGeolocatedInteractions =>
+            _allInteractions.Any(x =>
+                TryGetInteractionCoordinates(x, out _, out _));
 
         private string AddChipCssClass =>
             IsAiBusy ? "chip add-chip chip--disabled" : "chip add-chip";
@@ -233,6 +266,47 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 _aiStatusMessage = "SignalR GPT hub unavailable. Fallback mode only.";
             }
         }
+
+        protected override async Task SeedAsync(bool fit)
+        {
+            if (_disposed || !IsMapBooted)
+                return;
+
+            await MapInterop.EnsureAsync();
+            await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
+
+            var added = 0;
+            var withoutLocation = 0;
+            var failed = 0;
+
+            foreach (var interaction in _allInteractions)
+            {
+                if (!TryGetInteractionCoordinates(interaction, out _, out _))
+                {
+                    withoutLocation++;
+                    continue;
+                }
+
+                var created = await ApplySingleGptMarkerAsync(interaction);
+
+                if (created)
+                    added++;
+                else
+                    failed++;
+            }
+
+            Console.WriteLine($"[GPT][Seed] " + $"interactions={_allInteractions.Count}, " + $"markers={added}, " + $"withoutLocation={withoutLocation}, " + $"failed={failed}");
+
+            var state = await JS.InvokeAsync<object>("OutZenInterop.dumpState", ScopeKey);
+
+            Console.WriteLine("[GPT][Seed][State] " + System.Text.Json.JsonSerializer.Serialize(state));
+
+            if (fit && added > 0)
+            {
+                await MapInterop.RefreshSizeAsync(ScopeKey);
+                await MapInterop.FitToDetailsAsync(ScopeKey);
+            }
+        }
         private async Task LoadBrowserVoicesAsync()
         {
             try
@@ -254,8 +328,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         {
             var fetched = await GptInteractionService.GetAllInteractions();
 
+            var source = fetched ?? new List<ClientGptInteractionDTO>();
+
+            var geolocated = source.Where(x => x.Latitude.HasValue && x.Longitude.HasValue).ToList();
+
+            var latest = source.OrderByDescending(x => x.Id).FirstOrDefault();
+
+            Console.WriteLine($"[GPT][Load] " + $"total={source.Count}, " + $"geolocated={geolocated.Count}, " + $"latestId={latest?.Id}, " + $"latestLat={latest?.Latitude}, " + $"latestLng={latest?.Longitude}");
+
+            var interaction16021 = source.FirstOrDefault(x => x.Id == 16021);
+
+            Console.WriteLine($"[GPT][Load][16021] " + $"found={interaction16021 is not null}, " + $"lat={interaction16021?.Latitude}, " + $"lng={interaction16021?.Longitude}");
+
             _allInteractions.Clear();
-            _allInteractions.AddRange(fetched ?? []);
+            _allInteractions.AddRange(source);
 
             visibleGptInteractions.Clear();
             currentIndex = 0;
@@ -263,6 +349,72 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             LoadMoreItems();
 
             await SafeRenderAsync(250);
+
+            await NotifyDataLoadedAsync(fit: true);
+        }
+
+        private async Task<bool> ApplySingleGptMarkerAsync(ClientGptInteractionDTO interaction)
+        {
+            if (_disposed || !IsMapBooted || interaction is null || interaction.Id <= 0)
+            {
+                return false;
+            }
+
+            if (!TryGetInteractionCoordinates(interaction, out var latitude, out var longitude))
+            {
+                return false;
+            }
+
+            var prompt = interaction.Prompt?.Trim();
+            var description = string.IsNullOrWhiteSpace(prompt) ? "GPT interaction" : prompt.Length <= 120 ? prompt : prompt[..120] + "…";
+            var markerId = GptMarkerId(interaction.Id);
+
+            try
+            {
+                await MapInterop.EnsureAsync();
+
+                /*
+                 * Direct call to retrieve
+                 * the boolean actually returned by JS.
+                 */
+                var created = await JS.InvokeAsync<bool>("OutZenInterop.addOrUpdateCrowdMarker",
+                    markerId,
+                    latitude,
+                    longitude,
+                    1,
+                    new
+                    {
+                        kind = "gpt",
+                        title = $"GPT interaction #{interaction.Id}",
+
+                        description,
+
+                        icon = "🤖",
+
+                        /*
+                            * Explicitly prevents clustering,
+                            * even if it is re-enabled later.
+                            */
+                        noCluster = true
+                    },
+                    ScopeKey);
+
+                Console.WriteLine($"[GPT][Marker] " + $"id={markerId}, " + $"lat={latitude}, " + $"lng={longitude}, " + $"created={created}");
+
+                return created;
+            }
+            catch (JSException ex)
+            {
+                Console.Error.WriteLine($"[GPT][Marker] JS failure. " + $"id={markerId}, " + $"error={ex.Message}");
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[GPT][Marker] failure. " + $"id={markerId}, " + $"error={ex.Message}");
+
+                return false;
+            }
         }
         private async Task ApplyVoiceOptionsAsync()
         {
@@ -296,6 +448,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             await InvokeAsync(StateHasChanged);
         }
 
+        private async Task CloseGptDetail()
+        {
+            await ClearDetailMarkerHighlightAsync(
+                restoreOverview: true);
+
+            SelectedId = 0;
+
+            await InvokeAsync(StateHasChanged);
+        }
         private void LoadMoreItems()
         {
             var next = _allInteractions
@@ -310,7 +471,49 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             currentIndex += next.Count;
         }
 
-        private void ClickInfo(int id) => SelectedId = id;
+        private async Task ClickInfo(int id)
+        {
+            if (id <= 0 || IsAiBusy)
+                return;
+
+            SelectedId = id;
+
+            /*
+             * Display the details first.
+             */
+            await InvokeAsync(StateHasChanged);
+
+            var interaction = _allInteractions.FirstOrDefault(x => x.Id == id);
+
+            if (interaction is null)
+            {
+                Console.WriteLine($"[GPT Detail] Interaction #{id} " + $"not found in the local list.");
+
+                return;
+            }
+
+            /*
+             * A text interaction without a position
+             * intentionally has no marker.
+             */
+            if (!TryGetInteractionCoordinates(interaction, out _, out _))
+            {
+                Console.WriteLine($"[GPT Detail] Interaction #{id} " + $"has no geographic context. " + $"Detail opened without map highlight.");
+
+                return;
+            }
+
+            /*
+             * Ensure the marker exists before
+             * requesting its highlight.
+             */
+            var markerCreated = await ApplySingleGptMarkerAsync(interaction);
+
+            if (!markerCreated)
+                return;
+
+            await HighlightDetailMarkerAsync(GptMarkerId(id));
+        }
 
         private async Task HandleScroll()
         {
@@ -400,6 +603,25 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                     throw new InvalidOperationException("The GPT request could not be started.");
 
                 _activeGptInteractionId = started.InteractionId;
+
+                if (effectiveLatitude.HasValue &&
+                    effectiveLongitude.HasValue &&
+                    double.IsFinite(effectiveLatitude.Value) &&
+                    double.IsFinite(effectiveLongitude.Value) &&
+                    effectiveLatitude.Value is >= -90 and <= 90 &&
+                    effectiveLongitude.Value is >= -180 and <= 180 &&
+                    !(effectiveLatitude.Value == 0 &&
+                      effectiveLongitude.Value == 0))
+                {
+                    _interactionLocations[started.InteractionId] =
+                    (
+                        effectiveLatitude.Value,
+                        effectiveLongitude.Value
+                    );
+
+                    Console.WriteLine($"[GPT][Location] Stored for " + $"interaction #{started.InteractionId}: " + $"{effectiveLatitude.Value}, " + $"{effectiveLongitude.Value}");
+                }
+
                 SelectedId = started.InteractionId;
                 NewPrompt = string.Empty;
 
@@ -452,6 +674,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 SelectedId = dto.Id;
 
             await SafeRenderAsync(700);
+
+            if (IsMapBooted)
+            {
+                await ApplySingleGptMarkerAsync(dto);
+            }
         }
 
         private bool CanSpeakFinalResponse(ClientGptInteractionDTO dto)
@@ -478,6 +705,46 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 return false;
 
             return true;
+        }
+
+        private bool TryGetInteractionCoordinates(ClientGptInteractionDTO interaction, out double latitude, out double longitude)
+        {
+            latitude = default;
+            longitude = default;
+
+            if (interaction is null || interaction.Id <= 0)
+                return false;
+
+            /*
+             * Primary source :
+             * coordinates persisted and returned by the API.
+             */
+            if (interaction.Latitude.HasValue && interaction.Longitude.HasValue)
+            {
+                latitude = interaction.Latitude.Value;
+                longitude = interaction.Longitude.Value;
+            }
+            /*
+             * Secondary source :
+             * position remembered during the local start
+             * of the interaction.
+             */
+            else if (_interactionLocations.TryGetValue(interaction.Id, out var remembered))
+            {
+                latitude = remembered.Latitude;
+                longitude = remembered.Longitude;
+            }
+            else
+            {
+                return false;
+            }
+
+            return
+                double.IsFinite(latitude) &&
+                double.IsFinite(longitude) &&
+                latitude is >= -90 and <= 90 &&
+                longitude is >= -180 and <= 180 &&
+                !(latitude == 0 && longitude == 0);
         }
 
         private string ResolveTtsLang()
@@ -1026,10 +1293,64 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             _completedVoiceInteractionIds.Add(dto.Id);
 
-            await OnInteractionUpdatedAsync(dto);
+            ClientGptInteractionDTO completed = dto;
 
-            if (IsFinalUsableResponse(dto.Response ?? string.Empty))
-                await TrySpeakCompletedInteractionAsync(dto);
+            try
+            {
+                var persisted = await GptInteractionService.GetByIdAsync(dto.Id);
+
+                if (persisted is not null)
+                {
+                    completed = persisted;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[GPT COMPLETE] " + $"Reload #{dto.Id} failed: " + $"{ex.Message}");
+            }
+
+            await OnInteractionUpdatedAsync(completed);
+
+            if (SelectedId == completed.Id)
+            {
+                _detailRevision++;
+
+                await InvokeAsync(StateHasChanged);
+            }
+
+            if (IsMapBooted)
+            {
+                var markerCreated = await ApplySingleGptMarkerAsync(completed);
+
+                if (markerCreated)
+                {
+                    await MapInterop.RefreshSizeAsync(ScopeKey);
+
+                    await Task.Delay(120);
+
+                    var highlighted = await HighlightDetailMarkerAsync(markerId:GptMarkerId(completed.Id), targetZoom: 16, openPopup: false, verticalOffsetPx: 170);
+
+                    Console.WriteLine(
+                        $"[GPT COMPLETE][Map] " +
+                        $"id={completed.Id}, " +
+                        $"lat={completed.Latitude}, " +
+                        $"lng={completed.Longitude}, " +
+                        $"markerCreated={markerCreated}, " +
+                        $"highlighted={highlighted}");
+                }
+                else
+                {
+                    Console.WriteLine(
+                        $"[GPT COMPLETE][Map] " +
+                        $"No geographic marker for " +
+                        $"interaction #{completed.Id}. " +
+                        $"lat={completed.Latitude}, " +
+                        $"lng={completed.Longitude}");
+                }
+            }
+
+            if (IsFinalUsableResponse(completed.Response ?? string.Empty))
+                await TrySpeakCompletedInteractionAsync(completed);
 
             _activeGptInteractionId = null;
             _isSending = false;
@@ -1038,12 +1359,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             await StopElapsedTimerAsync();
             await SafeRenderAsync();
+
             if (_gptStartedAtUtc.HasValue)
             {
                 var duration = DateTime.UtcNow - _gptStartedAtUtc.Value;
 
-                Console.WriteLine($"[GPT TIMER] COMPLETED #{dto.Id} after {duration.TotalSeconds:F1}s");
+                Console.WriteLine($"[GPT TIMER] COMPLETED " + $"#{completed.Id} after " + $"{duration.TotalSeconds:F1}s");
             }
+
+            //if (SelectedId == dto.Id)
+            //{
+            //    _detailRevision++;
+
+            //    await InvokeAsync(StateHasChanged);
+            //}
 
             _gptStartedAtUtc = null;
         }
@@ -1106,6 +1435,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
         protected override async Task OnBeforeDisposeAsync()
         {
+            try
+            {
+                await ClearDetailMarkerHighlightAsync(
+                    restoreOverview: false);
+            }
+            catch
+            {
+            }
             _disposed = true;
 
             GptClientOrchestrator.InteractionUpdated -= OnInteractionUpdatedAsync;

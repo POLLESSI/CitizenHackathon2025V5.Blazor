@@ -34,10 +34,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
         [JSInvokable]
         public Task SelectSuggestionFromMap(int id)
         {
-            SelectedId = id;
-            StateHasChanged();
-            return Task.CompletedTask;
+            return OpenSuggestionDetailAsync(id);
         }
+        
         //private const string ApiBase = "https://localhost:7254";
 
         // ===== State =====
@@ -73,6 +72,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
         private string _q = string.Empty;
         private bool _onlyRecent;
         public int SelectedId { get; set; }   // must be accessible from the .razor
+
+        private async Task OpenSuggestionDetailAsync(int id)
+        {
+            if (id <= 0)
+                return;
+
+            SelectedId = id;
+
+            await InvokeAsync(StateHasChanged);
+
+            await HighlightDetailMarkerAsync(SuMarkerId(id));
+        }
         protected override async Task OnInitializedAsync()
         {
             allSuggestions = await SuggestionService.GetLatestSuggestionAsync();
@@ -256,6 +267,16 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
             visibleSuggestions.AddRange(next);
             currentIndex += next.Count;
         }
+
+        private async Task CloseSuggestionDetail()
+        {
+            await ClearDetailMarkerHighlightAsync(
+                restoreOverview: true);
+
+            SelectedId = 0;
+
+            await InvokeAsync(StateHasChanged);
+        }
         private async Task SeedSuggestionBundlesAsync(bool fit)
         {
             if (!IsMapBooted) return;
@@ -300,7 +321,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
         }
 
 
-        private void ClickInfo(int id) => SelectedId = id;
+        private Task ClickInfo(int id)
+        {
+            return OpenSuggestionDetailAsync(id);
+        }
 
         // Infinite scrolling (uses JS helpers: getScrollTop/getScrollHeight/getClientHeight)
         private async Task HandleScroll()
@@ -369,6 +393,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Suggestions
 
         protected override async Task OnBeforeDisposeAsync()
         {
+            try
+            {
+                await ClearDetailMarkerHighlightAsync(restoreOverview: false);
+            }
+            catch
+            {
+            }
             _disposed = true;
 
             try

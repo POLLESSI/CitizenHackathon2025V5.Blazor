@@ -1,0 +1,325 @@
+﻿@page "/emergency-intelligence-test"
+
+@using CitizenHackathon2025V5.Blazor.Client.DTOs
+@using CitizenHackathon2025V5.Blazor.Client.Services
+
+@inject EmergencyIntelligenceClientService EmergencyClient
+
+<PageTitle>Emergency Intelligence Test</PageTitle>
+
+<div class="container py-4">
+    <h1>Emergency Intelligence</h1>
+
+    <div class="d-flex gap-2 mb-3">
+        <button class="btn btn-primary"
+                disabled="@_loading"
+                @onclick="CheckSourceAsync">
+            Tester la source NCCN
+        </button>
+
+        <button class="btn btn-warning"
+                disabled="@_loading"
+                @onclick="SynchronizeAsync">
+            Lancer la synchronisation
+        </button>
+    </div>
+
+    @if (_loading)
+    {
+        <div class="alert alert-info">
+            Opération en cours…
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-danger">
+            @_error
+        </div>
+    }
+
+    @if (_source is { } source)
+    {
+        <section class="emergency-source-card"
+                 aria-live="polite">
+
+            <div class="emergency-source-header">
+                <div>
+                    <div class="emergency-source-kicker">
+                        Source de sécurité
+                    </div>
+
+                    <h2>
+                        Source d’urgence
+                    </h2>
+                </div>
+
+                <span class="emergency-source-code">
+                    @source.SourceCode
+                </span>
+            </div>
+
+            <div class="emergency-source-grid">
+                <div class="emergency-source-field">
+                    <span class="emergency-source-label">
+                        Nombre d’alertes
+                    </span>
+
+                    <strong class="emergency-source-value">
+                        @source.AlertCount
+                    </strong>
+                </div>
+
+                <div class="emergency-source-field">
+                    <span class="emergency-source-label">
+                        Récupération
+                    </span>
+
+                    <strong class="emergency-source-value">
+                        @source.FetchedAtUtc
+                        .ToLocalTime()
+                        .ToString("dd/MM/yyyy HH:mm:ss")
+                    </strong>
+                </div>
+
+                <div class="emergency-source-field">
+                    <span class="emergency-source-label">
+                        Fournisseur distant
+                    </span>
+
+                    @if (source.IsRemoteProviderConfigured)
+                    {
+                        <span class="emergency-status
+                                         emergency-status--online">
+                            Configuré
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="emergency-status
+                                         emergency-status--pending">
+                            Non configuré
+                        </span>
+                    }
+            </div>
+
+            <div class="emergency-source-field">
+                <span class="emergency-source-label">
+                    ETag
+                </span>
+
+                <strong class="emergency-source-value">
+                    @(source.ETag ?? "Aucun")
+                </strong>
+            </div>
+
+            <div class="emergency-source-field">
+                <span class="emergency-source-label">
+                    Dernière modification
+                </span>
+
+                <strong class="emergency-source-value">
+                    @(source.LastModifiedUtc?
+                                        .ToLocalTime()
+                                        .ToString("dd/MM/yyyy HH:mm:ss")
+                                        ?? "Non fournie")
+                </strong>
+            </div>
+
+                <div class="emergency-source-field">
+                    <span class="emergency-source-label">
+                        État de la source
+                    </span>
+
+                    <span class="emergency-status
+                                 emergency-status--test">
+                        Mode diagnostic
+                    </span>
+                </div>
+            </div>
+
+        @if (source.AlertCount == 0)
+            {
+                <div class="emergency-source-notice">
+                    <span aria-hidden="true">ℹ️</span>
+
+                    <span>
+                        No alerts were returned.
+                        The NCCN connector is still in use
+                        in development mode.
+                    </span>
+                </div>
+            }
+        </section>
+    }
+
+    @if (_sync is { } sync)
+    {
+        <div class="emergency-sync-success"
+             role="status">
+
+            <span class="emergency-sync-icon"
+                  aria-hidden="true">
+                ✓
+            </span>
+
+            <div>
+                <strong>
+                    Synchronisation terminée
+                </strong>
+
+                <div>
+                    @sync.SynchronizedAtUtc
+                    .ToLocalTime()
+                    .ToString("dd/MM/yyyy HH:mm:ss")
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                @* // Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025.API. All rights reserved. *@

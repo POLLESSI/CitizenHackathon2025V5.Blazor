@@ -97,9 +97,12 @@ builder.Services.AddHttpClient("ApiRootWithAuth", client =>
 .AddPolicyHandler(GetRetryPolicy())
 .AddPolicyHandler(GetCircuitBreakerPolicy());
 
+builder.Services.AddHttpClient("EmergencyApi", client => {client.BaseAddress = new Uri("https://localhost:7254/"); });
+
 // Default HttpClient injected into legacy services
-builder.Services.AddScoped(sp =>
-    sp.GetRequiredService<IHttpClientFactory>().CreateClient("ApiWithAuth"));
+builder.Services.AddScoped<EmergencyIntelligenceClientService>();
+
+builder.Services.AddScoped(sp => sp.GetRequiredService<IHttpClientFactory>().CreateClient("ApiWithAuth"));
 
 // ===============================
 // Auth / Token

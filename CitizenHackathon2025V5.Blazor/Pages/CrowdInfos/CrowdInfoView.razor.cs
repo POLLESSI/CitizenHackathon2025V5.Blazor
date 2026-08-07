@@ -42,7 +42,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
 
         // ===== UI & Scroll =====
         private ElementReference ScrollContainerRef;
-        private ElementReference TableScrollRef;
         private string _q = string.Empty;
         private bool _onlyRecent;
 
@@ -58,7 +57,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
         protected override bool ResetMarkersOnBoot => true;
         protected override OutZenMarkerPolicy MarkerPolicy => OutZenMarkerPolicy.OnlyPrefix;
         protected override string AllowedMarkerPrefix => "crowd:";
-        protected override bool ClearAllOnMapReady => true;
+        protected override bool ClearAllOnMapReady => false;
         private static string CIMarkerId(int id) => $"crowd:{id}";
         private string _token;
 
@@ -113,18 +112,56 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
             await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey);
         }
 
-        private async Task ReseedCrowdInfoMarkersAsync(bool fit)
+        private async Task OpenCrowdDetailAsync(int id)
         {
-            if (_disposed) return;
-            if (!IsMapBooted) return;
+            if (_disposed || id <= 0 || !IsMapBooted)
+            {
+                return;
+            }
 
-            try { await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey); } catch { }
+            SelectedId = id;
+
+            /*
+             * Requests the display of the Detail window.
+             */
+            await InvokeAsync(StateHasChanged);
+
+            /*
+             * Lets Blazor finish rendering the window
+             * before moving the map.
+             */
+            await Task.Delay(40);
+
+            if (_disposed || SelectedId != id)
+                return;
+
+            var markerId = CIMarkerId(id);
+
+            var highlighted = await HighlightDetailMarkerAsync(markerId: markerId, targetZoom: 16, openPopup: false, verticalOffsetPx: 170);
+
+            Console.WriteLine($"[Crowd Detail] " + $"id={id}, " + $"markerId={markerId}, " + $"highlighted={highlighted}");
+        }
+        private async Task ReseedCrowdInfoMarkersAsync(
+    bool fit)
+        {
+            if (_disposed || !IsMapBooted)
+                return;
+
+            try
+            {
+                await JS.InvokeVoidAsync("OutZenInterop.clearCrowdMarkers", ScopeKey);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[Crowd Seed] Clear failed: " + $"{ex.Message}");
+            }
 
             foreach (var dto in _all)
+            {
                 await ApplySingleCrowdInfoMarkerAsync(dto);
+            }
 
-            await FitThrottledAsync();
-            if (fit)
+            if (fit && _all.Count > 0)
             {
                 await FitThrottledAsync();
             }
@@ -248,6 +285,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
             }
             catch { }
         }
+
+        private async Task CloseCrowdDetail()
+        {
+            if (_disposed)
+                return;
+
+            SelectedId = 0;
+
+            await InvokeAsync(StateHasChanged);
+
+            /*
+             * Removes only the selection animation.
+             * The crowd :* marker remains on the map.
+             */
+            await ClearDetailMarkerHighlightAsync(
+                restoreOverview: true);
+        }
         private void UpsertLocal(ClientCrowdInfoDTO dto)
         {
             static void Upsert(List<ClientCrowdInfoDTO> list, ClientCrowdInfoDTO item)
@@ -341,7 +395,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
         {
             if (_disposed) return;
 
-            var scrollTop = await JS.InvokeAsync<int>("getScrollTop", TableScrollRef);
+            var scrollTop = await JS.InvokeAsync<int>("getScrollTop", ScrollContainerRef);
             var scrollHeight = await JS.InvokeAsync<int>("getScrollHeight", ScrollContainerRef);
             var clientHeight = await JS.InvokeAsync<int>("getClientHeight", ScrollContainerRef);
 
@@ -380,9 +434,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
             var safe = Math.Clamp(level, 0, 5);
             return $"info--lvl{safe}";
         }
-
-        private void ClickInfo(int id) => SelectedId = id;
-
         private async Task TestMarkers()
         {
             if (!IsMapBooted) return;
@@ -432,6 +483,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CrowdInfos
         // ----------------------------
         protected override async Task OnBeforeDisposeAsync()
         {
+            try
+            {
+                await ClearDetailMarkerHighlightAsync(restoreOverview: false);
+            }
+            catch
+            {
+            }
             _disposed = true;
 
             if (_hub is not null)

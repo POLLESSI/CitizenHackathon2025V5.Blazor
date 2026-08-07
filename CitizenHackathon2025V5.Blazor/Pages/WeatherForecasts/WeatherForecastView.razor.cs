@@ -17,7 +17,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 {
     public partial class WeatherForecastView 
     {
-#nullable disable
+    #nullable disable
         [Inject] public WeatherForecastService WeatherForecastService { get; set; }
         [Inject] public NavigationManager Navigation { get; set; }
         [Inject] public IJSRuntime JS { get; set; }
@@ -151,6 +151,29 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
             await InvokeAsync(StateHasChanged);
             await NotifyDataLoadedAsync(fit: true);
+        }
+
+        private async Task OpenWeatherDetailAsync(int id)
+        {
+            if (id <= 0)
+                return;
+
+            SelectedId = id;
+
+            await InvokeAsync(StateHasChanged);
+
+            await HighlightDetailMarkerAsync(
+                WfMarkerId(id));
+        }
+
+        private async Task CloseWeatherDetail()
+        {
+            await ClearDetailMarkerHighlightAsync(
+                restoreOverview: true);
+
+            SelectedId = 0;
+
+            await InvokeAsync(StateHasChanged);
         }
         private async Task LoadAsync(bool resetFilters = false, bool fitMap = true)
         {
@@ -300,16 +323,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
             // ✅ clear the same family as you upsert (crowd/details)
             await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
 
-            foreach (var dto in allWeatherForecasts)
-                await ApplySingleWeatherMarkerAsync(dto);
+            var source = FilterWeather(allWeatherForecasts).ToList();
 
-            if (fit && allWeatherForecasts.Count > 0)
+            foreach (var dto in source)
+            {
+                await ApplySingleWeatherMarkerAsync(dto);
+            }
+
+            if (fit && source.Count > 0)
             {
                 await MapInterop.RefreshSizeAsync(ScopeKey);
+
                 await MapInterop.FitToDetailsAsync(ScopeKey);
             }
 
-            Console.WriteLine($"[WF] SeedAsync: booted={IsMapBooted} count={allWeatherForecasts.Count}");
+            Console.WriteLine($"[WF] SeedAsync: " + $"booted={IsMapBooted}, " + $"source={source.Count}, " + $"all={allWeatherForecasts.Count}");
         }
 
         protected override async Task OnMapReadyAsync()
@@ -331,16 +359,40 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
 
         private async Task ReseedWeatherMarkersAsync(bool fit)
         {
-            if (_disposed) return;
-            if (!IsMapBooted) return;
+            if (_disposed)
+                return;
 
-            try { await MapInterop.ClearCrowdMarkersAsync(ScopeKey); ; } catch { }
+            if (!IsMapBooted)
+                return;
 
-            foreach (var dto in allWeatherForecasts)
+            try
+            {
+                await MapInterop.ClearCrowdMarkersAsync(ScopeKey);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[WF] Clear markers failed: {ex.Message}");
+            }
+
+            /*
+             * Full source matching the current filters.
+             *
+             * Recent, text search, etc.
+             */
+            var source = FilterWeather(allWeatherForecasts).ToList();
+
+            foreach (var dto in source)
+            {
                 await ApplySingleWeatherMarkerAsync(dto);
+            }
 
-            await FitThrottledAsync();
-            if (fit)
+            Console.WriteLine($"[WF][Reseed] " + $"source={source.Count}, " + $"all={allWeatherForecasts.Count}, " + $"recent={_onlyRecent}");
+
+            /*
+             * The map is re-centered only when requested
+             * and when at least one marker is present.
+             */
+            if (fit && source.Count > 0)
             {
                 await FitThrottledAsync();
             }
@@ -470,7 +522,23 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         private async Task ToggleRecent()
         {
             _onlyRecent = !_onlyRecent;
-            ApplyFilterAndReset();
+
+            visibleWeatherForecasts.Clear();
+            currentIndex = 0;
+
+            var filtered = FilterWeather(allWeatherForecasts).ToList();
+
+            visibleWeatherForecasts.AddRange(filtered.Take(PageSize));
+
+            currentIndex = visibleWeatherForecasts.Count;
+
+            if (IsMapBooted)
+            {
+                await ReseedWeatherMarkersAsync(fit: false);
+
+                await UpdateChartAsync();
+            }
+
             await InvokeAsync(StateHasChanged);
         }
 
@@ -550,6 +618,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.WeatherForecasts
         // ----------------------------
         protected override async Task OnBeforeDisposeAsync()
         {
+            try
+            {
+                await ClearDetailMarkerHighlightAsync(
+                    restoreOverview: false);
+            }
+            catch
+            {
+            }
             _disposed = true;
 
             if (hubConnection is not null)

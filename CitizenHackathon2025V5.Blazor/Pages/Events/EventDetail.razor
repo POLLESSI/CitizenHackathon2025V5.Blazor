@@ -1,0 +1,155 @@
+﻿@* @page "/eventsdetail/{Id:int}" *@
+@namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
+@using CitizenHackathon2025.Blazor.DTOs
+
+<div class="detail-container">
+
+    @if (_loading)
+    {
+        <div class="oz-detail-state">
+            Loading event #@Id…
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="oz-detail-state oz-detail-state--error">
+            @_error
+        </div>
+    }
+    else if (_event is null)
+    {
+        <div class="oz-detail-state oz-detail-state--empty">
+            No event found for identifier @Id.
+        </div>
+    }
+    else
+    {
+        <h3>Event Detail</h3>
+
+        <p>
+            <strong>Id:</strong> @_event.Id
+        </p>
+
+        <p>
+            <strong>Name:</strong> @(string.IsNullOrWhiteSpace(_event.Name) ? "—" : _event.Name)
+        </p>
+
+        <p>
+            <strong>Date:</strong> @_event.DateEvent.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+        </p>
+
+        <p>
+            <strong>Place Id:</strong> @(_event.PlaceId?.ToString() ?? "—")
+        </p>
+
+        <p>
+            <strong>Latitude:</strong> @_event.Latitude.ToString("0.######")
+        </p>
+
+        <p>
+            <strong>Longitude:</strong> @_event.Longitude.ToString("0.######")
+        </p>
+
+        <p>
+            <strong>Expected crowd:</strong> @(_event.ExpectedCrowd?.ToString() ?? "—")
+        </p>
+
+        <p>
+            <strong>Outdoor:</strong> @(_event.IsOutdoor ? "Yes" : "No")
+        </p>
+        }
+
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@* /*// Copyrigtht (c) 2025 Citizen Hackathon https://github.com/POLLESSI/Citizenhackathon2025V5.Blazor.Client. All rights reserved.*/ *@

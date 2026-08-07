@@ -74,6 +74,20 @@ function initState(s) {
 
         return id != null ? `${kind} #${id}` : kind;
     };
+    /*
+ * Marker currently highlighted by a detail window.
+ *
+ * Example:
+ * event:297
+ * place:1548
+ * crowd:17
+ */
+    if (!Object.prototype.hasOwnProperty.call(
+        s,
+        "highlightedMarkerKey"
+    )) {
+        s.highlightedMarkerKey = null;
+    }
 }
 
 function getS(scopeKey = "main") {
@@ -103,6 +117,7 @@ function getS(scopeKey = "main") {
             bundleMarkers: new Map(),   // bundle markers
             bundleIndex: new Map(),     // bundle data
             detailMarkers: new Map(),   // detailed markers
+            highlightedMarkerKey: null,
             calendarMarkers: new Map(), // calendar markers
             antennaMarkers: new Map(),  // antenna markers
             antennaAlertMarkers: new Map(), // antenna alert markers
@@ -360,7 +375,14 @@ function buildCalendarMarkerIcon(L, level, iconOverride = "🥁🎉", scopeKey =
 
     return L.divIcon({
         className: `oz-marker oz-marker--calendar oz-marker-lvl${lvl} ${scopeKey ? `oz-scope--${String(scopeKey).toLowerCase()}` : ""}`.trim(),
-        html: `<div class="oz-marker-inner oz-calendar-inner">${iconOverride}</div>`,
+        html: `
+                    <div class="oz-marker-inner oz-calendar-inner">
+                        <span class="oz-marker-glyph"
+                              aria-hidden="true">
+                            ${iconOverride}
+                        </span>
+                    </div>
+                `.trim(),
         iconSize: [30, 30],
         iconAnchor: [15, 15],
         popupAnchor: [0, -15],
@@ -412,8 +434,17 @@ function buildMarkerIcon(L, level, {
     const content = (emoji && String(emoji).trim()) ? emoji : "•";
 
     return L.divIcon({
-        className: `oz-marker ${lvlClass} ${kindClass} ${trafficClass} ${scopeClass}`.trim(),
-        html: `<div class="oz-marker-inner">${content}</div>`,
+        className: `oz-marker ${lvlClass} ${kindClass} ${trafficClass} ${scopeClass}` .trim(),
+
+        html: `
+                    <div class="oz-marker-inner">
+                        <span class="oz-marker-glyph"
+                              aria-hidden="true">
+                            ${content}
+                        </span>
+                    </div>
+                `.trim(),
+
         iconSize: [26, 26],
         iconAnchor: [13, 26],
         popupAnchor: [0, -26],
@@ -845,6 +876,475 @@ export function disposeOutZen({ mapId, scopeKey = "main", token = null, allowNoT
 }
 
 /* ---------------------------------------------------------
+   Selected marker / Detail highlight
+--------------------------------------------------------- */
+
+/*
+ * Wait for a Leaflet movement to finish.
+ *
+ * The timeout prevents a promise from getting stuck when
+ * the map was already exactly at the requested position
+ * and Leaflet does not trigger any moveend.
+ */
+function waitForMapMove(map, timeoutMs = 900) {
+    return new Promise((resolve) => {
+        if (!map) {resolve();
+            return;
+        }
+
+        let completed = false;
+
+        const finish = () => {
+            if (completed) {
+                return;
+            }
+
+            completed = true;
+
+            try {
+                map.off("moveend", finish);
+            }
+            catch {
+            }
+
+            resolve();
+        };
+
+        try {
+            map.once("moveend", finish);
+        }
+        catch {
+            resolve();
+            return;
+        }
+
+        globalThis.setTimeout(finish, Math.max(100, timeoutMs));
+    });
+}
+
+/*
+ * Wait for MarkerCluster to actually render the marker.
+ *
+ * When a marker is in a cluster, getElement()
+ * usually returns null until the cluster has been
+ * opened or sufficiently zoomed.
+ */
+function revealClusteredMarker(s, marker) {
+    return new Promise((resolve) => {
+        if (!s?.cluster || !marker || typeof s.cluster.hasLayer !== "function" || !s.cluster.hasLayer(marker) || typeof s.cluster.zoomToShowLayer !== "function") {
+
+            resolve();
+            return;
+        }
+
+        /*
+         * The marker is already rendered individually.
+         */
+        if (marker.getElement?.()) {
+            resolve();
+            return;
+        }
+
+        let completed = false;
+
+        const finish = () => {
+            if (completed) {
+                return;
+            }
+
+            completed = true;
+            resolve();
+        };
+
+        try {
+            s.cluster.zoomToShowLayer(marker, finish);
+        }
+        catch (error) {
+            console.warn("[OutZen Highlight] " + "zoomToShowLayer failed", error);
+
+            finish();
+            return;
+        }
+
+        /*
+         * Safety check if MarkerCluster is not called
+         * the callback in certain situations.
+         */
+        globalThis.setTimeout(finish, 1200);
+    });
+}
+
+/*
+ * Apply or remove the visual state on a Leaflet marker.
+ *
+ * Important:
+ * never transform the root element of the marker,
+ * because Leaflet already uses transform for its position.
+ * The CSS animation will target the inner element and
+ * the pseudo-elements.
+ */
+function applySelectedStateToMarker(marker, selected)
+{
+    if (!marker) {
+        return false;
+    }
+
+    marker.__ozSelected = selected === true;
+
+    /*
+     * Temporarily places the marker above
+     * the other markers.
+     */
+    if (selected) {
+        if (!Number.isFinite(marker.__ozPreviousZIndexOffset))
+        {
+            marker.__ozPreviousZIndexOffset = Number(marker.options?.zIndexOffset ?? 0);
+        }
+
+        try {
+            marker.setZIndexOffset?.(marker.__ozPreviousZIndexOffset + 20000);
+        }
+        catch {
+        }
+    }
+    else {
+        try {
+            const previous = Number.isFinite(marker.__ozPreviousZIndexOffset) ? marker.__ozPreviousZIndexOffset : 0;
+
+            marker.setZIndexOffset?.(previous);
+        }
+        catch {
+        }
+
+        delete marker.__ozPreviousZIndexOffset;
+    }
+
+    /*
+     * setIcon() and MarkerCluster can recreate
+     * the DOM element. We therefore apply the class
+     * immediately and then for two frames.
+     */
+    const applyClass = () => {
+        const element = marker.getElement?.();
+
+        if (!element) {
+            return false;
+        }
+
+        element.classList.toggle("oz-marker-selected",selected);
+
+        if (selected) {element.setAttribute("aria-current", "true");
+        }
+        else {
+            element.removeAttribute("aria-current");
+        }
+
+        return true;
+    };
+
+    applyClass();
+
+    requestAnimationFrame(() => { applyClass();
+
+        requestAnimationFrame(() => { applyClass();
+        });
+    });
+
+    return true;
+}
+
+function findManagedMarkerByKey(state, markerKey)
+{
+    if (!state || !markerKey) {
+        return null;
+    }
+
+    const key = String(markerKey);
+
+    return (
+        state.markers ?.get?.(key) ??
+        state.calendarMarkers ?.get?.(key) ??
+        state.detailMarkers ?.get?.(key) ??
+        state.antennaMarkers ?.get?.(key) ??
+        state.antennaAlertMarkers ?.get?.(key) ??
+
+        null
+    );
+}
+/**
+ * Remove the current marker highlight
+ * associated with a Detail window.
+ */
+export function clearHighlightedMarker(scopeKey = null)
+{
+    const k = pickScopeKey(scopeKey);
+    const s = peekS(k);
+
+    /*
+     * Idempotent :
+     * closing a detail after the map has been destroyed
+     * should not cause an error.
+     */
+    if (!s) {
+        return true;
+    }
+
+    const key = s.highlightedMarkerKey;
+
+    if (key) {
+        const marker = findManagedMarkerByKey(s, key);
+
+        if (marker) {applySelectedStateToMarker(marker, false);
+        }
+    }
+
+    s.highlightedMarkerKey = null;
+
+    console.log("[OutZen Highlight] cleared",
+        {
+            scopeKey: k,
+            markerId: key ?? null
+        }
+    );
+
+    return true;
+}
+
+export function diagnoseHighlightedMarker(scopeKey = null)
+{
+    const k = pickScopeKey(scopeKey);
+    const s = peekS(k);
+    const key = s?.highlightedMarkerKey ?? null;
+    const marker = key ? s?.markers?.get?.(key) : null;
+    const element = marker?.getElement?.() ?? null;
+    const inner = element?.querySelector(".oz-marker-inner") ?? null;
+    const before = element ? getComputedStyle(element, "::before") : null;
+    const after = element ? getComputedStyle(element, "::after") : null;
+    const core = inner ? getComputedStyle(inner) : null;
+    const result = {scopeKey: k,
+
+        highlightedMarkerKey: key,
+        markerExists: !!marker,
+        elementExists: !!element,
+        selectedClass: element?.classList.contains("oz-marker-selected") ?? false,
+        elementClass: element?.className ?? null,
+        before: before
+            ? {
+                content: before.content,
+                animationName: before.animationName,
+                animationDuration: before.animationDuration,
+                animationDelay: before.animationDelay,
+                iterationCount: before.animationIterationCount,
+                opacity: before.opacity
+            }
+            : null,
+
+        after: after
+            ? {
+                content: after.content,
+                animationName: after.animationName,
+                animationDuration: after.animationDuration,
+                animationDelay: after.animationDelay,
+                iterationCount: after.animationIterationCount,
+                opacity: after.opacity
+            }
+            : null,
+
+        core: core
+            ? {
+                animationName: core.animationName,
+                animationDuration: core.animationDuration,
+                iterationCount: core.animationIterationCount,
+                opacity:core.opacity,
+                filter: core.filter
+            }
+            : null,
+
+        reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+        runningAnimations: element ? element.getAnimations({subtree: true})
+                    .map(animation => ({animationName: animation.animationName ?? null,
+
+                        playState: animation.playState,
+
+                        currentTime: animation.currentTime,
+
+                        pseudoElement: animation.effect?.pseudoElement ?? null
+                    })
+                    )
+                : []
+    };
+
+    console.log("[OutZen Highlight Diagnostic]",result);
+
+    return result;
+}
+
+/**
+ * Highlight a marker and move the card onto it.
+ *
+ * @param {string|number} markerId
+ * Example: "event:297"
+ *
+ * @param {string|null} scopeKey
+ * Example: "eventview"
+ *
+ * @param {number} targetZoom
+ * Target zoom. 16 disables your clustering thanks to
+ * disableClusteringAtZoom: 16.
+ *
+ * @param {boolean} openPopup
+ * Whether to open the Leaflet popup.
+ *
+ * @param {number} verticalOffsetPx
+ * Offsets the marker upwards on the screen so that it
+ * is not hidden by the Detail window.
+ */
+export async function highlightMarkerById(markerId, scopeKey = null, targetZoom = 16, openPopup = false, verticalOffsetPx = 120)
+{
+    const ready = ensureMapReady(scopeKey);
+
+    if (!ready) {
+        console.warn("[OutZen Highlight] map not ready", {markerId, scopeKey: pickScopeKey(scopeKey)});
+
+        return false;
+    }
+
+    const {k, s, map} = ready;
+
+    const key = String(markerId ?? "");
+
+    if (!key) {console.warn("[OutZen Highlight] empty marker id", {scopeKey: k});
+
+        return false;
+    }
+
+    const marker = findManagedMarkerByKey(s, key);
+
+    if (!marker) {
+        console.warn("[OutZen Highlight] marker not found",
+            {
+                markerId: key,
+                scopeKey: k,
+
+                /*
+                 * Useful for diagnosing a prefix
+                 * without displaying hundreds
+                 * of keys.
+                 */
+                availableMarkerKeys: [...Array.from(s.markers?.keys?.() ?? []),
+
+                    ...Array.from(s.calendarMarkers?.keys?.() ?? [])].slice(0, 40)
+            }
+        );
+
+        return false;
+    }
+
+    if (s.highlightedMarkerKey && s.highlightedMarkerKey !== key) {
+
+        clearHighlightedMarker(k);
+    }
+
+    s.highlightedMarkerKey = key;
+
+    marker.__ozSelected = true;
+
+    /*
+     * Ask MarkerCluster to render the marker
+     * individually.
+     */
+    await revealClusteredMarker(s, marker);
+
+    const latLng = marker.getLatLng?.();
+
+    if (!latLng) {
+        console.warn("[OutZen Highlight] marker has no LatLng", {markerId: key, scopeKey: k}
+        );
+
+        return false;
+    }
+
+    const requestedZoom = Number(targetZoom);
+
+    const minZoom = Number(map.getMinZoom?.() ?? 5);
+
+    const maxZoom = Number(map.getMaxZoom?.() ?? 19);
+
+    const safeTargetZoom =
+        Number.isFinite(requestedZoom)
+            ? Math.min(maxZoom, Math.max(minZoom, requestedZoom))
+            : Math.min(maxZoom, 16);
+
+    const finalZoom =
+        Math.max(Number(map.getZoom?.() ?? minZoom), safeTargetZoom);
+
+    /*
+     * Center and zoom in on the marker.
+     */
+    try {
+        const movePromise = waitForMapMove(map, 1000);
+
+        map.setView(latLng, finalZoom,{animate: true});
+
+        await movePromise;
+    }
+    catch (error) {
+        console.warn("[OutZen Highlight] setView failed", error);
+    }
+
+    /*
+     * Shift the map downwards.
+     *
+     * Visually, the marker moves up within the viewport
+     * and remains visible above the Detail window.
+     */
+    const offsetY = Number(verticalOffsetPx);
+
+    if (Number.isFinite(offsetY) && offsetY !== 0)
+    {
+        try {
+            const panPromise = waitForMapMove(map, 700);
+
+            map.panBy([0, offsetY], {animate: true, duration: 0.35}
+            );
+
+            await panPromise;
+        }
+        catch (error) {console.warn("[OutZen Highlight] panBy failed", error);
+        }
+    }
+
+    /*
+     * MarkerCluster and Leaflet have now finished
+     * creating the DOM element.
+     */
+    applySelectedStateToMarker(marker, true);
+
+    if (openPopup) {
+        try {
+            marker.openPopup?.();
+        }
+        catch {
+        }
+    }
+
+    console.log("[OutZen Highlight] selected",
+    {
+        markerId: key,
+        scopeKey: k,
+        latitude: latLng.lat,
+        longitude: latLng.lng,
+        zoom: map.getZoom?.(),
+        elementExists:
+            !!marker.getElement?.(),
+        elementClass:
+            marker.getElement?.()
+                ?.className ?? null
+    });
+
+    return true;
+}
+/* ---------------------------------------------------------
    Public marker API (crowd/place/event/weather)
 --------------------------------------------------------- */
 export function addOrUpdateCrowdMarker(id, lat, lng, level, info, scopeKey = null) {
@@ -865,10 +1365,7 @@ export function addOrUpdateCrowdMarker(id, lat, lng, level, info, scopeKey = nul
 
     const popupHtml = buildPopupHtml(info ?? {}, s);
 
-    const resolvedKind =
-        info?.kind ??
-        (info?.weatherType ? "weather" :
-            (info?.isTraffic ? "traffic" : "crowd"));
+    const resolvedKind = info?.kind ?? (info?.weatherType ? "weather" : (info?.isTraffic ? "traffic" : "crowd"));
 
     const warn = shouldWarnMarker(resolvedKind, level, info, k);
 
@@ -889,20 +1386,31 @@ export function addOrUpdateCrowdMarker(id, lat, lng, level, info, scopeKey = nul
         } catch { }
 
         applyWarningStateToMarker(existing, { warn, isCalendar: false });
+        if (s.highlightedMarkerKey === key || existing.__ozSelected === true)
+        {
+
+            applySelectedStateToMarker(existing, true);
+        }
         return true;
     }
 
-    const marker = L.marker([latNum, lngNum], {
-        title: info?.title ?? key,
-        riseOnHover: true,
-        icon,
-    });
+    const marker = L.marker(
+        [latNum, lngNum],
+        {
+            title: info?.title ?? key,
+            riseOnHover: true,
+            icon,
+            __ozNoCluster: info?.noCluster === true || info?.__ozNoCluster === true
+        }
+    );
 
     safeBindPopup(marker, popupHtml);
     addLayerSmart(marker, s);
     s.markers.set(key, marker);
 
     applyWarningStateToMarker(marker, { warn, isCalendar: false });
+    if (s.highlightedMarkerKey === key) {applySelectedStateToMarker(marker, true);
+    }
     return true;
 }
 
@@ -915,9 +1423,17 @@ export function removeCrowdMarker(id, scopeKey = null) {
     const marker = s.markers.get(key);
     if (!marker) return true;
 
+    if (s.highlightedMarkerKey === key) {applySelectedStateToMarker(marker, false);
+
+        s.highlightedMarkerKey = null;
+    }
+
     removeLayerSmart(marker, s);
-    s.markers.delete(key);
-    clearManagedMarkerTimers(marker)
+
+    s.markers.delete(key
+    );
+
+    clearManagedMarkerTimers(marker);   
     return true;
 }
 
@@ -928,8 +1444,7 @@ export function clearCrowdMarkers(scopeKey = null) {
     if (!ready) {
         console.warn("[clearCrowdMarkers] map not ready",
             {
-                scopeKey:
-                    pickScopeKey(scopeKey)
+                scopeKey: pickScopeKey(scopeKey)
             });
 
         return false;
@@ -976,9 +1491,48 @@ export function clearGeneralMarkers(scopeKey = null) {
     return clearCrowdMarkers( scopeKey);
 }
 
-export function clearMarkersByPrefix(prefix = "", scopeKey = null) {
+export function clearMarkersByPrefix(prefix = "", scopeKey = null)
+{
+    const ready = ensureMapReady(scopeKey);
 
-    return pruneMarkersByPrefix(prefix, scopeKey);
+    if (!ready) {
+        return 0;
+    }
+
+    const { s } = ready;
+    const normalizedPrefix = String(prefix ?? "");
+
+    if (!normalizedPrefix) {
+        return 0;
+    }
+
+    let removed = 0;
+
+    for (const [key, marker] of Array.from(s.markers.entries()))
+    {
+        if (!String(key).startsWith(normalizedPrefix))
+        {
+            continue;
+        }
+
+        removeLayerSmart(marker, s);
+
+        try {
+            clearManagedMarkerTimers(marker);
+        }
+        catch {
+        }
+
+        s.markers.delete(key);
+        removed++;
+    }
+    try {
+        s.cluster?.refreshClusters?.();
+    }
+    catch {
+    }
+
+    return removed;
 }
 
 export function addOrUpdatePlaceMarker(place, scopeKey = null) {
@@ -4345,43 +4899,107 @@ export function activateHybridAndZoom(scopeKey = null, threshold = 13) {
     return wantDetails ? fitToDetails(k) : fitToBundles(k);
 }
 
-export function pruneMarkersByPrefix(prefix = "", scopeKey = null) {
+export function pruneMarkersByPrefix(prefix = "", scopeKey = null)
+{
     const k = pickScopeKey(scopeKey);
     const s = peekS(k) || getS(k);
-    if (!(s?.markers instanceof Map)) return 0;
+
+    if (!(s?.markers instanceof Map)) {
+        return 0;
+    }
+
+    const normalizedPrefix = String(prefix ?? "");
+
+    /*
+     * Without an explicit prefix, nothing is deleted.
+     * This prevents accidental complete cleanup.
+     */
+    if (!normalizedPrefix)
+    {
+        console.warn("[OutZen] pruneMarkersByPrefix skipped: " + "empty prefix",
+            {
+                scopeKey: k
+            }
+        );
+
+        return 0;
+    }
 
     let removed = 0;
+    let kept = 0;
 
-    for (const [key, marker] of Array.from(s.markers.entries())) {
-        if (!String(key).startsWith(prefix)) continue;
+    for (const [key, marker] of Array.from(s.markers.entries()))
+    {
+        const markerKey = String(key);
+
+        /*
+         * The marker belongs to this page :
+         * we keep it.
+         */
+        if (markerKey.startsWith(normalizedPrefix))
+        {
+            kept++;
+            continue;
+        }
+
+        /*
+         * Foreign marker :
+         * we remove it from the cluster or the map.
+         */
+        try {
+            if (s.cluster?.hasLayer?.(marker))
+            {
+                s.cluster.removeLayer(marker);
+            }
+        }
+        catch {
+        }
 
         try {
-            if (s.cluster?.hasLayer?.(marker)) s.cluster.removeLayer(marker);
-        } catch { }
+            if (s.map?.hasLayer?.(marker))
+            {
+                s.map.removeLayer(marker);
+            }
+        }
+        catch {
+        }
 
         try {
-            if (s.map?.hasLayer?.(marker)) s.map.removeLayer(marker);
-        } catch { }
+            clearManagedMarkerTimers(marker);
+        }
+        catch {
+        }
 
         s.markers.delete(key);
         removed++;
     }
 
-    try { s.cluster?.refreshClusters?.(); } catch { }
+    try {
+        s.cluster?.refreshClusters?.();
+    }
+    catch {
+    }
+
+    console.log("[OutZen] foreign marker prune completed",
+        {
+            scopeKey: k,
+            allowedPrefix: normalizedPrefix,
+            removed,
+            kept,
+            remainingKeys: Array.from(s.markers.keys())
+        }
+    );
 
     return removed;
 }
 
-function normalizeAntennaAlertKey(value) {
-    const raw = String(value ?? "").trim();
+function normalizeAntennaAlertKey(value) {const raw = String(value ?? "").trim();
 
     if (!raw) {
         return "";
     }
 
-    return raw.startsWith("antenna-alert:")
-        ? raw
-        : `antenna-alert:${raw}`;
+    return raw.startsWith("antenna-alert:") ? raw : `antenna-alert:${raw}`;
 }
 
 export function pruneAntennaAlertMarkers(activeIds, scopeKey = null) {
@@ -4396,11 +5014,10 @@ export function pruneAntennaAlertMarkers(activeIds, scopeKey = null) {
 
     s.antennaAlertMarkers ??= new Map();
 
-    const activeSet = new Set(
-        (activeIds ?? [])
-            .filter(x => x !== null && x !== undefined)
-            .map(normalizeAntennaAlertKey)
-            .filter(x => x.length > 0)
+    const activeSet = new Set((activeIds ?? [])
+        .filter(x => x !== null && x !== undefined)
+        .map(normalizeAntennaAlertKey)
+        .filter(x => x.length > 0)
     );
 
     let removed = 0;
@@ -4546,6 +5163,19 @@ export function upsertWeatherIntoBundleInput(delta, scopeKey = null) {
     s._weatherById.set(String(wid), normalized);
     s.bundleLastInput.weather = Array.from(s._weatherById.values());
     return true;
+}
+
+export function upsertEmergencyAlertAreas(scope, alerts)
+{
+    // Polygon / MultiPolygon / circle
+}
+
+export function pruneEmergencyAlertAreas(scope, activeAlertIds) {
+}
+
+export function highlightEmergencyRouteConflict(scope, routeId, conflictingAlertIds)
+{
+
 }
 
 /* ---------------------------------------------------------

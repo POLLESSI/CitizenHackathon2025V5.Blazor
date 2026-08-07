@@ -361,6 +361,27 @@ HIGHLIGHT / PULSE
     background: rgba(231,76,60,.98) !important;
 }
 
+.oz-calendar-date-separator td {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 0.55rem 0.85rem !important;
+    color: #ffd54f !important;
+    background: linear-gradient( 90deg, rgba(15, 27, 45, 0.98), rgba(24, 47, 63, 0.96) ) !important;
+    border-top: 1px solid rgba(0, 229, 238, 0.35);
+    border-bottom: 1px solid rgba(0, 229, 238, 0.25);
+    text-transform: capitalize;
+    letter-spacing: 0.02em;
+}
+
+.oz-calendar-date-separator strong {
+    color: #ffd54f !important;
+}
+
+.oz-calendar-date-separator td {
+    top: 42px;
+}
+
 .oz-calendar-inner {
     position: relative;
     display: flex;
@@ -2562,10 +2583,21 @@ HIGHLIGHT / PULSE
     position: relative;
 }
 
-    .oz-map-shell > .leaflet-host {
-        height: 100%;
-        display: block;
-    }
+.oz-map-shell > .leaflet-host {
+    height: 100%;
+    display: block;
+}
+
+.oz-map-empty-note {
+    margin-top: 0.5rem;
+    padding: 0.65rem 0.8rem;
+    color: rgba(220, 240, 248, 0.82);
+    background: rgba(8, 20, 34, 0.82);
+    border: 1px solid rgba(0, 229, 238, 0.18);
+    border-radius: 8px;
+    font-size: 0.82rem;
+    text-align: center;
+}
 
 #leafletMap-home {
     position: relative;

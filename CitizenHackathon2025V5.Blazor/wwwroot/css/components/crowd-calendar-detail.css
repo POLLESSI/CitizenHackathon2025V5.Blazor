@@ -1,0 +1,425 @@
+﻿/*CitizenHackathon2025V5.Blazor.Client.wwwroot.css.components*/
+/* ==========================================================
+   OUTZEN — CROWD CALENDAR DETAIL
+   ========================================================== */
+
+/*
+ * Specific size of this window.
+ */
+#calendar-detail-window {
+    width: min( 1060px, calc(100vw - 32px) );
+    max-height: min( 84dvh, 820px );
+}
+
+    /*
+ * Body of the window.
+ */
+#calendar-detail-window
+.oz-detail-dialog__body {
+    padding: 1.1rem 1.2rem 1.2rem;
+    color: #edf7fb;
+    background: radial-gradient( circle at 18% 5%, rgba(88, 28, 220, 0.10), transparent 34% ), linear-gradient( 180deg, rgba(13, 23, 39, 0.99), rgba(8, 15, 27, 0.99) );
+}
+
+/* ==========================================================
+   FORM
+   ========================================================== */
+
+.oz-calendar-detail-form {
+    width: 100%;
+    min-width: 0;
+    color: #edf7fb;
+}
+
+/*
+ * The grid does not depend on Bootstrap.
+ */
+.oz-calendar-detail-grid {
+    display: grid;
+    grid-template-columns: repeat( 4, minmax(0, 1fr) );
+    gap: 0.85rem;
+    width: 100%;
+}
+
+/*
+ * Each field becomes a small card.
+ */
+.oz-calendar-field {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.38rem;
+    padding: 0.72rem;
+    border: 1px solid rgba(91, 209, 255, 0.16);
+    border-radius: 11px;
+    background: linear-gradient( 145deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.025) );
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.oz-calendar-field:focus-within {
+    border-color: rgba(0, 229, 238, 0.60);
+    background: linear-gradient( 145deg, rgba(0, 229, 238, 0.075), rgba(255, 255, 255, 0.035) );
+    box-shadow: 0 0 0 3px rgba(0, 229, 238, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/*
+ * Fields occupying multiple columns.
+ */
+.oz-calendar-field--span-2 {
+    grid-column: span 2;
+}
+
+.oz-calendar-field--full {
+    grid-column: 1 / -1;
+}
+
+/* ==========================================================
+   LABELS
+   ========================================================== */
+
+.oz-calendar-field > label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0;
+    color: #d9f7fb !important;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+}
+
+.oz-calendar-field > label span {
+    color: rgba(186, 214, 226, 0.68);
+    font-size: 0.67rem;
+    font-weight: 500;
+    letter-spacing: 0.025em;
+    text-transform: none;
+}
+
+/* ==========================================================
+   INPUTS
+   ========================================================== */
+
+.oz-calendar-input {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    padding: 0.62rem 0.72rem;
+    color: #f4fbff !important;
+    background: rgba(5, 14, 27, 0.82) !important;
+    border: 1px solid rgba(143, 185, 207, 0.28) !important;
+    border-radius: 8px !important;
+    outline: none;
+    font: inherit;
+    font-size: 0.92rem;
+    box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.30);
+    transition: border-color 150ms ease, box-shadow 150ms ease, background 150ms ease;
+    /*
+     * Date and time use the browser's dark controls.
+     */
+    color-scheme: dark;
+}
+
+.oz-calendar-input:hover {
+    border-color: rgba(143, 211, 235, 0.46) !important;
+}
+
+.oz-calendar-input:focus {
+    color: #ffffff !important;
+    background: rgba(7, 19, 35, 0.96) !important;
+    border-color: rgba(0, 229, 238, 0.86) !important;
+    box-shadow: 0 0 0 3px rgba(0, 229, 238, 0.13), inset 0 1px 3px rgba(0, 0, 0, 0.26);
+}
+
+.oz-calendar-input::placeholder {
+    color: rgba(203, 223, 233, 0.42);
+}
+
+    /*
+ * Prevent browsers from resetting a white background
+ * during autocomplete.
+ */
+.oz-calendar-input:-webkit-autofill,
+.oz-calendar-input:-webkit-autofill:hover,
+.oz-calendar-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #f4fbff;
+    box-shadow: 0 0 0 1000px rgba(7, 19, 35, 0.98) inset !important;
+    transition: background-color 9999s ease-out;
+}
+
+/* ==========================================================
+   TEXTAREA
+   ========================================================== */
+
+.oz-calendar-textarea {
+    min-height: 112px;
+    resize: vertical;
+    line-height: 1.45;
+}
+
+/* ==========================================================
+   ACTIVE CHECKBOX
+   ========================================================== */
+
+.oz-calendar-active {
+    padding: 0.82rem 0.9rem;
+}
+
+.oz-calendar-checkbox {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 0.7rem !important;
+    width: max-content;
+    cursor: pointer;
+    text-transform: none !important;
+    user-select: none;
+}
+
+.oz-calendar-checkbox input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.oz-calendar-checkbox__control {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    flex: 0 0 44px;
+    border: 1px solid rgba(176, 205, 219, 0.35);
+    border-radius: 999px;
+    background: rgba(65, 78, 91, 0.76);
+    transition: background 170ms ease, border-color 170ms ease, box-shadow 170ms ease;
+}
+
+.oz-calendar-checkbox__control::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #f3f7fa;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+    transition: transform 170ms ease, background 170ms ease;
+}
+
+.oz-calendar-checkbox
+input:checked +
+.oz-calendar-checkbox__control {
+    border-color: rgba(0, 229, 238, 0.72);
+    background: linear-gradient( 90deg, #008f9d, #00c8a4 );
+    box-shadow: 0 0 12px rgba(0, 229, 238, 0.23);
+}
+
+.oz-calendar-checkbox
+input:checked +
+.oz-calendar-checkbox__control::after {
+    transform: translateX(20px);
+    background: #ffffff;
+}
+
+.oz-calendar-checkbox__text {
+    color: #e7f4f8 !important;
+    font-size: 0.86rem !important;
+    font-weight: 650 !important;
+    letter-spacing: 0.02em !important;
+}
+
+.oz-page--crowd-calendar
+.table-wrapper {
+    height: clamp( 260px, 36vh, 390px );
+}
+
+/* ==========================================================
+   ACTION BAR
+   ========================================================== */
+
+.oz-calendar-detail-actions {
+    position: sticky;
+    bottom: -1.2rem;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin: 1rem -1.2rem -1.2rem;
+    padding: 0.9rem 1.2rem;
+    border-top: 1px solid rgba(115, 183, 210, 0.18);
+    background: linear-gradient( 180deg, rgba(8, 16, 29, 0.92), rgba(5, 11, 21, 0.99) );
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.22);
+}
+
+.oz-calendar-action {
+    min-height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.42rem;
+    padding: 0.62rem 0.92rem;
+    border: 1px solid transparent !important;
+    border-radius: 9px !important;
+    color: #ffffff !important;
+    font-size: 0.82rem !important;
+    font-weight: 750 !important;
+    letter-spacing: 0.015em;
+    cursor: pointer;
+    box-shadow: 0 5px 14px rgba(0, 0, 0, 0.24);
+    transition: transform 130ms ease, filter 130ms ease, box-shadow 130ms ease;
+}
+
+.oz-calendar-action:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.12);
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.30);
+}
+
+.oz-calendar-action:active {
+    transform: translateY(1px) scale(0.985);
+}
+
+/*
+ * Save.
+ */
+.oz-calendar-action--save {
+    background: linear-gradient( 135deg, #008f74, #00b88a ) !important;
+    border-color: rgba(60, 255, 199, 0.30) !important;
+}
+
+/*
+ * Back.
+ */
+.oz-calendar-action--back {
+    background: linear-gradient( 135deg, #35445b, #4a5d76 ) !important;
+    border-color: rgba(190, 213, 230, 0.22) !important;
+}
+
+/*
+ * Soft delete.
+ */
+.oz-calendar-action--archive {
+    background: linear-gradient( 135deg, #9a5b00, #d18700 ) !important;
+    border-color: rgba(255, 195, 75, 0.35) !important;
+}
+
+/*
+ * Restore.
+ */
+.oz-calendar-action--restore {
+    background: linear-gradient( 135deg, #08649a, #078abd ) !important;
+    border-color: rgba(88, 210, 255, 0.34) !important;
+}
+
+/*
+ * Hard delete.
+ */
+.oz-calendar-action--delete {
+    margin-left: auto;
+    background: linear-gradient( 135deg, #971e30, #cf2942 ) !important;
+    border-color: rgba(255, 100, 124, 0.38) !important;
+}
+
+/* ==========================================================
+   VALIDATION
+   ========================================================== */
+
+.oz-calendar-validation {
+    margin: 0 0 0.85rem;
+    padding: 0.72rem 0.85rem;
+    color: #ffd7dc !important;
+    background: rgba(164, 25, 49, 0.18);
+    border: 1px solid rgba(255, 94, 120, 0.34);
+    border-radius: 9px;
+}
+
+.oz-calendar-validation:empty {
+    display: none;
+}
+
+.oz-calendar-detail-form
+.validation-message {
+    color: #ff9cac !important;
+    font-size: 0.76rem;
+}
+
+/* ==========================================================
+   RESPONSIVE
+   ========================================================== */
+
+@media (max-width: 900px) {
+    .oz-calendar-detail-grid {
+        grid-template-columns: repeat( 2, minmax(0, 1fr) );
+    }
+
+    .oz-calendar-field--span-2,
+    .oz-calendar-field--full {
+        grid-column: 1 / -1;
+    }
+
+    .oz-calendar-action--delete {
+        margin-left: 0;
+    }
+}
+
+@media (max-width: 560px) {
+    #calendar-detail-window {
+        width: calc(100vw - 16px);
+        max-height: calc(100dvh - 90px);
+    }
+
+        #calendar-detail-window
+        .oz-detail-dialog__body {
+            padding: 0.75rem;
+        }
+
+    .oz-calendar-detail-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.62rem;
+    }
+
+    .oz-calendar-field,
+    .oz-calendar-field--span-2,
+    .oz-calendar-field--full {
+        grid-column: 1;
+    }
+
+    .oz-calendar-detail-actions {
+        bottom: -0.75rem;
+        margin: 0.8rem -0.75rem -0.75rem;
+        padding: 0.72rem 0.75rem;
+    }
+
+    .oz-calendar-action {
+        flex: 1 1 calc(50% - 0.4rem);
+    }
+
+    .oz-calendar-action--delete {
+        flex-basis: 100%;
+    }
+}
+
+/*
+ * Accessibility.
+ */
+@media (prefers-reduced-motion: reduce) {
+    .oz-calendar-field,
+    .oz-calendar-input,
+    .oz-calendar-action,
+    .oz-calendar-checkbox__control,
+    .oz-calendar-checkbox__control::after {
+        transition: none !important;
+    }
+
+    .oz-calendar-action:hover,
+    .oz-calendar-action:active {
+        transform: none;
+    }
+}

@@ -2,12 +2,14 @@
 using CitizenHackathon2025V5.Blazor.Client.DTOs.Options;
 using CitizenHackathon2025V5.Blazor.Client.Services.Interop;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace CitizenHackathon2025V5.Blazor.Client.Pages.Shared
 {
     public abstract class OutZenMapPageBase : ComponentBase, IAsyncDisposable
     {
         [Inject] protected OutZenMapInterop MapInterop { get; set; } = default!;
+        [Inject] protected IJSRuntime DetailMarkerJS { get; set; } = default!;
 
         protected abstract string ScopeKey { get; }
         protected abstract string MapId { get; }
@@ -65,6 +67,79 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Shared
             _dataLoaded = true;
             _pendingFit = fit;
             await EnsureBootAndSeedAsync();
+        }
+
+        protected async Task<bool> HighlightDetailMarkerAsync(string markerId, int targetZoom = 16, bool openPopup = false, int verticalOffsetPx = 120)
+        {
+            if (IsDisposed)
+                return false;
+
+            if (!IsMapBooted)
+            {
+                Console.WriteLine($"[Detail Highlight] Map not booted. " + $"scope={ScopeKey}, markerId={markerId}");
+
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(markerId))
+                return false;
+
+            try
+            {
+                await MapInterop.EnsureAsync();
+
+                var highlighted = await DetailMarkerJS.InvokeAsync<bool>(
+                        "OutZenInterop.highlightMarkerById",
+                        markerId,
+                        ScopeKey,
+                        targetZoom,
+                        openPopup,
+                        verticalOffsetPx);
+
+                Console.WriteLine($"[Detail Highlight] " + $"scope={ScopeKey}, " + $"markerId={markerId}, " + $"highlighted={highlighted}");
+
+                return highlighted;
+            }
+            catch (JSException ex)
+            {
+                Console.Error.WriteLine($"[Detail Highlight] JavaScript error. " + $"scope={ScopeKey}, " + $"markerId={markerId}, " + $"error={ex.Message}");
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[Detail Highlight] Error. " + $"scope={ScopeKey}, " + $"markerId={markerId}, " + $"error={ex.Message}");
+
+                return false;
+            }
+        }
+
+        protected async Task ClearDetailMarkerHighlightAsync(bool restoreOverview = true)
+        {
+            if (!IsMapBooted)
+                return;
+
+            try
+            {
+                await MapInterop.EnsureAsync();
+
+                await DetailMarkerJS.InvokeAsync<bool>("OutZenInterop.clearHighlightedMarker", ScopeKey);
+
+                if (restoreOverview && !IsDisposed)
+                {
+                    await MapInterop.RefreshSizeAsync(ScopeKey);
+
+                    await MapInterop.FitToDetailsAsync(ScopeKey);
+                }
+            }
+            catch (JSException ex)
+            {
+                Console.Error.WriteLine($"[Detail Highlight] Clear JS error. " + $"scope={ScopeKey}, " + $"error={ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[Detail Highlight] Clear error. " + $"scope={ScopeKey}, " + $"error={ex.Message}");
+            }
         }
 
         private async Task EnsureBootAndSeedAsync()
@@ -127,9 +202,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Shared
             if (ClearAllOnMapReady)
                 await MapInterop.ClearAllOutZenLayersAsync(ScopeKey);
 
-            if (MarkerPolicy == OutZenMarkerPolicy.OnlyPrefix
-                && PruneForeignMarkersOnMapReady
-                && !string.IsNullOrWhiteSpace(AllowedMarkerPrefix))
+            if (MarkerPolicy == OutZenMarkerPolicy.OnlyPrefix && PruneForeignMarkersOnMapReady && !string.IsNullOrWhiteSpace(AllowedMarkerPrefix))
             {
                 try
                 {

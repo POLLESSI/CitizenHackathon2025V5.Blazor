@@ -129,15 +129,21 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
                 await ApplySingleEventMarkerAsync(pending);
             }
 
-            Console.WriteLine(
-                $"[EventView][Seed] " +
-                $"source={source.Count}, " +
-                $"added={added}");
+            Console.WriteLine($"[EventView][Seed] " + $"source={source.Count}, " + $"added={added}");
 
             if (fit && source.Count > 0)
             {
                 await MapInterop.RefreshSizeAsync(ScopeKey);
                 await MapInterop.FitToDetailsAsync(ScopeKey);
+            }
+
+            /*
+             * Case of a direct opening :
+             * /eventview?detailId=297
+             */
+            if (DetailId is > 0)
+            {
+                await HighlightEventMarkerAsync(DetailId.Value);
             }
         }
 
@@ -151,6 +157,77 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
             return (lat, lng);
         }
 
+        private async Task<bool> HighlightEventMarkerAsync(int eventId)
+        {
+            if (eventId <= 0)
+                return false;
+
+            if (!IsMapBooted)
+            {
+                Console.WriteLine($"[EventView Highlight] " + $"Map not booted for event:{eventId}");
+
+                return false;
+            }
+
+            try
+            {
+                /*
+                 * Ensures that the ESM module is imported
+                 * and that its exports are present in
+                 * OutZenInterop.
+                 */
+                await MapInterop.EnsureAsync();
+
+                var markerId = EvMarkerId(eventId);
+
+                var highlighted = await JS.InvokeAsync<bool>("OutZenInterop.highlightMarkerById",
+
+                        /*
+                         * event:297
+                         */
+                        markerId,
+
+                        /*
+                         * eventview
+                         */
+                        ScopeKey,
+
+                        /*
+                         * Target zoom.
+                         * Clustering is disabled at 16.
+                         */
+                        16,
+
+                        /*
+                         * The detail already displays the information:
+                         * no need to also open the popup.
+                         */
+                        false,
+
+                        /*
+                         * The marker rises by 120 pixels
+                         * to avoid being hidden by the window.
+                         */
+                        120
+                    );
+
+                Console.WriteLine($"[EventView Highlight] " + $"markerId={markerId}, " + $"highlighted={highlighted}");
+
+                return highlighted;
+            }
+            catch (JSException ex)
+            {
+                Console.Error.WriteLine($"[EventView Highlight] " + $"JavaScript failure for event:{eventId}: " + $"{ex.Message}");
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[EventView Highlight] " + $"failure for event:{eventId}: " + $"{ex.Message}");
+
+                return false;
+            }
+        }
         private async Task LoadAsync(bool resetFilters = false, bool fitMap = true)
         {
             if (resetFilters)
@@ -181,6 +258,81 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
             }
 
             return await EventService.GetLatestEventAsync();
+        }
+
+        private async Task OpenEventDetail(int id)
+        {
+            if (id <= 0)
+                return;
+
+            DetailId = id;
+            BestMatchId = id;
+
+            /*
+             * First, display the Detail window.
+             */
+            await InvokeAsync(StateHasChanged);
+
+            /*
+             * Then select and move the card
+             * over event:{id}.
+             */
+            await HighlightEventMarkerAsync(id);
+        }
+        private async Task CloseDetail()
+        {
+            /*
+             * Immediately remove the flashing
+             * before closing the window.
+             */
+            try
+            {
+                if (IsMapBooted)
+                {
+                    await MapInterop.EnsureAsync();
+                    await JS.InvokeAsync<bool>("OutZenInterop.clearHighlightedMarker", ScopeKey);
+                }
+            }
+            catch (JSException ex)
+            {
+                Console.Error.WriteLine($"[EventView] " + $"Clear highlight failed: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[EventView] " + $"Clear highlight failed: {ex.Message}");
+            }
+
+            DetailId = null;
+            BestMatchId = null;
+
+            await InvokeAsync(StateHasChanged);
+
+            /*
+             * After closing, the map reverts to a view
+             * of all events.
+             */
+            try
+            {
+                if (IsMapBooted)
+                {
+                    await FitThrottledAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[EventView] " + $"CloseDetail map refresh failed: " + $"{ex.Message}");
+            }
+
+            /*
+             * Cleans the URL if the page was opened
+             * directly with ?detailId=297.
+             */
+            var relativeUri = Navigation.ToBaseRelativePath(Navigation.Uri);
+
+            if (relativeUri.Contains("detailId=", StringComparison.OrdinalIgnoreCase))
+            {
+                Navigation.NavigateTo("/eventview", replace: true);
+            }
         }
 
         private void ResetFilters()
@@ -518,40 +670,47 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.Events
                 Console.Error.WriteLine($"[EventView] FocusEventAsync failed: {ex.Message}");
             }
         }
-
-        private async Task CloseDetail()
+        protected override async Task OnBeforeDisposeAsync()
         {
-            Navigation.NavigateTo("/eventview", replace: false);
-            DetailId = null;
-            BestMatchId = null;
+            _disposed = true;
 
             try
             {
                 if (IsMapBooted)
                 {
-                    await FitThrottledAsync();
+                    await MapInterop.EnsureAsync();
+                    await JS.InvokeAsync<bool>("OutZenInterop.clearHighlightedMarker", ScopeKey);
                 }
             }
-            catch { }
-
-            await InvokeAsync(StateHasChanged);
-        }
-
-        protected override async Task OnBeforeDisposeAsync()
-        {
-            _disposed = true;
+            catch
+            {
+            }
 
             if (hubConnection is not null)
             {
-                try { await hubConnection.StopAsync(); } catch { }
-                try { await hubConnection.DisposeAsync(); } catch { }
+                try
+                {
+                    await hubConnection.StopAsync();
+                }
+                catch
+                {
+                }
+
+                try
+                {
+                    await hubConnection.DisposeAsync();
+                }
+                catch
+                {
+                }
             }
+
+            _searchCts?.Cancel();
+            _searchCts?.Dispose();
+            _searchCts = null;
         }
     }
 }
-
-
-
 
 
 

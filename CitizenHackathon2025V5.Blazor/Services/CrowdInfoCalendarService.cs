@@ -65,8 +65,42 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             return await _httpClient.GetFromJsonAsync<List<ClientCrowdInfoCalendarDTO>>(url, _json, ct);
         }
 
-        public Task<ClientCrowdInfoCalendarDTO?> GetByIdAsync(int id, CancellationToken ct = default) =>
-            _httpClient.GetFromJsonAsync<ClientCrowdInfoCalendarDTO>($"{BaseRoute}/{id}", _json, ct);
+        public async Task<ClientCrowdInfoCalendarDTO?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
+        {
+            if (id <= 0)
+                return null;
+
+            try
+            {
+                using var response = await _httpClient.GetAsync($"{BaseRoute}/{id}", cancellationToken);
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    return null;
+                }
+
+                response.EnsureSuccessStatusCode();
+
+                return await response.Content
+                    .ReadFromJsonAsync<ClientCrowdInfoCalendarDTO>(_json, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.Error.WriteLine($"[CrowdInfoCalendarService] " + $"HTTP error loading #{id}: " + $"{ex.Message}");
+
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[CrowdInfoCalendarService] " + $"Unexpected error loading #{id}: " + $"{ex.Message}");
+
+                throw;
+            }
+        }
 
         public Task<List<string>?> GetAdvisoriesAsync(string region, int? placeId = null, CancellationToken ct = default)
         {

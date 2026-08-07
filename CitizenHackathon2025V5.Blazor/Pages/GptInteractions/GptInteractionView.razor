@@ -186,31 +186,37 @@
         </div>
     </div>
 
-    <div class="oz-page oz-page--event">
+    <div class="oz-page oz-page--gpt-map">
+
         <div class="oz-map-shell">
-            <div id="@MapId" class="oz-map"></div>
+            <div id="@MapId" class="oz-map">
+            </div>
         </div>
+
+        @if (!HasGeolocatedInteractions)
+        {
+            <div class="oz-map-empty-note">
+                No GPT interaction currently contains
+                a geographic position.
+            </div>
+        }
+
     </div>
 
-    @if (SelectedId > 0)
-    {
-        <div class="detail-wrapper">
-            <div class="list-toolbar">
-                <div class="left">
-                    <span class="badge badge-info">Details #@SelectedId</span>
-                </div>
-                <div class="right">
-                    <button class="chip"
-                            @onclick="() => SelectedId = 0"
-                            disabled="@IsAiBusy">
-                        Close
-                    </button>
-                </div>
-            </div>
+    <OutZenDetailModal Open="@(SelectedId > 0)"
+                       WindowId="gpt-detail-window"
+                       Title="@($"GPT interaction #{SelectedId}")"
+                       CanClose="@(!IsAiBusy)"
+                       CloseOnBackdrop="@(!IsAiBusy)"
+                       OnClose="CloseGptDetail">
 
-            <GptInteractionDetail Id="@SelectedId" />
-        </div>
-    }
+        @if (SelectedId > 0)
+        {
+            <GptInteractionDetail @key="(SelectedId, _detailRevision)" Id="@SelectedId" />
+        }
+
+    </OutZenDetailModal>
+
 </div>
 
 @if (ShowAiOverlay)

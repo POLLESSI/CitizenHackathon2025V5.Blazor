@@ -1,0 +1,260 @@
+﻿/* ==========================================================
+   OUTZEN — MOVABLE DETAIL WINDOW
+   ========================================================== */
+
+.oz-detail-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 30000;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: clamp(100px, 14vh, 150px) 16px 24px;
+    /*
+     * The component remains in the DOM when closed.
+     */
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 180ms ease, visibility 180ms ease;
+    overflow: hidden;
+}
+
+    /*
+ * Open window.
+ */
+    .oz-detail-overlay.is-open {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    /*
+ * Floating mode:
+ * same general behavior as Comments and GPT.
+ *
+ * The card, tables, and other commands remain
+ * usable around the window.
+ */
+.oz-detail-overlay.is-floating {
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.oz-detail-overlay.is-floating.is-open {
+    pointer-events: none;
+}
+
+        /*
+ * The window itself must continue to receive
+ * events while its overlay lets them pass through.
+ */
+.oz-detail-overlay.is-floating
+.oz-detail-dialog {
+    pointer-events: auto;
+}
+
+    /*
+ * Traditional modal mode, usable if a page
+ * really needs to block its background.
+ */
+.oz-detail-overlay.is-modal {
+    background: rgba(3, 8, 18, 0.46);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+.oz-detail-overlay.is-modal.is-open {
+    pointer-events: auto;
+}
+
+.oz-detail-dialog {
+    width: min(920px, calc(100vw - 32px));
+    max-height: min(76dvh, 760px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    pointer-events: auto;
+    color: #f3f7fb;
+    background: linear-gradient( 180deg, rgba(20, 29, 45, 0.98), rgba(9, 15, 27, 0.98) );
+    border: 1px solid rgba(90, 209, 255, 0.34);
+    border-radius: 18px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.72), 0 0 28px rgba(0, 229, 238, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    /*
+     * Optimization during movement.
+     */
+    will-change: left, top;
+}
+
+.oz-detail-dialog__header {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.15rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+    background: linear-gradient( 90deg, rgba(18, 31, 50, 0.98), rgba(13, 22, 38, 0.98) );
+    /*
+     * Visually indicates that the header can be grabbed.
+     */
+    cursor: grab;
+    /*
+     * Prevents the title text from being selected
+     * while dragging.
+     */
+    user-select: none;
+    -webkit-user-select: none;
+    /*
+     * Necessary for proper touch dragging.
+     */
+    touch-action: none;
+}
+
+.oz-detail-dialog.oz-dragging
+.oz-detail-dialog__header {
+    cursor: grabbing;
+}
+
+.oz-detail-dialog.oz-dragging {
+    opacity: 0.97;
+    box-shadow: 0 30px 95px rgba(0, 0, 0, 0.82), 0 0 36px rgba(0, 229, 238, 0.24);
+}
+
+/*
+ * The button retains its own cursor.
+ */
+.oz-detail-dialog__close {
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+.oz-detail-dialog__eyebrow {
+    margin-bottom: 0.18rem;
+    color: #00e5ee;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+}
+
+.oz-detail-dialog__title {
+    margin: 0;
+    color: #ffffff;
+    font-size: clamp(1.05rem, 2vw, 1.35rem);
+    text-shadow: 0 0 10px rgba(0, 229, 238, 0.24);
+}
+
+.oz-detail-dialog__close {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 10px;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.07);
+    font-size: 1.05rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 150ms ease, transform 150ms ease;
+}
+
+.oz-detail-dialog__close:hover {
+    background: rgba(220, 53, 69, 0.76);
+    transform: scale(1.05);
+}
+
+.oz-detail-dialog__close:disabled {
+    opacity: 0.45;
+    cursor: wait;
+}
+
+.oz-detail-dialog__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 1.1rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    color: #f3f7fb;
+}
+
+    /*
+ * Important correction :
+ * The Detail components currently use a color
+ * dark, derived notably from --color-text: #222.
+ */
+.oz-detail-dialog__body,
+.oz-detail-dialog__body p,
+.oz-detail-dialog__body span,
+.oz-detail-dialog__body label,
+.oz-detail-dialog__body strong,
+.oz-detail-dialog__body td,
+.oz-detail-dialog__body th {
+    color: #eef5fa;
+}
+
+        /*
+ * Neutralizes the dimensions intended for display
+ * at the bottom of the page.
+ */
+.oz-detail-dialog__body .detail-container,
+.oz-detail-dialog__body .detail-wrapper {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    color: #eef5fa;
+    background: transparent;
+    box-shadow: none;
+}
+
+            /*
+ * Keeps the detail lines readable.
+ */
+.oz-detail-dialog__body .detail-container p {
+    margin: 0.55rem 0;
+    padding: 0.72rem 0.9rem;
+    color: #eef5fa;
+    background: rgba(255, 255, 255, 0.055);
+    border-left: 3px solid #00c9ed;
+    border-radius: 8px;
+}
+
+.oz-detail-dialog[ data-oz-allow-partial-offscreen="true" ] .oz-detail-dialog__header {
+    position: relative;
+}
+
+    /*
+ * Small visual handle reminiscent of
+ * a dockable window.
+ */
+.oz-detail-dialog[ data-oz-allow-partial-offscreen="true" ] .oz-detail-dialog__header::after {
+    content: "⋮⋮";
+    position: absolute;
+    left: 50%;
+    bottom: 2px;
+    transform: translateX(-50%);
+    color: rgba(255, 255, 255, 0.38);
+    font-size: 13px;
+    letter-spacing: 2px;
+    pointer-events: none;
+}
+
+@media (max-width: 768px) {
+    .oz-detail-overlay {
+        padding: 88px 8px 12px;
+    }
+
+    .oz-detail-dialog {
+        width: calc(100vw - 16px);
+        max-height: calc(100dvh - 100px);
+        border-radius: 13px;
+    }
+
+    .oz-detail-dialog__header {
+        padding: 0.8rem 0.9rem;
+    }
+
+    .oz-detail-dialog__body {
+        padding: 0.8rem;
+    }
+}

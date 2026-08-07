@@ -8,7 +8,6 @@
 @inject NavigationManager Nav
 
 <h3>Crowd Calendar</h3>
-
 <div class="crowd-page">
     <div class="oz-map-shell">
         <div id="@MapId" class="oz-map"></div>
@@ -36,51 +35,196 @@
 
 @if (allCrowdInfoCalendars is null)
 {
-    <p>Loading…</p>
+    <div class="empty-state">
+        Loading…
+    </div>
 }
-else if (allCrowdInfoCalendars.Count == 0)
+else if (_tableSource.Count == 0)
 {
-    <p>No entries.</p>
+    <div class="empty-state">
+        No calendar entries match the current filters.
+    </div>
 }
 else
 {
-    <div class="table-responsive">
-        <table class="table table-sm table-striped align-middle">
-            <thead>
-                <tr>
-                    <th>Id</th>
-                    <th>DateUtc</th>
-                    <th>Region</th>
-                    <th>Event</th>
-                    <th>Level</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var e in allCrowdInfoCalendars)
+    <div class="page-list">
+
+        <div class="list-toolbar">
+
+            <div class="left">
+
+                <input class="input-compact" placeholder="Search calendar..." @bind="Q" @bind:event="oninput" />
+
+                @if (!string.IsNullOrWhiteSpace(Q))
                 {
-                    <tr>
-                        <td>@e.Id</td>
-                        <td>@e.DateUtc.ToString("yyyy-MM-dd")</td>
-                        <td>@e.RegionCode</td>
-                        @* <td>@(e.PlaceId?.ToString() ?? "-")</td> *@
-                        <td>@(string.IsNullOrWhiteSpace(e.EventName) ? "-" : e.EventName)</td>
-                        <td>
-                            <CrowdLevelBadge Level="e.ExpectedLevel" /> @* ✅ component accepte int? *@
-                        </td>
-                        @* <td>@e.Active</td> *@
-                        <td>
-                            <button class="btn btn-link p-0" @onclick="() => GoDetail(e.Id)">Details</button>
-                        </td>
-                    </tr>
+                    <span class="badge badge-info">
+                        “@Q”
+                    </span>
                 }
-            </tbody>
-        </table>
+
+                <span class="badge badge-info">
+                    @_visible.Count / @_tableSource.Count
+                </span>
+
+            </div>
+
+            <div class="right">
+
+                <button class="chip @(_onlyRecent ? "active" : null)" @onclick="ToggleRecent">
+                    Recent
+                </button>
+
+                <button class="chip" @onclick="Load">
+                    Search
+                </button>
+
+                <button class="chip" @onclick="LoadAll">
+                    Load All
+                </button>
+
+                <button class="chip add-chip" @onclick="GoNew">
+                    + New Entry
+                </button>
+
+            </div>
+
+        </div>
+
+        <div class="table-wrapper draggable-container"
+                @ref="ScrollContainerRef"
+                @onscroll="HandleScroll"
+                style="
+                    height: 300px;
+                    overflow-y: auto;
+                    overflow-x: auto;
+                    border: 1px solid #444;
+                    ">
+
+            <table class="table table-striped table-dark styled-table data-list">
+
+                <thead>
+                    <tr>
+                        <th class="col-narrow">
+                            Date
+                        </th>
+
+                        <th class="col-narrow">
+                            Region
+                        </th>
+
+                        <th class="col-narrow">
+                            Event
+                        </th>
+
+                        <th class="col-narrow">
+                            Level
+                        </th>
+
+                        <th class="col-actions">
+                            Actions
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    @for (var index = 0; index < _visible.Count; index++)
+                    {
+                        var entry = _visible[index];
+
+                        var showDateSeparator = index == 0 || entry.DateUtc.Date != _visible[index - 1].DateUtc.Date;
+
+                        @if (showDateSeparator)
+                        {
+                            <tr class="oz-calendar-date-separator">
+                                <td colspan="5">
+                                    <strong>
+                                        @(entry.DateUtc.ToString("dddd dd MMMM yyyy", System.Globalization.CultureInfo.GetCultureInfo("fr-BE")))
+                                    </strong>
+                                </td>
+                            </tr>
+                        }
+
+                        <tr @key="entry.Id">
+
+                            <td class="text-ellipsis">
+                                @entry.DateUtc.ToString("dd/MM/yyyy")
+                            </td>
+
+                            <td class="text-ellipsis" title="@entry.RegionCode">
+                                @(string.IsNullOrWhiteSpace(entry.RegionCode) ? "—" : entry.RegionCode)
+                            </td>
+
+                            <td class="text-ellipsis" title="@entry.EventName">
+                                @(string.IsNullOrWhiteSpace(entry.EventName) ? "—" : entry.EventName)
+                            </td>
+
+                            <td>
+                                <CrowdLevelBadge Level="entry.ExpectedLevel" />
+                            </td>
+
+                            <td class="col-actions">
+                                <button type="button" class="btn btn-sm btn-glow ev-chip" @onclick="() => OpenCalendarDetail(entry.Id)">
+                                    Details
+                                </button>
+                            </td>
+
+                        </tr>
+                    }
+
+                    @if (_currentIndex < _tableSource.Count)
+                    {
+                        <tr>
+                            <td colspan="5"
+                                class="text-center py-2">
+                                <small>
+                                    Scroll down to load the next
+                                    @PageSize entries…
+                                </small>
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        <tr>
+                            <td colspan="5"
+                                class="text-center py-2">
+                                <small>
+                                    All @_tableSource.Count entries
+                                    are loaded.
+                                </small>
+                            </td>
+                        </tr>
+                    }
+
+                    <Globe />
+                </tbody>
+
+            </table>
+
+        </div>
+
     </div>
-
-    <Globe />
-
 }
+<OutZenDetailModal WindowId="calendar-detail-window"
+                    Open="@(SelectedId > 0)"
+                    Title="@($"Calendar entry #{SelectedId}")"
+                    AllowBackgroundInteraction="true"
+                    OnClose="CloseCalendarDetail">
+
+    @if (SelectedId > 0)
+    {
+        <CrowdInfoCalendarDetail @key="SelectedId"
+                                    Id="@SelectedId"
+                                    Embedded="true"
+                                    OnCompleted="CloseCalendarDetail" />
+    }
+
+</OutZenDetailModal>
+
+<Globe />
+
+
 
 
 

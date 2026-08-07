@@ -96,21 +96,43 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
             }
             
         }
-        public async Task<ClientEventDTO> GetByIdAsync(int id)
+        public async Task<ClientEventDTO> GetByIdAsync(int id, CancellationToken cancellationToken = default)
         {
+            if (id <= 0)
+                return null;
+
             try
             {
-                var response = await _httpClient.GetAsync($"Event/{id}");
-                if (response.StatusCode == HttpStatusCode.NotFound) return null;
+                using var response = await _httpClient.GetAsync($"Event/{id}", cancellationToken);
+
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                    return null;
+
                 response.EnsureSuccessStatusCode();
-                return await response.Content.ReadFromJsonAsync<ClientEventDTO>();
+
+                return await response.Content
+                    .ReadFromJsonAsync<ClientEventDTO>(cancellationToken: cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                /*
+                 * Do not convert cancellation into a null result.
+                 * The calling component must be able to distinguish it.
+                 */
+                throw;
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.Error.WriteLine($"HTTP error in GetByIdAsync({id}): {ex.Message}");
+
+                throw;
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine($"Unexpected error in GetByIdAsync: {ex.Message}");
-                return null;
+                Console.Error.WriteLine($"Unexpected error in GetByIdAsync({id}): {ex.Message}");
+
+                throw;
             }
-            
         }
 
         public async Task<List<ClientEventDTO>> GetByNameAsync(string name, CancellationToken ct = default)
@@ -120,9 +142,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             try
             {
-                var url =
-                    $"Event/by-name" +
-                    $"?name={Uri.EscapeDataString(name.Trim())}";
+                var url = $"Event/by-name" + $"?name={Uri.EscapeDataString(name.Trim())}";
 
                 using var response = await _httpClient.GetAsync(url, ct);
 
@@ -131,9 +151,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
                 response.EnsureSuccessStatusCode();
 
-                return await response.Content.ReadFromJsonAsync<List<ClientEventDTO>>(
-                           cancellationToken: ct)
-                       ?? new();
+                return await response.Content.ReadFromJsonAsync<List<ClientEventDTO>>(cancellationToken: ct) ?? new();
             }
             catch (OperationCanceledException)
             {
@@ -153,9 +171,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
             try
             {
-                var url =
-                    $"Event/date-event" +
-                    $"?dateEvent={Uri.EscapeDataString(dateEvent.ToString("yyyy-MM-dd"))}";
+                var url = $"Event/date-event" + $"?dateEvent={Uri.EscapeDataString(dateEvent.ToString("yyyy-MM-dd"))}";
 
                 using var response = await _httpClient.GetAsync(url, ct);
 
@@ -164,9 +180,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
                 response.EnsureSuccessStatusCode();
 
-                return await response.Content.ReadFromJsonAsync<List<ClientEventDTO>>(
-                           cancellationToken: ct)
-                       ?? new();
+                return await response.Content.ReadFromJsonAsync<List<ClientEventDTO>>(cancellationToken: ct) ?? new();
             }
             catch (OperationCanceledException)
             {
