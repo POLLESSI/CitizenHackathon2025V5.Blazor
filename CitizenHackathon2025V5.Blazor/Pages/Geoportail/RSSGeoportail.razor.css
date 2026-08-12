@@ -1,0 +1,635 @@
+﻿.geoportal-page {
+    --geo-accent: #4fd1c5;
+    --geo-accent-soft: rgba(79, 209, 197, 0.16);
+    --geo-accent-border: rgba(79, 209, 197, 0.32);
+    --geo-blue: #63b3ed;
+    --geo-blue-soft: rgba(99, 179, 237, 0.14);
+    --geo-bg: rgba(8, 18, 31, 0.78);
+    --geo-bg-strong: rgba(8, 18, 31, 0.92);
+    --geo-card: rgba(15, 31, 49, 0.74);
+    --geo-card-hover: rgba(21, 44, 67, 0.92);
+    --geo-border: rgba(255, 255, 255, 0.10);
+    --geo-text: #f3f8fc;
+    --geo-muted: #9eb2c5;
+    width: min(1500px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 32px 0 70px;
+    color: var(--geo-text);
+}
+
+
+/* ============================================================
+   HERO
+   ============================================================ */
+
+.geoportal-hero {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+    align-items: center;
+    gap: 42px;
+    min-height: 430px;
+    padding: clamp(28px, 5vw, 64px);
+    overflow: hidden;
+    border: 1px solid var(--geo-border);
+    border-radius: 28px;
+    background: radial-gradient( circle at 88% 30%, rgba(79, 209, 197, 0.20), transparent 32% ), radial-gradient( circle at 12% 88%, rgba(99, 179, 237, 0.14), transparent 38% ), linear-gradient( 135deg, rgba(8, 18, 31, 0.96), rgba(11, 30, 48, 0.84) );
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+
+.geoportal-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: linear-gradient( rgba(255, 255, 255, 0.018) 1px, transparent 1px ), linear-gradient( 90deg, rgba(255, 255, 255, 0.018) 1px, transparent 1px );
+    background-size: 36px 36px;
+    mask-image: linear-gradient( to bottom, rgba(0, 0, 0, 0.75), transparent );
+}
+
+
+.geoportal-hero-content {
+    position: relative;
+    z-index: 2;
+    max-width: 800px;
+}
+
+
+.geoportal-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    margin-bottom: 20px;
+    padding: 7px 12px;
+    border: 1px solid var(--geo-accent-border);
+    border-radius: 999px;
+    background: var(--geo-accent-soft);
+    color: #8ce9df;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+}
+
+
+.geoportal-eyebrow-icon {
+    font-size: 1rem;
+}
+
+
+.geoportal-hero h1 {
+    margin: 0;
+    font-size: clamp(2.35rem, 5vw, 4.7rem);
+    font-weight: 800;
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+    color: #ffffff;
+}
+
+
+.geoportal-hero h1 span {
+    display: block;
+    margin-top: 5px;
+    color: var(--geo-accent);
+}
+
+
+.geoportal-intro {
+    max-width: 720px;
+    margin: 26px 0 0;
+    color: #b9cad8;
+    font-size: clamp(1rem, 1.5vw, 1.15rem);
+    line-height: 1.7;
+}
+
+
+/* ============================================================
+   ACTIONS
+   ============================================================ */
+
+.geoportal-main-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 32px;
+}
+
+
+.geoportal-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 260px;
+    padding: 14px 18px;
+    border-radius: 15px;
+    text-decoration: none;
+    transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+
+.geoportal-button:hover {
+    transform: translateY(-2px);
+    text-decoration: none;
+}
+
+
+.geoportal-button-primary {
+    border: 1px solid rgba(79, 209, 197, 0.55);
+    background: linear-gradient( 135deg, rgba(79, 209, 197, 0.28), rgba(79, 209, 197, 0.13) );
+    color: #ffffff;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+
+.geoportal-button-primary:hover {
+    border-color: rgba(79, 209, 197, 0.85);
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.24), 0 0 26px rgba(79, 209, 197, 0.10);
+}
+
+
+.geoportal-button-secondary {
+    border: 1px solid var(--geo-border);
+    background: rgba(255, 255, 255, 0.045);
+    color: #ffffff;
+}
+
+
+.geoportal-button-secondary:hover {
+    border-color: rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.075);
+}
+
+
+.geoportal-button-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.18);
+    font-size: 1.35rem;
+}
+
+
+.geoportal-button span:nth-child(2) {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
+
+.geoportal-button strong {
+    font-size: 0.97rem;
+}
+
+
+.geoportal-button small {
+    color: rgba(230, 240, 247, 0.68);
+    font-size: 0.76rem;
+}
+
+
+.geoportal-arrow {
+    font-size: 1.2rem;
+    opacity: 0.65;
+    transition: transform 160ms ease;
+}
+
+
+.geoportal-button:hover .geoportal-arrow {
+    transform: translate(2px, -2px);
+    opacity: 1;
+}
+
+
+/* ============================================================
+   HERO GLOBE
+   ============================================================ */
+
+.geoportal-hero-visual {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+}
+
+
+.geoportal-globe-wrapper {
+    position: relative;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    width: min(100%, 320px);
+    min-height: 260px;
+}
+
+
+.geoportal-orbit {
+    position: absolute;
+    border: 1px solid rgba(79, 209, 197, 0.17);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+
+.geoportal-orbit-one {
+    width: 270px;
+    height: 270px;
+}
+
+
+.geoportal-orbit-two {
+    width: 340px;
+    height: 340px;
+    border-color: rgba(99, 179, 237, 0.09);
+}
+
+
+.geoportal-status {
+    position: absolute;
+    right: 5px;
+    bottom: 5px;
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 11px;
+    border: 1px solid var(--geo-border);
+    border-radius: 999px;
+    background: rgba(8, 18, 31, 0.78);
+    color: #b9cad8;
+    font-size: 0.73rem;
+    backdrop-filter: blur(12px);
+}
+
+
+.geoportal-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #55e6a5;
+    box-shadow: 0 0 12px rgba(85, 230, 165, 0.72);
+}
+
+
+/* ============================================================
+   SECTIONS
+   ============================================================ */
+
+.geoportal-section {
+    margin-top: 56px;
+}
+
+
+.geoportal-section-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 30px;
+    margin-bottom: 22px;
+}
+
+.geoportal-section-heading > div {
+    flex: 1;
+}
+
+
+.geoportal-section-heading > p {
+    max-width: 500px;
+    margin: 0;
+    color: var(--geo-muted);
+    line-height: 1.55;
+}
+
+.geoportal-section-kicker {
+    display: block;
+    margin-bottom: 7px;
+    color: var(--geo-accent);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+}
+
+
+.geoportal-section h2 {
+    margin: 0;
+    color: #ffffff;
+    font-size: clamp(1.65rem, 3vw, 2.2rem);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+}
+
+
+/* ============================================================
+   RESOURCE CARDS
+   ============================================================ */
+
+.geoportal-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+
+.geoportal-card {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 17px;
+    min-height: 190px;
+    padding: 25px;
+    overflow: hidden;
+    border: 1px solid var(--geo-border);
+    border-radius: 20px;
+    background: linear-gradient( 145deg, rgba(18, 38, 58, 0.78), rgba(10, 24, 39, 0.70) );
+    color: var(--geo-text);
+    text-decoration: none;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.035);
+    transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+
+.geoportal-card::after {
+    content: "";
+    position: absolute;
+    width: 130px;
+    height: 130px;
+    top: -70px;
+    right: -65px;
+    border-radius: 50%;
+    background: rgba(79, 209, 197, 0.08);
+    filter: blur(8px);
+    transition: transform 250ms ease;
+}
+
+
+.geoportal-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(79, 209, 197, 0.38);
+    background: linear-gradient( 145deg, rgba(22, 48, 71, 0.94), rgba(11, 29, 47, 0.88) );
+    color: #ffffff;
+    text-decoration: none;
+    box-shadow: 0 20px 42px rgba(0, 0, 0, 0.20), 0 0 25px rgba(79, 209, 197, 0.06);
+}
+
+.geoportal-card:hover::after {
+    transform: scale(1.35);
+}
+
+
+.geoportal-card-icon,
+.geoportal-feed-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 52px;
+    height: 52px;
+    border: 1px solid var(--geo-accent-border);
+    border-radius: 15px;
+    background: var(--geo-accent-soft);
+    font-size: 1.5rem;
+}
+
+
+.geoportal-card-content {
+    position: relative;
+    z-index: 2;
+    flex: 1;
+}
+
+
+.geoportal-card-type,
+.geoportal-feed-label {
+    color: var(--geo-accent);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+}
+
+
+.geoportal-card h3,
+.geoportal-feed-card h3 {
+    margin: 7px 0 8px;
+    color: #ffffff;
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+
+.geoportal-card p,
+.geoportal-feed-card p {
+    margin: 0;
+    color: var(--geo-muted);
+    line-height: 1.6;
+}
+
+
+.geoportal-card-arrow {
+    position: relative;
+    z-index: 2;
+    color: var(--geo-accent);
+    font-size: 1.2rem;
+    opacity: 0.5;
+    transition: transform 160ms ease, opacity 160ms ease;
+}
+
+
+.geoportal-card:hover .geoportal-card-arrow,
+.geoportal-feed-card:hover .geoportal-card-arrow {
+    transform: translate(3px, -3px);
+    opacity: 1;
+}
+
+
+/* ============================================================
+   RSS / ICS
+   ============================================================ */
+
+.geoportal-feed-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+
+.geoportal-feed-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    min-height: 165px;
+    padding: 22px;
+    border: 1px solid var(--geo-border);
+    border-radius: 18px;
+    background: rgba(12, 29, 45, 0.66);
+    color: var(--geo-text);
+    text-decoration: none;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    transition: transform 180ms ease, background-color 180ms ease, border-color 180ms ease;
+}
+
+
+.geoportal-feed-card > div:nth-child(2) {
+    flex: 1;
+}
+
+
+.geoportal-feed-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(99, 179, 237, 0.34);
+    background: rgba(18, 42, 62, 0.82);
+    color: #ffffff;
+    text-decoration: none;
+}
+
+
+/* ============================================================
+   INFORMATION
+   ============================================================ */
+
+.geoportal-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    margin-top: 40px;
+    padding: 19px 22px;
+    border: 1px solid rgba(99, 179, 237, 0.20);
+    border-radius: 16px;
+    background: rgba(99, 179, 237, 0.07);
+    color: #c9d8e4;
+}
+
+
+.geoportal-info-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(99, 179, 237, 0.13);
+}
+
+
+.geoportal-info strong {
+    color: #ffffff;
+}
+
+
+.geoportal-info p {
+    margin: 4px 0 0;
+    color: var(--geo-muted);
+    line-height: 1.55;
+}
+
+
+/* ============================================================
+   FOCUS / ACCESSIBILITY
+   ============================================================ */
+
+.geoportal-page a:focus-visible {
+    outline: 3px solid rgba(79, 209, 197, 0.72);
+    outline-offset: 3px;
+}
+
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 1050px) {
+
+    .geoportal-hero {
+        grid-template-columns: 1fr;
+        min-height: auto;
+    }
+
+    .geoportal-hero-visual {
+        min-height: 250px;
+    }
+
+    .geoportal-section-heading {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .geoportal-feed-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+
+@media (max-width: 760px) {
+
+    .geoportal-page {
+        width: min(100% - 20px, 1500px);
+        padding-top: 16px;
+    }
+
+    .geoportal-hero {
+        gap: 22px;
+        padding: 25px 20px;
+        border-radius: 21px;
+    }
+
+    .geoportal-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .geoportal-main-actions {
+        flex-direction: column;
+    }
+
+    .geoportal-button {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .geoportal-card {
+        min-height: auto;
+        padding: 20px;
+    }
+
+    .geoportal-orbit-one {
+        width: 220px;
+        height: 220px;
+    }
+
+    .geoportal-orbit-two {
+        width: 275px;
+        height: 275px;
+    }
+
+    .geoportal-status {
+        right: 50%;
+        bottom: -4px;
+        transform: translateX(50%);
+        white-space: nowrap;
+    }
+}
+
+
+@media (max-width: 480px) {
+
+    .geoportal-hero h1 {
+        font-size: 2.25rem;
+    }
+
+    .geoportal-card,
+    .geoportal-feed-card {
+        gap: 12px;
+    }
+
+    .geoportal-card-icon,
+    .geoportal-feed-icon {
+        width: 44px;
+        height: 44px;
+        font-size: 1.25rem;
+    }
+}

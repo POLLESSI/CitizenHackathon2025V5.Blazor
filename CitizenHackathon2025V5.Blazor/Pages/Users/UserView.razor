@@ -17,6 +17,7 @@
                 <li @onclick="() => SelectUser(user)" style="cursor:pointer;@(SelectedUser == user ? " font-weight:bold;" : "")">
                     @user.Email (@user.Role)
                 </li>
+                <Globe />
             }
         </ul>
 
@@ -40,8 +41,8 @@
 
     <p>Current token : @_token</p>
 </div>
-
 <Globe />
+
 
 
 

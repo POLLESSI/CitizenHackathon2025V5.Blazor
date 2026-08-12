@@ -321,11 +321,7 @@
         </section>
     </div>
     <div class="earth-container scroll-fade">
-        <Globe CanvasId="homeEarth"
-               Width="320"
-               Height="320"
-               ShowControls="true"
-               CssClass="globe-in-header" />
+        <Globe CanvasId="homeEarth" Width="320" Height="320" ShowControls="true" CssClass="globe-in-header" />
     </div>
     <div>
         <button class="btn" @onclick="EnableSoundAsync">Enable sound</button>
@@ -333,8 +329,11 @@
 
     <footer class="index-footer">
         &copy; 2025 OutZen – Zen in the crowd, Zen in life.
+        <Globe />
     </footer>
 </div>
+<Globe />
+
 
 
 

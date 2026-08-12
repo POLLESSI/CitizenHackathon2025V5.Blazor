@@ -567,6 +567,46 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
 
             _ttsLang = languageCode == "wa-central" ? "fr-BE" : languageCode;
 
+            double? effectiveLatitude = null;
+            double? effectiveLongitude = null;
+
+            var nearMeIntent = IsNearMePrompt(rawPrompt);
+
+            // Contact details written explicitly
+            // in the prompt take priority.
+            if (TryExtractCoordinatesFromPrompt(rawPrompt, out var parsedLat, out var parsedLng))
+            {
+                effectiveLatitude = parsedLat;
+                effectiveLongitude = parsedLng;
+
+                Console.WriteLine(
+                    $"[GPT VIEW] Coordinates extracted " +
+                    $"from prompt: " +
+                    $"lat={effectiveLatitude}, " +
+                    $"lng={effectiveLongitude}");
+            }
+            else if (nearMeIntent)
+            {
+                var gpsAvailable = await TryAcquireGpsForGptAsync();
+
+                if (!gpsAvailable)
+                {
+                    _aiState = AiProcessingState.Error;
+
+                    _aiStatusMessage =
+                        "Votre position n’est pas disponible. " +
+                        "Autorisez la géolocalisation pour utiliser « près de moi ».";
+
+                    await SafeRenderAsync();
+
+                    return;
+                }
+
+                effectiveLatitude = _gptLatitude;
+
+                effectiveLongitude = _gptLongitude;
+            }
+
             try
             {
                 _isSending = true;
@@ -579,10 +619,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
                 await ShowOverlayAsync();
                 await InvokeAsync(StateHasChanged);
 
-                var effectiveLatitude = _gptLatitude;
-                var effectiveLongitude = _gptLongitude;
-
-                if (TryExtractCoordinatesFromPrompt(rawPrompt, out var parsedLat, out var parsedLng))
+                if (TryExtractCoordinatesFromPrompt(rawPrompt, out parsedLat, out parsedLng))
                 {
                     effectiveLatitude = parsedLat;
                     effectiveLongitude = parsedLng;
@@ -1016,6 +1053,70 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
             return response.Length >= 80;
         }
 
+        private static bool IsNearMePrompt(string? prompt)
+        {
+            if (string.IsNullOrWhiteSpace(prompt))
+                return false;
+
+            var text = prompt.Replace("’", "'").ToLowerInvariant();
+
+            return
+                Regex.IsMatch(
+                    text,
+                    @"\b(près|pres|proche)\s+de\s+moi\b") ||
+
+                Regex.IsMatch(
+                    text,
+                    @"\bautour\s+de\s+moi\b") ||
+
+                text.Contains("autour de ma position") ||
+
+                text.Contains("près d'ici");
+        }
+
+        private async Task<bool>TryAcquireGpsForGptAsync()
+        {
+            try
+            {
+                var position = await JS.InvokeAsync<BrowserGpsPosition>("OutZen.getCurrentPositionForGpt");
+
+                if (position is null ||
+                    !double.IsFinite(
+                        position.Latitude) ||
+                    !double.IsFinite(
+                        position.Longitude) ||
+                    position.Latitude is < -90 or > 90 ||
+                    position.Longitude is < -180 or > 180)
+                {
+                    return false;
+                }
+
+                _gptLatitude =
+                    position.Latitude;
+
+                _gptLongitude =
+                    position.Longitude;
+
+                Console.WriteLine(
+                    $"[GPT GPS] Resolved for request. " +
+                    $"lat={_gptLatitude}, " +
+                    $"lng={_gptLongitude}, " +
+                    $"accuracy={position.Accuracy}m");
+
+                return true;
+            }
+            catch (JSException ex)
+            {
+                Console.Error.WriteLine(
+                    $"[GPT GPS] Failed: {ex.Message}");
+
+                _gptLatitude = null;
+                _gptLongitude = null;
+
+                return false;
+            }
+        }
+
         private sealed class SpeechResult
         {
             public bool Ok { get; set; }
@@ -1026,6 +1127,15 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.GptInteractions
         {
             public bool Ok { get; set; }
             public string? Error { get; set; }
+        }
+
+        private sealed class BrowserGpsPosition
+        {
+            public double Latitude { get; set; }
+
+            public double Longitude { get; set; }
+
+            public double Accuracy { get; set; }
         }
 
         private async Task StopVoiceAsync()

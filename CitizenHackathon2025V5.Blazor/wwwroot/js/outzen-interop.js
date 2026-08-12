@@ -958,6 +958,41 @@
         return true;
     };
 
+    window.OutZen ??= {};
+
+    window.OutZen.getCurrentPositionForGpt =
+        function () {
+            return new Promise(
+                (resolve, reject) => {
+
+                    if (!navigator.geolocation) {
+                        reject(
+                            new Error(
+                                "Geolocation is not supported."));
+                        return;
+                    }
+
+                    navigator.geolocation.getCurrentPosition(
+                        position => {
+                            resolve({
+                                latitude: position.coords.latitude,
+                                longitude: position.coords.longitude,
+                                accuracy: position.coords.accuracy
+                            });
+                        },
+                        error => {
+                            reject(
+                                new Error(
+                                    `Geolocation failed (${error.code}): ${error.message}`));
+                        },
+                        {
+                            enableHighAccuracy: false,
+                            timeout: 10000,
+                            maximumAge: 60000
+                        });
+                });
+        };
+
     globalThis.OutZen ??= {};
 
     globalThis.OutZen.scrollIntoViewById = function (id, options = null) {

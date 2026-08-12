@@ -47,24 +47,18 @@ export async function initEarth(opts) {
         _setupControls(state, opts || {});
 
         // Initial location + periodic day/night update
-        const loc = await resolveLocation({
-            fallbackLat: opts?.fallbackLat ?? 48.8566,
-            fallbackLon: opts?.fallbackLon ?? 2.3522
-        });
-
-        applyDayNightNowInstance(state, loc);
-
-        state.dayNightTimerId = setInterval(async () => {
-            const l = await resolveLocation({
-                fallbackLat: opts?.fallbackLat ?? 48.8566,
-                fallbackLon: opts?.fallbackLon ?? 2.3522
-            });
-            applyDayNightNowInstance(state, l);
-        }, opts?.dayNightIntervalMs ?? 10 * 60 * 1000);
+        const loc = {lat: Number(opts?.fallbackLat) || 50.5039, lon: Number(opts?.fallbackLon) || 4.4699};
+        state.location = loc;
+        applyDayNightNowInstance(state, state.location);
+        state.dayNightTimerId = setInterval(() => {
+            applyDayNightNowInstance(state, state.location);
+        },
+        opts?.dayNightIntervalMs ?? 10 * 60 * 1000
+        );
         
         console.log(`initEarth: initialized instance ${canvasId}`);
-    } catch (err) {
-        console.error("initEarth: failed to initialize", err);
+
+    } catch (err) {console.error("initEarth: failed to initialize", err);
         // best-effort cleanup
         disposeEarth(canvasId);
     }
@@ -220,22 +214,69 @@ function _createState(canvasId, canvas, opts) {
 
 function _initThree(state) {
     const canvas = state.canvas;
-    const w = canvas.clientWidth || 450;
-    const h = canvas.clientHeight || 450;
+    /* --------------------------------------------------------
+       Determine one single dimension.
+       A globe is square, therefore width is enough.
+       -------------------------------------------------------- */
+
+    const rect = canvas.getBoundingClientRect();
+    const size = Math.max(1, Math.round(rect.width || canvas.clientWidth || 320));
+
+    /* --------------------------------------------------------
+       SCENE
+       -------------------------------------------------------- */
 
     state.scene = new THREE.Scene();
-    state.camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 1000);
+
+    /*
+     * Explicit transparent scene.
+     */
+    state.scene.background = null;
+
+    /* --------------------------------------------------------
+       CAMERA
+       -------------------------------------------------------- */
+
+    state.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
     state.camera.position.z = 3;
 
-    state.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-    if ("outputColorSpace" in state.renderer) {
+    /* --------------------------------------------------------
+       RENDERER
+       -------------------------------------------------------- */
+
+    state.renderer = new THREE.WebGLRenderer({
+            canvas,
+            alpha: true,
+            antialias: true,
+            premultipliedAlpha: true
+        });
+
+    /*
+     * Full transparency outside rendered objects.
+     */
+    state.renderer.setClearColor(0x000000, 0);
+    state.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+    if ("outputColorSpace" in state.renderer)
+    {
         state.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    } else {
+    }
+    else {
         state.renderer.outputEncoding = THREE.sRGBEncoding;
     }
-    state.renderer.setSize(w, h);
 
-    // Basic lighting
+    /*
+     * CRITICAL:
+     *
+     * Third argument false prevents Three.js
+     * from overwriting the CSS size.
+     */
+    state.renderer.setSize(size, size, false);
+
+    /* --------------------------------------------------------
+       LIGHTING
+       -------------------------------------------------------- */
+
     state.scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     const dir = new THREE.DirectionalLight(0xffffff, 0.8);
     dir.position.set(5, 3, 5);
@@ -247,10 +288,7 @@ async function _loadAndCreatePlanet(state, opts = {}) {
     const dayUrl = opts.dayUrl || DEFAULT_DAY_URL;
     const nightUrl = opts.nightUrl || DEFAULT_NIGHT_URL;
 
-    const [dayTex, nightTex] = await Promise.all([
-        loadTex(loader, dayUrl),
-        loadTex(loader, nightUrl)
-    ]);
+    const [dayTex, nightTex] = await Promise.all([loadTex(loader, dayUrl), loadTex(loader, nightUrl)]);
 
     const { earthDay, earthNight, atmosphere, glow } = makePlanet(state, dayTex, nightTex);
     state.earthDay = earthDay;
@@ -296,15 +334,28 @@ function _startAnimation(state) {
 
 function _setupResize(state) {
     const resizeHandler = () => {
-        if (!state.renderer || !state.camera || !state.canvas) return;
-        const w = state.canvas.clientWidth || state.canvas.width || 450;
-        const h = state.canvas.clientHeight || state.canvas.height || 450;
-        state.camera.aspect = w / h;
+        if (!state?.canvas || !state?.renderer || !state?.camera)
+        {
+            return;
+        }
+
+        const canvas = state.canvas;
+        const rect = canvas .getBoundingClientRect();
+        const size = Math.max(1, Math.round(rect.width || canvas.clientWidth || 320));
+        /*
+        * Globe = square.
+        */
+        state.camera.aspect = 1;
         state.camera.updateProjectionMatrix();
-        state.renderer.setSize(w, h);
+        state.renderer.setSize(size, size, false);
     };
+
     window.addEventListener("resize", resizeHandler);
-    state.listeners.push(() => window.removeEventListener("resize", resizeHandler));
+    state.listeners.push(() => {window.removeEventListener("resize", resizeHandler);});
+    /*
+     * Initial synchronization.
+     */
+    resizeHandler();
 }
 
 function _setupControls(state, opts = {}) {
@@ -432,7 +483,8 @@ function makePlanet(state, dayTex, nightTex) {
     });
     const glow = new THREE.Sprite(glowMat);
     glow.scale.set(2.6, 2.6, 1);
-    state.scene.add(glow);
+    // TEST : désactiver le sprite de glow
+    // state.scene.add(glow);
 
     // return objects (no globals)
     return { earthDay, earthNight, atmosphere, glow };
@@ -498,21 +550,19 @@ function loadTex(loader, url) {
 }
 
 // ----------------------------- Geolocation & sun times -----------------------------
-function resolveLocation(cfg, state) {
-    return new Promise((resolve) => {
-        if (!navigator.geolocation) {
-            if (state) state.geoDenied = true;
-            resolve({ lat: cfg.fallbackLat, lon: cfg.fallbackLon });
-            return;
-        }
-        navigator.geolocation.getCurrentPosition(
-            pos => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-            err => {
-                if (state && err && err.code === err.PERMISSION_DENIED) state.geoDenied = true;
-                resolve({ lat: cfg.fallbackLat, lon: cfg.fallbackLon });
-            },
-            { maximumAge: 3600_000, timeout: 6000, enableHighAccuracy: false }
-        );
+function resolveLocation(cfg, state)
+{
+    /*
+     * earthRotation must not request browser
+     * geolocation by itself.
+     *
+     * The application already owns location
+     * acquisition.
+     */
+
+    return Promise.resolve({
+        lat: Number(cfg?.fallbackLat) || 50.5039,
+        lon: Number(cfg?.fallbackLon) || 4.4699
     });
 }
 function sunTimes(dateLocal, latDeg, lonDeg) {

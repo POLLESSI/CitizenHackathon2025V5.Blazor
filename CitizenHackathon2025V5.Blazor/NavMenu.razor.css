@@ -1,0 +1,441 @@
+﻿/* ============================================================
+   OUTZEN NAVIGATION GROUPS
+   ============================================================ */
+
+.oz-nav-groups {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.75rem 1rem;
+    width: 100%;
+}
+
+
+/* ============================================================
+   GROUP
+   ============================================================ */
+
+.oz-nav-group {
+    --oz-group-accent: #d7e5ee;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    padding: 0.4rem 0.55rem 0.55rem;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 13px;
+    background: linear-gradient( 145deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012) );
+    transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+
+/* ============================================================
+   GROUP HEADER
+   ============================================================ */
+
+.oz-nav-group-header {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 15px;
+}
+
+
+.oz-nav-group-title {
+    flex: 0 0 auto;
+    color: var(--oz-group-accent);
+    font-size: 0.59rem;
+    font-weight: 800;
+    letter-spacing: 0.13em;
+    line-height: 1;
+    white-space: nowrap;
+    opacity: 0.80;
+}
+
+
+.oz-nav-group-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient( 90deg, transparent, rgba(255, 255, 255, 0.11), transparent );
+}
+
+
+/* ============================================================
+   ITEMS
+   ============================================================ */
+
+.oz-nav-group-items {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+
+/*
+ * NavLink is a Blazor child component.
+ * ::deep allows the isolated CSS of NavMenu
+ * to target the generated <a> element.
+ */
+
+::deep .oz-nav-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.43rem;
+    min-height: 38px;
+    padding: 0.48rem 0.64rem;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    color: rgba(245, 250, 253, 0.90);
+    font-size: 0.88rem;
+    font-weight: 500;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: transform 150ms ease, color 150ms ease, border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+
+::deep .oz-nav-link:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.07);
+    color: #ffffff;
+    text-decoration: none;
+}
+
+
+::deep .oz-nav-link.active {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.11);
+    color: #ffffff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 5px 18px rgba(0, 0, 0, 0.10);
+}
+
+
+.oz-nav-link-icon {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.2rem;
+    font-size: 1rem;
+    line-height: 1;
+}
+
+
+.oz-nav-link-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+
+/* ============================================================
+   GROUP IDENTITIES
+   ============================================================ */
+
+.oz-nav-group--outzen {
+    --oz-group-accent: #82e8ff;
+}
+
+
+.oz-nav-group--data {
+    --oz-group-accent: #8be5c3;
+}
+
+
+.oz-nav-group--community {
+    --oz-group-accent: #d3b2ff;
+}
+
+
+.oz-nav-group--operations {
+    --oz-group-accent: #ffb482;
+}
+
+
+/*
+ * An ecosystem deliberately made more visible :
+ * it groups external resources.
+ */
+
+.oz-nav-group--ecosystem {
+    --oz-group-accent: #ffe073;
+    border-color: rgba(255, 224, 115, 0.18);
+    background: radial-gradient( circle at 100% 0, rgba(255, 213, 74, 0.10), transparent 50% ), linear-gradient( 145deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014) );
+}
+
+
+.oz-nav-group--ecosystem:hover {
+    border-color: rgba(255, 224, 115, 0.31);
+    box-shadow: 0 7px 25px rgba(0, 0, 0, 0.09);
+}
+
+
+/* ============================================================
+   KEYBOARD
+   ============================================================ */
+
+::deep .oz-nav-link:focus-visible {
+    outline: 2px solid var(--oz-group-accent);
+    outline-offset: 2px;
+}
+
+
+/* ============================================================
+   TABLET
+   ============================================================ */
+
+@media (max-width: 1100px) {
+
+    .oz-nav-groups {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.7rem;
+    }
+
+
+    .oz-nav-group {
+        width: 100%;
+    }
+}
+
+
+/* ============================================================
+   MOBILE
+   ============================================================ */
+
+@media (max-width: 700px) {
+
+    .oz-nav-groups {
+        grid-template-columns: 1fr;
+        gap: 0.65rem;
+    }
+
+
+    .oz-nav-group {
+        padding: 0.55rem;
+    }
+
+
+    .oz-nav-group-items {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.25rem;
+    }
+
+
+    ::deep .oz-nav-link {
+        width: 100%;
+        justify-content: flex-start;
+        padding: 0.65rem 0.7rem;
+    }
+}
+
+
+@media (max-width: 430px) {
+
+    .oz-nav-group-items {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ============================================================
+   NAVIGATION BEHAVIOUR
+   Desktop != mobile drawer
+
+   IMPORTANT :
+   The desktop rules are intentionally strict so that
+   outzen-nav.js cannot hide the navigation on PC.
+   ============================================================ */
+
+
+/* ------------------------------------------------------------
+   NAV ROOT
+   ------------------------------------------------------------ */
+
+.main-nav {
+    position: sticky;
+    top: 0;
+    width: 100%;
+    z-index: 10000;
+    isolation: isolate;
+    overflow: visible;
+}
+
+
+/* ------------------------------------------------------------
+   DESKTOP
+   ------------------------------------------------------------ */
+
+@media (min-width: 901px) {
+
+    /*
+     * No hamburger on desktop.
+     */
+    .oz-nav-toggle {
+        display: none !important;
+    }
+
+
+    /*
+     * The "drawer" is NOT a drawer on desktop.
+     *
+     * Even if the JS left:
+     * transform / visibility / opacity / pointer-events,
+     * we explicitly take control here.
+     */
+    .nav-drawer {
+        display: block !important;
+        position: relative !important;
+        inset: auto !important;
+        top: auto !important;
+        right: auto !important;
+        bottom: auto !important;
+        left: auto !important;
+        width: 100% !important;
+        max-width: none !important;
+        height: auto !important;
+        max-height: none !important;
+        margin: 0 !important;
+        transform: none !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        overflow: visible !important;
+    }
+
+    /*
+     * The groups take the full available width.
+     */
+    .oz-nav-groups {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        justify-content: flex-start;
+        gap: 0.55rem 0.7rem;
+        width: 100%;
+    }
+}
+
+/* ============================================================
+   MOBILE / TABLET
+   ============================================================ */
+
+@media (max-width: 900px) {
+
+    /*
+     * CRITICAL:
+     *
+     * NavMenu is likely the child of a flex layout.
+     * It should therefore reserve NO columns when we
+     * use the mobile drawer.
+     */
+    .main-nav {
+        flex: 0 0 0 !important;
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        overflow: visible !important;
+        position: relative !important;
+        z-index: 10000;
+    }
+
+
+    /* --------------------------------------------------------
+       HAMBURGER
+       -------------------------------------------------------- */
+
+    .oz-nav-toggle {
+        display: inline-grid !important;
+        place-items: center;
+        /*
+         * Fixed => it does not participate in the layout.
+         */
+        position: fixed !important;
+        top: 12px;
+        left: 12px;
+        z-index: 10003;
+        width: 46px;
+        height: 46px;
+        margin: 0 !important;
+        padding: 0;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 12px;
+        background: rgba(8, 25, 38, 0.94);
+        color: #ffffff;
+        font-size: 1.35rem;
+        cursor: pointer;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+    }
+
+
+    /* --------------------------------------------------------
+       DRAWER CLOSED
+       -------------------------------------------------------- */
+
+    .nav-drawer {
+        position: fixed !important;
+        top: 0;
+        left: 0;
+        z-index: 10002;
+        width: min( 390px, calc(100vw - 34px) ) !important;
+        max-width: none !important;
+        height: 100dvh !important;
+        max-height: 100dvh !important;
+        padding: 72px 12px 22px;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        background: linear-gradient( 180deg, rgba(7, 28, 42, 0.985), rgba(9, 37, 49, 0.975) );
+        border-right: 1px solid rgba(255, 255, 255, 0.10);
+        box-shadow: 20px 0 55px rgba(0, 0, 0, 0.40);
+        transform: translateX(-105%);
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+        transition: transform 200ms ease, opacity 180ms ease, visibility 180ms ease;
+    }
+
+
+    /* --------------------------------------------------------
+       DRAWER OPEN
+       --------------------------------------------------------
+
+       Much more robust than guessing the class
+       eventually added by outzen-nav.js.
+
+       The Blazor button already has:
+           aria-expanded="@isMenuOpen"
+
+       and it is immediately followed by .nav-drawer.
+       -------------------------------------------------------- */
+
+    .oz-nav-toggle[aria-expanded="true"] + .nav-drawer {
+        transform: translateX(0) !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+    }
+
+
+    /* --------------------------------------------------------
+       GROUPS
+       -------------------------------------------------------- */
+
+    .oz-nav-groups {
+        display: grid;
+        grid-template-columns: 1fr;
+        width: 100%;
+        gap: 0.7rem;
+    }
+
+
+    .oz-nav-group {
+        width: 100%;
+        min-width: 0;
+    }
+}

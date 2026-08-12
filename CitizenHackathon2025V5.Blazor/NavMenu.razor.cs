@@ -1,4 +1,5 @@
 ﻿//NavMenu.razor.cs
+using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
@@ -11,7 +12,7 @@ namespace CitizenHackathon2025V5.Blazor.Client
         [Inject] private NavigationManager NavManager { get; set; } = default!;
         [Inject] private IJSRuntime JS { get; set; } = default!;
 
-        private bool collapseNavMenu = true; // mobile closed by default
+        /*private bool collapseNavMenu = true;*/ // mobile closed by default
         private bool isMenuOpen;
 
         private async Task ToggleNavMenu()
@@ -36,7 +37,13 @@ namespace CitizenHackathon2025V5.Blazor.Client
         [JSInvokable] public Task CloseFromJs() => CloseMenu();
 
         protected override void OnInitialized()
-            => NavManager.LocationChanged += async (_, _) => await CloseMenu();
+        {
+            NavManager.LocationChanged += OnLocationChanged;
+        }
+        private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+        {
+            _ = InvokeAsync(CloseMenu);
+        }
 
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
@@ -47,32 +54,78 @@ namespace CitizenHackathon2025V5.Blazor.Client
 
         public ValueTask DisposeAsync()
         {
+            NavManager.LocationChanged -= OnLocationChanged;
+
             _dotNetRef?.Dispose();
+            _dotNetRef = null;
+
             return ValueTask.CompletedTask;
         }
 
-        private record MenuItem(string Text, string Href, string Icon);
+        private sealed record MenuItem(string Text, string Href, string Icon, bool IconOnly = false);
+        private sealed record MenuGroup(string Key, string Title, string CssClass, IReadOnlyList<MenuItem> Items);
 
-        private List<MenuItem> MenuItems => new()
+        private static readonly IReadOnlyList<MenuGroup> MenuGroups =
+        new List<MenuGroup>
         {
-            new MenuItem("", "/", "🏠"),
-            new MenuItem("Antenna Crowd Panel", "/antennacrowdpanel", "📡"),
-            new MenuItem("OutZen Interactions", "/gptinteractionview", "🤖"),
-            new MenuItem("Crowd Calendar", "/crowdcalendar", "📆"),
-            new MenuItem("Crowd Infos", "/crowdinfoview", "✨"),
-            new MenuItem("Events", "/eventview", "📅"),
-            new MenuItem("Places", "/placeview", "📍"),
-            new MenuItem("Traffic", "/trafficconditionview", "🚦"),
-            new MenuItem("Weather", "/weatherforecastview", "🌤"),
-            new MenuItem("Historic Suggestions", "/suggestionview", "💡"),
-            new MenuItem("Comments", "/messageview", "💬"),
-            new MenuItem("GDPR", "/privacy", "🔐"),
-            new MenuItem("Help", "/help", "❓"),
-            new MenuItem("Command Center", "/commandcenter", "🛰️"),
-            new MenuItem("Presentation", "/presentation", "🛡")
+            new(
+                Key: "outzen",
+                Title: "OUTZEN",
+                CssClass: "oz-nav-group--outzen",
+                Items: new List<MenuItem>
+                {
+                    new("Accueil", "/", "🏠", IconOnly: true),
+                    new("OutZen Interactions", "/gptinteractionview", "🤖"),
+                    new("Crowd Infos", "/crowdinfoview", "✨"),
+                    new("Historic Suggestions", "/suggestionview", "💡"),
+                }),
+
+            new(
+                Key: "data",
+                Title: "DONNÉES",
+                CssClass: "oz-nav-group--data",
+                Items: new List<MenuItem>
+                {
+                    new("Antenna Crowd Panel", "/antennacrowdpanel", "📡"),
+                    new("Crowd Calendar", "/crowdcalendar", "📆"),
+                    new("Events", "/eventview", "📅"),
+                    new("Places", "/placeview", "📍"),
+                    new("Traffic", "/trafficconditionview", "🚦"),
+                    new("Weather", "/weatherforecastview", "🌤️")
+                }),
+
+            new(
+                Key: "community",
+                Title: "COMMUNAUTÉ",
+                CssClass: "oz-nav-group--community",
+                Items: new List<MenuItem>
+                {
+                    new("Comments", "/messageview", "💬"),
+                    new("GDPR", "/privacy", "🔐"),
+                    new("Help", "/help", "❓")
+                }),
+
+            new(
+                Key: "operations",
+                Title: "OPÉRATIONS",
+                CssClass: "oz-nav-group--operations",
+                Items: new List<MenuItem>
+                {
+                    new("Command Center", "/commandcenter", "🛰️"),
+                    new("Presentation", "/presentation", "🛡️")
+                }),
+
+            new(
+                Key: "ecosystem",
+                Title: "ÉCOSYSTEME / RESSOURCES",
+                CssClass: "oz-nav-group--ecosystem",
+                Items: new List<MenuItem>
+                {
+                    new("WalOnMap", "/rssgeoportail", "🗺️"),
+                    new("Géoportail Monitoring", "/geoportail-feed", "📡"),
+                    new("WallonieEnPoche", "/wallonieenpoche", "📱")
+                })
         };
-        //protected override void OnInitialized() =>
-        //    NavManager.LocationChanged += (_, _) => InvokeAsync(StateHasChanged);
     }
 }
 

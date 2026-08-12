@@ -121,6 +121,7 @@ function getS(scopeKey = "main") {
             calendarMarkers: new Map(), // calendar markers
             antennaMarkers: new Map(),  // antenna markers
             antennaAlertMarkers: new Map(), // antenna alert markers
+            emergencyAlertLayers: new Map(),
 
 
             // hybrid
@@ -4363,66 +4364,55 @@ function bundlePopupHtml(b, s) {
 
 const BUNDLE_POPUP_WIRING_VERSION = 3;
 
-function wireBundlePopupActions(
-    marker,
-    s,
-    scopeKey) {
 
+function wireBundlePopupActions(marker, s, scopeKey)
+{
     if (!marker || !s?.map) {
         return;
     }
 
-    if (
-        marker.__ozBundlePopupWiringVersion ===
-        BUNDLE_POPUP_WIRING_VERSION
-    ) {
+    /*
+     * Avoid wiring the same marker repeatedly.
+     */
+    if (marker.__ozBundlePopupWiringVersion === BUNDLE_POPUP_WIRING_VERSION)
+    {
         return;
     }
 
-    marker.__ozBundlePopupWiringVersion =
-        BUNDLE_POPUP_WIRING_VERSION;
+    marker.__ozBundlePopupWiringVersion = BUNDLE_POPUP_WIRING_VERSION;
 
     marker.on("popupopen", () => {
         requestAnimationFrame(() => {
-            const popupElement =
-                marker
-                    .getPopup?.()
-                    ?.getElement?.();
+            const popupElement = marker.getPopup?.()?.getElement?.();
 
             if (!popupElement) {
                 return;
             }
 
-            const detailsButton =
-                popupElement.querySelector(
-                    '[data-oz-action="details"]'
-                );
+            const detailsButton = popupElement.querySelector('[data-oz-action="details"]');
 
             if (!detailsButton) {
                 return;
             }
 
+            /*
+            * Prevent the button click from also being
+            * interpreted as a map click.
+            */
             try {
-                globalThis.L
-                    ?.DomEvent
-                    ?.disableClickPropagation(
-                        detailsButton
-                    );
+                globalThis.L ?.DomEvent ?.disableClickPropagation(detailsButton);
             }
             catch {
             }
 
-            detailsButton.onclick = event => {
+            detailsButton.onclick = (event) => {
                 event.preventDefault();
                 event.stopPropagation();
 
-                const bundle =
-                    marker.__ozBundleData;
+                const bundle = marker.__ozBundleData;
 
                 if (!bundle) {
-                    console.warn(
-                        "[Bundle popup] no bundle data"
-                    );
+                    console.warn("[Bundle popup] " + "no bundle data");
 
                     return;
                 }
@@ -4433,13 +4423,234 @@ function wireBundlePopupActions(
                 catch {
                 }
 
-                showSelectedBundleDetails(
-                    bundle,
-                    scopeKey
-                );
+                showSelectedBundleDetails(bundle, scopeKey);
             };
         });
     });
+}
+
+function ensureEmergencyAlertState(s) {
+    if (!s?.map) {
+        return false;
+    }
+
+    s.emergencyAlertLayers ??= new Map();
+
+    ensureCustomPane(s.map, "ozEmergencyPane", 690);
+
+    return true;
+}
+
+
+export function upsertEmergencyAlert(scopeKey, alert) {
+    const ready = ensureMapReady(scopeKey);
+
+    if (!ready || !alert) {
+        return false;
+    }
+
+    const {s, L } = ready;
+
+    if (!ensureEmergencyAlertState(s)) {
+        return false;
+    }
+
+    const alertId = alert.id ?? alert.Id;
+
+    if (alertId == null) {
+        console.warn(
+            "[OutZen Emergency] alert without id",
+            alert);
+
+        return false;
+    }
+
+    const key =
+        `emergency:${alertId}`;
+
+    const previous =
+        s.emergencyAlertLayers.get(key);
+
+    if (previous) {
+        try {
+            if (s.map.hasLayer(previous)) {
+                s.map.removeLayer(previous);
+            }
+        }
+        catch {
+        }
+
+        s.emergencyAlertLayers.delete(key);
+    }
+
+    const polygon =
+        alert.polygon ??
+        alert.Polygon;
+
+    const latitude =
+        toNumLoose(
+            alert.latitude ??
+            alert.Latitude);
+
+    const longitude =
+        toNumLoose(
+            alert.longitude ??
+            alert.Longitude);
+
+    const radiusMeters =
+        toNumLoose(
+            alert.radiusMeters ??
+            alert.RadiusMeters)
+        ?? 0;
+
+    let layer = null;
+
+    if (
+        Array.isArray(polygon) &&
+        polygon.length >= 3
+    ) {
+        layer =
+            L.polygon(
+                polygon,
+                {
+                    pane: "ozEmergencyPane",
+                    weight: 3,
+                    fillOpacity: 0.23
+                });
+    }
+    else if (
+        latitude != null &&
+        longitude != null &&
+        radiusMeters > 0
+    ) {
+        layer =
+            L.circle(
+                [
+                    latitude,
+                    longitude
+                ],
+                {
+                    radius: radiusMeters,
+                    pane: "ozEmergencyPane",
+                    weight: 3,
+                    fillOpacity: 0.23
+                });
+    }
+    else if (
+        latitude != null &&
+        longitude != null
+    ) {
+        layer =
+            L.marker(
+                [
+                    latitude,
+                    longitude
+                ],
+                {
+                    pane: "ozEmergencyPane"
+                });
+    }
+
+    if (!layer) {
+        console.warn(
+            "[OutZen Emergency] " +
+            "alert has no usable geometry",
+            alert);
+
+        return false;
+    }
+
+    const escapeHtml =
+        s.utils?.escapeHtml ??
+        ((value) =>
+            String(value ?? ""));
+
+    const headline =
+        alert.headline ??
+        alert.Headline ??
+        "BE-Alert";
+
+    const description =
+        alert.description ??
+        alert.Description ??
+        "";
+
+    const instructions =
+        alert.instructions ??
+        alert.Instructions ??
+        "Consultez les informations officielles.";
+
+    const sourceCode =
+        alert.sourceCode ??
+        alert.SourceCode ??
+        "unknown";
+
+    layer.bindPopup(`
+        <strong>
+            🚨 ${escapeHtml(headline)}
+        </strong>
+
+        <br />
+
+        ${escapeHtml(description)}
+
+        <br />
+
+        <strong>Consignes :</strong>
+        ${escapeHtml(instructions)}
+
+        <br />
+
+        <small>
+            Source:
+            ${escapeHtml(sourceCode)}
+        </small>
+    `);
+
+    layer.addTo(s.map);
+
+    s.emergencyAlertLayers.set(
+        key,
+        layer);
+
+    return true;
+}
+
+
+export function removeEmergencyAlert(
+    scopeKey,
+    alertId) {
+    const ready =
+        ensureMapReady(scopeKey);
+
+    if (!ready) {
+        return false;
+    }
+
+    const { s } =
+        ready;
+
+    const key =
+        `emergency:${alertId}`;
+
+    const layer =
+        s.emergencyAlertLayers?.get(key);
+
+    if (!layer) {
+        return false;
+    }
+
+    try {
+        if (s.map.hasLayer(layer)) {
+            s.map.removeLayer(layer);
+        }
+    }
+    catch {
+    }
+
+    s.emergencyAlertLayers.delete(key);
+
+    return true;
 }
 export function updateBundleMarker(b, scopeKey = "main") {
     const ready = ensureMapReady(scopeKey);

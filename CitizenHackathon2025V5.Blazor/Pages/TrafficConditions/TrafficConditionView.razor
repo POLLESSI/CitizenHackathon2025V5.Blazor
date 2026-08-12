@@ -92,14 +92,14 @@
                             </tr>
                         }
                     }
+                    <Globe />
                 </tbody>
             </table>
         </div>
     </div>
 </div>
-
 <Globe />
-            
+         
 <OutZenDetailModal Open="@(SelectedId > 0)" WindowId="traffic-detail-window" Title="@($"Traffic condition #{SelectedId}")" OnClose="CloseTrafficDetail">
 
     @if (SelectedId > 0)

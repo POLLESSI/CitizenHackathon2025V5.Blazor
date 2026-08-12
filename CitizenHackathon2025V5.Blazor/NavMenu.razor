@@ -1,40 +1,80 @@
-@* NavMenu.razor *@
-<nav class="main-nav @(isMenuOpen ? "is-open" : "")" @ref="_navRef">
-    <div class="nav-container">
-        <a href="/" class="logo"><b>Welcome</b></a>
+﻿@* NavMenu.razor *@
+<nav class="main-nav"
+     @ref="_navRef"
+     aria-label="Navigation principale">
 
-        <ul class="nav-links desktop">
-            @foreach (var item in MenuItems)
-            {
-                <li>
-                    <NavLink href="@item.Href" class="nav-link" ActiveClass="active">
-                        @item.Icon @item.Text
-                    </NavLink>
-                </li>
-            }
-        </ul>
+    <button type="button"
+            class="oz-nav-toggle"
+            aria-label="Ouvrir ou fermer le menu"
+            aria-expanded="@isMenuOpen"
+            @onclick="ToggleNavMenu">
 
-        <button class="nav-toggle" type="button"
-                @onclick="ToggleNavMenu"
-                aria-label="Toggle navigation"
-                aria-expanded="@isMenuOpen">
-            <span class="burger"></span>
-        </button>
-    </div>
-    <aside class="nav-drawer @(isMenuOpen ? "show" : "")" role="dialog" aria-modal="true">
-        <ul class="nav-links mobile">
-            @foreach (var item in MenuItems)
+        <span aria-hidden="true">
+            ☰
+        </span>
+
+    </button>
+
+
+    <div class="nav-drawer">
+
+        <div class="oz-nav-groups">
+
+            @foreach (var group in MenuGroups)
             {
-                <li>
-                    <NavLink href="@item.Href" class="nav-link" ActiveClass="active"
+                <section class="oz-nav-group @group.CssClass"
+                         aria-labelledby="@($"nav-group-{group.Key}")">
+
+                    <div class="oz-nav-group-header">
+
+                        <span class="oz-nav-group-line"></span>
+
+                        <span id="@($"nav-group-{group.Key}")"
+                              class="oz-nav-group-title">
+                            @group.Title
+                        </span>
+
+                        <span class="oz-nav-group-line"></span>
+
+                    </div>
+
+
+                    <div class="oz-nav-group-items">
+
+                        @foreach (var item in group.Items)
+                        {
+                            <NavLink href="@item.Href"
+                                     Match="@(item.Href == "/"
+                                                                              ? NavLinkMatch.All
+                                                                              : NavLinkMatch.Prefix)"
+                             class="oz-nav-link"
+                             aria-label="@item.Text"
                              @onclick="CloseMenu">
-                        @item.Icon @item.Text
-                    </NavLink>
-                </li>
+
+                                <span class="oz-nav-link-icon"
+                                      aria-hidden="true">
+                                    @item.Icon
+                                </span>
+
+                        @if (!item.IconOnly)
+                                {
+                                    <span class="oz-nav-link-text">
+                                        @item.Text
+                                    </span>
+                                }
+
+                            </NavLink>
+                        }
+
+                    </div>
+
+                </section>
             }
-        </ul>
-    </aside>
-    <div class="nav-overlay @(isMenuOpen ? "show" : "")" @onclick="CloseMenu"></div>
+
+        </div>
+
+    </div>
+
 </nav>
 
 

@@ -1,19 +1,373 @@
-﻿<h3>RSSGeoportail</h3>
+﻿@page "/rssgeoportail"
 
-<a href="https://geoportail.lu" target="_blank">Geoportail.lu</a> provides RSS feeds for various geographic data layers. You can subscribe to these feeds to stay updated on changes and new information related to specific geographic features.
+<PageTitle>Géoportail de la Wallonie | OutZen</PageTitle>
 
-<div>
-    <h4>Available RSS Feeds:</h4>
-    <ul>
-        <li><a href="https://geoportail.lu/rss/landuse.xml" target="_blank">Land Use Changes</a></li>
-        <li><a href="https://geoportail.lu/rss/waterbodies.xml" target="_blank">Water Bodies Updates</a></li>
-        <li><a href="https://geoportail.lu/rss/transport.xml" target="_blank">Transport Infrastructure Changes</a></li>
-        <li><a href="https://geoportail.lu/rss/urbanplanning.xml" target="_blank">Urban Planning Developments</a></li>
-    </ul>
-    <p>To subscribe to an RSS feed, simply click on the desired link and use your preferred RSS reader to stay informed about the latest updates.</p>
+<div class="geoportal-page">
+
+    <section class="geoportal-hero">
+
+        <div class="geoportal-hero-content">
+
+            <div class="geoportal-eyebrow">
+                <span class="geoportal-eyebrow-icon">🛰️</span>
+                <span>OUTZEN • DONNÉES GÉOGRAPHIQUES</span>
+            </div>
+
+            <h1>
+                Géoportail de la
+                <span>Wallonie</span>
+            </h1>
+
+            <p class="geoportal-intro">
+                Accès aux ressources cartographiques officielles du
+                Service public de Wallonie : WalOnMap, catalogue de données,
+                cartes interactives, actualités géomatiques et agenda.
+            </p>
+
+            <div class="geoportal-main-actions">
+
+                <a class="geoportal-button geoportal-button-primary"
+                   href="https://geoportail.wallonie.be/files/GeoViewer/WOM-5/index.html"
+                   target="_blank"
+                   rel="noopener noreferrer">
+
+                    <span class="geoportal-button-icon">🗺️</span>
+
+                    <span>
+                        <strong>Ouvrir WalOnMap</strong>
+                        <small>Carte interactive de la Wallonie</small>
+                    </span>
+
+                    <span class="geoportal-arrow">↗</span>
+
+                </a>
+
+                <a class="geoportal-button geoportal-button-secondary"
+                   href="https://geoportail.wallonie.be/"
+                   target="_blank"
+                   rel="noopener noreferrer">
+
+                    <span class="geoportal-button-icon">🌐</span>
+
+                    <span>
+                        <strong>Géoportail officiel</strong>
+                        <small>Portail principal</small>
+                    </span>
+
+                    <span class="geoportal-arrow">↗</span>
+
+                </a>
+
+            </div>
+
+        </div>
+
+        <div class="geoportal-hero-visual">
+
+            <div class="geoportal-orbit geoportal-orbit-one"></div>
+            <div class="geoportal-orbit geoportal-orbit-two"></div>
+
+            <div class="geoportal-globe-wrapper">
+                <Globe />
+            </div>
+
+            <div class="geoportal-status">
+                <span class="geoportal-status-dot"></span>
+                Source externe officielle
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <section class="geoportal-section">
+
+        <div class="geoportal-section-heading">
+
+            <div>
+                <span class="geoportal-section-kicker">
+                    RESSOURCES
+                </span>
+
+                <h2>
+                    Explorer les données wallonnes
+                </h2>
+            </div>
+
+            <p>
+                Accès direct aux principales ressources cartographiques
+                et géographiques proposées par le Géoportail.
+            </p>
+
+        </div>
+
+
+        <div class="geoportal-grid">
+
+            <a class="geoportal-card"
+               href="https://geoportail.wallonie.be/files/GeoViewer/WOM-5/index.html"
+               target="_blank"
+               rel="noopener noreferrer">
+
+                <div class="geoportal-card-icon">
+                    🗺️
+                </div>
+
+                <div class="geoportal-card-content">
+
+                    <span class="geoportal-card-type">
+                        CARTOGRAPHIE
+                    </span>
+
+                    <h3>WalOnMap 5</h3>
+
+                    <p>
+                        Visualiser les données géographiques publiques
+                        directement sur la carte interactive de la Wallonie.
+                    </p>
+
+                </div>
+
+                <span class="geoportal-card-arrow">
+                    ↗
+                </span>
+
+            </a>
+
+
+            <a class="geoportal-card"
+               href="https://geoportail.wallonie.be/catalogue-donnees"
+               target="_blank"
+               rel="noopener noreferrer">
+
+                <div class="geoportal-card-icon">
+                    🗂️
+                </div>
+
+                <div class="geoportal-card-content">
+
+                    <span class="geoportal-card-type">
+                        DONNÉES
+                    </span>
+
+                    <h3>Catalogue des données</h3>
+
+                    <p>
+                        Rechercher les ressources géographiques
+                        disponibles pour le territoire wallon.
+                    </p>
+
+                </div>
+
+                <span class="geoportal-card-arrow">
+                    ↗
+                </span>
+
+            </a>
+
+
+            <a class="geoportal-card"
+               href="https://geoportail.wallonie.be/mapstore"
+               target="_blank"
+               rel="noopener noreferrer">
+
+                <div class="geoportal-card-icon">
+                    🌍
+                </div>
+
+                <div class="geoportal-card-content">
+
+                    <span class="geoportal-card-type">
+                        CARTES
+                    </span>
+
+                    <h3>MapStore</h3>
+
+                    <p>
+                        Consulter les cartes interactives thématiques
+                        proposées par le Service public de Wallonie.
+                    </p>
+
+                </div>
+
+                <span class="geoportal-card-arrow">
+                    ↗
+                </span>
+
+            </a>
+
+
+            <a class="geoportal-card"
+               href="https://geoportail.wallonie.be/API-geoviewer"
+               target="_blank"
+               rel="noopener noreferrer">
+
+                <div class="geoportal-card-icon">
+                    ⚙️
+                </div>
+
+                <div class="geoportal-card-content">
+
+                    <span class="geoportal-card-type">
+                        DÉVELOPPEURS
+                    </span>
+
+                    <h3>API GeoViewer</h3>
+
+                    <p>
+                        Documentation technique de l'API cartographique
+                        utilisée notamment comme base de WalOnMap.
+                    </p>
+
+                </div>
+
+                <span class="geoportal-card-arrow">
+                    ↗
+                </span>
+
+            </a>
+
+        </div>
+
+    </section>
+
+
+    <section class="geoportal-section geoportal-feeds-section">
+
+        <div class="geoportal-section-heading">
+
+            <div>
+                <span class="geoportal-section-kicker">
+                    VEILLE
+                </span>
+
+                <h2>
+                    Flux officiels
+                </h2>
+            </div>
+
+            <p>
+                Ressources de veille publiées directement
+                par le Géoportail de la Wallonie.
+            </p>
+
+        </div>
+
+
+        <div class="geoportal-feed-grid">
+
+            <a class="geoportal-feed-card"
+               href="https://geoportail.wallonie.be/home/communaute-geomatique/actualites/a-la-une-main/geoportail-de-la-wallonie---actualites.rss"
+               target="_blank"
+               rel="noopener noreferrer">
+
+                <div class="geoportal-feed-icon">
+                    📡
+                </div>
+
+                <div>
+                    <span class="geoportal-feed-label">
+                        RSS
+                    </span>
+
+                    <h3>Actualités géomatiques</h3>
+
+                    <p>
+                        Nouveautés et informations publiées
+                        par le Géoportail wallon.
+                    </p>
+                </div>
+
+                <span class="geoportal-card-arrow">
+                    ↗
+                </span>
+
+            </a>
+
+
+            <a class="geoportal-feed-card"
+               href="https://geoportail.wallonie.be/home/communaute-geomatique/agenda/bc-agenda/geoportail-de-la-wallonie---agenda.rss"
+               target="_blank"
+               rel="noopener noreferrer">
+
+                <div class="geoportal-feed-icon">
+                    📅
+                </div>
+
+                <div>
+                    <span class="geoportal-feed-label">
+                        RSS
+                    </span>
+
+                    <h3>Agenda géomatique</h3>
+
+                    <p>
+                        Événements, formations et rencontres
+                        autour de l'information géographique.
+                    </p>
+                </div>
+
+                <span class="geoportal-card-arrow">
+                    ↗
+                </span>
+
+            </a>
+
+
+            <a class="geoportal-feed-card"
+               href="https://geoportail.wallonie.be/sites/geoportail/home/communaute-geomatique/agenda/bc-agenda/geoportail-de-la-wallonie---agenda.ics"
+               target="_blank"
+               rel="noopener noreferrer">
+
+                <div class="geoportal-feed-icon">
+                    🗓️
+                </div>
+
+                <div>
+                    <span class="geoportal-feed-label">
+                        ICS
+                    </span>
+
+                    <h3>Calendrier</h3>
+
+                    <p>
+                        Ajouter les événements du Géoportail
+                        à un calendrier compatible ICS.
+                    </p>
+                </div>
+
+                <span class="geoportal-card-arrow">
+                    ↗
+                </span>
+
+            </a>
+
+        </div>
+
+    </section>
+
+
+    <section class="geoportal-info">
+
+        <div class="geoportal-info-icon">
+            ℹ️
+        </div>
+
+        <div>
+            <strong>Source externe</strong>
+
+            <p>
+                The resources accessible from this page are hosted
+                by the Public Service of Wallonia. Their availability
+                and functionality depend on the Geoportal.
+            </p>
+        </div>
+
+    </section>
+
 </div>
 
-<Globe />
 
 
 
