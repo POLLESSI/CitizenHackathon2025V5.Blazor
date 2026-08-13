@@ -154,6 +154,68 @@
     <section class="cc-actions-panel">
         <div class="cc-panel-header compact">
             <div>
+                <h2>Emergency Intelligence</h2>
+                <p>
+                    Active official and trusted emergency feeds
+                </p>
+            </div>
+            <strong>
+                @ActiveEmergencyAlerts.Count active
+            </strong>
+        </div>
+
+        @if (ActiveEmergencyAlerts.Count == 0)
+        {
+            <div class="cc-empty-state">
+                No active emergency intelligence alert.
+            </div>
+        }
+        else
+        {
+            <div class="cc-action-list">
+                @foreach (var alert in ActiveEmergencyAlerts)
+                {
+                    <article class="cc-action-item">
+
+                        <div class="cc-action-priority">
+                            @alert.Severity
+                        </div>
+
+                        <div class="cc-action-body">
+
+                            <strong>
+                                @alert.Headline
+                            </strong>
+
+                            <p>
+                                @alert.Description
+                            </p>
+
+                            @if (!string.IsNullOrWhiteSpace(alert.Instructions))
+                            {
+                                <p>
+                                    <strong>
+                                        Instruction:
+                                    </strong>
+
+                                    @alert.Instructions
+                                </p>
+                            }
+
+                        <span>
+                            @alert.SourceCode·@(alert.IsOfficial ? "OFFICIAL" : "NON-OFFICIAL")·@alert.Urgency
+                    </span>
+
+                        </div>
+
+                    </article>
+                        }
+            </div>
+        }
+    </section>
+    <section class="cc-actions-panel">
+        <div class="cc-panel-header compact">
+            <div>
                 <h2>Decision Engine</h2>
                 <p>Automatic operational recommendations</p>
             </div>

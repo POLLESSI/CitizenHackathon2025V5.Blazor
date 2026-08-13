@@ -439,3 +439,86 @@
         min-width: 0;
     }
 }
+
+/* ============================================================
+   OUTZEN NAV - REMOVE LEGACY TOP OFFSET
+   ============================================================ */
+
+.main-nav {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    top: 0 !important;
+}
+
+.nav-drawer {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    min-height: 0 !important;
+}
+
+.oz-nav-groups {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+.main-nav {
+    padding: 4px 8px 5px !important;
+}
+
+
+.oz-nav-groups {
+    gap: 5px !important;
+}
+
+
+.oz-nav-group {
+    padding: 5px 8px !important;
+}
+
+
+.oz-nav-group-header {
+    margin-bottom: 2px !important;
+}
+
+
+.oz-nav-group-items {
+    gap: 3px !important;
+}
+
+
+.oz-nav-link {
+    min-height: 36px;
+    padding: 6px 9px;
+}
+
+.main-nav {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+}
+
+.nav-drawer {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    min-height: 0 !important;
+}
+
+.oz-nav-groups {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+/* ============================================================
+   OUTZEN NAV - FINAL VERTICAL LIFT
+   Conserve seulement une petite bande du background en haut.
+   ============================================================ */
+
+@media (min-width: 901px) {
+
+    .main-nav {
+        margin-top: -42px !important;
+    }
+}

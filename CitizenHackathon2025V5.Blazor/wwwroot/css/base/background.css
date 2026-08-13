@@ -120,6 +120,60 @@ body.night-mode::after {
     box-shadow: inset 0 0 0 7px rgba(0, 0, 0, 0.94), inset 0 0 0 6px rgba(40, 110, 135, 0.24), inset 0 0 34px 12px rgba(0, 0, 0, 0.42), inset 0 0 90px 20px rgba(0, 0, 0, 0.18);
 }
 
+/* ============================================================
+   OUTZEN BACKGROUND MUST NEVER AFFECT DOCUMENT FLOW
+   ============================================================ */
+
+#outzen-page-background {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    z-index: 0;
+    pointer-events: none;
+    background-position: center center !important;
+    background-repeat: no-repeat !important;
+    background-size: cover !important;
+}
+
+.background-svg,
+.dynamic-bg,
+#layoutBackgroundCanvas {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    pointer-events: none;
+}
+
+.background-svg {
+    display: none !important;
+}
+
+/* ============================================================
+   OUTZEN SHELL - FINAL TOP ALIGNMENT
+   ============================================================ */
+
+#app {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+#app > .app-container {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+}
+
+#app > .app-container > .main-nav {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    top: 0 !important;
+    min-height: 0 !important;
+}
 
 
 

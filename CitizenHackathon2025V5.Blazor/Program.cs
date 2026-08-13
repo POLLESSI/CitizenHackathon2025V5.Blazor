@@ -158,6 +158,8 @@ builder.Services.AddScoped<CrowdCalendarHubClient>();
 builder.Services.AddScoped<CrowdSafetyAlertClientService>();
 builder.Services.AddScoped<IDisasterCriticalAlertClientService, DisasterCriticalAlertClientService>();
 builder.Services.AddScoped<IDeviceIdentityService,DeviceIdentityService>();
+builder.Services.AddScoped<EmergencyAlertClientService>();
+builder.Services.AddScoped<EmergencyAlertStateService>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<GptInteractionService>();
 builder.Services.AddScoped<IGptClientOrchestrator, GptClientOrchestrator>();

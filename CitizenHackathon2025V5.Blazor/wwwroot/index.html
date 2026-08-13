@@ -359,7 +359,8 @@
                  * Theme classes.
                  */
                 document.body.classList.toggle("night-mode", isNight);
-                document.body.classList.toggle("day-mode", isNight);
+
+                document.body.classList.toggle("day-mode", !isNight);
 
                 /*
                  * Direct application to the tracing paper.

@@ -33,6 +33,94 @@
     padding-right: 0.5rem;
 }
 
+/* ============================================================
+   OUTZEN - COMPACT APPLICATION LAYOUT
+   ============================================================ */
+
+html,
+body,
+#app {
+    width: 100%;
+    min-height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+
+/* ------------------------------------------------------------
+   Application
+   ------------------------------------------------------------ */
+
+.app-container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+
+/* ------------------------------------------------------------
+   Navigation
+   ------------------------------------------------------------ */
+
+.main-nav {
+    position: sticky;
+    top: 0;
+    z-index: 5000;
+    width: 100%;
+    margin: 0;
+    padding: 8px 10px;
+    box-sizing: border-box;
+    background: linear-gradient( 180deg, rgba(5, 10, 23, 0.96), rgba(5, 10, 23, 0.92) );
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+
+/* ------------------------------------------------------------
+Drawer desktop
+------------------------------------------------------------ */
+
+.main-nav .nav-drawer {
+    margin: 0;
+    padding: 0;
+}
+
+
+/* ------------------------------------------------------------
+Groups
+------------------------------------------------------------ */
+
+.main-nav .oz-nav-groups {
+    margin: 0;
+    padding: 0;
+    gap: 8px;
+}
+
+
+/* ------------------------------------------------------------
+   Page content
+   ------------------------------------------------------------ */
+
+.main-content {
+    position: relative;
+    flex: 1 1 auto;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+
+.page-content {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
 
 
 

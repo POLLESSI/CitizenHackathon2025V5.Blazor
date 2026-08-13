@@ -1,6 +1,8 @@
 ﻿using CitizenHackathon2025.Contracts.DTOs;
+using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.Pages.Shared;
 using CitizenHackathon2025V5.Blazor.Client.Services;
+using CitizenHackathon2025V5.Blazor.Client.Services.Interfaces;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
@@ -9,6 +11,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
     public partial class CommandCenter : OutZenMapPageBase
     {
         [Inject] public CommandCenterClientService CommandCenterService { get; set; } = default!;
+        [Inject] public EmergencyAlertClientService EmergencyAlertClient { get; set; } = default!;
+        [Inject] public EmergencyAlertStateService EmergencyAlertState { get; set; } = default!;
+        [Inject] public IHubTokenService HubTokenService { get; set; } = default!;
+        [Inject] public IConfiguration Configuration { get; set; } = default!;
         [Inject] public IJSRuntime JS { get; set; } = default!;
 
         protected override string ScopeKey => "commandcenter";
@@ -29,8 +35,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
         private Task? _refreshTask;
         private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(5);
         //private static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(30);
+        private IReadOnlyList<EmergencyAlertSignalRDTO> ActiveEmergencyAlerts => EmergencyAlertState.Snapshot;
 
-        private const bool VerboseCommandCenterLogs = false;
+        private static readonly bool VerboseCommandCenterLogs = false;
         private int TotalClusterCount => Clusters.Count;
         private int TotalFusedAlertCount =>
             Clusters.Sum(c => c.AlertCount);
@@ -44,29 +51,44 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
         private int? _lastActiveConnectionCount;
         private int? _lastUniqueDeviceCount;
 
+        private bool _emergencyHandlersAttached;
+        private EmergencyAlertSignalRDTO? _lastEmergencyAlert;
+
         public CommandCenterSnapshotDTO? Snapshot { get; set; }
         public List<CrowdAlertCluster> Clusters { get; set; } = new();
         public List<DecisionActionDTO> Actions { get; set; } = new();
 
         protected override async Task OnInitializedAsync()
         {
-            await LoadCommandCenterDataAsync();
+            EmergencyAlertState.StateChanged += OnEmergencyAlertStateChangedAsync;
 
-            foreach (var cluster in Clusters)
+            try
             {
-                Console.WriteLine(
-                    $"[COMMAND CENTER] Cluster {cluster.ZoneName} lat={cluster.Latitude} lng={cluster.Longitude} risk={cluster.RiskScore}");
+                await EmergencyAlertState.StartAsync();
             }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[COMMAND CENTER][EMERGENCY] " + $"State startup failed: {ex}");
+            }
+
+            await LoadCommandCenterDataAsync();
 
             await NotifyDataLoadedAsync(fit: true);
 
             StartAutoRefresh();
         }
 
+        private async Task OnEmergencyAlertStateChangedAsync()
+        {
+            Console.WriteLine($"[COMMAND CENTER][EMERGENCY] " + $"Authoritative active count=" + $"{ActiveEmergencyAlerts.Count}");
+
+            await InvokeAsync(StateHasChanged);
+        }
+
         private async Task LoadCommandCenterDataAsync(CancellationToken ct = default)
         {
-            // Les méthodes client n’acceptent pas encore forcément ct.
-            // Ce n’est pas bloquant, mais on garde ct pour l’évolution future.
+            // Customer methods do not necessarily accept ct yet.
+            // It’s not blocking, but we keep ct for future evolution.
             Snapshot = await CommandCenterService.GetSnapshotAsync();
             Clusters = await CommandCenterService.GetIncidentsAsync();
             Actions = await CommandCenterService.GetDecisionActionsAsync();
@@ -192,16 +214,45 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
             }
         }
 
+        private async Task StartEmergencyAlertHubAsync()
+        {
+            var baseUrl = (Configuration["SignalR:HubBase"] ?? Configuration["ApiBaseUrl"] ?? "https://localhost:7254").TrimEnd('/');
+
+            var path = EmergencyAlertHubMethods.HubPath.Trim();
+
+            if (!path.StartsWith('/'))
+            {
+                path = "/" + path;
+            }
+
+
+            /*
+             * The API uses:
+             *
+             *     app.MapGroup("/hubs")
+             *
+             * Therefore HubPath "emergencyAlertHub"
+             * becomes:
+             *
+             *     /hubs/emergencyAlertHub
+             */
+            if (!path.StartsWith("/hubs/", StringComparison.OrdinalIgnoreCase))
+            {
+                path = "/hubs" + path;
+            }
+
+            var hubUrl = $"{baseUrl}{path}";
+
+            Console.WriteLine($"[COMMAND CENTER][EMERGENCY] " + $"Starting hub: {hubUrl}");
+
+            await EmergencyAlertClient.StartAsync(hubUrl, () => HubTokenService.GetHubTokenAsync());
+        }
         private static string ToAntennaAlertMarkerKey(string markerKey)
         {
             if (string.IsNullOrWhiteSpace(markerKey))
                 return "antenna-alert:unknown";
 
-            return markerKey.StartsWith(
-                "antenna-alert:",
-                StringComparison.OrdinalIgnoreCase)
-                    ? markerKey
-                    : $"antenna-alert:{markerKey}";
+            return markerKey.StartsWith("antenna-alert:", StringComparison.OrdinalIgnoreCase) ? markerKey : $"antenna-alert:{markerKey}";
         }
         private static string BuildMarkerKey(CrowdAlertCluster cluster)
         {
@@ -339,6 +390,81 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
             _refreshTask = RefreshLoopAsync(_refreshCts.Token);
         }
 
+        private void AttachEmergencyHandlers()
+        {
+            if (_emergencyHandlersAttached)
+                return;
+
+
+            EmergencyAlertClient.AlertUpserted += OnEmergencyAlertUpsertedAsync;
+
+            EmergencyAlertClient.AlertCancelled += OnEmergencyAlertCancelledAsync;
+
+            EmergencyAlertClient.AlertExpired += OnEmergencyAlertExpiredAsync;
+
+            EmergencyAlertClient.AlertsRefreshed += OnEmergencyAlertsRefreshedAsync;
+
+            _emergencyHandlersAttached = true;
+
+            Console.WriteLine("[COMMAND CENTER][EMERGENCY] " + "Handlers attached.");
+        }
+
+        private async Task OnEmergencyAlertUpsertedAsync(EmergencyAlertSignalRDTO alert)
+        {
+            _lastEmergencyAlert = alert;
+
+            Console.WriteLine(
+                $"[COMMAND CENTER][EMERGENCY] " +
+                $"UPSERT received " +
+                $"id={alert.Id}, " +
+                $"source={alert.SourceCode}, " +
+                $"external={alert.ExternalId}, " +
+                $"severity={alert.Severity}, " +
+                $"official={alert.IsOfficial}, " +
+                $"headline={alert.Headline}");
+
+
+            /*
+             * For the first SignalR test we deliberately
+             * do not transform this into a CrowdAlertCluster.
+             *
+             * Emergency Alerts and Crowd clusters remain
+             * separate concepts.
+             */
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task OnEmergencyAlertCancelledAsync(Guid alertId, string sourceCode, string externalId)
+        {
+            Console.WriteLine($"[COMMAND CENTER][EMERGENCY] " + $"CANCELLED received " + $"id={alertId}, " + $"source={sourceCode}, " + $"external={externalId}");
+
+            if (_lastEmergencyAlert?.Id == alertId)
+            {
+                _lastEmergencyAlert = null;
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task OnEmergencyAlertExpiredAsync(Guid alertId, string sourceCode, string externalId)
+        {
+            Console.WriteLine($"[COMMAND CENTER][EMERGENCY] " + $"EXPIRED received " + $"id={alertId}, " + $"source={sourceCode}, " + $"external={externalId}");
+
+            if (_lastEmergencyAlert?.Id == alertId)
+            {
+                _lastEmergencyAlert = null;
+            }
+
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task OnEmergencyAlertsRefreshedAsync(EmergencyAlertRefreshDTO refresh)
+        {
+            Console.WriteLine("[COMMAND CENTER][EMERGENCY] " + "REFRESH received.");
+
+            await InvokeAsync(StateHasChanged);
+        }
         private async Task RefreshLoopAsync(CancellationToken ct)
         {
             using var timer = new PeriodicTimer(RefreshInterval);
@@ -368,6 +494,18 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
 
         protected override async Task OnBeforeDisposeAsync()
         {
+            if (_emergencyHandlersAttached)
+            {
+                EmergencyAlertClient.AlertUpserted -= OnEmergencyAlertUpsertedAsync;
+                EmergencyAlertClient.AlertCancelled -= OnEmergencyAlertCancelledAsync;
+                EmergencyAlertClient.AlertExpired -= OnEmergencyAlertExpiredAsync;
+                EmergencyAlertClient.AlertsRefreshed -= OnEmergencyAlertsRefreshedAsync;
+                EmergencyAlertState.StateChanged -= OnEmergencyAlertStateChangedAsync;
+
+                _emergencyHandlersAttached = false;
+
+                Console.WriteLine("[COMMAND CENTER][EMERGENCY] " + "Handlers detached.");
+            }
             try
             {
                 _refreshCts?.Cancel();
