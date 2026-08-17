@@ -167,6 +167,250 @@
     pointer-events: none !important;
 }
 
+.oz-home-map-shell {
+    position: relative;
+}
+
+.oz-home-emergency-notice-stack {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(620px, calc(100% - 32px));
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 9700;
+    pointer-events: none;
+}
+
+.oz-home-emergency-notice {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+    align-items: start;
+    padding: 14px 16px;
+    border-radius: 14px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 10px 34px rgba(0, 0, 0, 0.45);
+    pointer-events: auto;
+    animation: oz-home-emergency-notice-in 180ms ease-out;
+}
+
+.oz-home-emergency-notice.is-advisory {
+    color: #f4f8ff;
+    background: rgba(6, 25, 48, 0.96);
+    border: 1px solid rgba(69, 174, 255, 0.75);
+}
+
+.oz-home-emergency-notice.is-critical {
+    color: #ffffff;
+    background: rgba(75, 5, 9, 0.97);
+    border: 1px solid rgba(255, 58, 58, 0.90);
+    box-shadow: 0 10px 34px rgba(150, 0, 0, 0.48);
+}
+
+.oz-home-emergency-notice-icon {
+    font-size: 25px;
+    line-height: 1;
+}
+
+.oz-home-emergency-notice-source {
+    margin-bottom: 3px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    opacity: 0.78;
+}
+
+.oz-home-emergency-notice-content p {
+    margin: 6px 0 0;
+    white-space: pre-line;
+    line-height: 1.42;
+}
+
+.oz-home-emergency-instruction {
+    font-weight: 650;
+}
+
+.oz-home-emergency-notice-close {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 25px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.75;
+}
+
+.oz-home-emergency-notice-close:hover {
+    opacity: 1;
+}
+
+@keyframes oz-home-emergency-notice-in {
+
+    from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@media (max-width: 700px) {
+
+    .oz-home-emergency-notice-stack {
+        top: 10px;
+        width: calc(100% - 18px);
+    }
+
+    .oz-home-emergency-notice {
+        padding: 12px;
+    }
+}
+
+/* =========================================================
+   OFFICIAL EMERGENCY MARKER - HOME
+   ========================================================= */
+
+.oz-emergency-critical-divicon {
+    background: transparent !important;
+    border: 0 !important;
+}
+
+.oz-emergency-critical-marker {
+    position: relative;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: auto;
+}
+
+
+    /*
+ * Expanding red warning halo.
+ */
+    .oz-emergency-critical-marker::before,
+    .oz-emergency-critical-marker::after {
+        content: "";
+        position: absolute;
+        inset: 3px;
+        border-radius: 50%;
+        border: 3px solid rgba(255, 25, 25, 0.95);
+        background: rgba(255, 0, 0, 0.16);
+        pointer-events: none;
+    }
+
+
+    .oz-emergency-critical-marker::before {
+        animation: oz-emergency-critical-pulse 1.35s ease-out infinite;
+    }
+
+
+    .oz-emergency-critical-marker::after {
+        animation: oz-emergency-critical-pulse 1.35s ease-out 0.45s infinite;
+    }
+
+
+/*
+ * Fixed central emergency point.
+ */
+.oz-emergency-critical-core {
+    position: relative;
+    z-index: 4;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 3px solid #ffffff;
+    background: radial-gradient( circle at 35% 25%, #ff7676 0%, #e00000 34%, #8d0000 100% );
+    color: #ffffff;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 23px;
+    font-weight: 900;
+    line-height: 1;
+    box-shadow: 0 0 8px rgba(255, 0, 0, 1), 0 0 18px rgba(255, 0, 0, 0.85), 0 3px 8px rgba(0, 0, 0, 0.65);
+    animation: oz-emergency-critical-blink 0.85s ease-in-out infinite;
+}
+
+
+.oz-emergency-critical-sim {
+    position: absolute;
+    left: 50%;
+    bottom: -10px;
+    transform: translateX(-50%);
+    z-index: 5;
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: #111;
+    border: 1px solid #ffffff;
+    color: #ffffff;
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    line-height: 1.25;
+}
+
+
+@keyframes oz-emergency-critical-pulse {
+
+    0% {
+        transform: scale(0.65);
+        opacity: 1;
+    }
+
+    70% {
+        transform: scale(1.65);
+        opacity: 0.18;
+    }
+
+    100% {
+        transform: scale(1.9);
+        opacity: 0;
+    }
+}
+
+
+@keyframes oz-emergency-critical-blink {
+
+    0%, 100% {
+        filter: brightness(1);
+        opacity: 1;
+    }
+
+    50% {
+        filter: brightness(1.8);
+        opacity: 0.72;
+    }
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+
+    .oz-emergency-critical-marker::before,
+    .oz-emergency-critical-marker::after,
+    .oz-emergency-critical-core {
+        animation: none !important;
+    }
+
+    .oz-emergency-critical-marker::before {
+        transform: scale(1.35);
+        opacity: 0.35;
+    }
+
+    .oz-emergency-critical-marker::after {
+        display: none;
+    }
+}
+
 
 
 

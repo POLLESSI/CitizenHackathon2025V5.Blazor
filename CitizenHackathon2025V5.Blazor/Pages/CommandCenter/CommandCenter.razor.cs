@@ -57,6 +57,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
         public CommandCenterSnapshotDTO? Snapshot { get; set; }
         public List<CrowdAlertCluster> Clusters { get; set; } = new();
         public List<DecisionActionDTO> Actions { get; set; } = new();
+        public List<RiskZoneDTO> RiskZones { get; set; } = new();
 
         protected override async Task OnInitializedAsync()
         {
@@ -80,22 +81,27 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
 
         private async Task OnEmergencyAlertStateChangedAsync()
         {
-            Console.WriteLine($"[COMMAND CENTER][EMERGENCY] " + $"Authoritative active count=" + $"{ActiveEmergencyAlerts.Count}");
-
-            await InvokeAsync(StateHasChanged);
+            await InvokeAsync(
+                async () =>
+                {
+                    if (IsMapBooted)
+                    {
+                        await SyncEmergencyAlertAreasAsync();
+                    }
+                    StateHasChanged();
+                });
         }
 
         private async Task LoadCommandCenterDataAsync(CancellationToken ct = default)
         {
-            // Customer methods do not necessarily accept ct yet.
-            // It’s not blocking, but we keep ct for future evolution.
             Snapshot = await CommandCenterService.GetSnapshotAsync();
             Clusters = await CommandCenterService.GetIncidentsAsync();
+            RiskZones = await CommandCenterService.GetRiskZonesAsync(ct);
             Actions = await CommandCenterService.GetDecisionActionsAsync();
 
-            LogInfo($"Data loaded. risk={Snapshot?.GlobalRiskScore}, clusters={Clusters.Count}");
+            var effectiveMaxRisk = RiskZones.Count == 0 ? 0 : RiskZones.Max(z => z.RiskScore);
 
-            LogCounterChanges();
+            Console.WriteLine($"[COMMAND CENTER] Data loaded. " + $"globalRisk={Snapshot?.GlobalRiskScore}, " + $"effectiveMaxRisk={effectiveMaxRisk}, " + $"clusters={Clusters.Count}, " + $"riskZones={RiskZones.Count}");
         }
 
         protected override async Task SeedAsync(bool fit)
@@ -105,6 +111,13 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
             if (Clusters.Count == 0)
             {
                 await PruneAllCommandCenterAlertMarkersAsync();
+
+                await SyncEmergencyAlertAreasAsync();
+
+                if (fit)
+                {
+                    await FitEmergencyAlertAreasAsync();
+                }
                 return;
             }
 
@@ -163,8 +176,96 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
             {
                 await FitCommandCenterAlertMarkersAsync();
             }
+
+            await SyncEmergencyAlertAreasAsync();
         }
 
+        private async Task SyncEmergencyAlertAreasAsync()
+        {
+            if (!IsMapBooted)
+                return;
+
+
+            var alerts =
+                EmergencyAlertState
+                    .Snapshot
+                    .Where(
+                        x =>
+                            x.IsOfficial
+                            &&
+                            !string.IsNullOrWhiteSpace(
+                                x.AreaGeoJson))
+                    .ToArray();
+
+
+            var activeIds =
+                new List<string>(
+                    alerts.Length);
+
+
+            foreach (var alert
+                     in alerts)
+            {
+                var id =
+                    alert.Id.ToString(
+                        "D");
+
+                try
+                {
+                    var added =
+                        await JS.InvokeAsync<bool>(
+                            "OutZenInterop.__esm." +
+                            "addOrUpdateEmergencyAlertArea",
+                            alert,
+                            ScopeKey);
+
+
+                    if (added)
+                    {
+                        activeIds.Add(
+                            id);
+                    }
+
+
+                    Console.WriteLine(
+                        $"[COMMAND CENTER][EMERGENCY MAP] " +
+                        $"upsert id={id}, " +
+                        $"added={added}, " +
+                        $"source={alert.SourceCode}, " +
+                        $"radius={alert.RadiusMeters}");
+                }
+                catch (JSException ex)
+                {
+                    Console.Error.WriteLine(
+                        $"[COMMAND CENTER][EMERGENCY MAP] " +
+                        $"upsert failed id={id}: " +
+                        $"{ex.Message}");
+                }
+            }
+
+
+            try
+            {
+                var removed =
+                    await JS.InvokeAsync<int>(
+                        "OutZenInterop.__esm." +
+                        "pruneEmergencyAlertAreas",
+                        activeIds,
+                        ScopeKey);
+
+
+                Console.WriteLine(
+                    $"[COMMAND CENTER][EMERGENCY MAP] " +
+                    $"active={activeIds.Count}, " +
+                    $"removed={removed}");
+            }
+            catch (JSException ex)
+            {
+                Console.Error.WriteLine(
+                    $"[COMMAND CENTER][EMERGENCY MAP] " +
+                    $"prune failed: {ex.Message}");
+            }
+        }
         private async Task PruneCommandCenterAlertMarkersAsync(List<string> activeMarkerKeys)
         {
             try
@@ -246,6 +347,42 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages.CommandCenter
             Console.WriteLine($"[COMMAND CENTER][EMERGENCY] " + $"Starting hub: {hubUrl}");
 
             await EmergencyAlertClient.StartAsync(hubUrl, () => HubTokenService.GetHubTokenAsync());
+        }
+
+        private async Task FitEmergencyAlertAreasAsync()
+        {
+            try
+            {
+                var fitted =
+                    await JS.InvokeAsync<bool>(
+                        "OutZenInterop.__esm." +
+                        "fitToEmergencyAlertAreas",
+
+                        ScopeKey,
+
+                        new
+                        {
+                            maxZoom = 11,
+                            paddingFactor = 0.75,
+                            padding =
+                                new[]
+                                {
+                            40,
+                            40
+                                }
+                        });
+
+
+                Console.WriteLine(
+                    $"[COMMAND CENTER][EMERGENCY MAP] " +
+                    $"fit={fitted}");
+            }
+            catch (JSException ex)
+            {
+                Console.Error.WriteLine(
+                    $"[COMMAND CENTER][EMERGENCY MAP] " +
+                    $"fit failed: {ex.Message}");
+            }
         }
         private static string ToAntennaAlertMarkerKey(string markerKey)
         {

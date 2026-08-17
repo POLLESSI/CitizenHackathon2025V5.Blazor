@@ -45,6 +45,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
 
         public event Func<Task>? StateChanged;
 
+        public event Func<EmergencyAlertSignalRDTO, Task>? LiveAlertReceived;
+
         public EmergencyAlertStateService(EmergencyAlertClientService hub, IHttpClientFactory httpClientFactory, IHubTokenService hubTokenService, IConfiguration configuration)
         {
             _hub = hub ?? throw new ArgumentNullException(nameof(hub));
@@ -213,7 +215,38 @@ namespace CitizenHackathon2025V5.Blazor.Client.Services
              * B may supersede A without sending
              * CANCELLED(A).
              */
+            await RaiseLiveAlertReceivedAsync(alert);
+
             ScheduleReconcile();
+        }
+
+        private async Task RaiseLiveAlertReceivedAsync(EmergencyAlertSignalRDTO alert)
+        {
+            var handlers = LiveAlertReceived;
+
+            if (handlers is null)
+                return;
+
+
+            foreach (var handler
+                     in handlers
+                         .GetInvocationList()
+                         .Cast<
+                             Func<EmergencyAlertSignalRDTO, Task>>())
+            {
+                try
+                {
+                    await handler(
+                        alert);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine(
+                        $"[EmergencyAlertState] " +
+                        $"LiveAlertReceived handler failed: " +
+                        $"{ex.Message}");
+                }
+            }
         }
 
         private async Task OnAlertCancelledAsync(Guid alertId, string sourceCode, string externalId)

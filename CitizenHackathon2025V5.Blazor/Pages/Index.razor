@@ -86,11 +86,56 @@
     @* <div id="@MapId" style="height: 72vh;"></div> *@
     <!-- Summary map -->
     <div class="oz-page oz-page--home">
-        <div class="homeMapCard">
-            <div id="@MapId" class="oz-map"></div>
-           @*  <div id="leafletMap-home" class="leaflet-host"></div> *@
-            <!-- Optional: canvas for the weather chart if you want to put it back -->
-            @* <canvas id="crowdChart"></canvas> *@
+        <div class="homeMapCard oz-home-map-shell">
+            @* Existing OutZen Home map.
+           Do NOT create another leafletMap-home element. *@
+            <div id="@MapId"
+                 class="oz-map">
+            </div>
+
+            @if (_homeEmergencyNotices.Count > 0)
+            {
+                <div class="oz-home-emergency-notice-stack" aria-live="polite">
+                    @foreach (var notice in _homeEmergencyNotices)
+                    {
+                        <article @key="notice.Key"
+                                 class="oz-home-emergency-notice @(notice.Critical ? "is-critical" : "is-advisory")"
+                                 style="@($"--oz-notice-duration:{notice.DurationSeconds}s;")"
+                                 role="@(notice.Critical ? "alert" : "status")">
+                            <div class="oz-home-emergency-notice-icon">
+                                @(notice.Critical ? "🚨" : "📢")
+                            </div>
+                            <div class="oz-home-emergency-notice-content">
+                                <div class="oz-home-emergency-notice-source">
+                                    BE-ALERT · OFFICIAL
+                                </div>
+                                <strong>
+                                    @notice.Title
+                                </strong>
+                                @if (!string.IsNullOrWhiteSpace(notice.Message))
+                                {
+                                    <p>
+                                        @notice.Message
+                                    </p>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(notice.Instructions))
+                                {
+                                    <p class="oz-home-emergency-instruction">
+                                        @notice.Instructions
+                                    </p>
+                                }
+                            </div>
+                            <button type="button"
+                                    class="oz-home-emergency-notice-close"
+                                    title="Fermer"
+                                    aria-label="Fermer le message"
+                                    @onclick="@(() => DismissHomeEmergencyNotice(notice.Key))">
+                                ×
+                            </button>
+                        </article>
+                    }
+                </div>
+            }
         </div>
     </div>
     <OzFloatingWindow Id="msgDrawer"
@@ -329,10 +374,66 @@
 
     <footer class="index-footer">
         &copy; 2025 OutZen – Zen in the crowd, Zen in life.
-        <Globe />
     </footer>
 </div>
-<Globe />
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

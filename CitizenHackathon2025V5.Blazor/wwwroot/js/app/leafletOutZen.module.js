@@ -122,7 +122,9 @@ function getS(scopeKey = "main") {
             antennaMarkers: new Map(),  // antenna markers
             antennaAlertMarkers: new Map(), // antenna alert markers
             emergencyAlertLayers: new Map(),
-
+            emergencyAlertAreas: new Map(),
+            emergencyAlertMarkers: new Map(),
+            emergencyCriticalMarkers: new Map(),
 
             // hybrid
             hybrid: { enabled: true, threshold: 13, showing: null },
@@ -615,16 +617,10 @@ export async function bootOutZen({
      * Optionally save the last payload before
      * disposeOutZen() does not remove it.
      */
-    const previousBundleInput =
-        resetAll
-            ? null
-            : s.bundleLastInput;
+    const previousBundleInput = resetAll ? null : s.bundleLastInput;
 
     if (s.map) {
-        disposeOutZen({
-            mapId: s.mapContainerId,
-            scopeKey,
-            allowNoToken: true
+        disposeOutZen({mapId: s.mapContainerId, scopeKey, allowNoToken: true
         });
 
         /*
@@ -743,6 +739,9 @@ export async function bootOutZen({
         s.calendarMarkers = new Map();
         s.antennaMarkers = new Map();
         s.antennaAlertMarkers = new Map();
+        s.emergencyAlertAreas = new Map();
+        s.emergencyAlertMarkers = new Map();
+        s.emergencyCriticalMarkers = new Map();
         s.bundleToleranceMeters = null;
 
         s._weatherById = new Map();
@@ -2523,6 +2522,1196 @@ export function addOrUpdateAntennaAlertCircle(alert, scopeKey = null) {
     return true;
 }
 
+function normalizeEmergencyAlertAreaKey(value) {
+    const raw =
+        String(value ?? "")
+            .trim();
+
+    if (!raw) {
+        return "";
+    }
+
+    return raw.startsWith("emergency-area:")
+        ? raw
+        : `emergency-area:${raw}`;
+}
+
+
+function parseEmergencyGeoJson(value) {
+    if (!value) {
+        return null;
+    }
+
+    if (typeof value === "object") {
+        return value;
+    }
+
+    if (typeof value !== "string") {
+        return null;
+    }
+
+    try {
+        return JSON.parse(value);
+    }
+    catch (error) {
+        console.warn(
+            "[EMERGENCY AREA] Invalid GeoJSON",
+            {
+                value,
+                error
+            });
+
+        return null;
+    }
+}
+
+
+function escapeEmergencyHtml(value) {
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+
+function resolveEmergencyAreaColor(severity) {
+    const level =
+        Number(severity) || 0;
+
+    if (level >= 4) {
+        return "#b71c1c";
+    }
+
+    if (level >= 3) {
+        return "#e65100";
+    }
+
+    if (level >= 2) {
+        return "#f9a825";
+    }
+
+    return "#1565c0";
+}
+
+function normalizeEmergencyCriticalMarkerKey(value) {
+    const raw =
+        String(value ?? "")
+            .trim();
+
+    if (!raw) {
+        return "";
+    }
+
+    return raw.startsWith(
+        "emergency-critical:")
+        ? raw
+        : `emergency-critical:${raw}`;
+}
+
+
+function resolveEmergencyCriticalLatLng(
+    L,
+    geoJson) {
+
+    if (!geoJson) {
+        return null;
+    }
+
+
+    /*
+     * GeoJSON Point:
+     *
+     * [longitude, latitude]
+     */
+    if (
+        geoJson.type === "Point"
+        &&
+        Array.isArray(
+            geoJson.coordinates)
+        &&
+        geoJson.coordinates.length >= 2
+    ) {
+        const longitude =
+            Number(
+                geoJson.coordinates[0]);
+
+        const latitude =
+            Number(
+                geoJson.coordinates[1]);
+
+
+        if (
+            !Number.isFinite(latitude)
+            ||
+            !Number.isFinite(longitude)
+        ) {
+            return null;
+        }
+
+
+        return L.latLng(
+            latitude,
+            longitude);
+    }
+
+
+    /*
+     * CAP Polygon / MultiPolygon:
+     *
+     * The marker is placed at the visual
+     * centre of the official area.
+     *
+     * The full polygon remains available
+     * separately for Command Center.
+     */
+    if (
+        geoJson.type === "Polygon"
+        ||
+        geoJson.type === "MultiPolygon"
+    ) {
+        try {
+            const temporaryLayer =
+                L.geoJSON(
+                    geoJson);
+
+            const bounds =
+                temporaryLayer
+                    .getBounds();
+
+            if (
+                bounds
+                &&
+                bounds.isValid?.()
+            ) {
+                return bounds
+                    .getCenter();
+            }
+        }
+        catch {
+        }
+    }
+
+
+    return null;
+}
+
+
+export function addOrUpdateEmergencyCriticalMarker(
+    alert,
+    scopeKey = null) {
+
+    const ready =
+        ensureMapReady(
+            scopeKey);
+
+    if (!ready || !alert) {
+        return false;
+    }
+
+
+    const {
+        s,
+        L,
+        map
+    } = ready;
+
+
+    const id =
+        alert.Id ??
+        alert.id;
+
+    if (!id) {
+        console.warn(
+            "[EMERGENCY CRITICAL] Missing id");
+
+        return false;
+    }
+
+
+    const geoJson =
+        parseEmergencyGeoJson(
+            alert.AreaGeoJson
+            ??
+            alert.areaGeoJson);
+
+
+    const latLng =
+        resolveEmergencyCriticalLatLng(
+            L,
+            geoJson);
+
+
+    if (!latLng) {
+        console.warn(
+            "[EMERGENCY CRITICAL] " +
+            "No usable geometry",
+            {
+                id,
+                geoJson
+            });
+
+        return false;
+    }
+
+
+    s.emergencyCriticalMarkers ??=
+        new Map();
+
+
+    /*
+     * Dedicated emergency pane.
+     *
+     * IMPORTANT:
+     * the marker is never passed to:
+     *
+     * s.cluster
+     * s.layerGroup
+     * bundle markers
+     * hybrid markers
+     */
+    ensureCustomPane(
+        map,
+        "ozEmergencyCriticalPane",
+        9600);
+
+
+    const key =
+        normalizeEmergencyCriticalMarkerKey(
+            id);
+
+
+    const previous =
+        s.emergencyCriticalMarkers
+            .get(key);
+
+
+    if (previous) {
+        try {
+            map.removeLayer(
+                previous);
+        }
+        catch {
+        }
+
+
+        s.emergencyCriticalMarkers
+            .delete(key);
+    }
+
+
+    const sourceCode =
+        String(
+            alert.SourceCode
+            ??
+            alert.sourceCode
+            ??
+            "");
+
+
+    const simulation =
+        sourceCode
+            .toUpperCase()
+            .includes("SIM");
+
+
+    const headline =
+        alert.Headline
+        ??
+        alert.headline
+        ??
+        "Emergency alert";
+
+
+    const description =
+        alert.Description
+        ??
+        alert.description
+        ??
+        "";
+
+
+    const instructions =
+        alert.Instructions
+        ??
+        alert.instructions
+        ??
+        "";
+
+
+    const severity =
+        Number(
+            alert.Severity
+            ??
+            alert.severity
+            ??
+            0);
+
+
+    const urgency =
+        Number(
+            alert.Urgency
+            ??
+            alert.urgency
+            ??
+            0);
+
+
+    const expiresAt =
+        alert.ExpiresAtUtc
+        ??
+        alert.expiresAtUtc
+        ??
+        null;
+
+
+    const icon =
+        L.divIcon(
+            {
+                className:
+                    "oz-emergency-critical-divicon",
+
+                html: `
+                    <div class="
+                        oz-emergency-critical-marker
+                        ${simulation
+                        ? "is-simulation"
+                        : ""}
+                    ">
+                        <span
+                            class="
+                                oz-emergency-critical-core
+                            ">
+                            !
+                        </span>
+
+                        ${simulation
+                        ? `
+                                    <span
+                                        class="
+                                            oz-emergency-critical-sim
+                                        ">
+                                        SIM
+                                    </span>
+                                  `
+                        : ""
+                    }
+                    </div>
+                `.trim(),
+
+                iconSize:
+                    [50, 50],
+
+                iconAnchor:
+                    [25, 25],
+
+                popupAnchor:
+                    [0, -30]
+            });
+
+
+    const marker =
+        L.marker(
+            latLng,
+            {
+                pane: "ozEmergencyCriticalPane",
+                icon,
+                keyboard: true,
+                riseOnHover: true,
+                zIndexOffset: 10000,
+                title: headline
+            });
+
+
+    const popupHtml = `
+        <div class="oz-emergency-popup">
+
+            <strong>
+                ${simulation ? "🧪" : "🚨"}
+                ${escapeEmergencyHtml(
+        headline)}
+            </strong>
+
+            <br />
+
+            <small>
+                ${escapeEmergencyHtml(
+            sourceCode)}
+                · Severity ${severity}
+                · Urgency ${urgency}
+                ${simulation
+            ? " · SIMULATION"
+            : " · OFFICIAL"}
+            </small>
+
+            ${description
+            ? `
+                        <hr />
+                        ${escapeEmergencyHtml(
+                description)}
+                      `
+            : ""
+        }
+
+            ${instructions
+            ? `
+                        <br /><br />
+
+                        <strong>
+                            Instructions:
+                        </strong>
+
+                        ${escapeEmergencyHtml(
+                instructions)}
+                      `
+            : ""
+        }
+
+            ${expiresAt
+            ? `
+                        <br /><br />
+
+                        <small>
+                            Expires:
+                            ${escapeEmergencyHtml(
+                expiresAt)}
+                        </small>
+                      `
+            : ""
+        }
+
+        </div>
+    `.trim();
+
+    safeBindPopup(marker, popupHtml);
+
+    /*
+     * CRITICAL:
+     *
+     * direct map insertion.
+     *
+     * Do NOT use addLayerSmart().
+     */
+    marker.addTo(map);
+
+    s.emergencyCriticalMarkers.set(key, marker);
+
+    console.log("[EMERGENCY CRITICAL] upserted",
+        {
+            key,
+            scopeKey,
+            latitude: latLng.lat,
+            longitude: latLng.lng,
+            severity,
+            urgency,
+            simulation
+        });
+
+    return true;
+}
+
+export function pruneEmergencyCriticalMarkers(activeIds, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
+
+    if (!ready) {
+        return 0;
+    }
+
+    const { s, map } = ready;
+
+    s.emergencyCriticalMarkers ??= new Map();
+
+    const activeSet =
+        new Set(
+            (activeIds ?? [])
+                .filter(
+                    x =>
+                        x !== null
+                        &&
+                        x !== undefined)
+                .map(
+                    normalizeEmergencyCriticalMarkerKey)
+                .filter(
+                    Boolean)
+        );
+
+
+    let removed =
+        0;
+
+
+    for (
+        const [key, marker]
+        of Array.from(
+            s.emergencyCriticalMarkers
+                .entries())
+    ) {
+        if (
+            activeSet.has(
+                key)
+        ) {
+            continue;
+        }
+
+
+        try {
+            map.removeLayer(
+                marker);
+        }
+        catch {
+        }
+
+
+        s.emergencyCriticalMarkers
+            .delete(key);
+
+
+        removed++;
+    }
+
+
+    console.log(
+        "[EMERGENCY CRITICAL] prune",
+        {
+            scopeKey,
+            active:
+                activeSet.size,
+            remaining:
+                s.emergencyCriticalMarkers
+                    .size,
+            removed
+        });
+
+
+    return removed;
+}
+export function addOrUpdateEmergencyAlertArea(alert, scopeKey = null)
+{
+
+    const ready =
+        ensureMapReady(
+            scopeKey);
+
+    if (!ready) {
+        console.warn(
+            "[EMERGENCY AREA] map not ready",
+            {
+                scopeKey
+            });
+
+        return false;
+    }
+
+
+    const {
+        s,
+        L,
+        map
+    } = ready;
+
+
+    if (!alert) {
+        return false;
+    }
+
+
+    const id =
+        alert.Id ??
+        alert.id;
+
+    if (!id) {
+        console.warn(
+            "[EMERGENCY AREA] Missing alert id",
+            alert);
+
+        return false;
+    }
+
+
+    const areaGeoJson =
+        alert.AreaGeoJson ??
+        alert.areaGeoJson;
+
+    const geoJson =
+        parseEmergencyGeoJson(
+            areaGeoJson);
+
+    if (!geoJson) {
+        console.warn(
+            "[EMERGENCY AREA] No geometry",
+            {
+                id,
+                areaGeoJson
+            });
+
+        return false;
+    }
+
+
+    s.emergencyAlertAreas ??=
+        new Map();
+
+
+    /*
+     * Existing antenna alert pane uses 9000.
+     *
+     * Emergency AREA must remain below
+     * alert markers but above ordinary map content.
+     */
+    ensureCustomPane(
+        map,
+        "ozEmergencyAreaPane",
+        8800);
+
+
+    const key =
+        normalizeEmergencyAlertAreaKey(
+            id);
+
+
+    const previous =
+        s.emergencyAlertAreas
+            .get(key);
+
+    if (previous) {
+        try {
+            map.removeLayer(
+                previous);
+        }
+        catch {
+        }
+
+        s.emergencyAlertAreas
+            .delete(key);
+    }
+
+
+    const severity =
+        Number(
+            alert.Severity ??
+            alert.severity ??
+            0);
+
+    const radiusMeters =
+        Number(
+            alert.RadiusMeters ??
+            alert.radiusMeters ??
+            0);
+
+    const sourceCode =
+        String(
+            alert.SourceCode ??
+            alert.sourceCode ??
+            "");
+
+    const headline =
+        alert.Headline ??
+        alert.headline ??
+        "Emergency alert";
+
+    const description =
+        alert.Description ??
+        alert.description ??
+        "";
+
+    const instructions =
+        alert.Instructions ??
+        alert.instructions ??
+        "";
+
+    const expiresAt =
+        alert.ExpiresAtUtc ??
+        alert.expiresAtUtc ??
+        null;
+
+
+    const simulation =
+        sourceCode
+            .toUpperCase()
+            .includes("SIM");
+
+
+    const color =
+        resolveEmergencyAreaColor(
+            severity);
+
+
+    const style = {
+        pane: "ozEmergencyAreaPane",
+        color,
+        weight: simulation ? 4 : 5,
+        opacity: 1,
+        fillColor: color,
+        fillOpacity: simulation ? 0.20 : 0.26,
+        dashArray: simulation ? "8 6" : null,
+        interactive: true
+    };
+
+    let centerLatLng =
+        null;
+
+    let layer =
+        null;
+
+
+    /*
+     * CAP circle:
+     *
+     * GeoJSON Point = center.
+     * RadiusMeters = real radius in metres.
+     */
+    if (
+        geoJson.type === "Point"
+        &&
+        Array.isArray(
+            geoJson.coordinates)
+        &&
+        geoJson.coordinates.length >= 2
+    ) {
+        const longitude =
+            Number(
+                geoJson.coordinates[0]);
+
+        const latitude =
+            Number(
+                geoJson.coordinates[1]);
+
+
+        if (
+            !Number.isFinite(latitude)
+            ||
+            !Number.isFinite(longitude)
+        ) {
+            return false;
+        }
+
+
+        /*
+         * Remember the center.
+         *
+         * The fixed visual marker will only
+         * be created AFTER popupHtml exists.
+         */
+        centerLatLng =
+            [
+                latitude,
+                longitude
+            ];
+
+
+        if (
+            Number.isFinite(
+                radiusMeters)
+            &&
+            radiusMeters > 0
+        ) {
+            layer =
+                L.circle(
+                    centerLatLng,
+                    {
+                        ...style,
+
+                        radius:
+                            radiusMeters
+                    });
+        }
+        else {
+            layer =
+                L.circleMarker(
+                    centerLatLng,
+                    {
+                        ...style,
+
+                        radius:
+                            12
+                    });
+        }
+    }
+
+
+    /*
+     * CAP polygon / multipolygon.
+     */
+    else if (
+        geoJson.type === "Polygon"
+        ||
+        geoJson.type === "MultiPolygon"
+    ) {
+        layer =
+            L.geoJSON(
+                geoJson,
+                {
+                    style:
+                        () => style
+                });
+    }
+
+
+    if (!layer) {
+        console.warn(
+            "[EMERGENCY AREA] Unsupported geometry",
+            {
+                id,
+
+                geometryType:
+                    geoJson.type
+            });
+
+        return false;
+    }
+
+    /*
+     * CAP polygon / multipolygon.
+     */
+    else if (
+        geoJson.type === "Polygon"
+        ||
+        geoJson.type === "MultiPolygon"
+    ) {
+        layer =
+            L.geoJSON(
+                geoJson,
+                {
+                    style:
+                        () => style
+                });
+    }
+
+
+    if (!layer) {
+        console.warn(
+            "[EMERGENCY AREA] Unsupported geometry",
+            {
+                id,
+                geometryType:
+                    geoJson.type
+            });
+
+        return false;
+    }
+
+
+    const popupHtml = `
+        <div class="oz-emergency-popup">
+
+            <strong>
+                ${simulation ? "🧪" : "🚨"}
+                ${escapeEmergencyHtml(
+        headline)}
+            </strong>
+
+            <br />
+
+            <small>
+                ${escapeEmergencyHtml(
+            sourceCode)}
+                · Severity ${severity}
+                ${simulation
+            ? " · SIMULATION"
+            : " · OFFICIAL"}
+            </small>
+
+            ${description
+            ? `
+                        <hr />
+                        ${escapeEmergencyHtml(
+                description)}
+                      `
+            : ""
+        }
+
+            ${instructions
+            ? `
+                        <br /><br />
+
+                        <strong>
+                            Instructions:
+                        </strong>
+
+                        ${escapeEmergencyHtml(
+                instructions)}
+                      `
+            : ""
+        }
+
+            ${expiresAt
+            ? `
+                        <br /><br />
+
+                        <small>
+                            Expires:
+                            ${escapeEmergencyHtml(
+                expiresAt)}
+                        </small>
+                      `
+            : ""
+        }
+
+        </div>
+    `.trim();
+
+
+    safeBindPopup(
+        layer,
+        popupHtml);
+
+        /*
+     * Add the real geographic area first.
+     */
+    layer.addTo(map);
+
+
+    s.emergencyAlertAreas
+        .set(
+            key,
+            layer);
+
+
+    /*
+     * Add a fixed-size visual anchor AFTER
+     * the geographic layer.
+     *
+     * It remains visible even at low zoom.
+     */
+    if (centerLatLng) {
+
+        s.emergencyAlertMarkers ??=
+            new Map();
+
+
+        const markerKey =
+            `emergency-marker:${id}`;
+
+
+        const previousMarker =
+            s.emergencyAlertMarkers
+                .get(markerKey);
+
+
+        if (previousMarker) {
+            try {
+                map.removeLayer(
+                    previousMarker);
+            }
+            catch {
+            }
+
+            s.emergencyAlertMarkers
+                .delete(markerKey);
+        }
+
+
+        const centerMarker =
+            L.circleMarker(
+                centerLatLng,
+                {
+                    pane:
+                        "ozEmergencyAreaPane",
+
+                    radius:
+                        simulation
+                            ? 8
+                            : 10,
+
+                    color:
+
+                        simulation
+                            ? "#ffffff"
+                            : color,
+
+                    weight:
+                        3,
+
+                    opacity:
+                        1,
+
+                    fillColor:
+                        color,
+
+                    fillOpacity:
+                        0.95,
+
+                    interactive:
+                        true
+                });
+
+
+        safeBindPopup(
+            centerMarker,
+            popupHtml);
+
+
+        centerMarker.addTo(
+            map);
+
+
+        /*
+         * Explicitly put the visual anchor
+         * above the geographic circle.
+         */
+        try {
+            centerMarker
+                .bringToFront?.();
+        }
+        catch {
+        }
+
+
+        s.emergencyAlertMarkers
+            .set(
+                markerKey,
+                centerMarker);
+    }
+
+    console.log("[EMERGENCY AREA] upserted",
+        {
+            key,
+            scopeKey,
+            geometryType: geoJson.type,
+            radiusMeters,
+            severity,
+            simulation,
+
+            centerLatLng
+        });
+
+
+    return true;
+}
+
+export function pruneEmergencyAlertAreas(
+    activeIds,
+    scopeKey = null) {
+
+    const ready =
+        ensureMapReady(
+            scopeKey);
+
+    if (!ready) {
+        return 0;
+    }
+
+
+    const {
+        s,
+        map
+    } = ready;
+
+
+    s.emergencyAlertAreas ??=
+        new Map();
+
+
+    const activeSet =
+        new Set(
+            (activeIds ?? [])
+                .filter(
+                    x =>
+                        x !== null
+                        &&
+                        x !== undefined)
+                .map(
+                    normalizeEmergencyAlertAreaKey)
+                .filter(
+                    x =>
+                        x.length > 0)
+        );
+
+
+    let removed = 0;
+
+
+    for (
+        const [key, layer]
+        of Array.from(
+            s.emergencyAlertAreas
+                .entries())
+    ) {
+        if (
+            activeSet.has(
+                key)
+        ) {
+            continue;
+        }
+
+
+        try {
+            map.removeLayer(
+                layer);
+        }
+        catch {
+        }
+
+
+        s.emergencyAlertAreas
+            .delete(key);
+
+        removed++;
+    }
+
+    s.emergencyAlertMarkers ??=
+        new Map();
+
+
+    const activeMarkerSet =
+        new Set(
+            (activeIds ?? [])
+                .filter(
+                    x =>
+                        x !== null
+                        &&
+                        x !== undefined)
+                .map(
+                    x =>
+                        `emergency-marker:${String(x).trim()
+                        }`)
+        );
+
+
+    for (
+        const [key, marker]
+        of Array.from(
+            s.emergencyAlertMarkers
+                .entries())
+    ) {
+        if (
+            activeMarkerSet.has(
+                key)
+        ) {
+            continue;
+        }
+
+
+        try {
+            map.removeLayer(
+                marker);
+        }
+        catch {
+        }
+
+
+        s.emergencyAlertMarkers
+            .delete(
+                key);
+    }
+
+
+    console.log(
+        "[EMERGENCY AREA] prune completed",
+        {
+            scopeKey,
+            activeIds,
+            remaining:
+                Array.from(
+                    s.emergencyAlertAreas
+                        .keys()),
+            removed
+        });
+
+
+    return removed;
+}
 export function removeAntennaAlertCircle(antennaId, scopeKey = null) {
     const ready = ensureMapReady(scopeKey);
     if (!ready) return false;
@@ -4503,6 +5692,8 @@ export function upsertEmergencyAlert(scopeKey, alert) {
             alert.RadiusMeters)
         ?? 0;
 
+    let centerLatLng = null;
+
     let layer = null;
 
     if (
@@ -5099,6 +6290,90 @@ export function fitToAntennaAlertMarkers(scopeKey = null, opts = {}) {
     }
 }
 
+export function fitToEmergencyAlertAreas(
+    scopeKey = null,
+    options = {}) {
+
+    const ready =
+        ensureMapReady(
+            scopeKey);
+
+    if (!ready) {
+        return false;
+    }
+
+
+    const {
+        s,
+        L,
+        map
+    } = ready;
+
+
+    const layers =
+        Array.from(
+            s.emergencyAlertAreas
+                ?.values?.()
+            ?? []
+        );
+
+
+    if (layers.length === 0) {
+        return false;
+    }
+
+
+    const bounds =
+        L.latLngBounds([]);
+
+
+    for (const layer of layers) {
+
+        try {
+            const layerBounds =
+                layer.getBounds?.();
+
+            if (
+                layerBounds
+                &&
+                layerBounds.isValid?.()
+            ) {
+                bounds.extend(
+                    layerBounds);
+            }
+        }
+        catch {
+        }
+    }
+
+
+    if (!bounds.isValid()) {
+        return false;
+    }
+
+
+    map.fitBounds(
+        bounds.pad(
+            Number(
+                options.paddingFactor
+                ?? 0.75)),
+        {
+            padding:
+                options.padding
+                ?? [40, 40],
+
+            maxZoom:
+                Number(
+                    options.maxZoom
+                    ?? 11),
+
+            animate:
+                false
+        });
+
+
+    return true;
+}
 export function activateHybridAndZoom(scopeKey = null, threshold = 13) {
     const k = pickScopeKey(scopeKey);
     enableHybridZoom(true, threshold, k);
@@ -5379,9 +6654,6 @@ export function upsertWeatherIntoBundleInput(delta, scopeKey = null) {
 export function upsertEmergencyAlertAreas(scope, alerts)
 {
     // Polygon / MultiPolygon / circle
-}
-
-export function pruneEmergencyAlertAreas(scope, activeAlertIds) {
 }
 
 export function highlightEmergencyRouteConflict(scope, routeId, conflictingAlertIds)

@@ -1,5 +1,6 @@
 ﻿using CitizenHackathon2025.Blazor.DTOs;
 using CitizenHackathon2025.Blazor.DTOs.Security;
+using CitizenHackathon2025.Contracts.DTOs;
 using CitizenHackathon2025.Contracts.Enums;
 using CitizenHackathon2025.Contracts.Hubs;
 using CitizenHackathon2025V5.Blazor.Client.DTOs.JsInterop;
@@ -40,6 +41,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         [Inject] public ITrafficCriticalAlertClientService TrafficCriticalAlertService { get; set; } = default!;
         [Inject] public IWeatherCriticalAlertClientService WeatherCriticalAlertService { get; set; } = default!;
         [Inject] public IHubUrlBuilder HubUrls { get; set; } = default!;
+        [Inject] public EmergencyAlertStateService EmergencyAlertState { get; set; } = default!;
         //[Inject] public IAuthService Auth { get; set; } = default!;
 
         protected override string ScopeKey => "home";
@@ -88,9 +90,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private bool _historyCollapsed = true;
         private bool _criticalAlertSending;
         private bool _criticalWeatherAlertSending;
-        private string _criticalWeatherAlertStatus;
         private bool _criticalTrafficSending;
+        private string _criticalWeatherAlertStatus;
         private string _criticalTrafficStatus;
+        private bool _emergencyStateHandlerAttached;
         private bool CanLoadMore => _currentIndex < _all.Count;
 
         private int _currentIndex = 0;
@@ -118,6 +121,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private readonly List<ClientGptInteractionDTO> _visible = new();
         private readonly SemaphoreSlim _homeRefreshLock = new(1, 1);
         private readonly string _instanceId = Guid.NewGuid().ToString("N")[..8];
+        private readonly List<HomeEmergencyNotice> _homeEmergencyNotices = new();
+
+        private readonly Dictionary<string, CancellationTokenSource> _homeEmergencyNoticeTimers = new();
+        private readonly HashSet<string> _seenHomeEmergencyNotices = new(StringComparer.Ordinal);
+
+        private const int MaxVisibleEmergencyNotices = 3;
 
         [JSInvokable]
         public Task SelectSuggestionFromMap(int suggestionId)
@@ -132,6 +141,14 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             GptClientOrchestrator.InteractionUpdated += OnGptInteractionUpdatedAsync;
             GptClientOrchestrator.StatusChanged += OnGptStatusChangedAsync;
+
+            /*
+             * Emergency Intelligence is initialized
+             * early because safety information takes
+             * priority over ordinary Home content.
+             */
+
+            await InitializeHomeEmergencyIntelligenceAsync();
 
             var trafficTask = TrafficConditionService.GetLatestTrafficConditionAsync();
             var crowdTask = CrowdInfoService.GetLatestCrowdInfoNonNullAsync();
@@ -235,10 +252,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateBundleMarkers", payload, 0, ScopeKey);
 
             var nowUtc = DateTime.UtcNow;
-
-            var todayCalendar = _allCal
-                .Where(x => IsNowActive(x, nowUtc))
-                .ToList();
+            var todayCalendar = _allCal.Where(x => IsNowActive(x, nowUtc)).ToList();
 
             await JS.InvokeVoidAsync("OutZenInterop.upsertCrowdCalendarMarkers", todayCalendar, ScopeKey);
 
@@ -271,6 +285,69 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 }
             }
         }
+
+        private async Task InitializeHomeEmergencyIntelligenceAsync()
+        {
+            if (!_emergencyStateHandlerAttached)
+            {
+                /*
+                 * Live event:
+                 * temporary BE-Alert popup only.
+                 */
+                EmergencyAlertState.LiveAlertReceived += OnHomeLiveEmergencyAlertReceivedAsync;
+
+                /*
+                 * Authoritative state:
+                 * persistent critical map marker.
+                 *
+                 * Also receives cancellation / expiry /
+                 * REST reconciliation changes.
+                 */
+                EmergencyAlertState.StateChanged += OnHomeEmergencyStateChangedAsync;
+
+                _emergencyStateHandlerAttached = true;
+            }
+
+            try
+            {
+                await EmergencyAlertState.StartAsync();
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[HOME][EMERGENCY] " + $"startup failed: {ex}");
+            }
+
+            /*
+             * If the visitor arrives after a BE-Alert
+             * was already published, show at most
+             * the two latest active messages.
+             */
+            foreach (
+                var alert
+                in EmergencyAlertState
+                    .Snapshot
+                    .Where(ShouldShowBeAlertNotice)
+                    .OrderByDescending(x => x.LastUpdatedAtUtc)
+                    .Take(2)
+                    .Reverse())
+            {
+                ShowHomeEmergencyNotice(alert);
+            }
+        }
+        private async Task OnHomeLiveEmergencyAlertReceivedAsync(EmergencyAlertSignalRDTO alert)
+        {
+            if (!ShouldShowBeAlertNotice(alert))
+            {
+                return;
+            }
+
+
+            await InvokeAsync(
+                () =>
+                {
+                    ShowHomeEmergencyNotice(alert);
+                });
+        }
         private async Task SendCriticalCrowdAlertAsync()
         {
             if (_criticalAlertSending)
@@ -278,8 +355,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             _criticalAlertSending = true;
 
-            await InvokeAsync(
-                StateHasChanged);
+            await InvokeAsync(StateHasChanged);
 
             try
             {
@@ -322,17 +398,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                     return;
                 }
 
-                var requiredConfirmations =
-                    Math.Max(FullAlertMinimumDistinctDevices, result.RequiredCount);
-
-                var isConfirmed =
-                    string.Equals(
-                        result.Status,
-                        "Confirmed",
-                        StringComparison.OrdinalIgnoreCase)
+                var requiredConfirmations = Math.Max(FullAlertMinimumDistinctDevices, result.RequiredCount);
+                var isConfirmed = string.Equals(result.Status, "Confirmed", StringComparison.OrdinalIgnoreCase)
                     &&
-                    result.ConfirmationCount >=
-                        requiredConfirmations;
+                    result.ConfirmationCount >= requiredConfirmations;
 
                 if (!isConfirmed)
                 {
@@ -355,9 +424,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
                 _criticalAlertStatus = $"Critical alert confirmed for " + $"{_selectedPlaceName}";
 
-                ToastService.ShowError(
-                    $"CRITICAL CROWD ALERT confirmed for " +
-                    $"{_selectedPlaceName}.",
+                ToastService.ShowError($"CRITICAL CROWD ALERT confirmed for " + $"{_selectedPlaceName}.",
                     settings =>
                     {
                         settings.Timeout = 0;
@@ -758,6 +825,12 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 await SeedAsync(fit);
                 await LoadLatestCrowdSafetyAlertsAsync();
 
+                /*
+                 * Emergency state may already have been loaded
+                 * before Leaflet became ready.
+                 */
+                await SyncHomeEmergencyCriticalMarkersAsync();
+
                 try
                 {
                     await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey);
@@ -794,30 +867,61 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         protected override async Task OnMapReadyAsync()
         {
             _dotNetRef ??= DotNetObjectReference.Create(this);
-            try { await JS.InvokeVoidAsync("OutZenInterop.registerDotNetRef", ScopeKey, _dotNetRef); } catch { }
 
-            //foreach (var a in _allAntennas)
-            //{
-            //    await JS.InvokeVoidAsync("OutZenInterop.addOrUpdateAntennaMarker", new
-            //    {
-            //        Id = a.Id,
-            //        Latitude = a.Latitude,
-            //        Longitude = a.Longitude,
-            //        Name = a.Name,
-            //        Description = "Waiting for counts…"
-            //    }, ScopeKey);
-            //}
+            try
+            {
+                await JS.InvokeVoidAsync(
+                    "OutZenInterop.registerDotNetRef",
+                    ScopeKey,
+                    _dotNetRef);
+            }
+            catch
+            {
+            }
 
             while (_pendingCountsUntilMap.TryDequeue(out var item))
             {
-                try { await ApplyAntennaCriticalOverlayAsync(item.AntennaId, item.Counts); } catch { }
+                try
+                {
+                    await ApplyAntennaCriticalOverlayAsync(item.AntennaId, item.Counts);
+                }
+                catch
+                {
+                }
             }
 
-            await LoadLatestCrowdSafetyAlertsAsync();
 
-            try { await JS.InvokeVoidAsync("OutZenInterop.refreshMapSize", ScopeKey); } catch { }
+            await
+                LoadLatestCrowdSafetyAlertsAsync();
 
-            try { await JS.InvokeVoidAsync("OutZenInterop.refreshHybridNow", ScopeKey); } catch { }
+
+            /*
+             * Persistent official emergency markers.
+             */
+            await
+                SyncHomeEmergencyCriticalMarkersAsync();
+
+
+            try
+            {
+                await JS.InvokeVoidAsync(
+                    "OutZenInterop.refreshMapSize",
+                    ScopeKey);
+            }
+            catch
+            {
+            }
+
+
+            try
+            {
+                await JS.InvokeVoidAsync(
+                    "OutZenInterop.refreshHybridNow",
+                    ScopeKey);
+            }
+            catch
+            {
+            }
         }
 
         protected override async Task OnBeforeDisposeAsync()
@@ -837,6 +941,32 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             try { _dotNetRef?.Dispose(); } catch { }
             _dotNetRef = null;
 
+            if (_emergencyStateHandlerAttached)
+            {
+                EmergencyAlertState.LiveAlertReceived -= OnHomeLiveEmergencyAlertReceivedAsync;
+
+                EmergencyAlertState.StateChanged -= OnHomeEmergencyStateChangedAsync;
+
+                _emergencyStateHandlerAttached = false;
+            }
+
+            /*
+             * Stop pending automatic popup timers.
+             */
+            foreach (var timer in _homeEmergencyNoticeTimers.Values.ToArray())
+            {
+                try
+                {
+                    timer.Cancel();
+                }
+                catch
+                {
+                }
+                timer.Dispose();
+            }
+            _homeEmergencyNoticeTimers.Clear();
+            _homeEmergencyNotices.Clear();
+
             Console.WriteLine($"[HOME][{_instanceId}] " + "Disposing.");
         }
 
@@ -846,9 +976,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 return;
 
             _timerStarted = true;
-
             _timer = new PeriodicTimer(TimeSpan.FromSeconds(15));
-
             _ = RunHomeRefreshLoopAsync();
         }
 
@@ -887,6 +1015,119 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             {
                 Console.Error.WriteLine($"[HOME] Refresh loop failed: {ex}");
             }
+        }
+
+        private void ShowHomeEmergencyNotice(EmergencyAlertSignalRDTO alert)
+        {
+            if (!ShouldShowBeAlertNotice(alert))
+            {
+                return;
+            }
+
+            /*
+             * An Update to the same alert is a new
+             * message if LastUpdatedAtUtc changed.
+             */
+            var key = $"{alert.Id:N}|" + $"{alert.LastUpdatedAtUtc:O}";
+
+            if (!_seenHomeEmergencyNotices.Add(key))
+            {
+                return;
+            }
+
+
+            var critical = IsCriticalEmergencyNotice(alert);
+            var title = !string.IsNullOrWhiteSpace(alert.Headline) ? alert.Headline.Trim() : "BE-Alert";
+            var message = !string.IsNullOrWhiteSpace(alert.Description) ? alert.Description.Trim() : alert.Instructions?.Trim() ?? string.Empty;
+            var instructions = !string.IsNullOrWhiteSpace(alert.Instructions)
+                &&
+                !string.Equals(alert.Instructions.Trim(), message, StringComparison.Ordinal) ? alert.Instructions.Trim() : null;
+
+            var notice = new HomeEmergencyNotice(
+                Key: key,
+                AlertId: alert.Id,
+                SourceCode: alert.SourceCode,
+                Title: title,
+                Message: message,
+                Instructions: instructions,
+                LastUpdatedAtUtc: alert.LastUpdatedAtUtc,
+                Critical: critical,
+                DurationSeconds: critical ? 25 : 18);
+
+            /*
+             * Newest first.
+             */
+            _homeEmergencyNotices.Insert(0, notice);
+
+            while (_homeEmergencyNotices.Count > MaxVisibleEmergencyNotices)
+            {
+                var oldest = _homeEmergencyNotices[^1];
+                RemoveHomeEmergencyNotice(oldest.Key);
+            }
+
+
+            StateHasChanged();
+
+            StartHomeEmergencyNoticeTimer(notice);
+        }
+
+        private void StartHomeEmergencyNoticeTimer(HomeEmergencyNotice notice)
+        {
+            if ( _homeEmergencyNoticeTimers.Remove(notice.Key, out var previous))
+            {
+                previous.Cancel();
+                previous.Dispose();
+            }
+
+            var cts = new CancellationTokenSource();
+
+            _homeEmergencyNoticeTimers[notice.Key] = cts;
+            _ = AutoDismissHomeEmergencyNoticeAsync(notice, cts);
+        }
+
+        private async Task AutoDismissHomeEmergencyNoticeAsync(HomeEmergencyNotice notice, CancellationTokenSource cts)
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(notice.DurationSeconds), cts.Token);
+
+                await InvokeAsync(
+                    () =>
+                    {
+                        RemoveHomeEmergencyNotice(notice.Key);
+
+                        StateHasChanged();
+                    });
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+
+        private void RemoveHomeEmergencyNotice(string key)
+        {
+            var notice = _homeEmergencyNotices.FirstOrDefault(x => string.Equals(x.Key, key, StringComparison.Ordinal));
+
+
+            if (notice is not null)
+            {
+                _homeEmergencyNotices.Remove(notice);
+            }
+
+
+            if (
+                _homeEmergencyNoticeTimers.Remove(key, out var timer))
+            {
+                timer.Cancel();
+                timer.Dispose();
+            }
+        }
+
+        private void DismissHomeEmergencyNotice(string key)
+        {
+            RemoveHomeEmergencyNotice(key);
+
+            StateHasChanged();
         }
 
         private async Task RefreshCalendarMarkersNowAsync()
@@ -966,7 +1207,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                              * obtain a new ephemeral JWT.
                              */
                             options.AccessTokenProvider = async () =>
-                           
                                 await HubTokenService.GetHubTokenAsync();
 
                         })
@@ -1029,11 +1269,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             if (_antennaHub is null || _antennaHub.State != HubConnectionState.Connected)
                 return;
 
-            var ids = _allAntennas
-                .Select(a => a.Id)
-                .Distinct()
-                .Take(100)
-                .ToArray();
+            var ids = _allAntennas.Select(a => a.Id).Distinct().Take(100).ToArray();
 
             if (ids.Length == 0)
                 return;
@@ -1056,7 +1292,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             if (antenna is null) return;
 
             var observedDevices = counts.UniqueDevices > 0 ? counts.UniqueDevices : counts.ActiveConnections;
-
             var level = ComputeLevelByCapacity(antenna, observedDevices);
 
             if (level == (int)CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Critical)
@@ -1085,50 +1320,17 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         {
             if (observedDevices <= 0)
             {
-                return (int)
-                    CitizenHackathon2025V5
-                        .Blazor
-                        .Client
-                        .Enums
-                        .CrowdLevelEnum
-                        .Low;
+                return (int) CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Low;
             }
 
             if (antenna.MaxCapacity is null or <= 0)
             {
                 return observedDevices switch
                 {
-                    >= 200 => (int)
-                        CitizenHackathon2025V5
-                            .Blazor
-                            .Client
-                            .Enums
-                            .CrowdLevelEnum
-                            .Critical,
-
-                    >= 100 => (int)
-                        CitizenHackathon2025V5
-                            .Blazor
-                            .Client
-                            .Enums
-                            .CrowdLevelEnum
-                            .High,
-
-                    >= 40 => (int)
-                        CitizenHackathon2025V5
-                            .Blazor
-                            .Client
-                            .Enums
-                            .CrowdLevelEnum
-                            .Medium,
-
-                    _ => (int)
-                        CitizenHackathon2025V5
-                            .Blazor
-                            .Client
-                            .Enums
-                            .CrowdLevelEnum
-                            .Low
+                    >= 200 => (int) CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Critical,
+                    >= 100 => (int) CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.High,
+                    >= 40 => (int) CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Medium,
+                    _ => (int) CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Low
                 };
             }
 
@@ -1136,44 +1338,20 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             if (ratio >= 0.90)
             {
-                return (int)
-                    CitizenHackathon2025V5
-                        .Blazor
-                        .Client
-                        .Enums
-                        .CrowdLevelEnum
-                        .Critical;
+                return (int) CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Critical;
             }
-
             if (ratio >= 0.70)
             {
-                return (int)
-                    CitizenHackathon2025V5
-                        .Blazor
-                        .Client
-                        .Enums
-                        .CrowdLevelEnum
-                        .High;
+                return (int) CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.High;
             }
-
             if (ratio >= 0.40)
             {
                 return (int)
-                    CitizenHackathon2025V5
-                        .Blazor
-                        .Client
-                        .Enums
-                        .CrowdLevelEnum
-                        .Medium;
+                    CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Medium;
             }
 
             return (int)
-                CitizenHackathon2025V5
-                    .Blazor
-                    .Client
-                    .Enums
-                    .CrowdLevelEnum
-                    .Low;
+                CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Low;
         }
 
         private async Task SafeLoadAntennasAsync()
@@ -1217,13 +1395,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             {
                 await GptClientOrchestrator.EnsureHubAsync();
 
-                var latitude = _selectedLatitude is >= 49.45 and <= 51.60
-                    ? _selectedLatitude
-                    : DefaultCenter.lat;
-
-                var longitude = _selectedLongitude is >= 2.30 and <= 6.60
-                    ? _selectedLongitude
-                    : DefaultCenter.lng;
+                var latitude = _selectedLatitude is >= 49.45 and <= 51.60 ? _selectedLatitude : DefaultCenter.lat;
+                var longitude = _selectedLongitude is >= 2.30 and <= 6.60 ? _selectedLongitude : DefaultCenter.lng;
 
                 _gptStatusMessage = "Sending request to Mistral...";
 
@@ -1251,7 +1424,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 ApplyOrInsertGptInteraction(pendingInteraction);
 
                 _gptStatusMessage = started.Message ?? $"Generation started — interaction #{started.InteractionId}.";
-
                 _userPrompt = string.Empty;
 
                 Console.WriteLine(
@@ -1296,9 +1468,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             Upsert(_all, dto);
             Upsert(_visible, dto);
 
-            GptInteractions = _all
-                .OrderByDescending(x => x.CreatedAt)
-                .ToList();
+            GptInteractions = _all.OrderByDescending(x => x.CreatedAt).ToList();
 
             if (_visible.Count > MaxVisibleGptItems)
                 _visible.RemoveRange(MaxVisibleGptItems, _visible.Count - MaxVisibleGptItems);
@@ -1321,9 +1491,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             if (_antennaHub is null)
                 return;
 
-            _antennaHub.On<ClientAntennaCountsUpdateDTO>(CrowdInfoAntennaConnectionHubMethods
-                    .ToClient
-                    .AntennaCountsUpdated,
+            _antennaHub.On<ClientAntennaCountsUpdateDTO>(CrowdInfoAntennaConnectionHubMethods.ToClient.AntennaCountsUpdated,
                 async message =>
                 {
                     if (_disposed || message is null || message.AntennaId <= 0 || message.Counts is null)
@@ -1337,8 +1505,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                     {
                         _pendingCountsUntilMap.Enqueue(
                             (
-                                message.AntennaId,
-                                message.Counts
+                                message.AntennaId, message.Counts
                             ));
 
                         return;
@@ -1347,9 +1514,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                     await InvokeAsync(
                         async () =>
                         {
-                            await ApplyAntennaCriticalOverlayAsync(
-                                message.AntennaId,
-                                message.Counts);
+                            await ApplyAntennaCriticalOverlayAsync(message.AntennaId, message.Counts);
 
                             StateHasChanged();
                         });
@@ -1441,7 +1606,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             _dragWired = false;
             await InvokeAsync(StateHasChanged);
         }
-
         public async Task SendMessageAsync()
         {
             if (IsSending) return;
@@ -1459,7 +1623,6 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 await InvokeAsync(StateHasChanged);
             }
         }
-
         private async Task ResolveNearestPlaceFromUserLocationAsync()
         {
             try
@@ -1477,19 +1640,11 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 Console.WriteLine($"[HOME] GPS resolved: {pos.Latitude}, {pos.Longitude}");
 
                 var nearestPlaces = _places
-                    .Where(p =>
-                        double.IsFinite(p.Latitude) &&
-                        double.IsFinite(p.Longitude) &&
-                        p.Latitude != 0 &&
-                        p.Longitude != 0)
+                    .Where(p => double.IsFinite(p.Latitude) && double.IsFinite(p.Longitude) && p.Latitude != 0 && p.Longitude != 0)
                     .Select(p => new
                     {
                         Place = p,
-                        Distance = GetDistanceKm(
-                            pos.Latitude,
-                            pos.Longitude,
-                            p.Latitude,
-                            p.Longitude)
+                        Distance = GetDistanceKm(pos.Latitude, pos.Longitude, p.Latitude, p.Longitude)
                     })
                     .OrderBy(x => x.Distance)
                     .Take(10)
@@ -1530,12 +1685,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
                 ToastService.ShowWarning("Unable to get your current location.");
                 var nearest = _places
-                    .OrderBy(p =>
-                        GetDistanceKm(
-                            DevFallbackLatitude,
-                            DevFallbackLongitude,
-                            p.Latitude,
-                            p.Longitude))
+                    .OrderBy(p => GetDistanceKm(DevFallbackLatitude, DevFallbackLongitude, p.Latitude, p.Longitude))
                     .FirstOrDefault();
 
                             if (nearest != null)
@@ -1561,18 +1711,9 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 var alerts = await CrowdSafetyAlertService.GetLatestAsync(50);
 
                 var activeCriticalAlerts = alerts
-                    .Where(a =>
-                        a.Active)
-
-                    .Where(a =>
-                        string.Equals(
-                            a.Status,
-                            "Validated",
-                            StringComparison.OrdinalIgnoreCase))
-
-                    .Where(a =>
-                        a.Severity >= 4)
-
+                    .Where(a => a.Active)
+                    .Where(a => string.Equals(a.Status, "Validated", StringComparison.OrdinalIgnoreCase))
+                    .Where(a => a.Severity >= 4)
                     .ToList();
 
                 foreach (var alert in activeCriticalAlerts)
@@ -1605,12 +1746,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             if (lat is < 49.45 or > 51.6 || lng is < 2.3 or > 6.6)
                 return;
 
-            var icon = alert.Severity switch
-            {
-                >= 4 => "🚨",
-                3 => "⚠️",
-                _ => "📡"
-            };
+            var icon = alert.Severity switch { >= 4 => "🚨", 3 => "⚠️", _ => "📡" };
 
             var description =
                 $"{alert.Message}<br/>" +
@@ -1633,6 +1769,115 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                     Status = alert.Status
                 },
                 ScopeKey);
+        }
+
+        private async Task SyncHomeEmergencyCriticalMarkersAsync()
+        {
+            if (
+                _disposed
+                ||
+                !IsMapBooted)
+            {
+                return;
+            }
+
+
+            var alerts =
+                EmergencyAlertState
+                    .Snapshot
+                    .Where(
+                        RequiresImmediateHomeAttention)
+                    .ToArray();
+
+
+            var activeIds =
+                new List<string>(
+                    alerts.Length);
+
+
+            foreach (
+                var alert
+                in alerts)
+            {
+                var id =
+                    alert.Id.ToString(
+                        "D");
+
+
+                try
+                {
+                    var added =
+                        await JS.InvokeAsync<bool>(
+                            "OutZenInterop.__esm." +
+                            "addOrUpdateEmergencyCriticalMarker",
+
+                            alert,
+
+                            ScopeKey);
+
+
+                    if (added)
+                    {
+                        activeIds.Add(
+                            id);
+                    }
+
+
+                    Console.WriteLine(
+                        $"[HOME][EMERGENCY MARKER] " +
+                        $"id={id}, " +
+                        $"added={added}, " +
+                        $"source={alert.SourceCode}, " +
+                        $"severity={alert.Severity}, " +
+                        $"urgency={alert.Urgency}");
+                }
+                catch (JSException ex)
+                {
+                    Console.Error.WriteLine(
+                        $"[HOME][EMERGENCY MARKER] " +
+                        $"upsert failed " +
+                        $"id={id}: {ex.Message}");
+                }
+            }
+
+
+            try
+            {
+                var removed =
+                    await JS.InvokeAsync<int>(
+                        "OutZenInterop.__esm." +
+                        "pruneEmergencyCriticalMarkers",
+
+                        activeIds,
+
+                        ScopeKey);
+
+
+                Console.WriteLine(
+                    $"[HOME][EMERGENCY MARKER] " +
+                    $"active={activeIds.Count}, " +
+                    $"removed={removed}");
+            }
+            catch (JSException ex)
+            {
+                Console.Error.WriteLine(
+                    $"[HOME][EMERGENCY MARKER] " +
+                    $"prune failed: {ex.Message}");
+            }
+        }
+
+        private async Task OnHomeEmergencyStateChangedAsync()
+        {
+            await InvokeAsync(
+                async () =>
+                {
+                    if (
+                        !_disposed && IsMapBooted)
+                    {
+                        await SyncHomeEmergencyCriticalMarkersAsync();
+                    }
+                    StateHasChanged();
+                });
         }
         private static double GetDistanceKm(double lat1, double lon1, double lat2, double lon2)
         {
@@ -1670,16 +1915,69 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private static bool IsStaleManualCriticalAlert(ClientCrowdInfoDTO c)
         {
             var nowUtc = DateTime.UtcNow;
-
-            var timestampUtc = c.Timestamp.Kind == DateTimeKind.Utc
-                ? c.Timestamp
-                : c.Timestamp.ToUniversalTime();
-
-            var isOldCriticalCrowd =
-                c.CrowdLevel >= 4 &&
-                timestampUtc < nowUtc.AddMinutes(-5);
+            var timestampUtc = c.Timestamp.Kind == DateTimeKind.Utc ? c.Timestamp : c.Timestamp.ToUniversalTime();
+            var isOldCriticalCrowd = c.CrowdLevel >= 4 && timestampUtc < nowUtc.AddMinutes(-5);
 
             return isOldCriticalCrowd;
+        }
+
+        private static bool RequiresImmediateHomeAttention(EmergencyAlertSignalRDTO alert)
+        {
+            if (!alert.IsOfficial)
+                return false;
+
+
+            var severity = Convert.ToInt32(alert.Severity);
+            var urgency = Convert.ToInt32(alert.Urgency);
+
+            /*
+             * Critical Home treatment:
+             *
+             * Extreme+
+             *
+             * OR
+             *
+             * Severe + Immediate.
+             */
+            return severity >= 4 ||
+                (
+                    severity >= 3 && urgency >= 4
+                );
+        }
+        private static bool ShouldShowBeAlertNotice(EmergencyAlertSignalRDTO alert)
+        {
+            if (!alert.IsOfficial)
+                return false;
+
+            if (!string.Equals(alert.SourceCode, "BE-ALERT", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            /*
+             * A BE-Alert public message is useful even
+             * without map geometry.
+             */
+            return
+                !string.IsNullOrWhiteSpace(alert.Headline)
+                || !string.IsNullOrWhiteSpace(alert.Description)
+                || !string.IsNullOrWhiteSpace(alert.Instructions);
+        }
+
+        private static bool IsCriticalEmergencyNotice(EmergencyAlertSignalRDTO alert)
+        {
+            if (!alert.IsOfficial)
+                return false;
+
+            var severity = Convert.ToInt32(alert.Severity);
+
+            var urgency = Convert.ToInt32(alert.Urgency);
+
+            return
+                severity >= 4 ||
+                (
+                    severity >= 3 && urgency >= 4
+                );
         }
 
         private static List<T> KeepPreviousWhenEmpty<T>(List<T> current, List<T> incoming, string category)
@@ -1701,11 +1999,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
 
             var safe = System.Net.WebUtility.HtmlEncode(text.Trim());
 
-            var parts = Regex.Split(
-                safe,
-                @"(?<=[\.!\?])\s+(?=[A-ZÀÂÄÇÉÈÊËÎÏÔÖÙÛÜ])")
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .ToList();
+            var parts = Regex.Split(safe, @"(?<=[\.!\?])\s+(?=[A-ZÀÂÄÇÉÈÊËÎÏÔÖÙÛÜ])").Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
 
             if (parts.Count <= 1)
                 return (MarkupString)$"<p>{safe}</p>";
@@ -1720,6 +2014,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             [MinLength(2)]
             public string NewMessage { get; set; } = string.Empty;
         }
+
+        private sealed record HomeEmergencyNotice(string Key, Guid AlertId, string SourceCode, string Title, string Message, string Instructions, DateTimeOffset LastUpdatedAtUtc, bool Critical, int DurationSeconds);
     }
 }
 
