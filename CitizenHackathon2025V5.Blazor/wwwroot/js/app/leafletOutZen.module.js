@@ -2697,56 +2697,155 @@ function resolveEmergencyCriticalLatLng(
     return null;
 }
 
+function resolveEmergencyHazardVisual(alert)
+{
+    const hazardCode = String(alert?.HazardCode ?? alert?.hazardCode ?? "Unknown").trim().toLowerCase();
 
-export function addOrUpdateEmergencyCriticalMarker(
-    alert,
-    scopeKey = null) {
+    switch (hazardCode) {
 
-    const ready =
-        ensureMapReady(
-            scopeKey);
+        case "wildfire":
+            return {
+                key: "wildfire",
+                icon: "🔥",
+                label: "Feu de végétation"
+            };
+
+
+        case "structuralfire":
+            return {
+                key: "structural-fire",
+                icon: "🔥",
+                label: "Incendie de structure"
+            };
+
+
+        case "flood":
+            return {
+                key: "flood",
+                icon: "🌊",
+                label: "Inondation"
+            };
+
+
+        case "flashflood":
+            return {
+                key: "flash-flood",
+                icon: "🌊",
+                label: "Crue soudaine"
+            };
+
+
+        case "severethunderstorm":
+            return {
+                key: "thunderstorm",
+                icon: "⛈️",
+                label: "Orage violent"
+            };
+
+
+        case "extremerainfall":
+            return {
+                key: "rainfall",
+                icon: "🌧️",
+                label: "Pluies extrêmes"
+            };
+
+
+        case "strongwind":
+            return {
+                key: "strong-wind",
+                icon: "💨",
+                label: "Vents violents"
+            };
+
+
+        case "chemicalrelease":
+            return {
+                key: "chemical",
+                icon: "☣️",
+                label: "Rejet chimique"
+            };
+
+
+        case "explosion":
+            return {
+                key: "explosion",
+                icon: "💥",
+                label: "Explosion"
+            };
+
+
+        case "evacuation":
+            return {
+                key: "evacuation",
+                icon: "🚨",
+                label: "Évacuation"
+            };
+
+
+        case "shelterinplace":
+            return {
+                key: "shelter",
+                icon: "🏠",
+                label: "Mise à l'abri"
+            };
+
+
+        case "roadclosure":
+            return {
+                key: "road-closure",
+                icon: "⛔",
+                label: "Route fermée"
+            };
+
+
+        case "rescueoperation":
+            return {
+                key: "rescue",
+                icon: "🛟",
+                label: "Opération de secours"
+            };
+
+
+        case "utilityfailure":
+            return {
+                key: "utility",
+                icon: "⚡",
+                label: "Défaillance réseau"
+            };
+
+
+        default:
+            return {
+                key: "unknown",
+                icon: "⚠️",
+                label: "Danger officiel"
+            };
+    }
+}
+export function addOrUpdateEmergencyCriticalMarker(alert, scopeKey = null)
+{
+
+    const ready = ensureMapReady(scopeKey);
 
     if (!ready || !alert) {
         return false;
     }
 
-
-    const {
-        s,
-        L,
-        map
-    } = ready;
-
-
-    const id =
-        alert.Id ??
-        alert.id;
+    const {s, L, map} = ready;
+    const id = alert.Id ?? alert.id;
 
     if (!id) {
-        console.warn(
-            "[EMERGENCY CRITICAL] Missing id");
+        console.warn("[EMERGENCY CRITICAL] Missing id");
 
         return false;
     }
 
-
-    const geoJson =
-        parseEmergencyGeoJson(
-            alert.AreaGeoJson
-            ??
-            alert.areaGeoJson);
-
-
-    const latLng =
-        resolveEmergencyCriticalLatLng(
-            L,
-            geoJson);
-
+    const geoJson = parseEmergencyGeoJson(alert.AreaGeoJson ?? alert.areaGeoJson);
+    const latLng = resolveEmergencyCriticalLatLng(L, geoJson);
 
     if (!latLng) {
-        console.warn(
-            "[EMERGENCY CRITICAL] " +
-            "No usable geometry",
+        console.warn("[EMERGENCY CRITICAL] " + "No usable geometry",
             {
                 id,
                 geoJson
@@ -2755,10 +2854,7 @@ export function addOrUpdateEmergencyCriticalMarker(
         return false;
     }
 
-
-    s.emergencyCriticalMarkers ??=
-        new Map();
-
+    s.emergencyCriticalMarkers ??= new Map();
 
     /*
      * Dedicated emergency pane.
@@ -2771,215 +2867,164 @@ export function addOrUpdateEmergencyCriticalMarker(
      * bundle markers
      * hybrid markers
      */
-    ensureCustomPane(
-        map,
-        "ozEmergencyCriticalPane",
-        9600);
+    ensureCustomPane(map, "ozEmergencyCriticalPane", 9600);
 
-
-    const key =
-        normalizeEmergencyCriticalMarkerKey(
-            id);
-
-
-    const previous =
-        s.emergencyCriticalMarkers
-            .get(key);
-
+    const key = normalizeEmergencyCriticalMarkerKey(id);
+    const previous = s.emergencyCriticalMarkers.get(key);
 
     if (previous) {
         try {
-            map.removeLayer(
-                previous);
+            map.removeLayer(previous);
         }
         catch {
         }
 
-
-        s.emergencyCriticalMarkers
-            .delete(key);
+        s.emergencyCriticalMarkers.delete(key);
     }
 
-
-    const sourceCode =
-        String(
-            alert.SourceCode
-            ??
-            alert.sourceCode
-            ??
-            "");
-
-
-    const simulation =
-        sourceCode
-            .toUpperCase()
-            .includes("SIM");
-
-
-    const headline =
-        alert.Headline
-        ??
-        alert.headline
-        ??
-        "Emergency alert";
-
-
-    const description =
-        alert.Description
-        ??
-        alert.description
-        ??
-        "";
-
-
-    const instructions =
-        alert.Instructions
-        ??
-        alert.instructions
-        ??
-        "";
-
-
-    const severity =
-        Number(
-            alert.Severity
-            ??
-            alert.severity
-            ??
-            0);
-
-
-    const urgency =
-        Number(
-            alert.Urgency
-            ??
-            alert.urgency
-            ??
-            0);
-
-
-    const expiresAt =
-        alert.ExpiresAtUtc
-        ??
-        alert.expiresAtUtc
-        ??
-        null;
-
+    const sourceCode = String(alert.SourceCode ?? alert.sourceCode ?? "");
+    const simulation = sourceCode.toUpperCase().includes("SIM");
+    const hazard = resolveEmergencyHazardVisual(alert);
+    const headline = alert.Headline ?? alert.headline ?? "Emergency alert";
+    const description = alert.Description ?? alert.description ?? "";
+    const instructions = alert.Instructions ?? alert.instructions ?? "";
+    const severity = Number(alert.Severity ?? alert.severity ?? 0);
+    const urgency = Number(alert.Urgency ?? alert.urgency ?? 0);
+    const expiresAt = alert.ExpiresAtUtc ?? alert.expiresAtUtc ?? null;
 
     const icon =
-        L.divIcon(
-            {
-                className:
-                    "oz-emergency-critical-divicon",
+            L.divIcon(
+                {
+                    className:"oz-emergency-critical-divicon",
+                    html: `
+                    <div class="oz-emergency-critical-marker oz-hazard-${hazard.key} ${simulation ? "is-simulation" : ""}">
+                        <span class="oz-emergency-critical-core" aria-hidden="true">
+                            ${hazard.icon}
+                        </span>
 
-                html: `
-                    <div class="
-                        oz-emergency-critical-marker
-                        ${simulation
-                        ? "is-simulation"
-                        : ""}
-                    ">
-                        <span
-                            class="
-                                oz-emergency-critical-core
-                            ">
+                        <span class="oz-emergency-critical-badge" aria-hidden="true">
                             !
                         </span>
 
-                        ${simulation
-                        ? `
-                                    <span
-                                        class="
-                                            oz-emergency-critical-sim
-                                        ">
-                                        SIM
-                                    </span>
-                                  `
-                        : ""
-                    }
+                        ${simulation ? `<span class="oz-emergency-critical-sim"> SIM </span>` : ""}
                     </div>
                 `.trim(),
-
-                iconSize:
-                    [50, 50],
-
-                iconAnchor:
-                    [25, 25],
-
-                popupAnchor:
-                    [0, -30]
+                iconSize: [58, 58],
+                iconAnchor: [29, 29],
+                popupAnchor: [0, -35]
             });
 
-
-    const marker =
-        L.marker(
-            latLng,
-            {
-                pane: "ozEmergencyCriticalPane",
-                icon,
-                keyboard: true,
-                riseOnHover: true,
-                zIndexOffset: 10000,
-                title: headline
-            });
-
-
+    const marker = L.marker(latLng, {pane: "ozEmergencyCriticalPane", icon, keyboard: true, riseOnHover: true, zIndexOffset: 10000, title: headline});
     const popupHtml = `
-        <div class="oz-emergency-popup">
+        <div
+            class="
+                oz-emergency-popup
+                oz-emergency-popup-${hazard.key}
+            ">
 
-            <strong>
-                ${simulation ? "🧪" : "🚨"}
+            <div
+                class="
+                    oz-emergency-popup-heading
+                ">
+
+                <div
+                    class="
+                        oz-emergency-popup-hazard-icon
+                    ">
+                    ${hazard.icon}
+                </div>
+
+                <div>
+
+                    <div
+                        class="
+                            oz-emergency-popup-hazard
+                        ">
+                        ${escapeEmergencyHtml(
+            hazard.label)}
+                    </div>
+
+                    <strong>
+                        ${escapeEmergencyHtml(
+                headline)}
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <div
+                class="
+                    oz-emergency-popup-meta
+                ">
+
                 ${escapeEmergencyHtml(
-        headline)}
-            </strong>
+                    sourceCode)}
 
-            <br />
-
-            <small>
-                ${escapeEmergencyHtml(
-            sourceCode)}
                 · Severity ${severity}
+
                 · Urgency ${urgency}
+
                 ${simulation
-            ? " · SIMULATION"
-            : " · OFFICIAL"}
-            </small>
+                ? " · SIMULATION"
+                : " · OFFICIAL"
+            }
+
+            </div>
+
 
             ${description
-            ? `
-                        <hr />
-                        ${escapeEmergencyHtml(
-                description)}
+                ? `
+                        <div
+                            class="
+                                oz-emergency-popup-description
+                            ">
+                            ${escapeEmergencyHtml(
+                    description)}
+                        </div>
                       `
-            : ""
-        }
+                : ""
+            }
+
 
             ${instructions
-            ? `
-                        <br /><br />
+                ? `
+                        <div
+                            class="
+                                oz-emergency-popup-instructions
+                            ">
 
-                        <strong>
-                            Instructions:
-                        </strong>
+                            <strong>
+                                Consignes
+                            </strong>
 
-                        ${escapeEmergencyHtml(
-                instructions)}
+                            <div>
+                                ${escapeEmergencyHtml(
+                    instructions)}
+                            </div>
+
+                        </div>
                       `
-            : ""
-        }
+                : ""
+            }
+
 
             ${expiresAt
-            ? `
-                        <br /><br />
+                ? `
+                        <div
+                            class="
+                                oz-emergency-popup-expiry
+                            ">
 
-                        <small>
-                            Expires:
+                            Expiration :
                             ${escapeEmergencyHtml(
-                expiresAt)}
-                        </small>
+                    expiresAt)}
+
+                        </div>
                       `
-            : ""
-        }
+                : ""
+            }
 
         </div>
     `.trim();
@@ -5553,7 +5598,6 @@ function bundlePopupHtml(b, s) {
 
 const BUNDLE_POPUP_WIRING_VERSION = 3;
 
-
 function wireBundlePopupActions(marker, s, scopeKey)
 {
     if (!marker || !s?.map) {
@@ -5647,18 +5691,13 @@ export function upsertEmergencyAlert(scopeKey, alert) {
     const alertId = alert.id ?? alert.Id;
 
     if (alertId == null) {
-        console.warn(
-            "[OutZen Emergency] alert without id",
-            alert);
+        console.warn("[OutZen Emergency] alert without id", alert);
 
         return false;
     }
 
-    const key =
-        `emergency:${alertId}`;
-
-    const previous =
-        s.emergencyAlertLayers.get(key);
+    const key = `emergency:${alertId}`;
+    const previous = s.emergencyAlertLayers.get(key);
 
     if (previous) {
         try {
@@ -5672,34 +5711,17 @@ export function upsertEmergencyAlert(scopeKey, alert) {
         s.emergencyAlertLayers.delete(key);
     }
 
-    const polygon =
-        alert.polygon ??
-        alert.Polygon;
-
-    const latitude =
-        toNumLoose(
-            alert.latitude ??
-            alert.Latitude);
-
-    const longitude =
-        toNumLoose(
-            alert.longitude ??
-            alert.Longitude);
-
-    const radiusMeters =
-        toNumLoose(
-            alert.radiusMeters ??
-            alert.RadiusMeters)
-        ?? 0;
+    const polygon = alert.polygon ?? alert.Polygon;
+    const latitude = toNumLoose(alert.latitude ?? alert.Latitude);
+    const longitude = toNumLoose(alert.longitude ?? alert.Longitude);
+    const radiusMeters = toNumLoose(alert.radiusMeters ?? alert.RadiusMeters) ?? 0;
 
     let centerLatLng = null;
-
     let layer = null;
 
-    if (
-        Array.isArray(polygon) &&
-        polygon.length >= 3
-    ) {
+    if (Array.isArray(polygon) && polygon.length >= 3
+    )
+    {
         layer =
             L.polygon(
                 polygon,
@@ -5709,17 +5731,11 @@ export function upsertEmergencyAlert(scopeKey, alert) {
                     fillOpacity: 0.23
                 });
     }
-    else if (
-        latitude != null &&
-        longitude != null &&
-        radiusMeters > 0
-    ) {
+    else if (latitude != null && longitude != null && radiusMeters > 0)
+    {
         layer =
             L.circle(
-                [
-                    latitude,
-                    longitude
-                ],
+                [latitude, longitude],
                 {
                     radius: radiusMeters,
                     pane: "ozEmergencyPane",
@@ -5727,10 +5743,8 @@ export function upsertEmergencyAlert(scopeKey, alert) {
                     fillOpacity: 0.23
                 });
     }
-    else if (
-        latitude != null &&
-        longitude != null
-    ) {
+    else if (latitude != null && longitude != null)
+    {
         layer =
             L.marker(
                 [
@@ -5743,38 +5757,16 @@ export function upsertEmergencyAlert(scopeKey, alert) {
     }
 
     if (!layer) {
-        console.warn(
-            "[OutZen Emergency] " +
-            "alert has no usable geometry",
-            alert);
+        console.warn("[OutZen Emergency] " + "alert has no usable geometry", alert);
 
         return false;
     }
 
-    const escapeHtml =
-        s.utils?.escapeHtml ??
-        ((value) =>
-            String(value ?? ""));
-
-    const headline =
-        alert.headline ??
-        alert.Headline ??
-        "BE-Alert";
-
-    const description =
-        alert.description ??
-        alert.Description ??
-        "";
-
-    const instructions =
-        alert.instructions ??
-        alert.Instructions ??
-        "Consultez les informations officielles.";
-
-    const sourceCode =
-        alert.sourceCode ??
-        alert.SourceCode ??
-        "unknown";
+    const escapeHtml = s.utils?.escapeHtml ?? ((value) => String(value ?? ""));
+    const headline = alert.headline ?? alert.Headline ?? "BE-Alert";
+    const description = alert.description ?? alert.Description ?? "";
+    const instructions = alert.instructions ?? alert.Instructions ?? "Consultez les informations officielles.";
+    const sourceCode = alert.sourceCode ?? alert.SourceCode ?? "unknown";
 
     layer.bindPopup(`
         <strong>
@@ -5793,39 +5785,29 @@ export function upsertEmergencyAlert(scopeKey, alert) {
         <br />
 
         <small>
-            Source:
-            ${escapeHtml(sourceCode)}
+            Source: ${escapeHtml(sourceCode)}
         </small>
     `);
 
     layer.addTo(s.map);
 
-    s.emergencyAlertLayers.set(
-        key,
-        layer);
+    s.emergencyAlertLayers.set(key, layer);
 
     return true;
 }
 
 
-export function removeEmergencyAlert(
-    scopeKey,
-    alertId) {
-    const ready =
-        ensureMapReady(scopeKey);
+export function removeEmergencyAlert(scopeKey, alertId)
+{
+    const ready = ensureMapReady(scopeKey);
 
     if (!ready) {
         return false;
     }
 
-    const { s } =
-        ready;
-
-    const key =
-        `emergency:${alertId}`;
-
-    const layer =
-        s.emergencyAlertLayers?.get(key);
+    const { s } = ready;
+    const key = `emergency:${alertId}`;
+    const layer = s.emergencyAlertLayers?.get(key);
 
     if (!layer) {
         return false;
@@ -5895,10 +5877,7 @@ export function updateBundleMarker(b, scopeKey = "main") {
     existing.__ozBundleData = b;
 
     try {
-        existing.setLatLng([
-            b.lat,
-            b.lng
-        ]);
+        existing.setLatLng([b.lat, b.lng]);
     }
     catch {
     }
@@ -5927,21 +5906,15 @@ export function updateBundleMarker(b, scopeKey = "main") {
     catch {
     }
 
-    wireBundlePopupActions(existing, s, scopeKey
-    );
+    wireBundlePopupActions(existing, s, scopeKey);
 
     s.bundleIndex.set(b.key, b);
 }
 
-function rebuildWeatherIndex(s, weatherItems) {
-    const index = new Map();
+function rebuildWeatherIndex(s, weatherItems) {const index = new Map();
 
     for (const item of weatherItems ?? []) {
-        const id =
-            item?.Id ??
-            item?.id ??
-            item?.WeatherForecastId ??
-            item?.weatherForecastId;
+        const id = item?.Id ?? item?.id ?? item?.WeatherForecastId ?? item?.weatherForecastId;
 
         if (id == null) {
             continue;
@@ -5953,18 +5926,12 @@ function rebuildWeatherIndex(s, weatherItems) {
     s._weatherById = index;
 }
 
-export function addOrUpdateBundleMarkers(
-    payload,
-    tolMeters = 0,
-    scopeKey = null) {
+export function addOrUpdateBundleMarkers(payload, tolMeters = 0, scopeKey = null) {
 
     const ready = ensureMapReady(scopeKey);
 
     if (!ready) {
-        console.warn(
-            "[addOrUpdateBundleMarkers] map not ready",
-            { scopeKey }
-        );
+        console.warn("[addOrUpdateBundleMarkers] map not ready", { scopeKey });
 
         return false;
     }
@@ -5976,17 +5943,9 @@ export function addOrUpdateBundleMarkers(
      * s = Leaflet state of the scope
      */
     const { k, s } = ready;
-
     const requestedTolerance = Number(tolMeters);
-    const currentZoom =
-        s.map?.getZoom?.() ?? 12;
-
-    const tolFinal =
-        Number.isFinite(requestedTolerance) &&
-            requestedTolerance > 0
-
-            ? requestedTolerance
-            : bundleToleranceForZoom(currentZoom);
+    const currentZoom = s.map?.getZoom?.() ?? 12;
+    const tolFinal = Number.isFinite(requestedTolerance) && requestedTolerance > 0 ? requestedTolerance : bundleToleranceForZoom(currentZoom);
 
     s.bundleToleranceMeters = tolFinal;
 
@@ -5998,37 +5957,25 @@ export function addOrUpdateBundleMarkers(
      * Synchronize the weather index before future
      * incremental updates.
      */
-    rebuildWeatherIndex(
-        s,
-        norm.weather
-    );
+    rebuildWeatherIndex(s, norm.weather);
 
     /*
      * Single declaration.
      */
-    const bundles =
-        computeBundles(
-            norm,
-            tolFinal
-        );
+    const bundles = computeBundles(norm, tolFinal);
 
     /*
      * Removes bundles that have become obsolete.
      */
-    for (const oldKey of Array.from(
-        s.bundleMarkers.keys())) {
+    for (const oldKey of Array.from(s.bundleMarkers.keys())) {
 
         if (bundles.has(oldKey)) {
             continue;
         }
 
-        const marker =
-            s.bundleMarkers.get(oldKey);
+        const marker = s.bundleMarkers.get(oldKey);
 
-        removeLayerSmart(
-            marker,
-            s
-        );
+        removeLayerSmart(marker, s);
 
         s.bundleMarkers.delete(oldKey);
         s.bundleIndex.delete(oldKey);
@@ -6038,10 +5985,7 @@ export function addOrUpdateBundleMarkers(
      * Adds or updates the current bundles.
      */
     for (const bundle of bundles.values()) {
-        updateBundleMarker(
-            bundle,
-            k
-        );
+        updateBundleMarker(bundle, k);
     }
 
     /*
@@ -6051,30 +5995,20 @@ export function addOrUpdateBundleMarkers(
         refreshHybridVisibility(k);
     }
     catch (error) {
-        console.warn(
-            "[addOrUpdateBundleMarkers] " +
-            "hybrid refresh failed",
-            error
-        );
+        console.warn("[addOrUpdateBundleMarkers] " + "hybrid refresh failed", error);
     }
 
     /*
      * Updates the classic clusters if the
      * The plugin is active for this page.
      */
-    if (
-        s.cluster &&
-        typeof s.cluster.refreshClusters === "function"
-    ) {
+    if (s.cluster && typeof s.cluster.refreshClusters === "function")
+    {
         try {
             s.cluster.refreshClusters();
         }
         catch (error) {
-            console.warn(
-                "[addOrUpdateBundleMarkers] " +
-                "cluster refresh failed",
-                error
-            );
+            console.warn("[addOrUpdateBundleMarkers] " + "cluster refresh failed", error);
         }
     }
 
@@ -6082,18 +6016,12 @@ export function addOrUpdateBundleMarkers(
      * Optional: show markers
      * Individual weather items in bundle mode.
      */
-    if (
-        s.flags.showWeatherPinsInBundles &&
-        s.hybrid?.showing !== "details"
-    ) {
-        addOrUpdateWeatherMarkers(
-            norm.weather ?? [],
-            k
-        );
+    if (s.flags.showWeatherPinsInBundles && s.hybrid?.showing !== "details")
+    {
+        addOrUpdateWeatherMarkers(norm.weather ?? [], k);
     }
 
-    console.log(
-        "[addOrUpdateBundleMarkers] ok",
+    console.log("[addOrUpdateBundleMarkers] ok",
         {
             scopeKey: k,
             zoom: currentZoom,
@@ -6276,12 +6204,7 @@ export function fitToAntennaAlertMarkers(scopeKey = null, opts = {}) {
 
     try {
         const bounds = L.latLngBounds(latlngs);
-
-        map.fitBounds(bounds, {
-            padding: opts.padding ?? [40, 40],
-            maxZoom: opts.maxZoom ?? 9,
-            animate: true
-        });
+        map.fitBounds(bounds, {padding: opts.padding ?? [40, 40], maxZoom: opts.maxZoom ?? 9, animate: true});
 
         return true;
     } catch (err) {
@@ -6290,33 +6213,18 @@ export function fitToAntennaAlertMarkers(scopeKey = null, opts = {}) {
     }
 }
 
-export function fitToEmergencyAlertAreas(
-    scopeKey = null,
-    options = {}) {
+export function fitToEmergencyAlertAreas(scopeKey = null, options = {}) {
 
-    const ready =
-        ensureMapReady(
-            scopeKey);
+    const ready = ensureMapReady(scopeKey);
 
     if (!ready) {
         return false;
     }
 
 
-    const {
-        s,
-        L,
-        map
-    } = ready;
+    const {s, L, map} = ready;
 
-
-    const layers =
-        Array.from(
-            s.emergencyAlertAreas
-                ?.values?.()
-            ?? []
-        );
-
+    const layers = Array.from(s.emergencyAlertAreas ?.values?.() ?? []);
 
     if (layers.length === 0) {
         return false;
@@ -6330,47 +6238,27 @@ export function fitToEmergencyAlertAreas(
     for (const layer of layers) {
 
         try {
-            const layerBounds =
-                layer.getBounds?.();
+            const layerBounds = layer.getBounds?.();
 
-            if (
-                layerBounds
-                &&
-                layerBounds.isValid?.()
-            ) {
-                bounds.extend(
-                    layerBounds);
+            if (layerBounds && layerBounds.isValid?.())
+            {
+                bounds.extend(layerBounds);
             }
         }
         catch {
         }
     }
 
-
     if (!bounds.isValid()) {
         return false;
     }
 
-
-    map.fitBounds(
-        bounds.pad(
-            Number(
-                options.paddingFactor
-                ?? 0.75)),
+    map.fitBounds(bounds.pad(Number(options.paddingFactor ?? 0.75)),
         {
-            padding:
-                options.padding
-                ?? [40, 40],
-
-            maxZoom:
-                Number(
-                    options.maxZoom
-                    ?? 11),
-
-            animate:
-                false
+            padding: options.padding ?? [40, 40],
+            maxZoom: Number(options.maxZoom ?? 11),
+            animate: false
         });
-
 
     return true;
 }
@@ -6523,13 +6411,7 @@ export function pruneAntennaAlertMarkers(activeIds, scopeKey = null) {
         removed++;
     }
 
-    console.log("[ANTENNA ALERT] prune completed", {
-        scopeKey,
-        activeIds,
-        keep: Array.from(activeSet),
-        remaining: Array.from(s.antennaAlertMarkers.keys()),
-        removed
-    });
+    console.log("[ANTENNA ALERT] prune completed", {scopeKey, activeIds, keep: Array.from(activeSet), remaining: Array.from(s.antennaAlertMarkers.keys()), removed });
 
     return removed;
 }
@@ -6585,11 +6467,7 @@ export function scheduleBundleRefresh(delayMs = 150, tolMeters = 0, scopeKey = n
 
     s._bundleRefreshT = setTimeout(() => {
         try {
-            if (s.bundleLastInput) {
-                addOrUpdateBundleMarkers(
-                    s.bundleLastInput,
-                    tolMeters,
-                    k);
+            if (s.bundleLastInput) {addOrUpdateBundleMarkers(s.bundleLastInput, tolMeters, k);
             }
         } catch {
         }
@@ -6674,12 +6552,7 @@ export function debugDumpMarkers(scopeKey = null) {
     console.log("[DBG] detail keys =", Array.from(s.detailMarkers?.keys?.() ?? []));
     console.log("[DBG] calendar keys =", Array.from(s.calendarMarkers?.keys?.() ?? []));
     console.log("[DBG] antenna keys =", Array.from(s.antennaMarkers?.keys?.() ?? []));
-    console.log("[DBG] map initialized =", !!s.map,
-        "cluster =", !!s.cluster,
-        "showing=", s.hybrid?.showing,
-        "hasDetailLayer=", has(s.detailLayer),
-        "hasCalendarLayer=", has(s.calendarLayer),
-        "hasAntennaLayer=", has(s.antennaLayer)
+    console.log("[DBG] map initialized =", !!s.map, "cluster =", !!s.cluster, "showing=", s.hybrid?.showing, "hasDetailLayer=", has(s.detailLayer), "hasCalendarLayer=", has(s.calendarLayer), "hasAntennaLayer=", has(s.antennaLayer)
     );
 }
 
@@ -6880,12 +6753,7 @@ export function setWeatherChart(points, metric = "Temperature", scopeKey = null,
     const arr = Array.isArray(points) ? points : [];
     const labels = arr.map(p => String(p?.label ?? ""));
     const data = arr.map(p => Number(p?.value ?? 0));
-
-    const label =
-        metric === "Humidity" ? "Humidité (%)" :
-            metric === "Wind" ? "Vent (km/h)" :
-                metric === "Rain" ? "Pluie (mm)" :
-                    "Température (°C)";
+    const label = metric === "Humidity" ? "Humidité (%)" : metric === "Wind" ? "Vent (km/h)" : metric === "Rain" ? "Pluie (mm)" : "Température (°C)";
 
     if (!s._wxChart) {
         const ctx = canvas.getContext("2d");
@@ -6893,20 +6761,8 @@ export function setWeatherChart(points, metric = "Temperature", scopeKey = null,
 
         s._wxChart = new ChartLib(ctx, {
             type: "line",
-            data: {
-                labels,
-                datasets: [{
-                    label,
-                    data,
-                    tension: 0.25,
-                    pointRadius: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                animation: false,
-                maintainAspectRatio: false
-            }
+            data: {labels, datasets: [{label, data, tension: 0.25, pointRadius: 2}]},
+            options: {responsive: true, animation: false, maintainAspectRatio: false}
         });
         return true;
     }

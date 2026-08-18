@@ -107,7 +107,9 @@
                             </div>
                             <div class="oz-home-emergency-notice-content">
                                 <div class="oz-home-emergency-notice-source">
-                                    BE-ALERT · OFFICIAL
+
+                                    @notice.SourceCode·@(notice.SourceCode.Contains("SIM", StringComparison.OrdinalIgnoreCase) ? "SIMULATION" : "OFFICIAL")
+
                                 </div>
                                 <strong>
                                     @notice.Title
