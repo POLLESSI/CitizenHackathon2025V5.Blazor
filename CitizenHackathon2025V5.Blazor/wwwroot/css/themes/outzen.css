@@ -777,6 +777,46 @@ HIGHLIGHT / PULSE
     font-style: italic;
 }
 
+.gpt-response-pending {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    color: rgba(232, 251, 248, 0.92);
+    font-weight: 600;
+    border: 1px solid rgba(44, 226, 209, 0.20);
+    border-radius: 12px;
+    background: rgba(24, 206, 192, 0.06);
+}
+
+.gpt-response-pending-brain {
+    display: inline-block;
+    font-size: 1.15rem;
+    animation: oz-gpt-thinking 1.6s ease-in-out infinite;
+    transform-origin: center;
+    will-change: transform, filter;
+}
+
+@keyframes oz-gpt-thinking {
+
+    0%, 100% {
+        transform: translateY(0) scale(1);
+        filter: drop-shadow( 0 0 2px rgba(38, 231, 215, 0.10) );
+    }
+
+    50% {
+        transform: translateY(-2px) scale(1.08);
+        filter: drop-shadow( 0 0 8px rgba(38, 231, 215, 0.48) );
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .gpt-response-pending-brain {
+        animation: none;
+    }
+}
+
 .oz-scrollfill--gpt-history {
     flex: 1 1 auto;
     min-height: 0;
@@ -1102,6 +1142,147 @@ HIGHLIGHT / PULSE
     border-radius: 999px;
 }
 
+/* ============================================================
+   OUTZEN ASSISTANT - CONVERSATION SEQUENCE
+   ============================================================ */
+
+.oz-assistant-stage-host {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 155px;
+    overflow: hidden;
+}
+
+.oz-assistant-stage {
+    width: 100%;
+}
+
+/*
+ * Steps 1 and 2 last exactly 2 seconds.
+ *
+ * 0 -> 12 % :
+ * entrance.
+ *
+ * 12 -> 82 % :
+ * reading.
+ *
+ * 82 -> 100 % :
+ * disappearance.
+ */
+.oz-assistant-stage--temporary {
+    animation: oz-assistant-message-sequence 2s ease-in-out both;
+}
+
+/*
+ * The third step appears but no longer disappears.
+ */
+.oz-assistant-stage--final {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    animation: oz-assistant-final-in 340ms cubic-bezier(.2, .85, .25, 1) both;
+}
+
+.oz-assistant-welcome-header[data-oz-drag-handle="true"] {
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+}
+
+.oz-assistant-welcome.oz-dragging
+.oz-assistant-welcome-header[data-oz-drag-handle="true"] {
+    cursor: grabbing;
+}
+
+.oz-assistant-welcome.oz-dragging {
+    user-select: none;
+    box-shadow: 0 30px 90px rgba(0, 0, 0, 0.68), 0 0 55px rgba(25, 222, 209, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.oz-assistant-welcome-header {
+    position: relative;
+}
+
+.oz-assistant-welcome-header[data-oz-drag-handle="true"]::after {
+    content: "⋮⋮";
+    margin-left: auto;
+    margin-right: 42px;
+    color: rgba(67, 234, 220, 0.30);
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: -0.18em;
+    opacity: 0;
+    transform: translateY(-1px);
+    transition: opacity 150ms ease, color 150ms ease;
+}
+
+.oz-assistant-welcome-header[data-oz-drag-handle="true"]:hover::after {
+    opacity: 1;
+    color: rgba(67, 234, 220, 0.72);
+}
+
+@keyframes oz-assistant-message-sequence {
+
+    0% {
+        opacity: 0;
+        transform: translateY(12px) scale(0.985);
+        filter: blur(3px);
+    }
+
+    12% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+    }
+
+    82% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-9px) scale(0.99);
+        filter: blur(2px);
+    }
+}
+
+@keyframes oz-assistant-final-in {
+
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.985);
+        filter: blur(2px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        filter: blur(0);
+    }
+}
+
+.oz-assistant-avatar {
+    animation: oz-assistant-avatar-breathe 2.4s ease-in-out infinite;
+    will-change: transform, box-shadow;
+}
+
+@keyframes oz-assistant-avatar-breathe {
+
+    0%, 100% {
+        transform: translateY(0) scale(1);
+        box-shadow: 0 0 20px rgba(31, 229, 215, 0.14);
+    }
+
+    50% {
+        transform: translateY(-3px) scale(1.035);
+        box-shadow: 0 0 32px rgba(31, 229, 215, 0.30);
+    }
+}
+
 @media (max-width: 768px) {
     .oz-drawer--gpt .oz-body {
         height: calc(100vh - 140px);
@@ -1112,6 +1293,73 @@ HIGHLIGHT / PULSE
         min-height: 140px;
     }
 }
+
+/* ============================================================
+   OUTZEN ASSISTANT - HELLO HAND
+   ============================================================ */
+
+.oz-assistant-wave {
+    display: inline-block;
+    margin-left: 6px;
+    transform-origin: 72% 78%;
+    /*
+     * Avoids certain minor rendering artifacts
+     * during the rotations of the emoji.
+     */
+    backface-visibility: hidden;
+    will-change: transform;
+}
+
+.oz-assistant-wave.is-waving {
+    animation: oz-assistant-wave-hello 1.65s cubic-bezier(.36, .07, .19, .97) both;
+}
+
+@keyframes oz-assistant-wave-hello {
+
+    0% {
+        opacity: 0;
+        transform: rotate(-12deg) translateY(4px) scale(0.72);
+    }
+
+    8% {
+        opacity: 1;
+        transform: rotate(8deg) translateY(-1px) scale(1.08);
+    }
+
+    18% {
+        transform: rotate(20deg) translateY(-2px) scale(1.06);
+    }
+
+    30% {
+        transform: rotate(-12deg) translateY(-2px) scale(1.05);
+    }
+
+    42% {
+        transform: rotate(22deg) translateY(-2px) scale(1.06);
+    }
+
+    54% {
+        transform: rotate(-10deg) translateY(-1px) scale(1.05);
+    }
+
+    66% {
+        transform: rotate(18deg) translateY(-2px) scale(1.04);
+    }
+
+    78% {
+        transform: rotate(-7deg) translateY(-1px) scale(1.03);
+    }
+
+    90% {
+        transform: rotate(7deg) translateY(0) scale(1.01);
+    }
+
+    100% {
+        opacity: 1;
+        transform: rotate(0deg) translateY(0) scale(1);
+    }
+}
+
 /* =========================================================
    FULL ALERT MARKER — red critical marker
    ========================================================= */
@@ -7761,6 +8009,22 @@ HIGHLIGHT / PULSE
     .oz-zone-marker {
         animation: none !important;
     }
+    .oz-assistant-welcome-layer,
+    .oz-assistant-welcome,
+    .oz-assistant-avatar,
+    .oz-assistant-stage--temporary,
+    .oz-assistant-stage--final {
+        animation: none !important;
+    }
+
+    .oz-assistant-wave {
+        animation: none !important;
+        transform: none !important;
+    }
+
+    .oz-assistant-submit {
+        transition: none;
+    }
 }
 
 /* =========================================================
@@ -8089,6 +8353,181 @@ HIGHLIGHT / PULSE
     .oz-emergency-critical-marker::after {
         display: none;
     }
+}
+
+/* ============================================================
+   OUTZEN HOME
+   SUGGESTIONS ZEN - GLASS PANEL
+   ============================================================ */
+
+.home-page #suggestions {
+    box-sizing: border-box !important;
+    position: relative !important;
+    width: min(1050px, calc(100% - 32px)) !important;
+    margin: 14px 8px 24px 8px !important;
+    padding: 18px 22px 20px !important;
+    background: linear-gradient( 135deg, rgba(5, 12, 18, 0.90), rgba(8, 20, 24, 0.82) ) !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+    backdrop-filter: blur(10px) saturate(115%) !important;
+    -webkit-backdrop-filter: blur(10px) saturate(115%) !important;
+    color: rgba(255, 255, 255, 0.96) !important;
+    isolation: isolate;
+}
+
+
+/* ------------------------------------------------------------
+TITLE
+------------------------------------------------------------ */
+
+.home-page #suggestions h2 {
+    margin-top: 0 !important;
+    margin-bottom: 8px !important;
+    color: #ffd500 !important;
+    text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85) !important;
+}
+
+
+/* ------------------------------------------------------------
+INTRODUCTION
+------------------------------------------------------------ */
+
+.home-page #suggestions p {
+    margin-top: 0 !important;
+    margin-bottom: 10px !important;
+    color: rgba(255, 255, 255, 0.88) !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.90) !important;
+}
+
+
+/* ------------------------------------------------------------
+LIST
+------------------------------------------------------------ */
+
+.home-page #suggestions ul {
+    margin: 0 !important;
+    padding-left: 1.4rem !important;
+}
+
+
+.home-page #suggestions li {
+    margin: 3px 0 !important;
+    color: rgba(255, 255, 255, 0.96) !important;
+    line-height: 1.4 !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.92) !important;
+}
+
+
+.home-page #suggestions li::marker {
+    color: #5ce1a3 !important;
+}
+
+/* ============================================================
+   OUTZEN HOME
+   INTRO GLASS PANEL
+   Welcome -> Discover suggestions
+   ============================================================ */
+
+.home-page .home-intro-panel {
+    box-sizing: border-box !important;
+    position: relative !important;
+    width: min( 1050px, calc(100% - 32px) ) !important;
+    margin: 14px 8px 18px 8px !important;
+    padding: 18px 22px 20px !important;
+    background: linear-gradient( 135deg, rgba(5, 12, 18, 0.90), rgba(8, 20, 24, 0.82) ) !important;
+    border: 1px solid rgba(255, 255, 255, 0.16) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+    backdrop-filter: blur(10px) saturate(115%) !important;
+    -webkit-backdrop-filter: blur(10px) saturate(115%) !important;
+    color: rgba( 255, 255, 255, 0.96 ) !important;
+    isolation: isolate !important;
+}
+
+
+/* ============================================================
+INTERNAL HEADER
+The wrapper now controls spacing/background
+============================================================ */
+
+.home-page
+.home-intro-panel
+.home-header {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+
+/* ============================================================
+TITLE
+============================================================ */
+
+.home-page
+.home-intro-panel
+.index-title {
+    margin: 0 0 8px 0 !important;
+    color: #ffd500 !important;
+    text-shadow: 0 2px 6px rgba( 0, 0, 0, 0.85 ) !important;
+}
+
+
+/* ============================================================
+SUBTITLE
+============================================================ */
+
+.home-page
+.home-intro-panel
+.index-subtitle {
+    margin: 0 0 16px 0 !important;
+    color: rgba( 255, 255, 255, 0.88 ) !important;
+    text-shadow: 0 1px 3px rgba( 0, 0, 0, 0.90 ) !important;
+    line-height: 1.4 !important;
+}
+
+
+/* ============================================================
+   ACTION
+   ============================================================ */
+
+.home-page
+.home-intro-actions {
+    display: flex !important;
+    align-items: center !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+
+/* Existing button remains functional */
+.home-page
+.home-intro-panel
+.index-cta {
+    margin: 0 !important;
+}
+
+/* ============================================================
+   OUTZEN HOME
+   SHARED GLASS PANEL
+   ============================================================ */
+
+.home-page .oz-home-glass-panel {
+    box-sizing: border-box !important;
+    position: relative !important;
+    width: min( 1050px, calc(100% - 32px) ) !important;
+    margin: 14px 8px 24px 8px !important;
+    padding: 18px 22px 20px !important;
+    background: linear-gradient( 135deg, rgba(5, 12, 18, 0.90), rgba(8, 20, 24, 0.82) ) !important;
+    border: 1px solid rgba( 255, 255, 255, 0.16 ) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba( 255, 255, 255, 0.06 ) !important;
+    backdrop-filter: blur(10px) saturate(115%) !important;
+    -webkit-backdrop-filter: blur(10px) saturate(115%) !important;
+    color: rgba( 255, 255, 255, 0.96 ) !important;
+    isolation: isolate !important;
 }
 
 

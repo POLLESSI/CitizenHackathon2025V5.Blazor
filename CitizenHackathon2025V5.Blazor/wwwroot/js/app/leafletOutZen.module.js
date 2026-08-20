@@ -579,29 +579,17 @@ export async function bootOutZen({
     const host = await waitForContainer(mapId, 30);
 
     if (!host) {
-        return bootFail(
-            mapId,
-            scopeKey,
-            "container-not-found");
+        return bootFail(mapId, scopeKey, "container-not-found");
     }
 
     // Force dispose current
-    const sameMap =
-        !!s.map &&
-        s.mapContainerId === mapId;
+    const sameMap = !!s.map && s.mapContainerId === mapId;
 
-    const canReuseExistingMap =
-        sameMap &&
-        !force &&
-        !resetAll &&
-        !resetMarkers;
+    const canReuseExistingMap = sameMap && !force && !resetAll && !resetMarkers;
 
     if (canReuseExistingMap) {
         try {
-            s.map.invalidateSize({
-                animate: false,
-                debounceMoveend: true
-            });
+            s.map.invalidateSize({animate: false, debounceMoveend: true});
         } catch {
         }
 
@@ -639,10 +627,7 @@ export async function bootOutZen({
     const L = ensureLeaflet();
 
     if (!L) {
-        return bootFail(
-            mapId,
-            scopeKey,
-            "leaflet-missing");
+        return bootFail(mapId, scopeKey, "leaflet-missing");
     }
 
     // Always clean host before creating map
@@ -662,7 +647,6 @@ export async function bootOutZen({
     }).setView(center, zoom);
 
     ensureCustomPane(map, "ozCalendarPane", 5000);
-
     ensureCustomPane(map, "ozAntennaAlertPane", 9000);
 
     // Base tile
@@ -760,7 +744,6 @@ export async function bootOutZen({
 
         // safer for antenna too
         s.antennaMarkers = new Map();
-
         s._weatherById ??= new Map();
     }
 
@@ -1162,16 +1145,12 @@ export function diagnoseHighlightedMarker(scopeKey = null)
 
         reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
         runningAnimations: element ? element.getAnimations({subtree: true})
-                    .map(animation => ({animationName: animation.animationName ?? null,
-
-                        playState: animation.playState,
-
-                        currentTime: animation.currentTime,
-
-                        pseudoElement: animation.effect?.pseudoElement ?? null
-                    })
-                    )
-                : []
+            .map(animation => ({animationName: animation.animationName ?? null,
+                playState: animation.playState,
+                currentTime: animation.currentTime,
+                pseudoElement: animation.effect?.pseudoElement ?? null
+            })
+            ) : []
     };
 
     console.log("[OutZen Highlight Diagnostic]",result);
@@ -1210,7 +1189,6 @@ export async function highlightMarkerById(markerId, scopeKey = null, targetZoom 
     }
 
     const {k, s, map} = ready;
-
     const key = String(markerId ?? "");
 
     if (!key) {console.warn("[OutZen Highlight] empty marker id", {scopeKey: k});
@@ -1258,25 +1236,16 @@ export async function highlightMarkerById(markerId, scopeKey = null, targetZoom 
     const latLng = marker.getLatLng?.();
 
     if (!latLng) {
-        console.warn("[OutZen Highlight] marker has no LatLng", {markerId: key, scopeKey: k}
-        );
+        console.warn("[OutZen Highlight] marker has no LatLng", {markerId: key, scopeKey: k});
 
         return false;
     }
 
     const requestedZoom = Number(targetZoom);
-
     const minZoom = Number(map.getMinZoom?.() ?? 5);
-
     const maxZoom = Number(map.getMaxZoom?.() ?? 19);
-
-    const safeTargetZoom =
-        Number.isFinite(requestedZoom)
-            ? Math.min(maxZoom, Math.max(minZoom, requestedZoom))
-            : Math.min(maxZoom, 16);
-
-    const finalZoom =
-        Math.max(Number(map.getZoom?.() ?? minZoom), safeTargetZoom);
+    const safeTargetZoom = Number.isFinite(requestedZoom) ? Math.min(maxZoom, Math.max(minZoom, requestedZoom)) : Math.min(maxZoom, 16);
+    const finalZoom = Math.max(Number(map.getZoom?.() ?? minZoom), safeTargetZoom);
 
     /*
      * Center and zoom in on the marker.
@@ -1335,11 +1304,8 @@ export async function highlightMarkerById(markerId, scopeKey = null, targetZoom 
         latitude: latLng.lat,
         longitude: latLng.lng,
         zoom: map.getZoom?.(),
-        elementExists:
-            !!marker.getElement?.(),
-        elementClass:
-            marker.getElement?.()
-                ?.className ?? null
+        elementExists: !!marker.getElement?.(),
+        elementClass: marker.getElement?.() ?.className ?? null
     });
 
     return true;
@@ -1362,11 +1328,8 @@ export function addOrUpdateCrowdMarker(id, lat, lng, level, info, scopeKey = nul
 
     const key = String(id);
     const existing = s.markers.get(key);
-
     const popupHtml = buildPopupHtml(info ?? {}, s);
-
     const resolvedKind = info?.kind ?? (info?.weatherType ? "weather" : (info?.isTraffic ? "traffic" : "crowd"));
-
     const warn = shouldWarnMarker(resolvedKind, level, info, k);
 
     const icon = buildMarkerIcon(L, level, {
@@ -1388,7 +1351,6 @@ export function addOrUpdateCrowdMarker(id, lat, lng, level, info, scopeKey = nul
         applyWarningStateToMarker(existing, { warn, isCalendar: false });
         if (s.highlightedMarkerKey === key || existing.__ozSelected === true)
         {
-
             applySelectedStateToMarker(existing, true);
         }
         return true;
@@ -1409,7 +1371,8 @@ export function addOrUpdateCrowdMarker(id, lat, lng, level, info, scopeKey = nul
     s.markers.set(key, marker);
 
     applyWarningStateToMarker(marker, { warn, isCalendar: false });
-    if (s.highlightedMarkerKey === key) {applySelectedStateToMarker(marker, true);
+    if (s.highlightedMarkerKey === key) {
+        applySelectedStateToMarker(marker, true);
     }
     return true;
 }
@@ -1607,23 +1570,17 @@ export function addOrUpdateWeatherMarkers(items, scopeKey = null) {
     return true;
 }
 
-export function addOrUpdateFullAlertMarker(
-    alert,
-    scopeKey = "home") {
+export function addOrUpdateFullAlertMarker(alert, scopeKey = "home") {
 
     const ready = ensureMapReady(scopeKey);
 
     if (!ready) {
-        console.warn(
-            "[FULL ALERT] map not ready",
-            { scopeKey }
-        );
+        console.warn("[FULL ALERT] map not ready", { scopeKey });
 
         return false;
     }
 
     const { k, s, L, map } = ready;
-
     const ll = pickLatLng(alert);
 
     if (!ll) {
@@ -1633,13 +1590,9 @@ export function addOrUpdateFullAlertMarker(
     }
 
     const placeId = alert.PlaceId ?? alert.placeId ?? "unknown";
-
     const key = `full-alert:${placeId}`;
-
     const placeName = alert.PlaceName ?? alert.placeName ?? "FULL ALERT";
-
     const declaredAtUtc = alert.DeclaredAtUtc ?? alert.declaredAtUtc ?? new Date().toISOString();
-
     const expiresAtUtc = alert.ExpiresAtUtc ?? alert.expiresAtUtc ?? new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
     /*
@@ -1650,15 +1603,9 @@ export function addOrUpdateFullAlertMarker(
 
     const popupHtml = buildPopupHtml(
         {
-            title:
-                "🚨 FULL ALERT",
+            title: "🚨 FULL ALERT",
 
-            description:
-                `${placeName} • ` +
-                `declared at ` +
-                `${fmtTime(declaredAtUtc)} • ` +
-                `expires at ` +
-                `${fmtTime(expiresAtUtc)}`
+            description:`${placeName} • ` + `declared at ` + `${fmtTime(declaredAtUtc)} • ` + `expires at ` + `${fmtTime(expiresAtUtc)}`
         },
         s
     );
@@ -1724,7 +1671,6 @@ export function addOrUpdateFullAlertMarker(
 
         try {
             marker.options.pane = "ozCriticalAlertPane";
-
             marker.options.zIndexOffset = 50000;
         }
         catch {
@@ -1738,8 +1684,7 @@ export function addOrUpdateFullAlertMarker(
             }
         }
         catch (error) {
-            console.error("[FULL ALERT] popup update failed",error
-            );
+            console.error("[FULL ALERT] popup update failed",error);
         }
     }
 
@@ -1750,7 +1695,6 @@ export function addOrUpdateFullAlertMarker(
      */
     try {
         const hasLayer = map.hasLayer(marker);
-
         const hasElement = !!marker.getElement?.();
 
         /*
@@ -1767,8 +1711,7 @@ export function addOrUpdateFullAlertMarker(
         }
     }
     catch (error) {
-        console.error(
-            "[FULL ALERT] marker attachment failed",
+        console.error("[FULL ALERT] marker attachment failed",
             {
                 key,
                 scopeKey: k,
@@ -1781,73 +1724,41 @@ export function addOrUpdateFullAlertMarker(
         return false;
     }
 
-    const expiresMs =
-        new Date(
-            expiresAtUtc
-        ).getTime();
-
-    const effectiveExpiresMs =
-        Number.isFinite(expiresMs)
-            ? expiresMs
-            : Date.now() +
-            5 * 60 * 1000;
-
-    const delay =
-        Math.max(
-            1000,
-            effectiveExpiresMs -
-            Date.now()
-        );
+    const expiresMs = new Date(expiresAtUtc).getTime();
+    const effectiveExpiresMs = Number.isFinite(expiresMs) ? expiresMs : Date.now() + 5 * 60 * 1000;
+    const delay = Math.max(1000, effectiveExpiresMs - Date.now());
 
     clearTimeout(
         marker.__ozFullAlertTimer
     );
 
-    marker.__ozKind =
-        "full-alert";
+    marker.__ozKind = "full-alert";
 
-    marker.__ozFullAlertKey =
-        key;
-
-    marker.__ozFullAlertExpiresMs =
-        effectiveExpiresMs;
-
+    marker.__ozFullAlertKey = key;
+    marker.__ozFullAlertExpiresMs = effectiveExpiresMs;
     marker.__ozFullAlertTimer =
         setTimeout(
             () => {
                 try {
-                    removeCrowdMarker(
-                        key,
-                        k
-                    );
+                    removeCrowdMarker(key, k);
                 }
                 catch (error) {
-                    console.error(
-                        "[FULL ALERT] removal failed",
-                        error
-                    );
+                    console.error("[FULL ALERT] removal failed", error);
                 }
             },
             delay
         );
 
     requestAnimationFrame(() => {
-        console.log(
-            "[FULL ALERT] marker upserted",
+        console.log("[FULL ALERT] marker upserted",
             {
                 key,
                 scopeKey: k,
-                mapHasLayer:
-                    map.hasLayer(marker),
+                mapHasLayer: map.hasLayer(marker),
+                 
+                elementExists: !!marker.getElement?.(),
 
-                elementExists:
-                    !!marker.getElement?.(),
-
-                elementClass:
-                    marker
-                        .getElement?.()
-                        ?.className ??
-                    null,
+                elementClass: marker.getElement?.()?.className ?? null,
 
                 expiresAtUtc,
                 delay
@@ -2012,10 +1923,7 @@ export function addOrUpdateTrafficAlertMarker(alert, scopeKey = "home") {
         s.markers.set(key, marker);
     }
 
-    const expiresMs = expiresAtUtc
-        ? new Date(expiresAtUtc).getTime()
-        : Date.now() + 5 * 60 * 1000;
-
+    const expiresMs = expiresAtUtc ? new Date(expiresAtUtc).getTime() : Date.now() + 5 * 60 * 1000;
     const delay = Math.max(5 * 60 * 1000, expiresMs - Date.now());
 
     clearTimeout(marker.__ozTrafficAlertTimer);
@@ -2087,10 +1995,7 @@ export function addOrUpdateDisasterAlertMarker(alert, scopeKey = "home") {
         s.markers.set(key, marker);
     }
 
-    const expiresMs = expiresAtUtc
-        ? new Date(expiresAtUtc).getTime()
-        : Date.now() + 10 * 60 * 1000;
-
+    const expiresMs = expiresAtUtc ? new Date(expiresAtUtc).getTime() : Date.now() + 10 * 60 * 1000;
     const delay = Math.max(10 * 60 * 1000, expiresMs - Date.now());
 
     clearTimeout(marker.__ozDisasterAlertTimer);
@@ -2145,7 +2050,8 @@ export function addOrUpdateCrowdCalendarMarker(id, lat, lng, level, info, scopeK
 
     let mk = s.calendarMarkers.get(key);
 
-    if (!mk) {
+    if (!mk)
+    {
         mk = L.marker([latNum, lngNum], {
             icon,
             pane: "ozCalendarPane",
@@ -2160,10 +2066,7 @@ export function addOrUpdateCrowdCalendarMarker(id, lat, lng, level, info, scopeK
         layer.addLayer(mk);
         s.calendarMarkers.set(key, mk);
 
-        applyWarningStateToMarker(mk, {
-            warn: isCalendarWarning,
-            isCalendar: true
-        });
+        applyWarningStateToMarker(mk, {warn: isCalendarWarning, isCalendar: true});
 
         console.log("[CIC][marker:new]", { key, scopeKey: k, isCalendarWarning, pane: mk?.options?.pane });
         console.log("[CIC][warning-check]", { key, scopeKey: k, level, lvl, isCalendarWarning });
@@ -2366,12 +2269,7 @@ export function addOrUpdateAntennaMarker(antenna, scopeKey = null) {
         return true;
     }
 
-    const m = L.marker([ll.lat, ll.lng], {
-        icon,
-        title,
-        riseOnHover: true,
-        __ozNoCluster: true,
-    });
+    const m = L.marker([ll.lat, ll.lng], {icon, title, riseOnHover: true, __ozNoCluster: true,});
 
     safeBindPopup(m, popup);
     try { layer.addLayer(m); } catch { addLayerSmart(m, s); }
@@ -2401,16 +2299,10 @@ export function addOrUpdateAntennaAlertCircle(alert, scopeKey = null) {
 
     if (!alert) return false;
 
-    const status = String(alert.Status ?? alert.status ?? "")
-        .trim()
-        .toLowerCase();
-
+    const status = String(alert.Status ?? alert.status ?? "").trim().toLowerCase();
     const confirmationCount = Number(alert.ConfirmationCount ?? alert.confirmationCount ?? 0);
-
     const requestedRequiredCount = Number(alert.RequiredCount ?? alert.requiredCount ?? 4);
-
     const requiredCount = Math.max(4, Number.isFinite(requestedRequiredCount) ? requestedRequiredCount : 4);
-
     const isCommandCenter = String(scopeKey ?? "").toLowerCase() === "commandcenter";
 
     if (!isCommandCenter && (status !== "confirmed" || confirmationCount < requiredCount))
@@ -2441,19 +2333,12 @@ export function addOrUpdateAntennaAlertCircle(alert, scopeKey = null) {
     ensureCustomPane(map, "ozAntennaAlertPane", 9000);
 
     const key = String(antennaId).startsWith("antenna-alert:") ? String(antennaId) : `antenna-alert:${antennaId}`;
-
     const active = Number(alert.ActiveConnections ?? alert.activeConnections ?? 0);
-
     const unique = Number(alert.UniqueDevices ?? alert.uniqueDevices ?? 0);
-
     const severity = Number(alert.Severity ?? alert.severity ?? 4);
-
     const size = computeAntennaAlertSize(active);
-
     const title = alert.Title ?? alert.title ?? "Concentration critique détectée";
-
     const message = alert.Message ?? alert.message ?? "Concentration critique détectée.";
-
     const popupHtml = buildPopupHtml({
         title,
         description:
@@ -2523,19 +2408,14 @@ export function addOrUpdateAntennaAlertCircle(alert, scopeKey = null) {
 }
 
 function normalizeEmergencyAlertAreaKey(value) {
-    const raw =
-        String(value ?? "")
-            .trim();
+    const raw = String(value ?? "").trim();
 
     if (!raw) {
         return "";
     }
 
-    return raw.startsWith("emergency-area:")
-        ? raw
-        : `emergency-area:${raw}`;
+    return raw.startsWith("emergency-area:") ? raw : `emergency-area:${raw}`;
 }
-
 
 function parseEmergencyGeoJson(value) {
     if (!value) {
@@ -2554,17 +2434,15 @@ function parseEmergencyGeoJson(value) {
         return JSON.parse(value);
     }
     catch (error) {
-        console.warn(
-            "[EMERGENCY AREA] Invalid GeoJSON",
-            {
-                value,
-                error
-            });
+        console.warn("[EMERGENCY AREA] Invalid GeoJSON",
+        {
+            value,
+            error
+        });
 
         return null;
     }
 }
-
 
 function escapeEmergencyHtml(value) {
     return String(value ?? "")
@@ -2575,10 +2453,8 @@ function escapeEmergencyHtml(value) {
         .replaceAll("'", "&#039;");
 }
 
-
 function resolveEmergencyAreaColor(severity) {
-    const level =
-        Number(severity) || 0;
+    const level = Number(severity) || 0;
 
     if (level >= 4) {
         return "#b71c1c";
@@ -2595,67 +2471,38 @@ function resolveEmergencyAreaColor(severity) {
     return "#1565c0";
 }
 
-function normalizeEmergencyCriticalMarkerKey(value) {
-    const raw =
-        String(value ?? "")
-            .trim();
+function normalizeEmergencyCriticalMarkerKey(value) {const raw = String(value ?? "").trim();
 
     if (!raw) {
         return "";
     }
 
-    return raw.startsWith(
-        "emergency-critical:")
-        ? raw
-        : `emergency-critical:${raw}`;
+    return raw.startsWith("emergency-critical:") ? raw : `emergency-critical:${raw}`;
 }
 
-
-function resolveEmergencyCriticalLatLng(
-    L,
-    geoJson) {
+function resolveEmergencyCriticalLatLng(L, geoJson) {
 
     if (!geoJson) {
         return null;
     }
-
 
     /*
      * GeoJSON Point:
      *
      * [longitude, latitude]
      */
-    if (
-        geoJson.type === "Point"
-        &&
-        Array.isArray(
-            geoJson.coordinates)
-        &&
-        geoJson.coordinates.length >= 2
-    ) {
-        const longitude =
-            Number(
-                geoJson.coordinates[0]);
+    if (geoJson.type === "Point" && Array.isArray(geoJson.coordinates) && geoJson.coordinates.length >= 2)
+    {
+        const longitude = Number(geoJson.coordinates[0]);
+        const latitude = Number(geoJson.coordinates[1]);
 
-        const latitude =
-            Number(
-                geoJson.coordinates[1]);
-
-
-        if (
-            !Number.isFinite(latitude)
-            ||
-            !Number.isFinite(longitude)
-        ) {
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude))
+        {
             return null;
         }
 
-
-        return L.latLng(
-            latitude,
-            longitude);
+        return L.latLng(latitude, longitude);
     }
-
 
     /*
      * CAP Polygon / MultiPolygon:
@@ -2666,33 +2513,20 @@ function resolveEmergencyCriticalLatLng(
      * The full polygon remains available
      * separately for Command Center.
      */
-    if (
-        geoJson.type === "Polygon"
-        ||
-        geoJson.type === "MultiPolygon"
-    ) {
+    if (geoJson.type === "Polygon" || geoJson.type === "MultiPolygon")
+    {
         try {
-            const temporaryLayer =
-                L.geoJSON(
-                    geoJson);
+            const temporaryLayer = L.geoJSON(geoJson);
+            const bounds = temporaryLayer.getBounds();
 
-            const bounds =
-                temporaryLayer
-                    .getBounds();
-
-            if (
-                bounds
-                &&
-                bounds.isValid?.()
-            ) {
-                return bounds
-                    .getCenter();
+            if (bounds && bounds.isValid?.())
+            {
+                return bounds.getCenter();
             }
         }
         catch {
         }
     }
-
 
     return null;
 }
@@ -2916,114 +2750,65 @@ export function addOrUpdateEmergencyCriticalMarker(alert, scopeKey = null)
 
     const marker = L.marker(latLng, {pane: "ozEmergencyCriticalPane", icon, keyboard: true, riseOnHover: true, zIndexOffset: 10000, title: headline});
     const popupHtml = `
-        <div
-            class="
-                oz-emergency-popup
-                oz-emergency-popup-${hazard.key}
-            ">
-
-            <div
-                class="
-                    oz-emergency-popup-heading
-                ">
-
-                <div
-                    class="
-                        oz-emergency-popup-hazard-icon
-                    ">
+        <div class="oz-emergency-popup oz-emergency-popup-${hazard.key}">
+            <div class="oz-emergency-popup-heading">
+                <div class="oz-emergency-popup-hazard-icon">
                     ${hazard.icon}
                 </div>
 
                 <div>
-
-                    <div
-                        class="
-                            oz-emergency-popup-hazard
-                        ">
-                        ${escapeEmergencyHtml(
-            hazard.label)}
+                    <div class="oz-emergency-popup-hazard">
+                        ${escapeEmergencyHtml(hazard.label)}
                     </div>
 
                     <strong>
-                        ${escapeEmergencyHtml(
-                headline)}
+                        ${escapeEmergencyHtml(headline)}
                     </strong>
-
                 </div>
-
             </div>
 
+            <div class="oz-emergency-popup-meta">
 
-            <div
-                class="
-                    oz-emergency-popup-meta
-                ">
-
-                ${escapeEmergencyHtml(
-                    sourceCode)}
-
+                ${escapeEmergencyHtml(sourceCode)}
                 · Severity ${severity}
-
                 · Urgency ${urgency}
-
-                ${simulation
-                ? " · SIMULATION"
-                : " · OFFICIAL"
-            }
+                ${simulation ? " · SIMULATION" : " · OFFICIAL"}
 
             </div>
-
 
             ${description
                 ? `
-                        <div
-                            class="
-                                oz-emergency-popup-description
-                            ">
-                            ${escapeEmergencyHtml(
-                    description)}
-                        </div>
-                      `
+                    <div class=" oz-emergency-popup-description">
+                        ${escapeEmergencyHtml(description)}
+                    </div>
+                    `
                 : ""
             }
 
-
             ${instructions
                 ? `
-                        <div
-                            class="
-                                oz-emergency-popup-instructions
-                            ">
+                    <div class="oz-emergency-popup-instructions">
 
-                            <strong>
-                                Consignes
-                            </strong>
+                        <strong>
+                            Consignes
+                        </strong>
 
-                            <div>
-                                ${escapeEmergencyHtml(
-                    instructions)}
-                            </div>
-
+                        <div>
+                            ${escapeEmergencyHtml(instructions)}
                         </div>
-                      `
+
+                    </div>
+                    `
                 : ""
             }
 
 
             ${expiresAt
                 ? `
-                        <div
-                            class="
-                                oz-emergency-popup-expiry
-                            ">
-
-                            Expiration :
-                            ${escapeEmergencyHtml(
-                    expiresAt)}
-
-                        </div>
-                      `
-                : ""
+                    <div class="oz-emergency-popup-expiry">
+                        Expiration : ${escapeEmergencyHtml(expiresAt)}
+                    </div>
+                `: ""
             }
 
         </div>
@@ -3043,15 +2828,15 @@ export function addOrUpdateEmergencyCriticalMarker(alert, scopeKey = null)
     s.emergencyCriticalMarkers.set(key, marker);
 
     console.log("[EMERGENCY CRITICAL] upserted",
-        {
-            key,
-            scopeKey,
-            latitude: latLng.lat,
-            longitude: latLng.lng,
-            severity,
-            urgency,
-            simulation
-        });
+    {
+        key,
+        scopeKey,
+        latitude: latLng.lat,
+        longitude: latLng.lng,
+        severity,
+        urgency,
+        simulation
+    });
 
     return true;
 }
@@ -3067,136 +2852,84 @@ export function pruneEmergencyCriticalMarkers(activeIds, scopeKey = null) {
 
     s.emergencyCriticalMarkers ??= new Map();
 
-    const activeSet =
-        new Set(
-            (activeIds ?? [])
-                .filter(
-                    x =>
-                        x !== null
-                        &&
-                        x !== undefined)
-                .map(
-                    normalizeEmergencyCriticalMarkerKey)
-                .filter(
-                    Boolean)
-        );
+    const activeSet =new Set((activeIds ?? [])
+        .filter(x => x !== null &&x !== undefined)
+        .map(normalizeEmergencyCriticalMarkerKey)
+        .filter(Boolean)
+    );
 
 
-    let removed =
-        0;
+    let removed = 0;
 
-
-    for (
-        const [key, marker]
-        of Array.from(
-            s.emergencyCriticalMarkers
-                .entries())
-    ) {
-        if (
-            activeSet.has(
-                key)
-        ) {
+    for (const [key, marker] of Array.from(s.emergencyCriticalMarkers.entries()))
+    {
+        if (activeSet.has(key))
+        {
             continue;
         }
 
-
         try {
-            map.removeLayer(
-                marker);
+            map.removeLayer(marker);
         }
         catch {
         }
 
-
-        s.emergencyCriticalMarkers
-            .delete(key);
-
+        s.emergencyCriticalMarkers.delete(key);
 
         removed++;
     }
 
-
-    console.log(
-        "[EMERGENCY CRITICAL] prune",
-        {
-            scopeKey,
-            active:
-                activeSet.size,
-            remaining:
-                s.emergencyCriticalMarkers
-                    .size,
-            removed
-        });
-
+    console.log("[EMERGENCY CRITICAL] prune",
+    {
+        scopeKey,
+        active: activeSet.size,
+        remaining: s.emergencyCriticalMarkers.size,
+        removed
+    });
 
     return removed;
 }
 export function addOrUpdateEmergencyAlertArea(alert, scopeKey = null)
 {
-
-    const ready =
-        ensureMapReady(
-            scopeKey);
+    const ready = ensureMapReady(scopeKey);
 
     if (!ready) {
-        console.warn(
-            "[EMERGENCY AREA] map not ready",
-            {
-                scopeKey
-            });
+        console.warn("[EMERGENCY AREA] map not ready",
+        {
+            scopeKey
+        });
 
         return false;
     }
 
-
-    const {
-        s,
-        L,
-        map
-    } = ready;
-
+    const {s, L, map} = ready;
 
     if (!alert) {
         return false;
     }
 
-
-    const id =
-        alert.Id ??
-        alert.id;
+    const id = alert.Id ?? alert.id;
 
     if (!id) {
-        console.warn(
-            "[EMERGENCY AREA] Missing alert id",
-            alert);
+        console.warn("[EMERGENCY AREA] Missing alert id", alert);
 
         return false;
     }
 
-
-    const areaGeoJson =
-        alert.AreaGeoJson ??
-        alert.areaGeoJson;
-
-    const geoJson =
-        parseEmergencyGeoJson(
-            areaGeoJson);
+    const areaGeoJson = alert.AreaGeoJson ?? alert.areaGeoJson;
+    const geoJson = parseEmergencyGeoJson(areaGeoJson);
 
     if (!geoJson) {
-        console.warn(
-            "[EMERGENCY AREA] No geometry",
-            {
-                id,
-                areaGeoJson
-            });
+        console.warn("[EMERGENCY AREA] No geometry",
+        {
+            id,
+            areaGeoJson
+        });
 
         return false;
     }
 
-
-    s.emergencyAlertAreas ??=
-        new Map();
-
+    s.emergencyAlertAreas ??= new Map();
 
     /*
      * Existing antenna alert pane uses 9000.
@@ -3204,83 +2937,30 @@ export function addOrUpdateEmergencyAlertArea(alert, scopeKey = null)
      * Emergency AREA must remain below
      * alert markers but above ordinary map content.
      */
-    ensureCustomPane(
-        map,
-        "ozEmergencyAreaPane",
-        8800);
+    ensureCustomPane(map, "ozEmergencyAreaPane", 8800);
 
-
-    const key =
-        normalizeEmergencyAlertAreaKey(
-            id);
-
-
-    const previous =
-        s.emergencyAlertAreas
-            .get(key);
+    const key = normalizeEmergencyAlertAreaKey(id);
+    const previous = s.emergencyAlertAreas.get(key);
 
     if (previous) {
         try {
-            map.removeLayer(
-                previous);
+            map.removeLayer(previous);
         }
         catch {
         }
 
-        s.emergencyAlertAreas
-            .delete(key);
+        s.emergencyAlertAreas.delete(key);
     }
 
-
-    const severity =
-        Number(
-            alert.Severity ??
-            alert.severity ??
-            0);
-
-    const radiusMeters =
-        Number(
-            alert.RadiusMeters ??
-            alert.radiusMeters ??
-            0);
-
-    const sourceCode =
-        String(
-            alert.SourceCode ??
-            alert.sourceCode ??
-            "");
-
-    const headline =
-        alert.Headline ??
-        alert.headline ??
-        "Emergency alert";
-
-    const description =
-        alert.Description ??
-        alert.description ??
-        "";
-
-    const instructions =
-        alert.Instructions ??
-        alert.instructions ??
-        "";
-
-    const expiresAt =
-        alert.ExpiresAtUtc ??
-        alert.expiresAtUtc ??
-        null;
-
-
-    const simulation =
-        sourceCode
-            .toUpperCase()
-            .includes("SIM");
-
-
-    const color =
-        resolveEmergencyAreaColor(
-            severity);
-
+    const severity = Number(alert.Severity ?? alert.severity ?? 0);
+    const radiusMeters = Number(alert.RadiusMeters ?? alert.radiusMeters ?? 0);
+    const sourceCode = String(alert.SourceCode ?? alert.sourceCode ?? "");
+    const headline = alert.Headline ?? alert.headline ?? "Emergency alert";
+    const description = alert.Description ?? alert.description ?? "";
+    const instructions = alert.Instructions ?? alert.instructions ?? "";
+    const expiresAt = alert.ExpiresAtUtc ?? alert.expiresAtUtc ?? null;
+    const simulation = sourceCode.toUpperCase().includes("SIM");
+    const color = resolveEmergencyAreaColor(severity);
 
     const style = {
         pane: "ozEmergencyAreaPane",
@@ -3293,12 +2973,9 @@ export function addOrUpdateEmergencyAlertArea(alert, scopeKey = null)
         interactive: true
     };
 
-    let centerLatLng =
-        null;
+    let centerLatLng = null;
 
-    let layer =
-        null;
-
+    let layer = null;
 
     /*
      * CAP circle:
@@ -3306,31 +2983,15 @@ export function addOrUpdateEmergencyAlertArea(alert, scopeKey = null)
      * GeoJSON Point = center.
      * RadiusMeters = real radius in metres.
      */
-    if (
-        geoJson.type === "Point"
-        &&
-        Array.isArray(
-            geoJson.coordinates)
-        &&
-        geoJson.coordinates.length >= 2
-    ) {
-        const longitude =
-            Number(
-                geoJson.coordinates[0]);
+    if (geoJson.type === "Point" && Array.isArray(geoJson.coordinates) && geoJson.coordinates.length >= 2)
+    {
+        const longitude = Number(geoJson.coordinates[0]);
+        const latitude = Number(geoJson.coordinates[1]);
 
-        const latitude =
-            Number(
-                geoJson.coordinates[1]);
-
-
-        if (
-            !Number.isFinite(latitude)
-            ||
-            !Number.isFinite(longitude)
-        ) {
+        if (!Number.isFinite(latitude) || !Number.isFinite(longitude))
+        {
             return false;
         }
-
 
         /*
          * Remember the center.
@@ -3338,27 +2999,16 @@ export function addOrUpdateEmergencyAlertArea(alert, scopeKey = null)
          * The fixed visual marker will only
          * be created AFTER popupHtml exists.
          */
-        centerLatLng =
-            [
-                latitude,
-                longitude
-            ];
+        centerLatLng = [latitude, longitude];
 
-
-        if (
-            Number.isFinite(
-                radiusMeters)
-            &&
-            radiusMeters > 0
-        ) {
+        if (Number.isFinite(radiusMeters) && radiusMeters > 0)
+        {
             layer =
                 L.circle(
                     centerLatLng,
                     {
                         ...style,
-
-                        radius:
-                            radiusMeters
+                        radius: radiusMeters
                     });
         }
         else {
@@ -3367,9 +3017,7 @@ export function addOrUpdateEmergencyAlertArea(alert, scopeKey = null)
                     centerLatLng,
                     {
                         ...style,
-
-                        radius:
-                            12
+                        radius: 12
                     });
         }
     }
@@ -3378,20 +3026,15 @@ export function addOrUpdateEmergencyAlertArea(alert, scopeKey = null)
     /*
      * CAP polygon / multipolygon.
      */
-    else if (
-        geoJson.type === "Polygon"
-        ||
-        geoJson.type === "MultiPolygon"
-    ) {
+    else if (geoJson.type === "Polygon" || geoJson.type === "MultiPolygon")
+    {
         layer =
             L.geoJSON(
                 geoJson,
                 {
-                    style:
-                        () => style
+                    style: () => style
                 });
     }
-
 
     if (!layer) {
         console.warn(
@@ -3399,8 +3042,7 @@ export function addOrUpdateEmergencyAlertArea(alert, scopeKey = null)
             {
                 id,
 
-                geometryType:
-                    geoJson.type
+                geometryType: geoJson.type
             });
 
         return false;
@@ -3409,29 +3051,19 @@ export function addOrUpdateEmergencyAlertArea(alert, scopeKey = null)
     /*
      * CAP polygon / multipolygon.
      */
-    else if (
-        geoJson.type === "Polygon"
-        ||
-        geoJson.type === "MultiPolygon"
-    ) {
+    else if (geoJson.type === "Polygon" || geoJson.type === "MultiPolygon")
+    {
         layer =
             L.geoJSON(
                 geoJson,
                 {
-                    style:
-                        () => style
+                    style: () => style
                 });
     }
 
 
     if (!layer) {
-        console.warn(
-            "[EMERGENCY AREA] Unsupported geometry",
-            {
-                id,
-                geometryType:
-                    geoJson.type
-            });
+        console.warn("[EMERGENCY AREA] Unsupported geometry", {id, geometryType: geoJson.type});
 
         return false;
     }
@@ -3442,76 +3074,33 @@ export function addOrUpdateEmergencyAlertArea(alert, scopeKey = null)
 
             <strong>
                 ${simulation ? "🧪" : "🚨"}
-                ${escapeEmergencyHtml(
-        headline)}
+                ${escapeEmergencyHtml(headline)}
             </strong>
 
             <br />
 
             <small>
-                ${escapeEmergencyHtml(
-            sourceCode)}
-                · Severity ${severity}
-                ${simulation
-            ? " · SIMULATION"
-            : " · OFFICIAL"}
+                ${escapeEmergencyHtml(sourceCode)}· Severity ${severity} ${simulation ? " · SIMULATION" : " · OFFICIAL"}
             </small>
 
-            ${description
-            ? `
-                        <hr />
-                        ${escapeEmergencyHtml(
-                description)}
-                      `
-            : ""
-        }
+            ${description ? `<hr /> ${escapeEmergencyHtml(description)}` : ""}
 
-            ${instructions
-            ? `
-                        <br /><br />
+            ${instructions ? `<br /><br /><strong>Instructions: </strong> ${escapeEmergencyHtml(instructions)}`: ""}
 
-                        <strong>
-                            Instructions:
-                        </strong>
-
-                        ${escapeEmergencyHtml(
-                instructions)}
-                      `
-            : ""
-        }
-
-            ${expiresAt
-            ? `
-                        <br /><br />
-
-                        <small>
-                            Expires:
-                            ${escapeEmergencyHtml(
-                expiresAt)}
-                        </small>
-                      `
-            : ""
-        }
+            ${expiresAt ? `<br /><br /><small> Expires: ${escapeEmergencyHtml(expiresAt)}</small>` : ""}
 
         </div>
     `.trim();
 
-
-    safeBindPopup(
-        layer,
-        popupHtml);
+    safeBindPopup(layer, popupHtml);
 
         /*
      * Add the real geographic area first.
      */
     layer.addTo(map);
 
-
-    s.emergencyAlertAreas
-        .set(
-            key,
-            layer);
-
+    s.emergencyAlertAreas ??= new Map();
+    s.emergencyAlertAreas.set(key, layer);
 
     /*
      * Add a fixed-size visual anchor AFTER
@@ -3520,93 +3109,50 @@ export function addOrUpdateEmergencyAlertArea(alert, scopeKey = null)
      * It remains visible even at low zoom.
      */
     if (centerLatLng) {
+        s.emergencyAlertMarkers ??= new Map();
 
-        s.emergencyAlertMarkers ??=
-            new Map();
-
-
-        const markerKey =
-            `emergency-marker:${id}`;
-
-
-        const previousMarker =
-            s.emergencyAlertMarkers
-                .get(markerKey);
-
+        const markerKey = `emergency-marker:${id}`;
+        const previousMarker = s.emergencyAlertMarkers.get(markerKey);
 
         if (previousMarker) {
             try {
-                map.removeLayer(
-                    previousMarker);
+                map.removeLayer(previousMarker);
             }
             catch {
             }
 
-            s.emergencyAlertMarkers
-                .delete(markerKey);
+            s.emergencyAlertMarkers.delete(markerKey);
         }
-
 
         const centerMarker =
             L.circleMarker(
                 centerLatLng,
                 {
-                    pane:
-                        "ozEmergencyAreaPane",
-
-                    radius:
-                        simulation
-                            ? 8
-                            : 10,
-
-                    color:
-
-                        simulation
-                            ? "#ffffff"
-                            : color,
-
-                    weight:
-                        3,
-
-                    opacity:
-                        1,
-
-                    fillColor:
-                        color,
-
-                    fillOpacity:
-                        0.95,
-
-                    interactive:
-                        true
+                    pane: "ozEmergencyAreaPane",
+                    radius: simulation ? 8 : 10,
+                    color:simulation ? "#ffffff": color,
+                    weight: 3,
+                    opacity: 1,
+                    fillColor: color,
+                    fillOpacity: 0.95,
+                    interactive: true
                 });
 
+        safeBindPopup(centerMarker, popupHtml);
 
-        safeBindPopup(
-            centerMarker,
-            popupHtml);
-
-
-        centerMarker.addTo(
-            map);
-
+        centerMarker.addTo(map);
 
         /*
          * Explicitly put the visual anchor
          * above the geographic circle.
          */
         try {
-            centerMarker
-                .bringToFront?.();
+            centerMarker.bringToFront?.();
         }
         catch {
         }
 
-
-        s.emergencyAlertMarkers
-            .set(
-                markerKey,
-                centerMarker);
+        s.emergencyAlertMarkers.set(markerKey, centerMarker);
     }
 
     console.log("[EMERGENCY AREA] upserted",
@@ -3625,135 +3171,73 @@ export function addOrUpdateEmergencyAlertArea(alert, scopeKey = null)
     return true;
 }
 
-export function pruneEmergencyAlertAreas(
-    activeIds,
-    scopeKey = null) {
+export function pruneEmergencyAlertAreas(activeIds, scopeKey = null) {
 
-    const ready =
-        ensureMapReady(
-            scopeKey);
+    const ready = ensureMapReady(scopeKey);
 
     if (!ready) {
         return 0;
     }
 
 
-    const {
-        s,
-        map
-    } = ready;
+    const {s, map} = ready;
 
 
-    s.emergencyAlertAreas ??=
-        new Map();
+    s.emergencyAlertAreas ??= new Map();
 
-
-    const activeSet =
-        new Set(
-            (activeIds ?? [])
-                .filter(
-                    x =>
-                        x !== null
-                        &&
-                        x !== undefined)
-                .map(
-                    normalizeEmergencyAlertAreaKey)
-                .filter(
-                    x =>
-                        x.length > 0)
-        );
-
+    const activeSet = new Set((activeIds ?? []).filter(x => x !== null && x !== undefined)
+        .map(normalizeEmergencyAlertAreaKey)
+        .filter(x => x.length > 0));
 
     let removed = 0;
 
-
-    for (
-        const [key, layer]
-        of Array.from(
-            s.emergencyAlertAreas
-                .entries())
-    ) {
-        if (
-            activeSet.has(
-                key)
-        ) {
+    for (const [key, layer] of Array.from(s.emergencyAlertAreas.entries()))
+    {
+        if (activeSet.has(key))
+        {
             continue;
         }
 
 
         try {
-            map.removeLayer(
-                layer);
+            map.removeLayer(layer);
         }
         catch {
         }
 
 
-        s.emergencyAlertAreas
-            .delete(key);
-
+        s.emergencyAlertAreas.delete(key);
         removed++;
     }
 
-    s.emergencyAlertMarkers ??=
-        new Map();
+    s.emergencyAlertMarkers ??= new Map();
 
+    const activeMarkerSet = new Set((activeIds ?? [])
+        .filter(x => x !== null && x !== undefined)
+        .map(x => `emergency-marker:${String(x).trim()}`));
 
-    const activeMarkerSet =
-        new Set(
-            (activeIds ?? [])
-                .filter(
-                    x =>
-                        x !== null
-                        &&
-                        x !== undefined)
-                .map(
-                    x =>
-                        `emergency-marker:${String(x).trim()
-                        }`)
-        );
-
-
-    for (
-        const [key, marker]
-        of Array.from(
-            s.emergencyAlertMarkers
-                .entries())
-    ) {
-        if (
-            activeMarkerSet.has(
-                key)
-        ) {
+    for (const [key, marker] of Array.from(s.emergencyAlertMarkers.entries()))
+    {
+        if (activeMarkerSet.has(key)) {
             continue;
         }
 
-
         try {
-            map.removeLayer(
-                marker);
+            map.removeLayer(marker);
         }
         catch {
         }
 
-
-        s.emergencyAlertMarkers
-            .delete(
-                key);
+        s.emergencyAlertMarkers.delete(key);
     }
 
-
-    console.log(
-        "[EMERGENCY AREA] prune completed",
-        {
-            scopeKey,
-            activeIds,
-            remaining:
-                Array.from(
-                    s.emergencyAlertAreas
-                        .keys()),
-            removed
-        });
-
+    console.log("[EMERGENCY AREA] prune completed",
+    {
+        scopeKey,
+        activeIds,
+        remaining: Array.from(s.emergencyAlertAreas.keys()),
+        removed
+    });
 
     return removed;
 }
@@ -3763,9 +3247,7 @@ export function removeAntennaAlertCircle(antennaId, scopeKey = null) {
 
     const { s } = ready;
 
-    const key = String(antennaId).startsWith("antenna-alert:")
-        ? String(antennaId)
-        : `antenna-alert:${antennaId}`;
+    const key = String(antennaId).startsWith("antenna-alert:") ? String(antennaId) : `antenna-alert:${antennaId}`;
 
     const marker = s.antennaAlertMarkers?.get(key);
     if (!marker) return true;
@@ -3931,11 +3413,7 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
     if (kindLower === "weather") {
         const severe = !!(item?.IsSevere ?? item?.isSevere);
         const level = severe ? 4 : 2;
-
-        const icon = buildMarkerIcon(L, level, {
-            kind: "weather",
-            weatherType: (item?.WeatherType ?? item?.weatherType ?? "").toString(),
-        });
+        const icon = buildMarkerIcon(L, level, {kind: "weather", weatherType: (item?.WeatherType ?? item?.weatherType ?? "").toString(),});
 
         const m = L.marker([ll.lat, ll.lng], {
             icon,
@@ -3969,10 +3447,7 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
             __ozNoCluster: true
         });
 
-        safeBindPopup(m, buildPopupHtml({
-            title,
-            description: item?.Description ?? item?.description ?? ""
-        }, s));
+        safeBindPopup(m, buildPopupHtml({title, description: item?.Description ?? item?.description ?? ""}, s));
 
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
@@ -3993,10 +3468,7 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
             __ozNoCluster: true
         });
 
-        safeBindPopup(m, buildPopupHtml({
-            title,
-            description: item?.Description ?? item?.description ?? ""
-        }, s));
+        safeBindPopup(m, buildPopupHtml({title, description: item?.Description ?? item?.description ?? ""}, s));
 
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
@@ -4017,10 +3489,7 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
             __ozNoCluster: true
         });
 
-        safeBindPopup(m, buildPopupHtml({
-            title,
-            description: item?.Message ?? item?.message ?? ""
-        }, s));
+        safeBindPopup(m, buildPopupHtml({title, description: item?.Message ?? item?.message ?? ""}, s));
 
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
@@ -4031,25 +3500,10 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
     // --- Traffic
     if (kindLower === "traffic") {
         const level = clampLevel14(item?.TrafficLevel ?? item?.trafficLevel ?? item?.CongestionLevel ?? item?.level ?? 2);
-        const icon = buildMarkerIcon(L, level, {
-            kind: "traffic",
-            isTraffic: true,
-            iconOverride: "🚗"
-        });
+        const icon = buildMarkerIcon(L, level, {kind: "traffic", isTraffic: true, iconOverride: "🚗"});
+        const m = L.marker([ll.lat, ll.lng], {icon, title: `Traffic: ${title}`, riseOnHover: true, pane: "markerPane",  __ozNoCluster: true});
 
-        const m = L.marker([ll.lat, ll.lng], {
-            icon,
-            title: `Traffic: ${title}`,
-            riseOnHover: true,
-            pane: "markerPane",
-            __ozNoCluster: true
-        });
-
-        safeBindPopup(m, buildPopupHtml({
-            title,
-            description: item?.Description ?? item?.description ?? ""
-        }, s));
-
+        safeBindPopup(m, buildPopupHtml({title, description: item?.Description ?? item?.description ?? ""}, s));
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
 
@@ -4059,9 +3513,7 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
     // --- Suggestion
     if (kindLower === "suggestion") {
         const level = 2;
-        const icon = buildMarkerIcon(L, level, {
-            kind: "suggestion",
-            iconOverride: "💡"
+        const icon = buildMarkerIcon(L, level, {kind: "suggestion", iconOverride: "💡"
         });
 
         const m = L.marker([ll.lat, ll.lng], {
@@ -4079,10 +3531,7 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
             (item?.DistanceKm != null) ? `Distance: ${item.DistanceKm} km` : null,
         ].filter(Boolean).join(" • ");
 
-        safeBindPopup(m, buildPopupHtml({
-            title,
-            description: popupDesc
-        }, s));
+        safeBindPopup(m, buildPopupHtml({title, description: popupDesc}, s));
 
         const sid = Number(item?.SuggestionId ?? item?.suggestionId ?? item?.Id ?? item?.id);
         m.on("click", () => {
@@ -4109,36 +3558,20 @@ function addDetailMarker(kind, item, s, L, scopeKey) {
     {
         const level = 1;
         const icon = buildMarkerIcon(L, level, { kind: kindLower });
+        const m = L.marker([ll.lat, ll.lng], {icon, title: `${kindLower}: ${title}`, riseOnHover: true, pane: "markerPane", __ozNoCluster: true});
 
-        const m = L.marker([ll.lat, ll.lng], {
-            icon,
-            title: `${kindLower}: ${title}`,
-            riseOnHover: true,
-            pane: "markerPane",
-            __ozNoCluster: true
-        });
-
-        safeBindPopup(m, buildPopupHtml({
-            title,
-            description: item?.Description ?? item?.description ?? ""
-        }, s));
+        safeBindPopup(m, buildPopupHtml({title, description: item?.Description ?? item?.description ?? ""}, s));
 
         layer.addLayer(m);
         s.detailMarkers.set(key, m);
 
-        applyWarningStateToMarker(m, {
-            warn: shouldWarnMarker(kindLower, level, item, scopeKey),
-            isCalendar: false
+        applyWarningStateToMarker(m, {warn: shouldWarnMarker(kindLower, level, item, scopeKey), isCalendar: false
         });
     }
 }
 
-export function addOrUpdateDetailMarkers(
-    payload,
-    scopeKey = null) {
-
-    const ready =
-        ensureMapReady(scopeKey);
+export function addOrUpdateDetailMarkers(payload, scopeKey = null) {
+    const ready = ensureMapReady(scopeKey);
 
     if (!ready) {
         return false;
@@ -4148,22 +3581,14 @@ export function addOrUpdateDetailMarkers(
 
     clearDetailMarkers(s);
 
-    const norm =
-        normalizePayload(payload);
-
+    const norm = normalizePayload(payload);
     const push = (items, kind) => {
         if (!Array.isArray(items)) {
             return;
         }
 
         for (const item of items) {
-            addDetailMarker(
-                kind,
-                item,
-                s,
-                L,
-                k
-            );
+            addDetailMarker(kind, item, s, L, k);
         }
     };
 
@@ -4175,8 +3600,7 @@ export function addOrUpdateDetailMarkers(
     push(norm.suggestions, "suggestion");
     push(norm.gpt, "gpt");
 
-    console.log(
-        "[OutZen details] markers created",
+    console.log("[OutZen details] markers created",
         {
             scopeKey: k,
             events: norm.events.length,
@@ -4186,27 +3610,22 @@ export function addOrUpdateDetailMarkers(
             weather: norm.weather.length,
             suggestions: norm.suggestions.length,
             gpt: norm.gpt.length,
-            markerCount:
-                s.detailMarkers.size
+            markerCount: s.detailMarkers.size
         }
     );
 
     return true;
 }
 
-function showSelectedBundleDetails(
-    bundle,
-    scopeKey = null) {
+function showSelectedBundleDetails(bundle, scopeKey = null) {
 
-    const ready =
-        ensureMapReady(scopeKey);
+    const ready = ensureMapReady(scopeKey);
 
     if (!ready || !bundle) {
         return false;
     }
 
-    const { k, s, L, map } =
-        ready;
+    const { k, s, L, map } = ready;
 
     /*
      * Clear the old details.
@@ -4216,8 +3635,7 @@ function showSelectedBundleDetails(
     /*
      * Hide all bundles.
      */
-    for (const bundleMarker
-        of s.bundleMarkers.values()) {
+    for (const bundleMarker of s.bundleMarkers.values()) {
 
         try {
             if (map.hasLayer(bundleMarker)) {
@@ -4234,13 +3652,7 @@ function showSelectedBundleDetails(
         }
 
         for (const item of items) {
-            addDetailMarker(
-                kind,
-                item,
-                s,
-                L,
-                k
-            );
+            addDetailMarker(kind, item, s, L, k);
         }
     };
 
@@ -4259,17 +3671,14 @@ function showSelectedBundleDetails(
     s.flags.userLockedMode = true;
     s.hybrid.enabled = true;
     s.hybrid.showing = "details";
-    s.activeDetailBundleKey =
-        bundle.key ?? null;
+    s.activeDetailBundleKey = bundle.key ?? null;
 
     const positions = [];
 
-    for (const detailMarker
-        of s.detailMarkers.values()) {
+    for (const detailMarker of s.detailMarkers.values()) {
 
         try {
-            const latLng =
-                detailMarker.getLatLng?.();
+            const latLng = detailMarker.getLatLng?.();
 
             if (latLng) {
                 positions.push(latLng);
@@ -4280,14 +3689,7 @@ function showSelectedBundleDetails(
     }
 
     if (positions.length === 0) {
-        console.warn(
-            "[Bundle details] no marker created",
-            {
-                scopeKey: k,
-                bundleKey: bundle.key,
-                bundle
-            }
-        );
+        console.warn("[Bundle details] no marker created", {scopeKey: k, bundleKey: bundle.key, bundle});
 
         /*
          * Do not leave the card blank.
@@ -4295,8 +3697,8 @@ function showSelectedBundleDetails(
         s.flags.userLockedMode = false;
         s.hybrid.showing = "bundles";
 
-        for (const bundleMarker
-            of s.bundleMarkers.values()) {
+        for (const bundleMarker of s.bundleMarkers.values())
+        {
 
             try {
                 if (!map.hasLayer(bundleMarker)) {
@@ -4314,74 +3716,35 @@ function showSelectedBundleDetails(
         if (positions.length === 1) {
             map.setView(
                 positions[0],
-                Math.max(
-                    Number(s.hybrid.threshold) || 14,
-                    15
-                ),
+                Math.max(Number(s.hybrid.threshold) || 14, 15),
                 {
                     animate: true
                 }
             );
         }
         else {
-            const bounds =
-                L.latLngBounds(positions);
+            const bounds = L.latLngBounds(positions);
 
-            map.fitBounds(
-                bounds,
-                {
-                    padding: [45, 45],
-                    maxZoom: 16,
-                    animate: true
-                }
-            );
+            map.fitBounds(bounds, {padding: [45, 45], maxZoom: 16, animate: true});
         }
     }
     catch (error) {
-        console.warn(
-            "[Bundle details] fit failed",
-            error
-        );
+        console.warn("[Bundle details] fit failed", error);
 
-        map.setView(
-            [
-                Number(bundle.lat),
-                Number(bundle.lng)
-            ],
-            15,
-            {
-                animate: false
-            }
-        );
+        map.setView([Number(bundle.lat), Number(bundle.lng)], 15,{animate: false});
     }
 
-    console.log(
-        "[Bundle details] visible",
+    console.log("[Bundle details] visible",
         {
             scopeKey: k,
-            bundleKey:
-                bundle.key,
-
-            markerCount:
-                s.detailMarkers.size,
-
-            zoom:
-                map.getZoom?.(),
-
-            places:
-                bundle.places?.length ?? 0,
-
-            events:
-                bundle.events?.length ?? 0,
-
-            crowds:
-                bundle.crowds?.length ?? 0,
-
-            traffic:
-                bundle.traffic?.length ?? 0,
-
-            weather:
-                bundle.weather?.length ?? 0
+            bundleKey: bundle.key,
+            markerCount: s.detailMarkers.size,
+            zoom: map.getZoom?.(),
+            places: bundle.places?.length ?? 0,
+            events: bundle.events?.length ?? 0,
+            crowds: bundle.crowds?.length ?? 0,
+            traffic: bundle.traffic?.length ?? 0,
+            weather: bundle.weather?.length ?? 0
         }
     );
 
@@ -4466,11 +3829,8 @@ function refreshHybridVisibility(scopeKey = null) {
     if (s._hybridSwitching) return;
 
     if (s.flags?.userLockedMode) {
-        const zoom =
-            Number(map.getZoom?.()) || 0;
-
-        const threshold =
-            Number(s.hybrid.threshold) || 14;
+        const zoom = Number(map.getZoom?.()) || 0;
+        const threshold = Number(s.hybrid.threshold) || 14;
 
         /*
          * If the user drops back below the threshold,
@@ -4480,10 +3840,7 @@ function refreshHybridVisibility(scopeKey = null) {
             s.flags.userLockedMode = false;
             s.activeDetailBundleKey = null;
 
-            switchToBundles(
-                s,
-                map
-            );
+            switchToBundles(s, map);
 
             return;
         }
@@ -4492,7 +3849,8 @@ function refreshHybridVisibility(scopeKey = null) {
          * Keep the selected details.
          * Do not rebuild the global details.
          */
-        if (s.hybrid.showing !== "details") {
+        if (s.hybrid.showing !== "details")
+        {
             s.hybrid.showing = "details";
         }
 
@@ -4535,26 +3893,19 @@ export function enableHybridZoom(enabled = true, threshold = 13, scopeKey = "mai
             const zoom = s.map?.getZoom?.() ?? 12;
             const threshold = Number(s.hybrid.threshold) || 13;
 
-            if (!s.flags?.userLockedMode &&
-                zoom < threshold &&
-                s.bundleLastInput) {
-
+            if (!s.flags?.userLockedMode && zoom < threshold && s.bundleLastInput)
+            {
                 const nextTolerance = bundleToleranceForZoom(zoom);
 
                 if (nextTolerance !== s.bundleToleranceMeters) {
-                    addOrUpdateBundleMarkers(
-                        s.bundleLastInput,
-                        0,
-                        k);
+                    addOrUpdateBundleMarkers(s.bundleLastInput, 0, k);
                 }
             }
-
             refreshHybridVisibility(k);
         }, 180);
         s._hybridHandler = h;
         try { s.map.on("zoomend", h); } catch { }
     }
-
     refreshHybridVisibility(k);
     return true;
 }
@@ -4595,8 +3946,7 @@ export function refreshHybridNow(scopeKey = null) {
    Bundles (group by proximity)
 --------------------------------------------------------- */
 function bundleToleranceForZoom(zoom) {
-    const z =
-        Number(zoom) || 12;
+    const z = Number(zoom) || 12;
 
     if (z <= 7) return 20_000;
     if (z === 8) return 10_000;
@@ -4616,11 +3966,7 @@ function haversineMeters(lat1, lng1, lat2, lng2) {
     const dLat = toRadians(lat2 - lat1);
     const dLng = toRadians(lng2 - lng1);
 
-    const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRadians(lat1)) *
-        Math.cos(toRadians(lat2)) *
-        Math.sin(dLng / 2) ** 2;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLng / 2) ** 2;
 
     return 2 * earthRadiusMeters * Math.asin(Math.sqrt(a));
 }
@@ -4635,11 +3981,7 @@ function flattenBundlePayload(payload) {
             const ll = pickLatLng(item);
             if (!ll) continue;
 
-            points.push({
-                kind,
-                item,
-                lat: ll.lat,
-                lng: ll.lng
+            points.push({kind, item, lat: ll.lat, lng: ll.lng
             });
         }
     };
@@ -4653,10 +3995,7 @@ function flattenBundlePayload(payload) {
     append(payload.gpt, "gpt");
 
     // A stable order limits the unnecessary recreation of bundles.
-    points.sort((a, b) =>
-        a.lat - b.lat ||
-        a.lng - b.lng ||
-        a.kind.localeCompare(b.kind));
+    points.sort((a, b) => a.lat - b.lat || a.lng - b.lng || a.kind.localeCompare(b.kind));
 
     return points;
 }
@@ -4666,19 +4005,15 @@ function computeBundles(payload, tolMeters) {
     const referenceLatitude = 50.5;
 
     const metersPerDegreeLatitude = 111_320;
-    const metersPerDegreeLongitude =
-        111_320 * Math.cos(referenceLatitude * Math.PI / 180);
-
+    const metersPerDegreeLongitude = 111_320 * Math.cos(referenceLatitude * Math.PI / 180);
     const points = flattenBundlePayload(payload);
     const grid = new Map();
     const bundles = [];
 
     const getCell = (lat, lng) => {
-        const y = Math.floor(
-            lat * metersPerDegreeLatitude / radiusMeters);
+        const y = Math.floor(lat * metersPerDegreeLatitude / radiusMeters);
 
-        const x = Math.floor(
-            lng * metersPerDegreeLongitude / radiusMeters);
+        const x = Math.floor(lng * metersPerDegreeLongitude / radiusMeters);
 
         return { x, y, key: `${x}:${y}` };
     };
@@ -4717,10 +4052,7 @@ function computeBundles(payload, tolMeters) {
             index;
 
         const bundle = {
-            key:
-                `bundle:${point.kind}:${id}:` +
-                `${Math.round(point.lat * 100_000)}:` +
-                `${Math.round(point.lng * 100_000)}`,
+            key: `bundle:${point.kind}:${id}:` + `${Math.round(point.lat * 100_000)}:` + `${Math.round(point.lng * 100_000)}`,
 
             lat: point.lat,
             lng: point.lng,
@@ -4773,8 +4105,7 @@ function computeBundles(payload, tolMeters) {
         // or the current cell.
         for (let dy = -1; dy <= 1; dy++) {
             for (let dx = -1; dx <= 1; dx++) {
-                const candidateCell =
-                    grid.get(`${cell.x + dx}:${cell.y + dy}`);
+                const candidateCell = grid.get(`${cell.x + dx}:${cell.y + dy}`);
 
                 if (!candidateCell) continue;
 
@@ -4788,15 +4119,10 @@ function computeBundles(payload, tolMeters) {
         let selectedDistance = Number.POSITIVE_INFINITY;
 
         for (const bundle of candidates) {
-            const distance = haversineMeters(
-                point.lat,
-                point.lng,
-                bundle.lat,
-                bundle.lng);
+            const distance = haversineMeters(point.lat, point.lng, bundle.lat, bundle.lng);
 
-            if (distance <= radiusMeters &&
-                distance < selectedDistance) {
-
+            if (distance <= radiusMeters && distance < selectedDistance)
+            {
                 selectedBundle = bundle;
                 selectedDistance = distance;
             }
@@ -4833,10 +4159,7 @@ function pickWeatherLevel(item) {
 }
 
 function pickEventLevel(item) {
-    const expectedCrowd = readNumber(
-        item,
-        "ExpectedCrowd",
-        "expectedCrowd");
+    const expectedCrowd = readNumber(item, "ExpectedCrowd", "expectedCrowd");
 
     if (expectedCrowd == null) return 1;
     if (expectedCrowd >= 50_000) return 4;
@@ -4849,27 +4172,19 @@ function bundleSeverity(b) {
     let severity = 1;
 
     for (const crowd of b?.crowds ?? []) {
-        severity = Math.max(
-            severity,
-            pickCrowdLevel(crowd));
+        severity = Math.max(severity, pickCrowdLevel(crowd));
     }
 
     for (const traffic of b?.traffic ?? []) {
-        severity = Math.max(
-            severity,
-            pickTrafficLevel(traffic));
+        severity = Math.max(severity, pickTrafficLevel(traffic));
     }
 
     for (const weather of b?.weather ?? []) {
-        severity = Math.max(
-            severity,
-            pickWeatherLevel(weather));
+        severity = Math.max(severity, pickWeatherLevel(weather));
     }
 
     for (const event of b?.events ?? []) {
-        severity = Math.max(
-            severity,
-            pickEventLevel(event));
+        severity = Math.max(severity, pickEventLevel(event));
     }
 
     return severity;
@@ -4925,45 +4240,13 @@ function makeBadgeIcon(totalCount, severity = 1, b = null, zoom = 12) {
         }
     ].filter(x => x.count > 0);
 
-    const numericZoom =
-        Number(zoom) || 12;
-
-    const compact =
-        numericZoom <= 8;
-
-    const medium =
-        numericZoom >= 9 &&
-        numericZoom <= 11;
-
-    const maxDisplayedCategories =
-        compact
-            ? 0
-            : medium
-                ? 2
-                : 4;
-
-    const displayedCategories =
-        categories.slice(
-            0,
-            maxDisplayedCategories
-        );
-
-    const hiddenCategoryCount =
-        compact
-            ? 0
-            : Math.max(
-                0,
-                categories.length -
-                displayedCategories.length
-            );
-
-    const displayClass =
-        compact
-            ? "oz-bundle-icon--compact"
-            : medium
-                ? "oz-bundle-icon--medium"
-                : "oz-bundle-icon--full";
-
+    const numericZoom = Number(zoom) || 12;
+    const compact = numericZoom <= 8;
+    const medium = numericZoom >= 9 && numericZoom <= 11;
+    const maxDisplayedCategories = compact ? 0 : medium ? 2 : 4;
+    const displayedCategories = categories.slice(0, maxDisplayedCategories);
+    const hiddenCategoryCount = compact ? 0 : Math.max(0, categories.length - displayedCategories.length);
+    const displayClass = compact ? "oz-bundle-icon--compact" : medium ? "oz-bundle-icon--medium" : "oz-bundle-icon--full";
     const categoryHtml = displayedCategories
         .map(category => `
             <span class="oz-zone-type oz-zone-type--${category.key}"
@@ -4974,24 +4257,10 @@ function makeBadgeIcon(totalCount, severity = 1, b = null, zoom = 12) {
         `)
         .join("");
 
-    const moreHtml = hiddenCategoryCount > 0
-        ? `<span class="oz-zone-more">+${hiddenCategoryCount}</span>`
-        : "";
-
-    const criticalCrowdCount =
-        (b?.crowds ?? [])
-            .filter(crowd =>
-                pickCrowdLevel(crowd) >= 4
-            )
-            .length;
-
-    const hasCriticalCrowd =
-        criticalCrowdCount > 0;
-
-    const criticalCrowdClass =
-        hasCriticalCrowd
-            ? "oz-bundle-icon--critical-crowd"
-            : "";
+    const moreHtml = hiddenCategoryCount > 0 ? `<span class="oz-zone-more">+${hiddenCategoryCount}</span>` : "";
+    const criticalCrowdCount = (b?.crowds ?? []).filter(crowd => pickCrowdLevel(crowd) >= 4).length;
+    const hasCriticalCrowd = criticalCrowdCount > 0;
+    const criticalCrowdClass = hasCriticalCrowd ? "oz-bundle-icon--critical-crowd" : "";
 
     const html = `
         <div class="oz-zone-marker oz-zone-sev-${severity}">
@@ -5005,8 +4274,7 @@ function makeBadgeIcon(totalCount, severity = 1, b = null, zoom = 12) {
     `.trim();
 
     return Leaflet.divIcon({
-        className:
-            `oz-bundle-icon ${displayClass} ${criticalCrowdClass}`.trim(),
+        className:`oz-bundle-icon ${displayClass} ${criticalCrowdClass}`.trim(),
         html,
         iconSize: [48, 48],
         iconAnchor: [24, 24],
@@ -5019,12 +4287,7 @@ function fmtDate(v) {
     try {
         const d = new Date(v);
         if (Number.isNaN(d.getTime())) return String(v);
-        return d.toLocaleString("fr-BE", {
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit"
+        return d.toLocaleString("fr-BE", {year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit"
         });
     } catch {
         return String(v);
@@ -5036,11 +4299,7 @@ function fmtTime(v) {
     try {
         const d = new Date(v);
         if (Number.isNaN(d.getTime())) return String(v);
-        return d.toLocaleTimeString("fr-BE", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit"
-        });
+        return d.toLocaleTimeString("fr-BE", {hour: "2-digit", minute: "2-digit", second: "2-digit"});
     } catch {
         return String(v);
     }
@@ -5057,8 +4316,7 @@ function firstSingleBundleItem(b) {
         /*["gpt", b?.gpt]*/
     ];
 
-    const found = groups
-        .filter(([, arr]) => Array.isArray(arr) && arr.length > 0);
+    const found = groups.filter(([, arr]) => Array.isArray(arr) && arr.length > 0);
 
     if (found.length !== 1) return null;
     if (found[0][1].length !== 1) return null;
@@ -5073,9 +4331,7 @@ function readFirst(item, ...propertyNames) {
     for (const propertyName of propertyNames) {
         const value = item?.[propertyName];
 
-        if (value !== null &&
-            value !== undefined &&
-            String(value).trim() !== "") {
+        if (value !== null && value !== undefined && String(value).trim() !== "") {
 
             return value;
         }
@@ -5089,10 +4345,7 @@ function readNumber(item, ...propertyNames) {
 
     if (value === null) return null;
 
-    const number = Number(
-        typeof value === "string"
-            ? value.replace(",", ".")
-            : value);
+    const number = Number(typeof value === "string" ? value.replace(",", ".") : value);
 
     return Number.isFinite(number) ? number : null;
 }
@@ -5129,27 +4382,15 @@ function uniqueTexts(items, ...propertyNames) {
 function levelLabel(level) {
     const numericLevel = clampLevel14(level);
 
-    return numericLevel === 4 ? "Critique" :
-        numericLevel === 3 ? "Élevé" :
-            numericLevel === 2 ? "Modéré" :
-                "Faible";
+    return numericLevel === 4 ? "Critique" : numericLevel === 3 ? "Élevé" : numericLevel === 2 ? "Modéré" : "Faible";
 }
 
 function bundleRiskLabel(severity) {
-    return severity >= 4 ? "Critique" :
-        severity === 3 ? "Attention" :
-            severity === 2 ? "Surveillance" :
-                "Normal";
+    return severity >= 4 ? "Critique" : severity === 3 ? "Attention" : severity === 2 ? "Surveillance" : "Normal";
 }
 
 function bundleZoneName(b) {
-    const orderedItems = [
-        ...(b.places ?? []),
-        ...(b.crowds ?? []),
-        ...(b.traffic ?? []),
-        ...(b.events ?? []),
-        ...(b.weather ?? [])
-    ];
+    const orderedItems = [...(b.places ?? []), ...(b.crowds ?? []), ...(b.traffic ?? []), ...(b.events ?? []), ...(b.weather ?? []) ];
 
     for (const item of orderedItems) {
         const name = readFirst(
@@ -5173,14 +4414,8 @@ function bundleZoneName(b) {
     return "zone sélectionnée";
 }
 
-function buildZoneCard({
-    type,
-    icon,
-    title,
-    count,
-    headline,
-    details
-}) {
+function buildZoneCard({type, icon, title, count, headline, details})
+{
     return `
         <section class="oz-zone-card oz-zone-card--${type}">
             <div class="oz-zone-card-icon">${icon}</div>
@@ -5284,29 +4519,10 @@ function buildSingleBundlePopupHtml(kind, item, s) {
     }
 
     if (kind === "suggestion") {
-        const title =
-            item?.Title ??
-            item?.title ??
-            item?.SuggestedAlternatives ??
-            item?.suggestedAlternatives ??
-            item?.LocationLabel ??
-            item?.locationLabel ??
-            "Suggestion";
-
-        const original =
-            item?.OriginalPlace ??
-            item?.originalPlace ??
-            "—";
-
-        const reason =
-            item?.Reason ??
-            item?.reason ??
-            "—";
-
-        const distance =
-            item?.DistanceKm ??
-            item?.distanceKm ??
-            null;
+        const title = item?.Title ?? item?.title ?? item?.SuggestedAlternatives ?? item?.suggestedAlternatives ?? item?.LocationLabel ?? item?.locationLabel ?? "Suggestion";
+        const original = item?.OriginalPlace ?? item?.originalPlace ?? "—";
+        const reason = item?.Reason ?? item?.reason ?? "—";
+        const distance = item?.DistanceKm ?? item?.distanceKm ?? null;
 
         return `
     <div class="oz-bundle-popup oz-bundle-popup--single">
@@ -5324,11 +4540,7 @@ function bundlePopupHtml(b, s) {
     const single = firstSingleBundleItem(b);
 
     if (single) {
-        const html =
-            buildSingleBundlePopupHtml(
-                single.kind,
-                single.item,
-                s);
+        const html = buildSingleBundlePopupHtml(single.kind, single.item, s);
 
         if (html) return html;
     }
@@ -5347,43 +4559,16 @@ function bundlePopupHtml(b, s) {
         const events = [...b.events];
 
         events.sort((a, b) => {
-            const dateA = new Date(
-                readFirst(a,
-                    "DateEvent",
-                    "dateEvent",
-                    "StartDate",
-                    "startDate") ?? 0);
-
-            const dateB = new Date(
-                readFirst(b,
-                    "DateEvent",
-                    "dateEvent",
-                    "StartDate",
-                    "startDate") ?? 0);
+            const dateA = new Date(readFirst(a, "DateEvent", "dateEvent", "StartDate", "startDate") ?? 0);
+            const dateB = new Date(readFirst(b, "DateEvent", "dateEvent", "StartDate", "startDate") ?? 0);
 
             return dateA.getTime() - dateB.getTime();
         });
 
         const nextEvent = events[0];
-
-        const eventName = readFirst(
-            nextEvent,
-            "Name",
-            "name",
-            "Title",
-            "title") ?? "Événement";
-
-        const eventDate = readFirst(
-            nextEvent,
-            "DateEvent",
-            "dateEvent",
-            "StartDate",
-            "startDate");
-
-        const expectedCrowd = maximumNumber(
-            events,
-            "ExpectedCrowd",
-            "expectedCrowd");
+        const eventName = readFirst(nextEvent, "Name", "name", "Title", "title") ?? "Événement";
+        const eventDate = readFirst(nextEvent, "DateEvent", "dateEvent", "StartDate", "startDate");
+        const expectedCrowd = maximumNumber(events, "ExpectedCrowd", "expectedCrowd");
 
         cards.push(buildZoneCard({
             type: "events",
@@ -5392,13 +4577,8 @@ function bundlePopupHtml(b, s) {
             count: events.length,
             headline: esc(eventName),
             details: [
-                eventDate
-                    ? `Prochain : ${esc(fmtDate(eventDate))}`
-                    : null,
-
-                expectedCrowd !== null
-                    ? `Affluence attendue max. : ${expectedCrowd.toLocaleString("fr-BE")}`
-                    : null
+                eventDate ? `Prochain : ${esc(fmtDate(eventDate))}` : null,
+                expectedCrowd !== null ? `Affluence attendue max. : ${expectedCrowd.toLocaleString("fr-BE")}` : null
             ].filter(Boolean).join(" • ")
         }));
     }
@@ -5407,22 +4587,15 @@ function bundlePopupHtml(b, s) {
     // Crowd
     // -----------------------------------------------------
     if ((b.crowds?.length ?? 0) > 0) {
-        const crowdLevel = maximumNumber(
-            b.crowds,
-            "CrowdLevel",
-            "crowdLevel",
-            "Level",
-            "level");
+        const crowdLevel = maximumNumber(b.crowds, "CrowdLevel", "crowdLevel", "Level", "level");
 
         cards.push(buildZoneCard({
             type: "crowds",
             icon: "👥",
             title: "Affluence",
             count: b.crowds.length,
-            headline:
-                `Niveau maximal : ${esc(levelLabel(crowdLevel ?? 1))}`,
-            details:
-                `${b.crowds.length} observation(s) active(s)`
+            headline: `Niveau maximal : ${esc(levelLabel(crowdLevel ?? 1))}`,
+            details: `${b.crowds.length} observation(s) active(s)`
         }));
     }
 
@@ -5430,46 +4603,19 @@ function bundlePopupHtml(b, s) {
     // Traffic
     // -----------------------------------------------------
     if ((b.traffic?.length ?? 0) > 0) {
-        const trafficLevel = maximumNumber(
-            b.traffic,
-            "TrafficLevel",
-            "trafficLevel",
-            "CongestionLevel",
-            "congestionLevel",
-            "Level",
-            "level");
-
-        const roads = uniqueTexts(
-            b.traffic,
-            "Road",
-            "road",
-            "RoadName",
-            "roadName",
-            "Location",
-            "location");
-
-        const incidents = uniqueTexts(
-            b.traffic,
-            "IncidentType",
-            "incidentType",
-            "Title",
-            "title");
+        const trafficLevel = maximumNumber(b.traffic, "TrafficLevel", "trafficLevel", "CongestionLevel", "congestionLevel", "Level", "level");
+        const roads = uniqueTexts(b.traffic, "Road", "road", "RoadName", "roadName", "Location", "location");
+        const incidents = uniqueTexts(b.traffic, "IncidentType", "incidentType", "Title", "title");
 
         cards.push(buildZoneCard({
             type: "traffic",
             icon: "🚗",
             title: "Trafic",
             count: b.traffic.length,
-            headline:
-                `Congestion maximale : ${esc(levelLabel(trafficLevel ?? 1))}`,
+            headline: `Congestion maximale : ${esc(levelLabel(trafficLevel ?? 1))}`,
             details: [
-                roads.length > 0
-                    ? `Route(s) : ${esc(roads.slice(0, 3).join(", "))}`
-                    : null,
-
-                incidents.length > 0
-                    ? `Incident(s) : ${esc(incidents.slice(0, 3).join(", "))}`
-                    : null
+                roads.length > 0 ? `Route(s) : ${esc(roads.slice(0, 3).join(", "))}` : null,
+                incidents.length > 0 ? `Incident(s) : ${esc(incidents.slice(0, 3).join(", "))}` : null
             ].filter(Boolean).join(" • ")
         }));
     }
@@ -5478,40 +4624,24 @@ function bundlePopupHtml(b, s) {
     // Weather
     // -----------------------------------------------------
     if ((b.weather?.length ?? 0) > 0) {
-        const minimumTemperature = minimumNumber(
-            b.weather,
-            "TemperatureC",
-            "temperatureC");
+        const minimumTemperature = minimumNumber(b.weather, "TemperatureC", "temperatureC");
+        const maximumTemperature = maximumNumber(b.weather, "TemperatureC", "temperatureC");
 
-        const maximumTemperature = maximumNumber(
-            b.weather,
-            "TemperatureC",
-            "temperatureC");
+        const maximumWind = maximumNumber(b.weather, "WindSpeedKmh", "windSpeedKmh", "WindSeedKmh", "windSeedKmh");
+        const maximumRain = maximumNumber(b.weather, "RainfallMm", "rainfallMm");
+        const severeCount = b.weather.filter(item => item?.IsSevere ?? item?.isSevere).length;
 
-        const maximumWind = maximumNumber(
-            b.weather,
-            "WindSpeedKmh",
-            "windSpeedKmh",
-            "WindSeedKmh",
-            "windSeedKmh");
+        let temperatureText = "Unknown temperature";
 
-        const maximumRain = maximumNumber(
-            b.weather,
-            "RainfallMm",
-            "rainfallMm");
+        if (minimumTemperature !== null && maximumTemperature !== null)
+        {
+            temperatureText = minimumTemperature === maximumTemperature
 
-        const severeCount = b.weather.filter(
-            item => item?.IsSevere ?? item?.isSevere).length;
+                ? `${maximumTemperature} °C`
 
-        const temperatureText =
-            minimumTemperature !== null &&
-                maximumTemperature !== null &&
-                minimumTemperature !== maximumTemperature
+                : `${minimumTemperature} à ${maximumTemperature} °C`;
+        }
 
-                ? `${minimumTemperature} à ${maximumTemperature} °C`
-                : maximumTemperature !== null
-                    ? `${maximumTemperature} °C`
-                    : "Température inconnue";
 
         cards.push(buildZoneCard({
             type: "weather",
@@ -5520,17 +4650,9 @@ function bundlePopupHtml(b, s) {
             count: b.weather.length,
             headline: esc(temperatureText),
             details: [
-                maximumWind !== null
-                    ? `Vent max. : ${maximumWind} km/h`
-                    : null,
-
-                maximumRain !== null
-                    ? `Pluie max. : ${maximumRain} mm`
-                    : null,
-
-                severeCount > 0
-                    ? `${severeCount} prévision(s) sévère(s)`
-                    : null
+                maximumWind !== null ? `Vent max. : ${maximumWind} km/h`: null,
+                maximumRain !== null ? `Pluie max. : ${maximumRain} mm` : null,
+                severeCount > 0 ? `${severeCount} prévision(s) sévère(s)` : null
             ].filter(Boolean).join(" • ")
         }));
     }
@@ -5539,20 +4661,14 @@ function bundlePopupHtml(b, s) {
     // Places
     // -----------------------------------------------------
     if ((b.places?.length ?? 0) > 0) {
-        const placeNames = uniqueTexts(
-            b.places,
-            "Name",
-            "name",
-            "Title",
-            "title");
+        const placeNames = uniqueTexts(b.places, "Name", "name", "Title", "title");
 
         cards.push(buildZoneCard({
             type: "places",
             icon: "📍",
             title: "Lieux",
             count: b.places.length,
-            headline:
-                esc(placeNames.slice(0, 3).join(", ") || "Lieux proches"),
+            headline: esc(placeNames.slice(0, 3).join(", ") || "Lieux proches"),
             details: ""
         }));
     }

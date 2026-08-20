@@ -11,6 +11,136 @@
 <PageTitle>OutZen - Home</PageTitle>
 
 <div class="home-page">
+    @if (_welcomeAssistantOpen)
+    {
+        <div class="oz-assistant-welcome-layer"
+             role="presentation">
+
+            <section id="outzenWelcomeAssistant"
+                     class="oz-assistant-welcome"
+                     role="dialog"
+                     aria-modal="true"
+                     aria-labelledby="oz-assistant-welcome-title">
+
+                <button type="button"
+                        class="oz-assistant-welcome-close"
+                        title="Fermer"
+                        aria-label="Fermer l'assistant"
+                        @onclick="CloseWelcomeAssistantAsync">
+                    ×
+                </button>
+
+                <div class="oz-assistant-welcome-header" data-oz-drag-handle="true" title="Maintenir et déplacer l'assistant">
+
+                    <div class="oz-assistant-avatar"
+                         aria-hidden="true">
+                        🧠
+                    </div>
+
+                    <div>
+                        <div class="oz-assistant-eyebrow">
+                            OUTZEN ASSISTANT
+                        </div>
+
+                        <h2 id="oz-assistant-welcome-title">
+                            Bonjour
+                            <span class="oz-assistant-wave @(_welcomeAssistantStep == WelcomeAssistantIntroStep ? "is-waving" : null)"aria-hidden="true">
+                            👋
+                        </span>
+                    </h2>
+                    </div>
+
+                </div>
+
+                <div class="oz-assistant-conversation" aria-live="polite" aria-atomic="true">
+
+                    <div class="oz-assistant-stage-host">
+
+                        @if (_welcomeAssistantStep == WelcomeAssistantIntroStep)
+                        {
+                            <div @key="WelcomeAssistantIntroStep" class="oz-assistant-stage oz-assistant-stage--temporary">
+
+                                <div class="oz-assistant-message">
+                                    Bonjour, je suis votre assistant OutZen.
+                                    Je suis là pour vous donner des suggestions
+                                    touristiques et agrémenter votre journée.
+                                </div>
+
+                            </div>
+                        }
+                        else if (_welcomeAssistantStep == WelcomeAssistantInvitationStep)
+                        {
+                            <div @key="WelcomeAssistantInvitationStep"
+                                 class="oz-assistant-stage oz-assistant-stage--temporary">
+
+                                <div class="oz-assistant-message oz-assistant-message--secondary">
+                                    Posez-moi les questions que vous voulez.
+                                </div>
+
+                            </div>
+                        }
+                        else
+                        {
+                            <div @key="WelcomeAssistantDestinationStep" class="oz-assistant-stage oz-assistant-stage--final">
+
+                                <div class="oz-assistant-question"> 
+                                    Où avez-vous l'intention d'aller aujourd'hui ?
+                                </div>
+
+                                <form @onsubmit="SubmitWelcomeDestinationAsync" @onsubmit:preventDefault="true">
+
+                                    <div class="oz-assistant-destination">
+
+                                        <input type="text"
+                                               class="oz-assistant-destination-input"
+                                               placeholder="Ex. Dinant, Namur, Bruxelles..."
+                                               autocomplete="off"
+                                               autofocus
+                                               @bind="_welcomeDestination"
+                                               @bind:event="oninput" />
+
+                                        <button type="submit"
+                                                class="oz-assistant-submit"
+                                                disabled="@(
+                                                _isSendingPrompt || string.IsNullOrWhiteSpace(_welcomeDestination))">
+
+                                    @if (_isSendingPrompt)
+                                            {
+                                                <span>Préparation…</span>
+                                            }
+                                            else
+                                            {
+                                                <span>
+                                                    Découvrir avec OutZen
+                                                </span>
+
+                                                <span aria-hidden="true">
+                                                    →
+                                                </span>
+                                            }
+
+                                        </button>
+
+                                    </div>
+
+                                </form>
+
+                                <button type="button" class="oz-assistant-later" @onclick="CloseWelcomeAssistantAsync">
+                                    Pas maintenant
+                                </button>
+
+                            </div>
+                        }
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        </div>
+    }
+
     <div class="critical-alert-panel alert-cluster">
 
         <div class="alert-cluster-header">OUTZEN CONTROL CENTER</div>
@@ -236,10 +366,34 @@
                         </div>
 
                         <div class="gpt-block">
-                            <div class="gpt-block-label">Response</div>
-                            <div class="gpt-rich-response gpt-pre gpt-pre--response">
-                                @FormatGptResponse(latest.Response)
+
+                            <div class="gpt-block-label">
+                                Response
                             </div>
+
+                            <div class="gpt-rich-response gpt-pre gpt-pre--response" aria-live="polite">
+
+                                @if (_isSendingPrompt || string.IsNullOrWhiteSpace(latest.Response) || string.Equals(latest.Response?.Trim(), GptPendingResponse, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <div class="gpt-response-pending" role="status">
+
+                                        <span class="gpt-response-pending-brain" aria-hidden="true">
+                                            🧠
+                                        </span>
+
+                                        <span>
+                                            OutZen is preparing its suggestions…
+                                        </span>
+
+                                    </div>
+                                }
+                                else
+                                {
+                                    @FormatGptResponse(latest.Response)
+                                }
+
+                            </div>
+
                         </div>
                     </article>
                 </div>
@@ -307,21 +461,36 @@
         </div>
     </OzFloatingWindow>
 
-    <!-- Top banner: title + globe -->
-    <div class="home-header">
-        <div class="home-header-left">
-            <h1 class="index-title">Welcome to OutZen application</h1>
-            <p class="index-subtitle">
-                Explore events with peace of mind, even when the crowds get involved.
-            </p>
+    <!-- ==========================================================
+     HOME INTRO PANEL
+     ========================================================== -->
+    <section class="home-intro-panel oz-home-glass-panel scroll-fade">
+
+        <div class="home-header">
+            <div class="home-header-left">
+
+                <h1 class="index-title">
+                    Welcome to OutZen application
+                </h1>
+
+                <p class="index-subtitle">
+                    Explore events with peace of mind,
+                    even when the crowds get involved.
+                </p>
+
+            </div>
         </div>
-    </div>
+
+        <div class="home-intro-actions">
+            <button class="index-cta"
+                    @onclick="ScrollToSuggestions">
+                Discover the suggestions
+            </button>
+        </div>
+
+    </section>
+
     <!-- Main block: map + side panel -->
-    <div>
-        <button class="index-cta" @onclick="ScrollToSuggestions">
-            Discover the suggestions
-        </button>
-    </div>
     <div class="home-main">
         <!-- Side panel: GPT + message -->
         <aside class="home-side-panel scroll-fade">
@@ -346,7 +515,7 @@
     </div>
     <!-- Suggestions (for the scroll button) -->
     <div>
-        <section class="index-section scroll-fade" id="suggestions">
+        <section class="index-section oz-home-glass-panel scroll-fade" id="suggestions">
             <h2>Suggestions Zen</h2>
             <p>
                 Here are some alternatives within a 25 km radius of the selected event:

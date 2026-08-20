@@ -43,16 +43,9 @@
 
                         @foreach (var item in group.Items)
                         {
-                            <NavLink href="@item.Href"
-                                     Match="@(item.Href == "/"
-                                                                              ? NavLinkMatch.All
-                                                                              : NavLinkMatch.Prefix)"
-                             class="oz-nav-link"
-                             aria-label="@item.Text"
-                             @onclick="CloseMenu">
+                            <NavLink href="@item.Href" Match="@(item.Href == "/" ? NavLinkMatch.All : NavLinkMatch.Prefix)" class="oz-nav-link" aria-label="@item.Text" @onclick="CloseMenu">
 
-                                <span class="oz-nav-link-icon"
-                                      aria-hidden="true">
+                                <span class="oz-nav-link-icon" aria-hidden="true">
                                     @item.Icon
                                 </span>
 

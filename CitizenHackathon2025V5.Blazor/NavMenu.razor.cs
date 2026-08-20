@@ -74,7 +74,7 @@ namespace CitizenHackathon2025V5.Blazor.Client
                 CssClass: "oz-nav-group--outzen",
                 Items: new List<MenuItem>
                 {
-                    new("Accueil", "/", "🏠", IconOnly: true),
+                    new("Home", "/", "🏠", IconOnly: true),
                     new("OutZen Interactions", "/gptinteractionview", "🤖"),
                     new("Crowd Infos", "/crowdinfoview", "✨"),
                     new("Historic Suggestions", "/suggestionview", "💡"),

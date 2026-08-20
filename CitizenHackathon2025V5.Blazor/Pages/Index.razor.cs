@@ -59,6 +59,26 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private bool _msgDrawerOpen = false;
         private bool _gptDrawerOpen = false;
 
+        private bool _welcomeAssistantOpen;
+        private bool _welcomeAssistantChecked;
+
+        private string _welcomeDestination = string.Empty;
+
+        private const string WelcomeAssistantStorageKey = "outzen.assistant.welcome.seen";
+        private const string GptPendingResponse = "Generation in progress...";
+
+        private int _welcomeAssistantStep = 1;
+
+        private bool _welcomeAssistantDragWired;
+
+        private CancellationTokenSource _welcomeAssistantSequenceCts;
+
+        private const int WelcomeAssistantIntroStep = 1;
+        private const int WelcomeAssistantInvitationStep = 2;
+        private const int WelcomeAssistantDestinationStep = 3;
+
+        private static readonly TimeSpan WelcomeAssistantStepDuration = TimeSpan.FromSeconds(2);
+
         private string _criticalDisasterStatus;
 
         public MessageFormModel Model { get; } = new();
@@ -208,16 +228,51 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         {
             await base.OnAfterRenderAsync(firstRender);
 
-            if (!firstRender)
-                return;
+            /*
+             * ======================================================
+             * Initial rendering of the home page.
+             * ======================================================
+             */
+            if (firstRender)
+            {
+                try
+                {
+                    await JS.InvokeVoidAsync("OutZenInterop.makeAlertClusterDraggable");
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[HOME] Alert cluster wiring failed: {ex.Message}");
+                }
 
-            try
-            {
-                await JS.InvokeVoidAsync("OutZenInterop.makeAlertClusterDraggable");
+                /*
+                 * Opening the Welcome Assistant will
+                 * intentionally trigger a new render.
+                 */
+                await InitializeWelcomeAssistantAsync();
             }
-            catch (Exception ex)
+
+            /*
+             * ======================================================
+             * The Welcome Assistant has just appeared in the DOM.
+             *
+             * We reuse the generic floating window engine
+             * already present in OutZen.
+             * ======================================================
+             */
+            if (_welcomeAssistantOpen && !_welcomeAssistantDragWired)
             {
-                Console.Error.WriteLine($"[HOME] Alert cluster wiring failed: {ex.Message}");
+                try
+                {
+                    _welcomeAssistantDragWired = await JS.InvokeAsync<bool>("OutZen.makeDrawerDraggable", "outzenWelcomeAssistant");
+
+                    Console.WriteLine("[HOME][ASSISTANT] " + $"drag wired={_welcomeAssistantDragWired}");
+                }
+                catch (Exception ex)
+                {
+                    _welcomeAssistantDragWired = false;
+
+                    Console.Error.WriteLine("[HOME][ASSISTANT] " + $"drag wiring failed: {ex.Message}");
+                }
             }
         }
         protected override async Task SeedAsync(bool fit)
@@ -830,6 +885,8 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             _disposed = true;
             _timerStarted = false;
 
+            CancelWelcomeAssistantSequence();
+
             try { _timer?.Dispose(); } catch { }
             try { if (_antennaHub is not null) await _antennaHub.DisposeAsync(); } catch { }
 
@@ -1241,6 +1298,236 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
             return (int) CitizenHackathon2025V5.Blazor.Client.Enums.CrowdLevelEnum.Low;
         }
 
+        private async Task InitializeWelcomeAssistantAsync()
+        {
+            if (_welcomeAssistantChecked || _disposed)
+                return;
+
+            _welcomeAssistantChecked = true;
+
+            try
+            {
+                var alreadySeen = await JS.InvokeAsync<bool>("OutZenAssistant.hasSeenWelcome");
+
+                _welcomeAssistantOpen = !alreadySeen;
+            }
+            catch (Exception ex)
+            {
+                /*
+                 * If sessionStorage or interop is not
+                 * available, the popup remains usable.
+                 */
+                Console.Error.WriteLine($"[HOME][ASSISTANT] Welcome state failed: {ex.Message}");
+
+                _welcomeAssistantOpen = true;
+            }
+
+            if (!_welcomeAssistantOpen)
+                return;
+
+            /*
+             * The assistant has just been created:
+             * its drag engine will need to be wired
+             * after Razor has actually created the DOM.
+             */
+            _welcomeAssistantDragWired = false;
+
+            /*
+             * Always start with the first message.
+             */
+            _welcomeAssistantStep = WelcomeAssistantIntroStep;
+
+            await InvokeAsync(StateHasChanged);
+
+            StartWelcomeAssistantSequence();
+        }
+
+        private void StartWelcomeAssistantSequence()
+        {
+            CancelWelcomeAssistantSequence();
+
+            _welcomeAssistantSequenceCts = new CancellationTokenSource();
+
+            _ = RunWelcomeAssistantSequenceAsync(_welcomeAssistantSequenceCts.Token);
+        }
+
+        private async Task RunWelcomeAssistantSequenceAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                /*
+                 * --------------------------------------------------
+                 * STEP 1
+                 * Hello, I am your OutZen assistant...
+                 * --------------------------------------------------
+                 */
+
+                _welcomeAssistantStep = WelcomeAssistantIntroStep;
+
+                await InvokeAsync(StateHasChanged);
+
+                await Task.Delay(WelcomeAssistantStepDuration, cancellationToken);
+
+                if (_disposed || !_welcomeAssistantOpen || cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                /*
+                 * --------------------------------------------------
+                 * STEP 2
+                 * Ask me whatever questions you want.
+                 * --------------------------------------------------
+                 */
+
+                _welcomeAssistantStep = WelcomeAssistantInvitationStep;
+
+                await InvokeAsync(StateHasChanged);
+
+                await Task.Delay(WelcomeAssistantStepDuration, cancellationToken);
+
+                if (_disposed || !_welcomeAssistantOpen || cancellationToken.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                /*
+                 * --------------------------------------------------
+                 * STEP 3
+                 * Destination.
+                 *
+                 * This step no longer disappears.
+                 * --------------------------------------------------
+                 */
+
+                _welcomeAssistantStep = WelcomeAssistantDestinationStep;
+
+                await InvokeAsync(StateHasChanged);
+            }
+            catch (OperationCanceledException)
+            {
+                /*
+                 * Normal :
+                 * user closing the popup,
+                 * navigation or destruction of the page.
+                 */
+            }
+            catch (ObjectDisposedException)
+            {
+                /*
+                 * Same principle during the destruction
+                 * of the page.
+                 */
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[HOME][ASSISTANT] Sequence failed: {ex}");
+            }
+        }
+
+        private void CancelWelcomeAssistantSequence()
+        {
+            var cts = _welcomeAssistantSequenceCts;
+
+            _welcomeAssistantSequenceCts = null;
+
+            if (cts is null)
+                return;
+
+            try
+            {
+                cts.Cancel();
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                cts.Dispose();
+            }
+            catch
+            {
+            }
+        }
+
+        private async Task CloseWelcomeAssistantAsync()
+        {
+            CancelWelcomeAssistantSequence();
+            _welcomeAssistantOpen = false;
+            _welcomeAssistantDragWired = false;
+
+            try
+            {
+                await JS.InvokeVoidAsync("OutZenAssistant.markWelcomeSeen");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[HOME][ASSISTANT] Could not persist welcome state: {ex.Message}");
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        private async Task SubmitWelcomeDestinationAsync()
+        {
+            var destination = _welcomeDestination?.Trim();
+
+            if (string.IsNullOrWhiteSpace(destination) || _isSendingPrompt || _disposed || _welcomeAssistantStep != WelcomeAssistantDestinationStep)
+            {
+                return;
+            }
+
+            CancelWelcomeAssistantSequence();
+
+            try
+            {
+                /*
+                 * We remember the welcome message
+                 * has already been presented during this session.
+                 */
+                await JS.InvokeVoidAsync("OutZenAssistant.markWelcomeSeen");
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[HOME][ASSISTANT] Could not persist welcome state: {ex.Message}");
+            }
+
+            _welcomeAssistantOpen = false;
+            _welcomeAssistantDragWired = false;
+            /*
+             * We open the existing GPT window.
+             */
+            _gptDrawerOpen = true;
+
+            /*
+             * We intentionally reuse _userPrompt:
+             * no second GPT pipeline.
+             */
+            _userPrompt =
+                $"""
+                    J'ai l'intention d'aller à {destination} aujourd'hui.
+
+                    Propose-moi des suggestions touristiques adaptées à cette destination
+                    et à ses environs.
+
+                    Utilise le contexte OutZen disponible lorsque c'est pertinent :
+                    lieux, événements, fréquentation, météo, trafic et informations
+                    utiles à la sécurité du déplacement.
+
+                    Donne-moi plusieurs possibilités intéressantes et explique
+                    brièvement pourquoi tu me les recommandes.
+                    """;
+
+            _welcomeDestination = string.Empty;
+
+            await InvokeAsync(StateHasChanged);
+
+            /*
+             * We reuse exactly the existing GPT pipeline.
+             */
+            await SendUserPromptAsync();
+        }
         private async Task SafeLoadAntennasAsync()
         {
             try
@@ -1302,7 +1589,7 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
                 {
                     Id = started.InteractionId,
                     Prompt = prompt,
-                    Response = "Generation in progress...",
+                    Response = GptPendingResponse,
                     CreatedAt = DateTime.UtcNow,
                     Active = true,
                     SourceType = "MistralLocal"
@@ -1813,7 +2100,10 @@ namespace CitizenHackathon2025V5.Blazor.Client.Pages
         private MarkupString FormatGptResponse(string text)
         {
             if (string.IsNullOrWhiteSpace(text))
-                return (MarkupString)"<span class='gpt-empty'>— Response vide —</span>";
+            {
+                return (MarkupString)
+                    "<span class='gpt-empty'>— No response —</span>";
+            }
 
             var safe = System.Net.WebUtility.HtmlEncode(text.Trim());
 

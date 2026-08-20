@@ -4,14 +4,88 @@
 
     console.log("[outzen-interop] loaded");
 
-    globalThis.OutZen = (typeof globalThis.OutZen === "object" && globalThis.OutZen)
-            ? globalThis.OutZen
-            : {};
+    globalThis.OutZen = (typeof globalThis.OutZen === "object" && globalThis.OutZen) ? globalThis.OutZen : {};
 
-    globalThis.OutZenInterop = (typeof globalThis.OutZenInterop === "object" && globalThis.OutZenInterop)
-            ? globalThis.OutZenInterop
-            : {};
+    globalThis.OutZenInterop = (typeof globalThis.OutZenInterop === "object" && globalThis.OutZenInterop) ? globalThis.OutZenInterop : {};
 
+    /* =========================================================
+    OUTZEN WELCOME ASSISTANT
+    ========================================================= */
+
+    globalThis.OutZenAssistant = (typeof globalThis.OutZenAssistant === "object" && globalThis.OutZenAssistant) ? globalThis.OutZenAssistant : {};
+
+    /*
+     * Returns true when the welcome assistant
+     * has already been displayed during this browser session.
+     */
+    globalThis.OutZenAssistant.hasSeenWelcome = function () {
+
+        try {
+            return (sessionStorage.getItem("outzen.assistant.welcome.seen") === "1"
+            );
+        }
+        catch (error) {
+
+            console.warn("[OutZenAssistant] sessionStorage read failed",
+                error
+            );
+
+            return false;
+        }
+    };
+
+    /*
+     * Marks the assistant as seen for the current session.
+     */
+    globalThis.OutZenAssistant.markWelcomeSeen = function () {
+
+        try {
+            sessionStorage.setItem("outzen.assistant.welcome.seen", "1"
+            );
+
+            return true;
+        }
+        catch (error) {
+
+            console.warn("[OutZenAssistant] sessionStorage write failed",
+                error
+            );
+
+            return false;
+        }
+    };
+
+    /*
+     * Mainly useful when logging out or during development.
+     */
+    globalThis.OutZenAssistant.resetWelcome = function () {
+
+        try {
+            sessionStorage.removeItem("outzen.assistant.welcome.seen"
+            );
+
+            return true;
+        }
+        catch (error) {
+
+            console.warn("[OutZenAssistant] sessionStorage reset failed",
+                error
+            );
+
+            return false;
+        }
+    };
+
+
+    console.log("[OutZenAssistant] registered",
+        {
+            available: typeof globalThis.OutZenAssistant === "object",
+
+            hasSeenWelcome: typeof globalThis.OutZenAssistant.hasSeenWelcome === "function",
+
+            markWelcomeSeen: typeof globalThis.OutZenAssistant.markWelcomeSeen === "function"
+        }
+    );
     const isDev = location.hostname === "localhost" || location.hostname === "127.0.0.1";
     const BUILD = globalThis.__ozBuild || "20260804-prune-prefix-fix-1";
     const MODULE_BASE_URL = `/js/app/leafletOutZen.module.js` + `?v=${encodeURIComponent(BUILD)}`;
@@ -136,25 +210,13 @@
             globalThis.__OutZenImportUrl = null;
 
             globalThis.OutZenInterop.__loadError = {
-                name:
-                    error?.name ??
-                    "UnknownError",
-
-                message:
-                    error?.message ??
-                    String(error),
-
-                url:
-                    importUrl ??
-                    null,
-
-                timestamp:
-                    new Date().toISOString()
+                name: error?.name ?? "UnknownError",
+                message: error?.message ?? String(error),
+                url: importUrl ?? null,
+                timestamp: new Date().toISOString()
             };
 
-            console.error(
-                "[OutZenInterop] " +
-                "leafletOutZen.module.js load failed",
+            console.error("[OutZenInterop] " + "leafletOutZen.module.js load failed",
                 {
                     url: importUrl,
                     name: error?.name,
